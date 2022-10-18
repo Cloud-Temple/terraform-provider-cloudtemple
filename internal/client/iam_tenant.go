@@ -17,7 +17,7 @@ type Tenant struct {
 	CompanyID string
 }
 
-func (t *TenantClient) List(ctx context.Context, companyID string) ([]*Tenant, error) {
+func (t *TenantClient) List(ctx context.Context) ([]*Tenant, error) {
 	r := t.c.newRequest("GET", "/api/iam/v2/tenants")
 	resp, err := t.c.doRequest(ctx, r)
 	if err != nil {

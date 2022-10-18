@@ -22,7 +22,7 @@ type Config struct {
 
 	HttpClient *http.Client
 
-	Transport *http.Transport
+	Transport http.RoundTripper
 
 	ClientID, SecretID string
 }
@@ -123,7 +123,6 @@ func (r *request) toHTTP(ctx context.Context, token string) (*http.Request, erro
 	}
 
 	// Content-Type must always be set when a body is present
-	// See https://github.com/hashicorp/consul/issues/10011
 	if req.Body != nil && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
 	}
@@ -162,6 +161,35 @@ func (c *Client) token(ctx context.Context) (*jwt.Token, error) {
 	c.savedToken = token
 
 	return token, err
+}
+
+type LoginToken struct {
+	t *jwt.Token
+}
+
+func (l *LoginToken) UserID() string {
+	return l.t.Claims.(jwt.MapClaims)["userId"].(string)
+}
+
+func (l *LoginToken) TenantID() string {
+	scope := l.t.Claims.(jwt.MapClaims)["scope"].(map[string]interface{})
+	return scope["id"].(string)
+}
+
+func (l *LoginToken) CompanyID() string {
+	return l.t.Claims.(jwt.MapClaims)["companyId"].(string)
+}
+
+func (c *Client) Token(ctx context.Context) (*LoginToken, error) {
+	token, err := c.token(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return &LoginToken{
+		t: token,
+	}, nil
+
 }
 
 func (c *Client) doRequest(ctx context.Context, r *request) (*http.Response, error) {

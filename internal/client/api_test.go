@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/stretchr/testify/require"
 )
 
@@ -59,8 +58,7 @@ func testCompanyID(t *testing.T) string {
 func testTenantID(t *testing.T) string {
 	t.Helper()
 
-	testCompanyID := testCompanyID(t)
-	tenants, err := client.IAM().Tenant().List(context.Background(), testCompanyID)
+	tenants, err := client.IAM().Tenant().List(context.Background())
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(tenants), 1)
 
@@ -70,10 +68,10 @@ func testTenantID(t *testing.T) string {
 func testUserID(t *testing.T) string {
 	t.Helper()
 
-	token, err := client.token(context.Background())
+	lt, err := client.Token(context.Background())
 	require.NoError(t, err)
 
-	return token.Claims.(jwt.MapClaims)["userId"].(string)
+	return lt.UserID()
 }
 
 func testRole(t *testing.T) *Role {

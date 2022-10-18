@@ -9,12 +9,12 @@ import (
 )
 
 func TestIAM_Tenants(t *testing.T) {
-	companyID := os.Getenv(testCompanyIDEnvName)
-	tenants, err := client.IAM().Tenant().List(context.Background(), companyID)
+	tenants, err := client.IAM().Tenant().List(context.Background())
 	require.NoError(t, err)
 
 	require.Len(t, tenants, 1)
 
+	companyID := os.Getenv(testCompanyIDEnvName)
 	expected := &Tenant{
 		ID:        "e225dbf8-e7c5-4664-a595-08edf3526080",
 		Name:      "BOB",

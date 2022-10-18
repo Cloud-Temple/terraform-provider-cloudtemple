@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -31,7 +32,8 @@ func TestIAM_PATRead(t *testing.T) {
 func TestIAM_PATCreateAndDelete(t *testing.T) {
 	ctx := context.Background()
 	roles := []string{testRole(t).ID}
-	token, err := client.IAM().PAT().Create(ctx, "client-test", roles, 1664402400000)
+	expirationDate := int(time.Now().UnixMilli() + 24*60*60*1000)
+	token, err := client.IAM().PAT().Create(ctx, "client-test", roles, expirationDate)
 	require.NoError(t, err)
 	require.NotEmpty(t, token.Secret)
 

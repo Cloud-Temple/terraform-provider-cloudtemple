@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -27,8 +26,7 @@ func TestIAM_Features(t *testing.T) {
 
 func TestIAM_FeatureAssignments(t *testing.T) {
 	ctx := context.Background()
-	companyID := os.Getenv(testCompanyIDEnvName)
-	tenants, err := client.IAM().Tenant().List(ctx, companyID)
+	tenants, err := client.IAM().Tenant().List(ctx)
 	require.NoError(t, err)
 	require.Len(t, tenants, 1)
 
