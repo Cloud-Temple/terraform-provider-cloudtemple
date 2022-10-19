@@ -13,3 +13,8 @@ testacc:
 .PHONY: fmt
 fmt:
 	go fmt ./...
+	terraform fmt -recursive
+
+.PHONY: build
+build:
+	go build
