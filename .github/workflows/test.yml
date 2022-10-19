@@ -98,8 +98,6 @@ jobs:
       timeout-minutes: 10
       env:
         TF_ACC: "1"
-        CLOUDTEMPLE_CLIENT_ID: ${{ secrets.CLOUDTEMPLE_CLIENT_ID }}
-        CLOUDTEMPLE_SECRET_ID: ${{ secrets.CLOUDTEMPLE_SECRET_ID }}
 
         # Set whatever additional acceptance test env vars here. You can
         # optionally use data from your repository secrets using the
