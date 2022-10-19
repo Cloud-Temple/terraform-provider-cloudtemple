@@ -49,12 +49,6 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func testCompanyID(t *testing.T) string {
-	t.Helper()
-
-	return os.Getenv(testCompanyIDEnvName)
-}
-
 func testTenantID(t *testing.T) string {
 	t.Helper()
 
