@@ -1,0 +1,17 @@
+---
+page_title: "{{.ProviderShortName}} Provider"
+subcategory: ""
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.ProviderShortName}} Provider
+
+Use the `cloudtemple` Terraform provider to interact with the resources present
+in your Cloud Temple account.
+
+{{ if .HasExample -}}
+## Example Usage
+{{ tffile "examples/provider/provider.tf" }}
+{{- end }}
+{{ .SchemaMarkdown | trimspace }}

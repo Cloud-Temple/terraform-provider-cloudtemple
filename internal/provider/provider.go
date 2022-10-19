@@ -29,21 +29,25 @@ func New(version string) func() *schema.Provider {
 		p := &schema.Provider{
 			Schema: map[string]*schema.Schema{
 				"address": {
-					Type:     schema.TypeString,
-					Optional: true,
-					Default:  "pp-shiva.cloud-temple.com",
+					Description: "The HTTP address to connect to the API. Defaults to `pp-shiva.cloud-temple.com`.",
+					Type:        schema.TypeString,
+					Optional:    true,
+					Default:     "pp-shiva.cloud-temple.com",
 				},
 				"scheme": {
-					Type:     schema.TypeString,
-					Optional: true,
-					Default:  "https",
+					Description: "The URL scheme to used to connect to the API. Default to `https`.",
+					Type:        schema.TypeString,
+					Optional:    true,
+					Default:     "https",
 				},
 				"client_id": {
+					Description: "The client ID to login to the API with. Can also be specified with the environment variable `CLOUDTEMPLE_CLIENT_ID`.",
 					Type:        schema.TypeString,
 					Required:    true,
 					DefaultFunc: schema.EnvDefaultFunc("CLOUDTEMPLE_CLIENT_ID", nil),
 				},
 				"secret_id": {
+					Description: "The secret ID to login to the API with. Can also be specified with the environment variable `CLOUDTEMPLE_SECRET_ID`.",
 					Type:        schema.TypeString,
 					Required:    true,
 					Sensitive:   true,
