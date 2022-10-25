@@ -44,5 +44,14 @@ Read-Only:
 
 - `id` (String)
 - `name` (String)
+- `subfeatures` (List of Object) (see [below for nested schema](#nestedobjatt--features--subfeatures--subfeatures))
+
+<a id="nestedobjatt--features--subfeatures--subfeatures"></a>
+### Nested Schema for `features.subfeatures.subfeatures`
+
+Read-Only:
+
+- `id` (String)
+- `name` (String)
 
 

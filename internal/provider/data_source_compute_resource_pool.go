@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceResourcePool() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceResourcePoolRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			pool, err := client.Compute().ResourcePool().Read(ctx, id)
+			if err == nil && pool == nil {
+				return nil, fmt.Errorf("failed to find resource pool with id %q", id)
+			}
+			return pool, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -96,44 +107,4 @@ func dataSourceResourcePool() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceResourcePoolRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	resourcePool, err := client.Compute().ResourcePool().Read(ctx, d.Get("id").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, resourcePool.ID)
-	sw.set("id", resourcePool.ID)
-	sw.set("name", resourcePool.Name)
-	sw.set("machine_manager_id", resourcePool.MachineManagerID)
-	sw.set("moref", resourcePool.Moref)
-	sw.set("parent", []interface{}{
-		map[string]interface{}{
-			"id":   resourcePool.Parent.ID,
-			"type": resourcePool.Parent.Type,
-		},
-	})
-	sw.set("metrics", []interface{}{
-		map[string]interface{}{
-			"cpu": []interface{}{
-				map[string]interface{}{
-					"max_usage":        resourcePool.Metrics.CPU.MaxUsage,
-					"reservation_used": resourcePool.Metrics.CPU.ReservationUsed,
-				},
-			},
-			"memory": []interface{}{
-				map[string]interface{}{
-					"max_usage":        resourcePool.Metrics.Memory.MaxUsage,
-					"reservation_used": resourcePool.Metrics.Memory.ReservationUsed,
-					"ballooned_memory": resourcePool.Metrics.Memory.BalloonedMemory,
-				},
-			},
-		},
-	})
-
-	return sw.diags
 }

@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,16 +11,22 @@ func dataSourceHosts() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceHostsRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			hosts, err := client.Compute().Host().List(ctx, "", "", "", "")
+			return map[string]interface{}{
+				"id":    "hosts",
+				"hosts": hosts,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"hosts": {
 				Type:     schema.TypeList,
 				Computed: true,
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-
 						"id": {
 							Type:     schema.TypeString,
 							Computed: true,
@@ -143,65 +149,4 @@ func dataSourceHosts() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceHostsRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	hosts, err := client.Compute().Host().List(ctx, "", "", "", "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(hosts))
-	for i, host := range hosts {
-		virtualMachines := make([]interface{}, len(host.VirtualMachines))
-		for j, vm := range host.VirtualMachines {
-			virtualMachines[j] = map[string]interface{}{
-				"id":   vm.ID,
-				"type": vm.Type,
-			}
-		}
-
-		res[i] = map[string]interface{}{
-			"id":                 host.ID,
-			"name":               host.Name,
-			"moref":              host.Moref,
-			"machine_manager_id": host.MachineManagerID,
-			"metrics": []interface{}{
-				map[string]interface{}{
-					"esx": []interface{}{
-						map[string]interface{}{
-							"version":   host.Metrics.ESX.Version,
-							"build":     host.Metrics.ESX.Build,
-							"full_name": host.Metrics.ESX.FullName,
-						},
-					},
-					"cpu": []interface{}{
-						map[string]interface{}{
-							"overall_cpu_usage": host.Metrics.CPU.OverallCPUUsage,
-							"cpu_mhz":           host.Metrics.CPU.CPUMhz,
-							"cpu_cores":         host.Metrics.CPU.CPUCores,
-							"cpu_threads":       host.Metrics.CPU.CPUThreads,
-						},
-					},
-					"memory": []interface{}{
-						map[string]interface{}{
-							"memory_size":  host.Metrics.Memory.MemorySize,
-							"memory_usage": host.Metrics.Memory.MemoryUsage,
-						},
-					},
-					"maintenance_status": host.Metrics.MaintenanceStatus,
-					"uptime":             host.Metrics.Uptime,
-					"connected":          host.Metrics.Connected,
-				},
-			},
-			"virtual_machines": virtualMachines,
-		}
-	}
-
-	sw := newStateWriter(d, "hosts")
-	sw.set("hosts", res)
-
-	return sw.diags
 }

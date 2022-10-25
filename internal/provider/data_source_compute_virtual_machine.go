@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceVirtualMachine() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceVirtualMachineRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			vm, err := client.Compute().VirtualMachine().Read(ctx, id)
+			if err == nil && vm == nil {
+				return nil, fmt.Errorf("failed to find virtual machine with id %q", id)
+			}
+			return vm, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -257,89 +268,4 @@ func dataSourceVirtualMachine() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	vm, err := client.Compute().VirtualMachine().Read(ctx, d.Get("id").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, vm.ID)
-	sw.set("name", vm.Name)
-	sw.set("moref", vm.Moref)
-	sw.set("machine_manager_type", vm.MachineManagerType)
-	sw.set("machine_manager_id", vm.MachineManagerId)
-	sw.set("machine_manager_name", vm.MachineManagerName)
-	sw.set("datastore_name", vm.DatastoreName)
-	sw.set("consolidation_needed", vm.ConsolidationNeeded)
-	sw.set("template", vm.Template)
-	sw.set("power_state", vm.PowerState)
-	sw.set("hardware_version", vm.HardwareVersion)
-	sw.set("num_cores_per_socket", vm.NumCoresPerSocket)
-	sw.set("operating_system_name", vm.OperatingSystemName)
-	sw.set("cpu", vm.Cpu)
-	sw.set("cpu_hot_add_enabled", vm.CpuHotAddEnabled)
-	sw.set("cpu_hot_remove_enabled", vm.CpuHotRemoveEnabled)
-	sw.set("memory_hot_add_enabled", vm.MemoryHotAddEnabled)
-	sw.set("memory", vm.Memory)
-	sw.set("cpu_usage", vm.CpuUsage)
-	sw.set("memory_usage", vm.MemoryUsage)
-	sw.set("tools", vm.Tools)
-	sw.set("tools_version", vm.ToolsVersion)
-	sw.set("virtual_datacenter_id", vm.VirtualDatacenterId)
-	sw.set("distributed_virtual_port_group_ids", vm.DistributedVirtualPortGroupIds)
-	sw.set("spp_mode", vm.SppMode)
-	sw.set("snapshoted", vm.Snapshoted)
-	sw.set("triggered_alarms", vm.TriggeredAlarms)
-
-	disk := make([]interface{}, len(vm.ReplicationConfig.Disk))
-	for i, d := range vm.ReplicationConfig.Disk {
-		disk[i] = map[string]interface{}{
-			"key":                 d.Key,
-			"disk_replication_id": d.DiskReplicationId,
-		}
-	}
-	sw.set("replication_config", []interface{}{
-		map[string]interface{}{
-			"generation":              vm.ReplicationConfig.Generation,
-			"vm_replication_id":       vm.ReplicationConfig.VmReplicationId,
-			"rpo":                     vm.ReplicationConfig.Rpo,
-			"quiesce_guest_enabled":   vm.ReplicationConfig.QuiesceGuestEnabled,
-			"paused":                  vm.ReplicationConfig.Paused,
-			"opp_updates_enabled":     vm.ReplicationConfig.OppUpdatesEnabled,
-			"net_compression_enabled": vm.ReplicationConfig.NetCompressionEnabled,
-			"net_encryption_enabled":  vm.ReplicationConfig.NetEncryptionEnabled,
-			"encryption_destination":  vm.ReplicationConfig.EncryptionDestination,
-			"disk":                    disk,
-		},
-	})
-
-	extraConfig := make([]interface{}, len(vm.ExtraConfig))
-	for i, ec := range vm.ExtraConfig {
-		extraConfig[i] = map[string]interface{}{
-			"key":   ec.Key,
-			"value": ec.Value,
-		}
-	}
-	sw.set("extra_config", extraConfig)
-	sw.set("storage", []interface{}{
-		map[string]interface{}{
-			"committed":   vm.Storage.Committed,
-			"uncommitted": vm.Storage.Uncommitted,
-		},
-	})
-	sw.set("boot_options", []interface{}{
-		map[string]interface{}{
-			"firmware":           vm.BootOptions.Firmware,
-			"boot_delay":         vm.BootOptions.BootDelay,
-			"enter_bios_setup":   vm.BootOptions.EnterBIOSSetup,
-			"boot_retry_enabled": vm.BootOptions.BootRetryEnabled,
-			"boot_retry_delay":   vm.BootOptions.BootRetryDelay,
-		},
-	})
-
-	return sw.diags
 }

@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,7 +11,13 @@ func dataSourceRoles() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceRolesRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			roles, err := client.IAM().Role().List(ctx)
+			return map[string]interface{}{
+				"id":    "roles",
+				"roles": roles,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
 			// Out
@@ -35,27 +41,4 @@ func dataSourceRoles() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceRolesRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	roles, err := client.IAM().Role().List(ctx)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, "roles")
-
-	lRoles := []interface{}{}
-	for _, r := range roles {
-		lRoles = append(lRoles, map[string]interface{}{
-			"id":   r.ID,
-			"name": r.Name,
-		})
-	}
-
-	sw.set("roles", lRoles)
-
-	return sw.diags
 }

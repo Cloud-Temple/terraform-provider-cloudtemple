@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +11,16 @@ func dataSourceVirtualMachines() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceVirtualMachinesRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			virtualMachines, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
+			return map[string]interface{}{
+				"id":               "virtual_machines",
+				"virtual_machines": virtualMachines,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"virtual_machines": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -266,97 +273,4 @@ func dataSourceVirtualMachines() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceVirtualMachinesRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	virtualMachines, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, "virtual-machines")
-
-	res := make([]interface{}, len(virtualMachines))
-	for i, vm := range virtualMachines {
-		disk := make([]interface{}, len(vm.ReplicationConfig.Disk))
-		for i, d := range vm.ReplicationConfig.Disk {
-			disk[i] = map[string]interface{}{
-				"key":                 d.Key,
-				"disk_replication_id": d.DiskReplicationId,
-			}
-		}
-
-		extraConfig := make([]interface{}, len(vm.ExtraConfig))
-		for i, ec := range vm.ExtraConfig {
-			extraConfig[i] = map[string]interface{}{
-				"key":   ec.Key,
-				"value": ec.Value,
-			}
-		}
-
-		res[i] = map[string]interface{}{
-			"name":                               vm.Name,
-			"moref":                              vm.Moref,
-			"machine_manager_type":               vm.MachineManagerType,
-			"machine_manager_id":                 vm.MachineManagerId,
-			"machine_manager_name":               vm.MachineManagerName,
-			"datastore_name":                     vm.DatastoreName,
-			"consolidation_needed":               vm.ConsolidationNeeded,
-			"template":                           vm.Template,
-			"power_state":                        vm.PowerState,
-			"hardware_version":                   vm.HardwareVersion,
-			"num_cores_per_socket":               vm.NumCoresPerSocket,
-			"operating_system_name":              vm.OperatingSystemName,
-			"cpu":                                vm.Cpu,
-			"cpu_hot_add_enabled":                vm.CpuHotAddEnabled,
-			"cpu_hot_remove_enabled":             vm.CpuHotRemoveEnabled,
-			"memory_hot_add_enabled":             vm.MemoryHotAddEnabled,
-			"memory":                             vm.Memory,
-			"cpu_usage":                          vm.CpuUsage,
-			"memory_usage":                       vm.MemoryUsage,
-			"tools":                              vm.Tools,
-			"tools_version":                      vm.ToolsVersion,
-			"virtual_datacenter_id":              vm.VirtualDatacenterId,
-			"distributed_virtual_port_group_ids": vm.DistributedVirtualPortGroupIds,
-			"spp_mode":                           vm.SppMode,
-			"snapshoted":                         vm.Snapshoted,
-			"triggered_alarms":                   vm.TriggeredAlarms,
-			"replication_config": []interface{}{
-				map[string]interface{}{
-					"generation":              vm.ReplicationConfig.Generation,
-					"vm_replication_id":       vm.ReplicationConfig.VmReplicationId,
-					"rpo":                     vm.ReplicationConfig.Rpo,
-					"quiesce_guest_enabled":   vm.ReplicationConfig.QuiesceGuestEnabled,
-					"paused":                  vm.ReplicationConfig.Paused,
-					"opp_updates_enabled":     vm.ReplicationConfig.OppUpdatesEnabled,
-					"net_compression_enabled": vm.ReplicationConfig.NetCompressionEnabled,
-					"net_encryption_enabled":  vm.ReplicationConfig.NetEncryptionEnabled,
-					"encryption_destination":  vm.ReplicationConfig.EncryptionDestination,
-					"disk":                    disk,
-				},
-			},
-			"extra_config": extraConfig,
-			"storage": []interface{}{
-				map[string]interface{}{
-					"committed":   vm.Storage.Committed,
-					"uncommitted": vm.Storage.Uncommitted,
-				},
-			},
-			"boot_options": []interface{}{
-				map[string]interface{}{
-					"firmware":           vm.BootOptions.Firmware,
-					"boot_delay":         vm.BootOptions.BootDelay,
-					"enter_bios_setup":   vm.BootOptions.EnterBIOSSetup,
-					"boot_retry_enabled": vm.BootOptions.BootRetryEnabled,
-					"boot_retry_delay":   vm.BootOptions.BootRetryDelay,
-				},
-			},
-		}
-	}
-
-	sw.set("virtual_machines", res)
-
-	return sw.diags
 }

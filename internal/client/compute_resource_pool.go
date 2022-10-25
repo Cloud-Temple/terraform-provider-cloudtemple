@@ -11,33 +11,33 @@ func (c *Compute) ResourcePool() *ResourcePoolClient {
 }
 
 type ResourcePool struct {
-	ID               string
-	Name             string
-	MachineManagerID string
-	Moref            string
-	Parent           ResourcePoolParent
-	Metrics          ResourcePoolMetrics
+	ID               string              `terraform:"id"`
+	Name             string              `terraform:"name"`
+	MachineManagerID string              `terraform:"machine_manager_id"`
+	Moref            string              `terraform:"moref"`
+	Parent           ResourcePoolParent  `terraform:"parent"`
+	Metrics          ResourcePoolMetrics `terraform:"metrics"`
 }
 
 type ResourcePoolParent struct {
-	ID   string
-	Type string
+	ID   string `terraform:"id"`
+	Type string `terraform:"type"`
 }
 
 type ResourcePoolMetrics struct {
-	CPU    ResourcePoolCPUMetrics
-	Memory ResourcePoolMemoryMetrics
+	CPU    ResourcePoolCPUMetrics    `terraform:"cpu"`
+	Memory ResourcePoolMemoryMetrics `terraform:"memory"`
 }
 
 type ResourcePoolCPUMetrics struct {
-	MaxUsage        int
-	ReservationUsed int
+	MaxUsage        int `terraform:"max_usage"`
+	ReservationUsed int `terraform:"reservation_used"`
 }
 
 type ResourcePoolMemoryMetrics struct {
-	MaxUsage        int
-	ReservationUsed int
-	BalloonedMemory int
+	MaxUsage        int `terraform:"max_usage"`
+	ReservationUsed int `terraform:"reservation_used"`
+	BalloonedMemory int `terraform:"ballooned_memory"`
 }
 
 func (rp *ResourcePoolClient) List(
@@ -72,7 +72,8 @@ func (rp *ResourcePoolClient) Read(ctx context.Context, id string) (*ResourcePoo
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

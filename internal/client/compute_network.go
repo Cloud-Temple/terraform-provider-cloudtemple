@@ -11,13 +11,13 @@ func (c *Compute) Network() *NetworkClient {
 }
 
 type Network struct {
-	ID                    string
-	Name                  string
-	Moref                 string
-	MachineManagerId      string
-	VirtualMachinesNumber int
-	HostNumber            int
-	HostNames             []string
+	ID                    string   `terraform:"id"`
+	Name                  string   `terraform:"name"`
+	Moref                 string   `terraform:"moref"`
+	MachineManagerId      string   `terraform:"machine_manager_id"`
+	VirtualMachinesNumber int      `terraform:"virtual_machines_number"`
+	HostNumber            int      `terraform:"host_number"`
+	HostNames             []string `terraform:"host_names"`
 }
 
 func (n *NetworkClient) List(
@@ -58,7 +58,8 @@ func (n *NetworkClient) Read(ctx context.Context, id string) (*Network, error) {
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

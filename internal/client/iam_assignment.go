@@ -11,9 +11,9 @@ func (i *IAM) Assignment() *AssignmentClient {
 }
 
 type TenantAssignment struct {
-	UserID   string
-	TenantID string
-	RoleID   string
+	UserID   string `terraform:"user_id"`
+	TenantID string `terraform:"tenant_id"`
+	RoleID   string `terraform:"role_id"`
 }
 
 func (a *AssignmentClient) List(ctx context.Context, userId, tenantId, roleId string) ([]*TenantAssignment, error) {

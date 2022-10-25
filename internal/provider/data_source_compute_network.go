@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceNetwork() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceNetworkRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			network, err := client.Compute().Network().Read(ctx, id)
+			if err == nil && network == nil {
+				return nil, fmt.Errorf("failed to find network with id %q", id)
+			}
+			return network, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -48,24 +59,4 @@ func dataSourceNetwork() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceNetworkRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	network, err := client.Compute().Network().Read(ctx, d.Get("id").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, network.ID)
-	sw.set("id", network.ID)
-	sw.set("name", network.Name)
-	sw.set("moref", network.Moref)
-	sw.set("machine_manager_id", network.MachineManagerId)
-	sw.set("virtual_machines_number", network.VirtualMachinesNumber)
-	sw.set("host_number", network.HostNumber)
-	sw.set("host_names", network.HostNames)
-
-	return sw.diags
 }

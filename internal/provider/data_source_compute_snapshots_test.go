@@ -17,6 +17,12 @@ func TestAccDataSourceSnapshots(t *testing.T) {
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_snapshots.foo", "snapshots.#", "0"),
 				),
 			},
+			{
+				Config: testAccDataSourceSnapshotsMissing,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_snapshots.foo", "snapshots.#", "0"),
+				),
+			},
 		},
 	})
 }
@@ -24,5 +30,11 @@ func TestAccDataSourceSnapshots(t *testing.T) {
 const testAccDataSourceSnapshots = `
 data "cloudtemple_compute_snapshots" "foo" {
   virtual_machine_id = "de2b8b80-8b90-414a-bc33-e12f61a4c05c"
+}
+`
+
+const testAccDataSourceSnapshotsMissing = `
+data "cloudtemple_compute_snapshots" "foo" {
+  virtual_machine_id = "12345678-1234-5678-1234-567812345678"
 }
 `

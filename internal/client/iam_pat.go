@@ -16,11 +16,11 @@ func (i *IAM) PAT() *PATClient {
 }
 
 type Token struct {
-	ID             string
-	Name           string
-	Secret         string
-	Roles          []string
-	ExpirationDate string
+	ID             string   `terraform:"client_id"`
+	Name           string   `terraform:"name"`
+	Secret         string   `terraform:"secret"`
+	Roles          []string `terraform:"roles"`
+	ExpirationDate string   `terraform:"expiration_date"`
 }
 
 func (p *PATClient) List(ctx context.Context, userId string, tenantId string) ([]*Token, error) {
@@ -51,7 +51,8 @@ func (p *PATClient) Read(ctx context.Context, patID string) (*Token, error) {
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 500)
+	if err != nil || !found {
 		return nil, err
 	}
 

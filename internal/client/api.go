@@ -40,6 +40,8 @@ type Client struct {
 	savedToken *jwt.Token
 
 	config Config
+
+	UserAgent string
 }
 
 func NewClient(config *Config) (*Client, error) {
@@ -98,7 +100,7 @@ func (c *Client) newRequest(method, path string) *request {
 	return r
 }
 
-func (r *request) toHTTP(ctx context.Context, token string) (*http.Request, error) {
+func (r *request) toHTTP(ctx context.Context, token, userAgent string) (*http.Request, error) {
 	r.url.RawQuery = r.params.Encode()
 
 	if r.body == nil && r.obj != nil {
@@ -125,6 +127,10 @@ func (r *request) toHTTP(ctx context.Context, token string) (*http.Request, erro
 	// Content-Type must always be set when a body is present
 	if req.Body != nil && req.Header.Get("Content-Type") == "" {
 		req.Header.Set("Content-Type", "application/json")
+	}
+
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Set("User-Agent", userAgent)
 	}
 
 	return req, nil
@@ -201,7 +207,7 @@ func (c *Client) doRequest(ctx context.Context, r *request) (*http.Response, err
 }
 
 func (c *Client) doRequestWithToken(ctx context.Context, r *request, token string) (*http.Response, error) {
-	req, err := r.toHTTP(ctx, token)
+	req, err := r.toHTTP(ctx, token, c.UserAgent)
 	if err != nil {
 		return nil, err
 	}
@@ -233,6 +239,17 @@ func requireHttpCodes(resp *http.Response, httpCodes ...int) error {
 	// if we reached here, then none of the http codes in resp matched any that we expected
 	// so err out
 	return generateUnexpectedResponseCodeError(resp)
+}
+
+func requireNotFoundOrOK(resp *http.Response, notFoundCode int) (bool, error) {
+	switch resp.StatusCode {
+	case 200:
+		return true, nil
+	case 404, notFoundCode:
+		return false, nil
+	default:
+		return false, generateUnexpectedResponseCodeError(resp)
+	}
 }
 
 type StatusError struct {

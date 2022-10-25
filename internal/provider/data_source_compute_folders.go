@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +11,16 @@ func dataSourceFolders() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceFoldersRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			folders, err := client.Compute().Folder().List(ctx, "", "")
+			return map[string]interface{}{
+				"id":      "folders",
+				"folders": folders,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"folders": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -37,27 +44,4 @@ func dataSourceFolders() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceFoldersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	folders, err := client.Compute().Folder().List(ctx, "", "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(folders))
-	for i, f := range folders {
-		res[i] = map[string]interface{}{
-			"id":                 f.ID,
-			"name":               f.Name,
-			"machine_manager_id": f.MachineManagerId,
-		}
-	}
-
-	sw := newStateWriter(d, "folders")
-	sw.set("folders", res)
-
-	return sw.diags
 }

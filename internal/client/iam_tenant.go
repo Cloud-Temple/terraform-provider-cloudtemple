@@ -11,10 +11,10 @@ func (i *IAM) Tenant() *TenantClient {
 }
 
 type Tenant struct {
-	ID        string
-	Name      string
-	SNC       bool
-	CompanyID string
+	ID        string `terraform:"id"`
+	Name      string `terraform:"name"`
+	SNC       bool   `terraform:"snc"`
+	CompanyID string `terraform:"company_id"`
 }
 
 func (t *TenantClient) List(ctx context.Context) ([]*Tenant, error) {

@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,7 +11,13 @@ func dataSourceTenants() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceTenantsRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			tenants, err := client.IAM().Tenant().List(ctx)
+			return map[string]interface{}{
+				"id":      "tenants",
+				"tenants": tenants,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
 			// Out
@@ -47,28 +53,4 @@ func dataSourceTenants() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceTenantsRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	tenants, err := client.IAM().Tenant().List(ctx)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	lTenants := []interface{}{}
-	for _, t := range tenants {
-		lTenants = append(lTenants, map[string]interface{}{
-			"id":         t.ID,
-			"name":       t.Name,
-			"snc":        t.SNC,
-			"company_id": t.CompanyID,
-		})
-	}
-
-	sw := newStateWriter(d, "tenants")
-	sw.set("tenants", lTenants)
-
-	return sw.diags
 }

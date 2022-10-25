@@ -11,8 +11,8 @@ func (i *IAM) Role() *RoleClient {
 }
 
 type Role struct {
-	ID   string
-	Name string
+	ID   string `terraform:"id"`
+	Name string `terraform:"name"`
 }
 
 func (r *RoleClient) List(ctx context.Context) ([]*Role, error) {
@@ -41,7 +41,8 @@ func (r *RoleClient) Read(ctx context.Context, roleID string) (*Role, error) {
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 404)
+	if err != nil || !found {
 		return nil, err
 	}
 

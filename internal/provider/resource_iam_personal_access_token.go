@@ -42,7 +42,6 @@ func resourcePersonalAccessToken() *schema.Resource {
 				Required:     true,
 				ForceNew:     true,
 
-				// DiffSuppressOnRefresh: true,
 				DiffSuppressFunc: func(k, oldValue, newValue string, d *schema.ResourceData) bool {
 					o, err := time.Parse(time.RFC3339, oldValue)
 					if err != nil {
@@ -90,9 +89,10 @@ func resourcePersonalAccessTokenCreate(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
-	sw := newStateWriter(d, token.ID)
+	sw := newStateWriter(d)
 	sw.set("client_id", token.ID)
 	sw.set("secret_id", token.Secret)
+	d.SetId(token.ID)
 
 	return sw.diags
 }
@@ -102,9 +102,11 @@ func resourcePersonalAccessTokenRead(ctx context.Context, d *schema.ResourceData
 
 	token, err := client.IAM().PAT().Read(ctx, d.Id())
 	if err != nil {
-		// TODO: detect properly that the token has been removed
+		return diag.FromErr(err)
+	}
+	if token == nil {
+		d.SetId("")
 		return nil
-		// return diag.FromErr(err)
 	}
 
 	i, err := strconv.ParseInt(token.ExpirationDate, 10, 64)
@@ -113,7 +115,7 @@ func resourcePersonalAccessTokenRead(ctx context.Context, d *schema.ResourceData
 	}
 	expirationDate := time.Unix(i/1000, i%1000)
 
-	sw := newStateWriter(d, token.ID)
+	sw := newStateWriter(d)
 	sw.set("name", token.Name)
 	sw.set("roles", stringSliceToInterfaceSlice(token.Roles))
 	sw.set("expiration_date", expirationDate.Format(time.RFC3339))

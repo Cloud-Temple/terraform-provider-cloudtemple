@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,7 +11,18 @@ func dataSourceUsers() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceUsersRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			companyID, err := getCompanyID(ctx, client, d)
+			if err != nil {
+				return nil, err
+			}
+
+			users, err := client.IAM().User().List(ctx, companyID)
+			return map[string]interface{}{
+				"id":    "users",
+				"users": users,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -78,37 +89,4 @@ func dataSourceUsers() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceUsersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	companyID, diags := getCompanyID(ctx, client, d)
-	if diags != nil {
-		return diags
-	}
-
-	users, err := client.IAM().User().List(ctx, companyID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	lUsers := []interface{}{}
-	for _, u := range users {
-		lUsers = append(lUsers, map[string]interface{}{
-			"id":             u.ID,
-			"internal_id":    u.InternalID,
-			"name":           u.Name,
-			"type":           u.Type,
-			"source":         u.Source,
-			"source_id":      u.SourceID,
-			"email_verified": u.EmailVerified,
-			"email":          u.Email,
-		})
-	}
-
-	sw := newStateWriter(d, "users")
-	sw.set("users", lUsers)
-
-	return sw.diags
 }

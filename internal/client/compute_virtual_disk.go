@@ -11,21 +11,21 @@ func (c *Compute) VirtualDisk() *VirtualDiskClient {
 }
 
 type VirtualDisk struct {
-	ID                  string
-	VirtualMachineId    string
-	MachineManagerId    string
-	Name                string
-	Capacity            int
-	DiskUnitNumber      int
-	ControllerBusNumber int
-	DatastoreId         string
-	DatastoreName       string
-	InstantAccess       bool
-	NativeId            string
-	DiskPath            string
-	ProvisioningType    string
-	DiskMode            string
-	Editable            bool
+	ID                  string `terraform:"id"`
+	VirtualMachineId    string `terraform:"virtual_machine_id"`
+	MachineManagerId    string `terraform:"machine_manager_id"`
+	Name                string `terraform:"name"`
+	Capacity            int    `terraform:"capacity"`
+	DiskUnitNumber      int    `terraform:"disk_unit_number"`
+	ControllerBusNumber int    `terraform:"controller_bus_number"`
+	DatastoreId         string `terraform:"datastore_id"`
+	DatastoreName       string `terraform:"datastore_name"`
+	InstantAccess       bool   `terraform:"instant_access"`
+	NativeId            string `terraform:"native_id"`
+	DiskPath            string `terraform:"disk_path"`
+	ProvisioningType    string `terraform:"provisioning_type"`
+	DiskMode            string `terraform:"disk_mode"`
+	Editable            bool   `terraform:"editable"`
 }
 
 func (v *VirtualDiskClient) List(ctx context.Context, virtualMachineId string) ([]*VirtualDisk, error) {
@@ -36,7 +36,8 @@ func (v *VirtualDiskClient) List(ctx context.Context, virtualMachineId string) (
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 
@@ -55,7 +56,8 @@ func (v *VirtualDiskClient) Read(ctx context.Context, id string) (*VirtualDisk, 
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

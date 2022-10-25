@@ -11,14 +11,14 @@ func (c *Compute) NetworkAdapter() *NetworkAdapterClient {
 }
 
 type NetworkAdapter struct {
-	ID               string
-	VirtualMachineId string
-	Name             string
-	Type             string
-	MacType          string
-	MacAddress       string
-	Connected        bool
-	AutoConnect      bool
+	ID               string `terraform:"id"`
+	VirtualMachineId string `terraform:"virtual_machine_id"`
+	Name             string `terraform:"name"`
+	Type             string `terraform:"type"`
+	MacType          string `terraform:"mac_type"`
+	MacAddress       string `terraform:"mac_address"`
+	Connected        bool   `terraform:"connected"`
+	AutoConnect      bool   `terraform:"auto_connect"`
 }
 
 func (n *NetworkAdapterClient) List(ctx context.Context, virtualMachineId string) ([]*NetworkAdapter, error) {
@@ -29,7 +29,8 @@ func (n *NetworkAdapterClient) List(ctx context.Context, virtualMachineId string
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 
@@ -48,7 +49,8 @@ func (n *NetworkAdapterClient) Read(ctx context.Context, id string) (*NetworkAda
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

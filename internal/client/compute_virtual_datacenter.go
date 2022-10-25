@@ -11,10 +11,10 @@ func (c *Compute) VirtualDatacenter() *VirtualDatacenterClient {
 }
 
 type VirtualDatacenter struct {
-	ID               string
-	Name             string
-	MachineManagerID string
-	TenantID         string
+	ID               string `terraform:"id"`
+	Name             string `terraform:"name"`
+	MachineManagerID string `terraform:"machine_manager_id"`
+	TenantID         string `terraform:"tenant_id"`
 }
 
 func (v *VirtualDatacenterClient) List(
@@ -48,7 +48,8 @@ func (v *VirtualDatacenterClient) Read(ctx context.Context, id string) (*Virtual
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

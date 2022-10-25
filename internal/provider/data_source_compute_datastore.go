@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceDatastore() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceDatastoreRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			datastore, err := client.Compute().Datastore().Read(ctx, id)
+			if err == nil && datastore == nil {
+				return nil, fmt.Errorf("failed to find datastore with id %q", id)
+			}
+			return datastore, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -76,38 +87,4 @@ func dataSourceDatastore() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceDatastoreRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	id := d.Get("id").(string)
-
-	datastore, err := client.Compute().Datastore().Read(ctx, id)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, id)
-
-	hostNames := make([]interface{}, len(datastore.HostsNames))
-	for i, hn := range datastore.HostsNames {
-		hostNames[i] = hn
-	}
-
-	sw.set("name", datastore.Name)
-	sw.set("moref", datastore.Moref)
-	sw.set("max_capacity", datastore.MaxCapacity)
-	sw.set("free_capacity", datastore.FreeCapacity)
-	sw.set("accessible", datastore.Accessible)
-	sw.set("maintenance_status", datastore.MaintenanceStatus)
-	sw.set("unique_id", datastore.UniqueId)
-	sw.set("machine_manager_id", datastore.MachineManagerId)
-	sw.set("type", datastore.Type)
-	sw.set("virtual_machines_number", datastore.VirtualMachinesNumber)
-	sw.set("hosts_number", datastore.HostsNumber)
-	sw.set("hosts_names", hostNames)
-	sw.set("associated_folder", datastore.AssociatedFolder)
-
-	return sw.diags
 }

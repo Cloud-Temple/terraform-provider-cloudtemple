@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceVirtualDatacenter() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceVirtualDatacenterRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			datacenter, err := client.Compute().VirtualDatacenter().Read(ctx, id)
+			if err == nil && datacenter == nil {
+				return nil, fmt.Errorf("failed to find virtual datacenter with id %q", id)
+			}
+			return datacenter, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -32,21 +43,4 @@ func dataSourceVirtualDatacenter() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceVirtualDatacenterRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	datacenter, err := client.Compute().VirtualDatacenter().Read(ctx, d.Get("id").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, datacenter.ID)
-	sw.set("id", datacenter.ID)
-	sw.set("name", datacenter.Name)
-	sw.set("machine_manager_id", datacenter.MachineManagerID)
-	sw.set("tenant_id", datacenter.TenantID)
-
-	return sw.diags
 }

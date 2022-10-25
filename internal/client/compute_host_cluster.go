@@ -11,27 +11,27 @@ func (c *Compute) HostCluster() *HostClusterClient {
 }
 
 type HostCluster struct {
-	ID                    string
-	Name                  string
-	Moref                 string
-	Hosts                 []HostClusterHostStub
-	Metrics               HostClusterMetrics
-	VirtualMachinesNumber int
-	MachineManagerId      string
+	ID                    string                `terraform:"id"`
+	Name                  string                `terraform:"name"`
+	Moref                 string                `terraform:"moref"`
+	Hosts                 []HostClusterHostStub `terraform:"hosts"`
+	Metrics               HostClusterMetrics    `terraform:"metrics"`
+	VirtualMachinesNumber int                   `terraform:"virtual_machines_number"`
+	MachineManagerId      string                `terraform:"machine_manager_id"`
 }
 
 type HostClusterHostStub struct {
-	ID   string
-	Type string
+	ID   string `terraform:"id"`
+	Type string `terraform:"type"`
 }
 
 type HostClusterMetrics struct {
-	TotalCpu     int
-	TotalMemory  int
-	TotalStorage int
-	CpuUsed      int
-	MemoryUsed   int
-	StorageUsed  int
+	TotalCpu     int `terraform:"total_cpu"`
+	TotalMemory  int `terraform:"total_memory"`
+	TotalStorage int `terraform:"total_storage"`
+	CpuUsed      int `terraform:"cpu_used"`
+	MemoryUsed   int `terraform:"memory_used"`
+	StorageUsed  int `terraform:"storage_used"`
 }
 
 func (h *HostClusterClient) List(
@@ -66,7 +66,8 @@ func (h *HostClusterClient) Read(ctx context.Context, id string) (*HostCluster, 
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

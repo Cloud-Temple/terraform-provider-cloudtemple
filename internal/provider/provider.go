@@ -2,6 +2,8 @@ package provider
 
 import (
 	"context"
+	"fmt"
+	"reflect"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -110,10 +112,6 @@ func New(version string) func() *schema.Provider {
 
 func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (any, diag.Diagnostics) {
 	return func(ctx context.Context, d *schema.ResourceData) (any, diag.Diagnostics) {
-		// Setup a User-Agent for your API client (replace the provider name for yours):
-		// userAgent := p.UserAgent("terraform-provider-scaffolding", version)
-		// TODO: myClient.UserAgent = userAgent
-
 		config := client.DefaultConfig()
 
 		config.ClientID = d.Get("client_id").(string)
@@ -123,6 +121,9 @@ func configure(version string, p *schema.Provider) func(context.Context, *schema
 		if err != nil {
 			return nil, diag.FromErr(err)
 		}
+
+		userAgent := p.UserAgent("terraform-provider-cloudtemple", version)
+		client.UserAgent = userAgent
 
 		// We check now  that we can login to return this user as soon as
 		// to the user
@@ -139,7 +140,7 @@ func getClient(meta any) *client.Client {
 	return meta.(*client.Client)
 }
 
-func getUserID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, diag.Diagnostics) {
+func getUserID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, error) {
 	userID, ok := d.Get("user_id").(string)
 	if ok && userID != "" {
 		return userID, nil
@@ -147,13 +148,13 @@ func getUserID(ctx context.Context, client *client.Client, d *schema.ResourceDat
 
 	l, err := client.Token(ctx)
 	if err != nil {
-		return "", diag.Errorf("failed to get token: %v", err)
+		return "", fmt.Errorf("failed to get token: %v", err)
 	}
 
 	return l.UserID(), nil
 }
 
-func getTenantID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, diag.Diagnostics) {
+func getTenantID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, error) {
 	userID, ok := d.Get("tenant_id").(string)
 	if ok && userID != "" {
 		return userID, nil
@@ -161,13 +162,13 @@ func getTenantID(ctx context.Context, client *client.Client, d *schema.ResourceD
 
 	l, err := client.Token(ctx)
 	if err != nil {
-		return "", diag.Errorf("failed to get token: %v", err)
+		return "", fmt.Errorf("failed to get token: %v", err)
 	}
 
 	return l.TenantID(), nil
 }
 
-func getCompanyID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, diag.Diagnostics) {
+func getCompanyID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, error) {
 	userID, ok := d.Get("tenant_id").(string)
 	if ok && userID != "" {
 		return userID, nil
@@ -175,7 +176,7 @@ func getCompanyID(ctx context.Context, client *client.Client, d *schema.Resource
 
 	l, err := client.Token(ctx)
 	if err != nil {
-		return "", diag.Errorf("failed to get token: %v", err)
+		return "", fmt.Errorf("failed to get token: %v", err)
 	}
 
 	return l.CompanyID(), nil
@@ -186,14 +187,98 @@ type stateWriter struct {
 	diags diag.Diagnostics
 }
 
-func newStateWriter(d *schema.ResourceData, id string) *stateWriter {
-	d.SetId(id)
+func newStateWriter(d *schema.ResourceData) *stateWriter {
 	return &stateWriter{d: d}
 }
 
 func (sw *stateWriter) set(key string, value interface{}) {
+	if key == "id" {
+		sw.d.SetId(value.(string))
+		return
+	}
 	err := sw.d.Set(key, value)
 	if err != nil {
 		sw.diags = append(sw.diags, diag.Errorf("failed to  set '%s': %v", key, err)...)
+	}
+}
+
+func (sw *stateWriter) save(obj interface{}, skip []string) {
+	skipFields := map[string]struct{}{}
+	for _, s := range skip {
+		skipFields[s] = struct{}{}
+	}
+
+	typ := reflect.TypeOf(obj)
+	fields := map[string]reflect.Value{}
+
+	switch {
+	case typ.Kind() == reflect.Map:
+		for name, value := range obj.(map[string]interface{}) {
+			fields[name] = reflect.ValueOf(value)
+		}
+	case typ.Elem().Kind() == reflect.Struct:
+		typ = typ.Elem()
+		for _, field := range reflect.VisibleFields(typ) {
+			name, found := field.Tag.Lookup("terraform")
+			if !found {
+				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
+				continue
+			}
+			fields[name] = reflect.ValueOf(obj).Elem().FieldByName(field.Name)
+		}
+	default:
+		sw.diags = append(sw.diags, diag.Errorf("unexpected type %s", typ.String())...)
+	}
+
+	for name, value := range fields {
+		if _, skip := skipFields[name]; skip {
+			continue
+		}
+
+		sw.set(name, sw.convert(value, false, name, skipFields))
+	}
+}
+
+func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string, skipFields map[string]struct{}) interface{} {
+	k := v.Kind()
+	switch k {
+	case reflect.Bool, reflect.Int, reflect.String:
+		return v.Interface()
+
+	case reflect.Slice:
+		items := []interface{}{}
+		for i := 0; i < v.Len(); i++ {
+			item := v.Index(i)
+			if item.Kind() == reflect.Ptr {
+				item = item.Elem()
+			}
+			items = append(items, sw.convert(item, true, path+".#", skipFields))
+		}
+		return items
+
+	case reflect.Struct:
+		body := map[string]interface{}{}
+		for _, field := range reflect.VisibleFields(v.Type()) {
+			name, found := field.Tag.Lookup("terraform")
+
+			p := path + "." + name
+			if _, skip := skipFields[p]; skip {
+				continue
+			}
+
+			if !found {
+				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
+				continue
+			}
+			body[name] = sw.convert(v.FieldByName(field.Name), false, p, skipFields)
+		}
+		if alreadyInSlice {
+			return body
+		}
+		return []interface{}{body}
+
+	default:
+		sw.diags = append(sw.diags, diag.Errorf("unknown kind %q", k.String())...)
+		return nil
 	}
 }

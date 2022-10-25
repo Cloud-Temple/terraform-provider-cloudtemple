@@ -19,33 +19,6 @@ func TestAccResourcePersonalAccessToken(t *testing.T) {
 					resource.TestCheckResourceAttrSet("cloudtemple_iam_personal_access_token.foo", "secret_id"),
 				),
 			},
-			// {
-			// 	PreConfig: func() {
-			// 		c, userID, tenantID := getTestClient(t)
-			// 		tokens, err := c.IAM().PAT().List(context.Background(), userID, tenantID)
-			// 		if err != nil {
-			// 			t.Fatalf("fail to list tokens: %s", err)
-			// 		}
-
-			// 		var tok *client.Token
-			// 		for _, token := range tokens {
-			// 			if token.Name == "test-terraform" {
-			// 				tok = token
-			// 				break
-			// 			}
-			// 		}
-			// 		if tok == nil {
-			// 			t.Fatalf(`failed to find "test-terraform" terraform`)
-			// 		}
-
-			// 		err = c.IAM().PAT().Delete(context.Background(), tok.ID)
-			// 		if err != nil {
-			// 			t.Fatalf("failed to delete token: %s", err)
-			// 		}
-			// 	},
-			// 	Config: testAccResourcePersonalAccessToken,
-			// 	Check:  resource.ComposeTestCheckFunc(),
-			// },
 		},
 	})
 }

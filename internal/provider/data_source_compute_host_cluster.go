@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceHostCluster() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceHostClusterRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			cluster, err := client.Compute().HostCluster().Read(ctx, id)
+			if err == nil && cluster == nil {
+				return nil, fmt.Errorf("failed to find host cluster with id %q", id)
+			}
+			return cluster, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -86,41 +97,4 @@ func dataSourceHostCluster() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceHostClusterRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	hc, err := client.Compute().HostCluster().Read(ctx, d.Get("id").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	hosts := make([]interface{}, len(hc.Hosts))
-	for j, host := range hc.Hosts {
-		hosts[j] = map[string]interface{}{
-			"id":   host.ID,
-			"type": host.Type,
-		}
-	}
-
-	sw := newStateWriter(d, hc.ID)
-	sw.set("id", hc.ID)
-	sw.set("name", hc.Name)
-	sw.set("moref", hc.Moref)
-	sw.set("hosts", hosts)
-	sw.set("metrics", []interface{}{
-		map[string]interface{}{
-			"total_cpu":     hc.Metrics.TotalCpu,
-			"total_memory":  hc.Metrics.TotalMemory,
-			"total_storage": hc.Metrics.TotalStorage,
-			"cpu_used":      hc.Metrics.CpuUsed,
-			"memory_used":   hc.Metrics.MemoryUsed,
-			"storage_used":  hc.Metrics.StorageUsed,
-		},
-	})
-	sw.set("virtual_machines_number", hc.VirtualMachinesNumber)
-	sw.set("machine_manager_id", hc.MachineManagerId)
-
-	return sw.diags
 }

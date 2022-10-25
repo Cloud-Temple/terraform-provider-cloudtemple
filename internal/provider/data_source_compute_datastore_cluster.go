@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceDatastoreCluster() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceDatastoreClusterRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			cluster, err := client.Compute().DatastoreCluster().Read(ctx, id)
+			if err == nil && cluster == nil {
+				return nil, fmt.Errorf("failed to find datastore cluster with id %q", id)
+			}
+			return cluster, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -101,40 +112,4 @@ func dataSourceDatastoreCluster() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceDatastoreClusterRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	id := d.Get("id").(string)
-
-	dc, err := client.Compute().DatastoreCluster().Read(ctx, id)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, id)
-	sw.set("name", dc.Name)
-	sw.set("moref", dc.Moref)
-	sw.set("machine_manager_id", dc.MachineManagerId)
-	sw.set("datastores", dc.Datastores)
-	sw.set("metrics", []interface{}{
-		map[string]interface{}{
-			"free_capacity":                    dc.Metrics.FreeCapacity,
-			"max_capacity":                     dc.Metrics.MaxCapacity,
-			"enabled":                          dc.Metrics.Enabled,
-			"default_vm_behavior":              dc.Metrics.DefaultVmBehavior,
-			"load_balance_interval":            dc.Metrics.LoadBalanceInterval,
-			"space_threshold_mode":             dc.Metrics.SpaceThresholdMode,
-			"space_utilization_threshold":      dc.Metrics.SpaceUtilizationThreshold,
-			"min_space_utilization_difference": dc.Metrics.MinSpaceUtilizationDifference,
-			"reservable_percent_threshold":     dc.Metrics.ReservablePercentThreshold,
-			"reservable_threshold_mode":        dc.Metrics.ReservableThresholdMode,
-			"io_latency_threshold":             dc.Metrics.IoLatencyThreshold,
-			"io_load_imbalance_threshold":      dc.Metrics.IoLoadImbalanceThreshold,
-			"io_load_balance_enabled":          dc.Metrics.IoLoadBalanceEnabled,
-		},
-	})
-
-	return sw.diags
 }

@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +11,16 @@ func dataSourceDatastoreClusters() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceDatastoreClustersRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			datastoreClusters, err := client.Compute().DatastoreCluster().List(ctx, "", "", "", "")
+			return map[string]interface{}{
+				"id":                 "datastore_clusters",
+				"datastore_clusters": datastoreClusters,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"datastore_clusters": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -110,46 +117,4 @@ func dataSourceDatastoreClusters() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceDatastoreClustersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	datastoreClusters, err := client.Compute().DatastoreCluster().List(ctx, "", "", "", "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(datastoreClusters))
-	for i, dc := range datastoreClusters {
-		res[i] = map[string]interface{}{
-			"id":                 dc.ID,
-			"name":               dc.Name,
-			"moref":              dc.Moref,
-			"machine_manager_id": dc.MachineManagerId,
-			"datastores":         dc.Datastores,
-			"metrics": []interface{}{
-				map[string]interface{}{
-					"free_capacity":                    dc.Metrics.FreeCapacity,
-					"max_capacity":                     dc.Metrics.MaxCapacity,
-					"enabled":                          dc.Metrics.Enabled,
-					"default_vm_behavior":              dc.Metrics.DefaultVmBehavior,
-					"load_balance_interval":            dc.Metrics.LoadBalanceInterval,
-					"space_threshold_mode":             dc.Metrics.SpaceThresholdMode,
-					"space_utilization_threshold":      dc.Metrics.SpaceUtilizationThreshold,
-					"min_space_utilization_difference": dc.Metrics.MinSpaceUtilizationDifference,
-					"reservable_percent_threshold":     dc.Metrics.ReservablePercentThreshold,
-					"reservable_threshold_mode":        dc.Metrics.ReservableThresholdMode,
-					"io_latency_threshold":             dc.Metrics.IoLatencyThreshold,
-					"io_load_imbalance_threshold":      dc.Metrics.IoLoadImbalanceThreshold,
-					"io_load_balance_enabled":          dc.Metrics.IoLoadBalanceEnabled,
-				},
-			},
-		}
-	}
-
-	sw := newStateWriter(d, "datastore-clusters")
-	sw.set("datastore_clusters", res)
-
-	return sw.diags
 }

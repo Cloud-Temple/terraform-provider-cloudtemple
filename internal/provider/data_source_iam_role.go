@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,7 +12,14 @@ func dataSourceRole() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceRoleRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			role, err := client.IAM().Role().Read(ctx, id)
+			if err == nil && role == nil {
+				return nil, fmt.Errorf("failed to find role with id %q", id)
+			}
+			return role, err
+		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -27,19 +35,4 @@ func dataSourceRole() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceRoleRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	roleID := d.Get("id").(string)
-
-	role, err := client.IAM().Role().Read(ctx, roleID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, roleID)
-	sw.set("name", role.Name)
-	return sw.diags
 }

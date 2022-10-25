@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -18,6 +19,10 @@ func TestAccDataSourceNetwork(t *testing.T) {
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "name", "VLAN_201"),
 				),
 			},
+			{
+				Config:      testAccDataSourceNetworkMissing,
+				ExpectError: regexp.MustCompile("failed to find network with id"),
+			},
 		},
 	})
 }
@@ -25,5 +30,11 @@ func TestAccDataSourceNetwork(t *testing.T) {
 const testAccDataSourceNetwork = `
 data "cloudtemple_compute_network" "foo" {
   id = "5e029210-b433-4c45-93be-092cef684edc"
+}
+`
+
+const testAccDataSourceNetworkMissing = `
+data "cloudtemple_compute_network" "foo" {
+  id = "12345678-1234-5678-1234-567812345678"
 }
 `

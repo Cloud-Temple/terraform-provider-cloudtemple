@@ -11,13 +11,13 @@ func (c *Compute) VirtualController() *VirtualControllerClient {
 }
 
 type VirtualController struct {
-	ID               string
-	VirtualMachineId string
-	HotAddRemove     bool
-	Type             string
-	Label            string
-	Summary          string
-	VirtualDisks     []string
+	ID               string   `terraform:"id"`
+	VirtualMachineId string   `terraform:"virtual_machine_id"`
+	HotAddRemove     bool     `terraform:"hot_add_remove"`
+	Type             string   `terraform:"type"`
+	Label            string   `terraform:"label"`
+	Summary          string   `terraform:"summary"`
+	VirtualDisks     []string `terraform:"virtual_disks"`
 }
 
 func (v *VirtualControllerClient) List(
@@ -33,7 +33,8 @@ func (v *VirtualControllerClient) List(
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,7 +11,22 @@ func dataSourcePersonalAccessTokens() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourcePersonalAccessTokensRead,
+		ReadContext: readResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, []string, error) {
+			userID, err := getUserID(ctx, client, d)
+			if err != nil {
+				return nil, nil, err
+			}
+			tenantID, err := getTenantID(ctx, client, d)
+			if err != nil {
+				return nil, nil, err
+			}
+
+			tokens, err := client.IAM().PAT().List(ctx, userID, tenantID)
+			return map[string]interface{}{
+				"id":     "tokens",
+				"tokens": tokens,
+			}, []string{"tokens.#.secret"}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -33,7 +48,7 @@ func dataSourcePersonalAccessTokens() *schema.Resource {
 				Computed:    true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"id": {
+						"client_id": {
 							Description: "",
 							Type:        schema.TypeString,
 							Computed:    true,
@@ -52,47 +67,14 @@ func dataSourcePersonalAccessTokens() *schema.Resource {
 								Type: schema.TypeString,
 							},
 						},
+						"expiration_date": {
+							Description: "",
+							Type:        schema.TypeString,
+							Computed:    true,
+						},
 					},
 				},
 			},
 		},
 	}
-}
-
-func dataSourcePersonalAccessTokensRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	userID, diags := getUserID(ctx, client, d)
-	if diags != nil {
-		return diags
-	}
-	tenantID, diags := getTenantID(ctx, client, d)
-	if diags != nil {
-		return diags
-	}
-
-	tokens, err := client.IAM().PAT().List(ctx, userID, tenantID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, "tokens")
-
-	mTokens := []interface{}{}
-	for _, t := range tokens {
-		roles := []interface{}{}
-		for _, r := range t.Roles {
-			roles = append(roles, r)
-		}
-
-		mTokens = append(mTokens, map[string]interface{}{
-			"id":    t.ID,
-			"name":  t.Name,
-			"roles": roles,
-		})
-	}
-
-	sw.set("tokens", mTokens)
-
-	return sw.diags
 }

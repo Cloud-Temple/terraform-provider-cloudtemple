@@ -13,8 +13,8 @@ func (i *IAM) Company() *CompanyClient {
 }
 
 type Company struct {
-	ID   string
-	Name string
+	ID   string `terraform:"id"`
+	Name string `terraform:"name"`
 }
 
 func (c *CompanyClient) Read(ctx context.Context, companyID string) (*Company, error) {
@@ -24,7 +24,8 @@ func (c *CompanyClient) Read(ctx context.Context, companyID string) (*Company, e
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 404)
+	if err != nil || !found {
 		return nil, err
 	}
 

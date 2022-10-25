@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceWorker() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceWorkerRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			worker, err := client.Compute().Worker().Read(ctx, id)
+			if err == nil && worker == nil {
+				return nil, fmt.Errorf("failed to find worker with id %q", id)
+			}
+			return worker, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -84,34 +95,4 @@ func dataSourceWorker() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceWorkerRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	worker, err := client.Compute().Worker().Read(ctx, d.Get("id").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, worker.ID)
-	sw.set("id", worker.ID)
-	sw.set("name", worker.Name)
-	sw.set("full_name", worker.FullName)
-	sw.set("vendor", worker.Vendor)
-	sw.set("version", worker.Version)
-	sw.set("build", worker.Build)
-	sw.set("locale_version", worker.LocaleVersion)
-	sw.set("locale_build", worker.LocaleBuild)
-	sw.set("os_type", worker.OsType)
-	sw.set("product_line_id", worker.ProductLineID)
-	sw.set("api_type", worker.ApiType)
-	sw.set("api_version", worker.ApiVersion)
-	sw.set("instance_uuid", worker.InstanceUuid)
-	sw.set("license_product_name", worker.LicenseProductName)
-	sw.set("license_product_version", worker.LicenseProductVersion)
-	sw.set("tenant_id", worker.TenantID)
-	sw.set("tenant_name", worker.TenantName)
-
-	return sw.diags
 }

@@ -11,11 +11,11 @@ func (c *Compute) VirtualSwitch() *VirtualSwitchClient {
 }
 
 type VirtualSwitch struct {
-	ID               string
-	Name             string
-	Moref            string
-	FolderID         string
-	MachineManagerID string
+	ID               string `terraform:"id"`
+	Name             string `terraform:"name"`
+	Moref            string `terraform:"moref"`
+	FolderID         string `terraform:"folder_id"`
+	MachineManagerID string `terraform:"machine_manager_id"`
 }
 
 func (v *VirtualSwitchClient) List(
@@ -50,7 +50,8 @@ func (v *VirtualSwitchClient) Read(ctx context.Context, id string) (*VirtualSwit
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

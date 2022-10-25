@@ -11,20 +11,20 @@ func (c *Compute) Datastore() *DatastoreClient {
 }
 
 type Datastore struct {
-	ID                    string
-	Name                  string
-	Moref                 string
-	MaxCapacity           int
-	FreeCapacity          int
-	Accessible            int
-	MaintenanceStatus     string
-	UniqueId              string
-	MachineManagerId      string
-	Type                  string
-	VirtualMachinesNumber int
-	HostsNumber           int
-	HostsNames            []string
-	AssociatedFolder      string
+	ID                    string   `terraform:"id"`
+	Name                  string   `terraform:"name"`
+	Moref                 string   `terraform:"moref"`
+	MaxCapacity           int      `terraform:"max_capacity"`
+	FreeCapacity          int      `terraform:"free_capacity"`
+	Accessible            int      `terraform:"accessible"`
+	MaintenanceStatus     string   `terraform:"maintenance_status"`
+	UniqueId              string   `terraform:"unique_id"`
+	MachineManagerId      string   `terraform:"machine_manager_id"`
+	Type                  string   `terraform:"type"`
+	VirtualMachinesNumber int      `terraform:"virtual_machines_number"`
+	HostsNumber           int      `terraform:"hosts_number"`
+	HostsNames            []string `terraform:"hosts_names"`
+	AssociatedFolder      string   `terraform:"associated_folder"`
 }
 
 func (d *DatastoreClient) List(
@@ -61,7 +61,8 @@ func (d *DatastoreClient) Read(ctx context.Context, id string) (*Datastore, erro
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

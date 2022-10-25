@@ -17,6 +17,12 @@ func TestAccDataSourceGuestOperatingSystems(t *testing.T) {
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_guest_operating_systems.foo", "guest_operating_systems.#", "82"),
 				),
 			},
+			{
+				Config: testAccDataSourceGuestOperatingSystemsMissing,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_guest_operating_systems.foo", "guest_operating_systems.#", "0"),
+				),
+			},
 		},
 	})
 }
@@ -24,5 +30,11 @@ func TestAccDataSourceGuestOperatingSystems(t *testing.T) {
 const testAccDataSourceGuestOperatingSystems = `
 data "cloudtemple_compute_guest_operating_systems" "foo" {
   machine_manager_id = "9dba240e-a605-4103-bac7-5336d3ffd124"
+}
+`
+
+const testAccDataSourceGuestOperatingSystemsMissing = `
+data "cloudtemple_compute_guest_operating_systems" "foo" {
+  machine_manager_id = "12345678-1234-5678-1234-567812345678"
 }
 `

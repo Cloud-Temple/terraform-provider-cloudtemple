@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -23,6 +24,10 @@ func TestAccDataSourceUser(t *testing.T) {
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email", "remi.lapeyre@lenstra.fr"),
 				),
 			},
+			{
+				Config:      testAccDataSourceUserMissing,
+				ExpectError: regexp.MustCompile("failed to find user with id"),
+			},
 		},
 	})
 }
@@ -30,5 +35,11 @@ func TestAccDataSourceUser(t *testing.T) {
 const testAccDataSourceUser = `
 data "cloudtemple_iam_user" "foo" {
   id = "37105598-4889-43da-82ea-cf60f2a36aee"
+}
+`
+
+const testAccDataSourceUserMissing = `
+data "cloudtemple_iam_user" "foo" {
+  id = "12345678-1234-5678-1234-567812345678"
 }
 `

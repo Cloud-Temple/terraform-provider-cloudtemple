@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +11,22 @@ func dataSourceGuestOperatingSystems() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceGuestOperatingSystemsRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			gos, err := client.Compute().GuestOperatingSystem().List(ctx, d.Get("machine_manager_id").(string), "", "", "")
+			return map[string]interface{}{
+				"id":                      "guest_operating_systems",
+				"guest_operating_systems": gos,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"machine_manager_id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"guest_operating_systems": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -41,27 +50,4 @@ func dataSourceGuestOperatingSystems() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceGuestOperatingSystemsRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	gos, err := client.Compute().GuestOperatingSystem().List(ctx, d.Get("machine_manager_id").(string), "", "", "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(gos))
-	for i, g := range gos {
-		res[i] = map[string]interface{}{
-			"moref":     g.Moref,
-			"family":    g.Family,
-			"full_name": g.FullName,
-		}
-	}
-
-	sw := newStateWriter(d, "guest-operating-systems")
-	sw.set("guest_operating_systems", res)
-
-	return sw.diags
 }

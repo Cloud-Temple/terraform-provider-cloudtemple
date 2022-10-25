@@ -11,73 +11,73 @@ func (c *Compute) VirtualMachine() *VirtualMachineClient {
 }
 
 type VirtualMachine struct {
-	ID                             string
-	Name                           string
-	Moref                          string
-	MachineManagerType             string
-	MachineManagerId               string
-	MachineManagerName             string
-	DatastoreName                  string
-	ConsolidationNeeded            bool
-	Template                       bool
-	PowerState                     string
-	HardwareVersion                string
-	NumCoresPerSocket              int
-	OperatingSystemName            string
-	Cpu                            int
-	CpuHotAddEnabled               bool
-	CpuHotRemoveEnabled            bool
-	MemoryHotAddEnabled            bool
-	Memory                         int
-	CpuUsage                       int
-	MemoryUsage                    int
-	Tools                          string
-	ToolsVersion                   int
-	VirtualDatacenterId            string
-	DistributedVirtualPortGroupIds []string
-	SppMode                        string
-	Snapshoted                     bool
-	TriggeredAlarms                []string
-	ReplicationConfig              VirtualMachineReplicationConfig
-	ExtraConfig                    []VirtualMachineExtraConfig
-	Storage                        VirtualMachineStorage
-	BootOptions                    VirtualMachineBootOptions
+	ID                             string                          `terraform:"id"`
+	Name                           string                          `terraform:"name"`
+	Moref                          string                          `terraform:"moref"`
+	MachineManagerType             string                          `terraform:"machine_manager_type"`
+	MachineManagerId               string                          `terraform:"machine_manager_id"`
+	MachineManagerName             string                          `terraform:"machine_manager_name"`
+	DatastoreName                  string                          `terraform:"datastore_name"`
+	ConsolidationNeeded            bool                            `terraform:"consolidation_needed"`
+	Template                       bool                            `terraform:"template"`
+	PowerState                     string                          `terraform:"power_state"`
+	HardwareVersion                string                          `terraform:"hardware_version"`
+	NumCoresPerSocket              int                             `terraform:"num_cores_per_socket"`
+	OperatingSystemName            string                          `terraform:"operating_system_name"`
+	Cpu                            int                             `terraform:"cpu"`
+	CpuHotAddEnabled               bool                            `terraform:"cpu_hot_add_enabled"`
+	CpuHotRemoveEnabled            bool                            `terraform:"cpu_hot_remove_enabled"`
+	MemoryHotAddEnabled            bool                            `terraform:"memory_hot_add_enabled"`
+	Memory                         int                             `terraform:"memory"`
+	CpuUsage                       int                             `terraform:"cpu_usage"`
+	MemoryUsage                    int                             `terraform:"memory_usage"`
+	Tools                          string                          `terraform:"tools"`
+	ToolsVersion                   int                             `terraform:"tools_version"`
+	VirtualDatacenterId            string                          `terraform:"virtual_datacenter_id"`
+	DistributedVirtualPortGroupIds []string                        `terraform:"distributed_virtual_port_group_ids"`
+	SppMode                        string                          `terraform:"spp_mode"`
+	Snapshoted                     bool                            `terraform:"snapshoted"`
+	TriggeredAlarms                []string                        `terraform:"triggered_alarms"`
+	ReplicationConfig              VirtualMachineReplicationConfig `terraform:"replication_config"`
+	ExtraConfig                    []VirtualMachineExtraConfig     `terraform:"extra_config"`
+	Storage                        VirtualMachineStorage           `terraform:"storage"`
+	BootOptions                    VirtualMachineBootOptions       `terraform:"boot_options"`
 }
 
 type VirtualMachineReplicationConfig struct {
-	Generation            int
-	VmReplicationId       string
-	Rpo                   int
-	QuiesceGuestEnabled   bool
-	Paused                bool
-	OppUpdatesEnabled     bool
-	NetCompressionEnabled bool
-	NetEncryptionEnabled  bool
-	EncryptionDestination bool
-	Disk                  []VirtualMachineDisk
+	Generation            int                  `terraform:"generation"`
+	VmReplicationId       string               `terraform:"vm_replication_id"`
+	Rpo                   int                  `terraform:"rpo"`
+	QuiesceGuestEnabled   bool                 `terraform:"quiesce_guest_enabled"`
+	Paused                bool                 `terraform:"paused"`
+	OppUpdatesEnabled     bool                 `terraform:"opp_updates_enabled"`
+	NetCompressionEnabled bool                 `terraform:"net_compression_enabled"`
+	NetEncryptionEnabled  bool                 `terraform:"net_encryption_enabled"`
+	EncryptionDestination bool                 `terraform:"encryption_destination"`
+	Disk                  []VirtualMachineDisk `terraform:"disk"`
 }
 
 type VirtualMachineDisk struct {
-	Key               int
-	DiskReplicationId string
+	Key               int    `terraform:"key"`
+	DiskReplicationId string `terraform:"disk_replication_id"`
 }
 
 type VirtualMachineExtraConfig struct {
-	Key   string
-	Value string
+	Key   string `terraform:"key"`
+	Value string `terraform:"value"`
 }
 
 type VirtualMachineStorage struct {
-	Committed   int
-	Uncommitted int
+	Committed   int `terraform:"committed"`
+	Uncommitted int `terraform:"uncommitted"`
 }
 
 type VirtualMachineBootOptions struct {
-	Firmware         string
-	BootDelay        int
-	EnterBIOSSetup   bool
-	BootRetryEnabled bool
-	BootRetryDelay   int
+	Firmware         string `terraform:"firmware"`
+	BootDelay        int    `terraform:"boot_delay"`
+	EnterBIOSSetup   bool   `terraform:"enter_bios_setup"`
+	BootRetryEnabled bool   `terraform:"boot_retry_enabled"`
+	BootRetryDelay   int    `terraform:"boot_retry_delay"`
 }
 
 func (v *VirtualMachineClient) List(
@@ -118,7 +118,8 @@ func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMac
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

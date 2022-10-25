@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceVirtualSwitch() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceVirtualSwitchRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			swtch, err := client.Compute().VirtualSwitch().Read(ctx, id)
+			if err == nil && swtch == nil {
+				return nil, fmt.Errorf("failed to find virtual switch with id %q", id)
+			}
+			return swtch, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -36,21 +47,4 @@ func dataSourceVirtualSwitch() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceVirtualSwitchRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	swtch, err := client.Compute().VirtualSwitch().Read(ctx, d.Get("id").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, swtch.ID)
-	sw.set("name", swtch.Name)
-	sw.set("moref", swtch.Moref)
-	sw.set("folder_id", swtch.FolderID)
-	sw.set("machine_manager_id", swtch.MachineManagerID)
-
-	return sw.diags
 }

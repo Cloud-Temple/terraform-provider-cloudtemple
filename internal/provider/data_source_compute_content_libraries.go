@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +11,16 @@ func dataSourceContentLibraries() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceContentLibrariesRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			contentLibraries, err := client.Compute().ContentLibrary().List(ctx, "", "", "")
+			return map[string]interface{}{
+				"id":                "content_libraries",
+				"content_libraries": contentLibraries,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"content_libraries": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -58,34 +65,4 @@ func dataSourceContentLibraries() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceContentLibrariesRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	contentLibraries, err := client.Compute().ContentLibrary().List(ctx, "", "", "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(contentLibraries))
-	for i, cl := range contentLibraries {
-		res[i] = map[string]interface{}{
-			"id":                 cl.ID,
-			"name":               cl.Name,
-			"machine_manager_id": cl.MachineManagerID,
-			"type":               cl.Type,
-			"datastore": []interface{}{
-				map[string]interface{}{
-					"id":   cl.Datastore.ID,
-					"name": cl.Datastore.Name,
-				},
-			},
-		}
-	}
-
-	sw := newStateWriter(d, "content-libraries")
-	sw.set("content_libraries", res)
-
-	return sw.diags
 }

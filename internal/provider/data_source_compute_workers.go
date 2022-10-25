@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +11,16 @@ func dataSourceWorkers() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceWorkersRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			workers, err := client.Compute().Worker().List(ctx, "")
+			return map[string]interface{}{
+				"id":      "workers",
+				"workers": workers,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"workers": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -93,41 +100,4 @@ func dataSourceWorkers() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceWorkersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	workers, err := client.Compute().Worker().List(ctx, "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(workers))
-	for i, w := range workers {
-		res[i] = map[string]interface{}{
-			"id":                      w.ID,
-			"name":                    w.Name,
-			"full_name":               w.FullName,
-			"vendor":                  w.Vendor,
-			"version":                 w.Version,
-			"build":                   w.Build,
-			"locale_version":          w.LocaleVersion,
-			"locale_build":            w.LocaleBuild,
-			"os_type":                 w.OsType,
-			"product_line_id":         w.ProductLineID,
-			"api_type":                w.ApiType,
-			"api_version":             w.ApiVersion,
-			"instance_uuid":           w.InstanceUuid,
-			"license_product_name":    w.LicenseProductName,
-			"license_product_version": w.LicenseProductVersion,
-			"tenant_id":               w.TenantID,
-			"tenant_name":             w.TenantName,
-		}
-	}
-
-	sw := newStateWriter(d, "workers")
-	sw.set("workers", res)
-
-	return sw.diags
 }

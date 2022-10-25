@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceNetworkAdapter() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceNetworkAdapterRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			adapter, err := client.Compute().NetworkAdapter().Read(ctx, id)
+			if err == nil && adapter == nil {
+				return nil, fmt.Errorf("failed to find network adapter with id %q", id)
+			}
+			return adapter, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"virtual_machine_id": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -48,24 +59,4 @@ func dataSourceNetworkAdapter() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	networkAdapter, err := client.Compute().NetworkAdapter().Read(ctx, d.Get("id").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, networkAdapter.ID)
-	sw.set("virtual_machine_id", networkAdapter.VirtualMachineId)
-	sw.set("name", networkAdapter.Name)
-	sw.set("type", networkAdapter.Type)
-	sw.set("mac_type", networkAdapter.MacType)
-	sw.set("mac_address", networkAdapter.MacAddress)
-	sw.set("connected", networkAdapter.Connected)
-	sw.set("auto_connect", networkAdapter.AutoConnect)
-
-	return sw.diags
 }

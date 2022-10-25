@@ -11,44 +11,44 @@ func (c *Compute) Host() *HostClient {
 }
 
 type Host struct {
-	ID               string
-	Name             string
-	Moref            string
-	MachineManagerID string
-	Metrics          HostMetrics
-	VirtualMachines  []HostVirtualMachinesStub
+	ID               string                    `terraform:"id"`
+	Name             string                    `terraform:"name"`
+	Moref            string                    `terraform:"moref"`
+	MachineManagerID string                    `terraform:"machine_manager_id"`
+	Metrics          HostMetrics               `terraform:"metrics"`
+	VirtualMachines  []HostVirtualMachinesStub `terraform:"virtual_machines"`
 }
 
 type HostMetrics struct {
-	ESX               HostMetricsESXStub
-	CPU               HostMetricsCPUStub
-	Memory            HostMetricsMemoryStub
-	MaintenanceStatus bool
-	Uptime            int
-	Connected         bool
+	ESX               HostMetricsESXStub    `terraform:"esx"`
+	CPU               HostMetricsCPUStub    `terraform:"cpu"`
+	Memory            HostMetricsMemoryStub `terraform:"memory"`
+	MaintenanceStatus bool                  `terraform:"maintenance_status"`
+	Uptime            int                   `terraform:"uptime"`
+	Connected         bool                  `terraform:"connected"`
 }
 
 type HostMetricsESXStub struct {
-	Version  string
-	Build    int
-	FullName string
+	Version  string `terraform:"version"`
+	Build    int    `terraform:"build"`
+	FullName string `terraform:"full_name"`
 }
 
 type HostMetricsCPUStub struct {
-	OverallCPUUsage int
-	CPUMhz          int
-	CPUCores        int
-	CPUThreads      int
+	OverallCPUUsage int `terraform:"overall_cpu_usage"`
+	CPUMhz          int `terraform:"cpu_mhz"`
+	CPUCores        int `terraform:"cpu_cores"`
+	CPUThreads      int `terraform:"cpu_threads"`
 }
 
 type HostMetricsMemoryStub struct {
-	MemorySize  int
-	MemoryUsage int
+	MemorySize  int `terraform:"memory_size"`
+	MemoryUsage int `terraform:"memory_usage"`
 }
 
 type HostVirtualMachinesStub struct {
-	ID   string
-	Type string
+	ID   string `terraform:"id"`
+	Type string `terraform:"type"`
 }
 
 func (h *HostClient) List(
@@ -84,7 +84,8 @@ func (h *HostClient) Read(ctx context.Context, id string) (*Host, error) {
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -18,6 +19,10 @@ func TestAccDataSourceVirtualMachine(t *testing.T) {
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", "virtual_machine_67_bob-clone"),
 				),
 			},
+			{
+				Config:      testAccDataSourceVirtualMachineMissing,
+				ExpectError: regexp.MustCompile("failed to find virtual machine with id"),
+			},
 		},
 	})
 }
@@ -25,5 +30,11 @@ func TestAccDataSourceVirtualMachine(t *testing.T) {
 const testAccDataSourceVirtualMachine = `
 data "cloudtemple_compute_virtual_machine" "foo" {
   id = "de2b8b80-8b90-414a-bc33-e12f61a4c05c"
+}
+`
+
+const testAccDataSourceVirtualMachineMissing = `
+data "cloudtemple_compute_virtual_machine" "foo" {
+  id = "12345678-1234-5678-1234-567812345678"
 }
 `

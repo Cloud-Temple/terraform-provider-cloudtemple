@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,7 +12,17 @@ func dataSourcePersonalAccessToken() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourcePersonalAccessTokenRead,
+		ReadContext: readResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, []string, error) {
+			id := d.Get("client_id").(string)
+			token, err := client.IAM().PAT().Read(ctx, id)
+			if err == nil && token == nil {
+				return nil, nil, fmt.Errorf("failed to find personal access token with id %q", id)
+			}
+			if token != nil {
+				d.SetId(token.ID)
+			}
+			return token, []string{"secret"}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -43,23 +54,4 @@ func dataSourcePersonalAccessToken() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourcePersonalAccessTokenRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	ID := d.Get("client_id").(string)
-
-	token, err := client.IAM().PAT().Read(ctx, ID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, token.ID)
-
-	sw.set("name", token.Name)
-	sw.set("roles", token.Roles)
-	sw.set("expiration_date", token.ExpirationDate)
-
-	return sw.diags
 }

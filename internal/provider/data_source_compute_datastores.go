@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +11,16 @@ func dataSourceDatastores() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceDatastoresRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			datastores, err := client.Compute().Datastore().List(ctx, "", "", "", "", "")
+			return map[string]interface{}{
+				"id":         "datastores",
+				"datastores": datastores,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"datastores": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -85,38 +92,4 @@ func dataSourceDatastores() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceDatastoresRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	datastores, err := client.Compute().Datastore().List(ctx, "", "", "", "", "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(datastores))
-	for i, d := range datastores {
-		res[i] = map[string]interface{}{
-			"id":                      d.ID,
-			"name":                    d.Name,
-			"moref":                   d.Moref,
-			"max_capacity":            d.MaxCapacity,
-			"free_capacity":           d.FreeCapacity,
-			"accessible":              d.Accessible,
-			"maintenance_status":      d.MaintenanceStatus,
-			"unique_id":               d.UniqueId,
-			"machine_manager_id":      d.MachineManagerId,
-			"type":                    d.Type,
-			"virtual_machines_number": d.VirtualMachinesNumber,
-			"hosts_number":            d.HostsNumber,
-			"hosts_names":             d.HostsNames,
-			"associated_folder":       d.AssociatedFolder,
-		}
-	}
-
-	sw := newStateWriter(d, "datastores")
-	sw.set("datastores", res)
-
-	return sw.diags
 }

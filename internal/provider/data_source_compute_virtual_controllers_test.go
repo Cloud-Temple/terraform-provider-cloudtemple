@@ -17,6 +17,12 @@ func TestAccDataSourceVirtualControllers(t *testing.T) {
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_controllers.foo", "virtual_controllers.#", "5"),
 				),
 			},
+			{
+				Config: testAccDataSourceVirtualControllersMissing,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_controllers.foo", "virtual_controllers.#", "0"),
+				),
+			},
 		},
 	})
 }
@@ -24,5 +30,11 @@ func TestAccDataSourceVirtualControllers(t *testing.T) {
 const testAccDataSourceVirtualControllers = `
 data "cloudtemple_compute_virtual_controllers" "foo" {
   virtual_machine_id = "de2b8b80-8b90-414a-bc33-e12f61a4c05c"
+}
+`
+
+const testAccDataSourceVirtualControllersMissing = `
+data "cloudtemple_compute_virtual_controllers" "foo" {
+  virtual_machine_id = "12345678-1234-5678-1234-567812345678"
 }
 `

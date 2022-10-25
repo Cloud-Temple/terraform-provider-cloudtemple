@@ -11,9 +11,9 @@ func (c *Compute) GuestOperatingSystem() *GuestOperatingSystemClient {
 }
 
 type GuestOperatingSystem struct {
-	Moref    string
-	Family   string
-	FullName string
+	Moref    string `terraform:"moref"`
+	Family   string `terraform:"family"`
+	FullName string `terraform:"full_name"`
 }
 
 func (g *GuestOperatingSystemClient) List(
@@ -31,7 +31,8 @@ func (g *GuestOperatingSystemClient) List(
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 
@@ -51,7 +52,8 @@ func (g *GuestOperatingSystemClient) Read(ctx context.Context, machineManagerId 
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 500)
+	if err != nil || !found {
 		return nil, err
 	}
 

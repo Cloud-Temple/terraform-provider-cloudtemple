@@ -11,10 +11,10 @@ func (c *Compute) Snapshot() *SnapshotClient {
 }
 
 type Snapshot struct {
-	ID               string
-	VirtualMachineId string
-	Name             string
-	CreateTime       int
+	ID               string `terraform:"id"`
+	VirtualMachineId string `terraform:"virtual_machine_id"`
+	Name             string `terraform:"name"`
+	CreateTime       int    `terraform:"create_time"`
 }
 
 func (s *SnapshotClient) List(ctx context.Context, virtualMachineId string) ([]*Snapshot, error) {
@@ -25,7 +25,8 @@ func (s *SnapshotClient) List(ctx context.Context, virtualMachineId string) ([]*
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

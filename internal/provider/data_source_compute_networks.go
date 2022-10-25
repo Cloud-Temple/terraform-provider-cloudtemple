@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +11,16 @@ func dataSourceNetworks() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceNetworksRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			networks, err := client.Compute().Network().List(ctx, "", "", "", "", "", "", "", "", true)
+			return map[string]interface{}{
+				"id":       "networks",
+				"networks": networks,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"networks": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -57,31 +64,4 @@ func dataSourceNetworks() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceNetworksRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	networks, err := client.Compute().Network().List(ctx, "", "", "", "", "", "", "", "", true)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(networks))
-	for i, network := range networks {
-		res[i] = map[string]interface{}{
-			"id":                      network.ID,
-			"name":                    network.Name,
-			"moref":                   network.Moref,
-			"machine_manager_id":      network.MachineManagerId,
-			"virtual_machines_number": network.VirtualMachinesNumber,
-			"host_number":             network.HostNumber,
-			"host_names":              network.HostNames,
-		}
-	}
-
-	sw := newStateWriter(d, "networks")
-	sw.set("networks", res)
-
-	return sw.diags
 }

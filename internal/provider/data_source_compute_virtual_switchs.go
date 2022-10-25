@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +11,16 @@ func dataSourceVirtualSwitchs() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceVirtualSwitchsRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			switches, err := client.Compute().VirtualSwitch().List(ctx, "", "", "")
+			return map[string]interface{}{
+				"id":              "virtual_switchs",
+				"virtual_switchs": switches,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"virtual_switchs": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -45,29 +52,4 @@ func dataSourceVirtualSwitchs() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceVirtualSwitchsRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	switches, err := client.Compute().VirtualSwitch().List(ctx, "", "", "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(switches))
-	for i, sw := range switches {
-		res[i] = map[string]interface{}{
-			"id":                 sw.ID,
-			"name":               sw.Name,
-			"moref":              sw.Moref,
-			"folder_id":          sw.FolderID,
-			"machine_manager_id": sw.MachineManagerID,
-		}
-	}
-
-	sw := newStateWriter(d, "virtual-switches")
-	sw.set("virtual_switchs", res)
-
-	return sw.diags
 }

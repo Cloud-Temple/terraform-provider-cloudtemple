@@ -11,9 +11,9 @@ func (c *Compute) Folder() *FolderClient {
 }
 
 type Folder struct {
-	ID               string
-	Name             string
-	MachineManagerId string
+	ID               string `terraform:"id"`
+	Name             string `terraform:"name"`
+	MachineManagerId string `terraform:"machine_manager_id"`
 }
 
 func (f *FolderClient) List(
@@ -47,7 +47,8 @@ func (f *FolderClient) Read(ctx context.Context, id string) (*Folder, error) {
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,7 +12,14 @@ func dataSourceUser() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceUserRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			user, err := client.IAM().User().Read(ctx, id)
+			if err == nil && user == nil {
+				return nil, fmt.Errorf("failed to find user with id %q", id)
+			}
+			return user, err
+		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -63,26 +71,4 @@ func dataSourceUser() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceUserRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	userID := d.Get("id").(string)
-	user, err := client.IAM().User().Read(ctx, userID)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, userID)
-	sw.set("id", user.ID)
-	sw.set("internal_id", user.InternalID)
-	sw.set("name", user.Name)
-	sw.set("type", user.Type)
-	sw.set("source", user.Source)
-	sw.set("source_id", user.SourceID)
-	sw.set("email_verified", user.EmailVerified)
-	sw.set("email", user.Email)
-
-	return sw.diags
 }

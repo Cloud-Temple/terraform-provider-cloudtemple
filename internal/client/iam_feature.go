@@ -11,10 +11,10 @@ func (i *IAM) Feature() *FeatureClient {
 }
 
 type Feature struct {
-	ID   string
-	Name string
+	ID   string `terraform:"id"`
+	Name string `terraform:"name"`
 
-	SubFeatures []*Feature
+	SubFeatures []*Feature `terraform:"subfeatures"`
 }
 
 func (f *FeatureClient) List(ctx context.Context) ([]*Feature, error) {

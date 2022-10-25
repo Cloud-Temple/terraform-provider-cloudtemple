@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +11,22 @@ func dataSourceNetworkAdapters() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceNetworkAdaptersRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			networkAdapters, err := client.Compute().NetworkAdapter().List(ctx, d.Get("virtual_machine_id").(string))
+			return map[string]interface{}{
+				"id":               "network_adapters",
+				"network_adapters": networkAdapters,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"virtual_machine_id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"network_adapters": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -61,32 +70,4 @@ func dataSourceNetworkAdapters() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceNetworkAdaptersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	networkAdapters, err := client.Compute().NetworkAdapter().List(ctx, d.Get("virtual_machine_id").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(networkAdapters))
-	for i, networkAdapter := range networkAdapters {
-		res[i] = map[string]interface{}{
-			"id":                 networkAdapter.ID,
-			"virtual_machine_id": networkAdapter.VirtualMachineId,
-			"name":               networkAdapter.Name,
-			"type":               networkAdapter.Type,
-			"mac_type":           networkAdapter.MacType,
-			"mac_address":        networkAdapter.MacAddress,
-			"connected":          networkAdapter.Connected,
-			"auto_connect":       networkAdapter.AutoConnect,
-		}
-	}
-
-	sw := newStateWriter(d, "network-adapters")
-	sw.set("network_adapters", res)
-
-	return sw.diags
 }

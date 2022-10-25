@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +12,23 @@ func dataSourceContentLibrary() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceContentLibraryReadRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			id := d.Get("id").(string)
+			library, err := client.Compute().ContentLibrary().Read(ctx, id)
+			if err == nil && library == nil {
+				return nil, fmt.Errorf("failed to find content library with id %q", id)
+			}
+			return library, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -49,28 +60,4 @@ func dataSourceContentLibrary() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceContentLibraryReadRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	id := d.Get("id").(string)
-
-	cl, err := client.Compute().ContentLibrary().Read(ctx, id)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, id)
-	sw.set("name", cl.Name)
-	sw.set("machine_manager_id", cl.MachineManagerID)
-	sw.set("type", cl.Type)
-	sw.set("datastore", []interface{}{
-		map[string]interface{}{
-			"id":   cl.Datastore.Name,
-			"name": cl.Datastore.Name,
-		},
-	})
-
-	return sw.diags
 }

@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +11,16 @@ func dataSourceVirtualDatacenters() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceVirtualDatacentersRead,
+		ReadContext: readResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, []string, error) {
+			datacenters, err := client.Compute().VirtualDatacenter().List(ctx, "", "")
+			return map[string]interface{}{
+				"id":                  "virtual_datacenters",
+				"virtual_datacenters": datacenters,
+			}, nil, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// Out
 			"virtual_datacenters": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -41,28 +48,4 @@ func dataSourceVirtualDatacenters() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceVirtualDatacentersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	datacenters, err := client.Compute().VirtualDatacenter().List(ctx, "", "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(datacenters))
-	for i, datacenter := range datacenters {
-		res[i] = map[string]interface{}{
-			"id":                 datacenter.ID,
-			"name":               datacenter.Name,
-			"machine_manager_id": datacenter.MachineManagerID,
-			"tenant_id":          datacenter.TenantID,
-		}
-	}
-
-	sw := newStateWriter(d, "virtual-datacenters")
-	sw.set("virtual_datacenters", res)
-
-	return sw.diags
 }

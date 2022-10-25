@@ -11,16 +11,16 @@ func (c *Compute) ContentLibrary() *ContentLibraryClient {
 }
 
 type ContentLibrary struct {
-	ID               string
-	Name             string
-	MachineManagerID string
-	Type             string
-	Datastore        DatastoreLink
+	ID               string        `terraform:"id"`
+	Name             string        `terraform:"name"`
+	MachineManagerID string        `terraform:"machine_manager_id"`
+	Type             string        `terraform:"type"`
+	Datastore        DatastoreLink `terraform:"datastore"`
 }
 
 type DatastoreLink struct {
-	ID   string
-	Name string
+	ID   string `terraform:"id"`
+	Name string `terraform:"name"`
 }
 
 func (c *ContentLibraryClient) List(ctx context.Context, machineManagerID string, datacenterID string, hostID string) ([]*ContentLibrary, error) {
@@ -50,7 +50,8 @@ func (c *ContentLibraryClient) Read(ctx context.Context, id string) (*ContentLib
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
 		return nil, err
 	}
 

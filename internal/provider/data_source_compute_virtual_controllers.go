@@ -3,7 +3,7 @@ package provider
 import (
 	"context"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +11,22 @@ func dataSourceVirtualControllers() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceVirtualControllersRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			controllers, err := client.Compute().VirtualController().List(ctx, d.Get("virtual_machine_id").(string), "")
+			return map[string]interface{}{
+				"id":                  "virtual_controllers",
+				"virtual_controllers": controllers,
+			}, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"virtual_machine_id": {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"virtual_controllers": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -61,31 +70,4 @@ func dataSourceVirtualControllers() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceVirtualControllersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	controllers, err := client.Compute().VirtualController().List(ctx, d.Get("virtual_machine_id").(string), "")
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	res := make([]interface{}, len(controllers))
-	for i, controller := range controllers {
-		res[i] = map[string]interface{}{
-			"id":                 controller.ID,
-			"virtual_machine_id": controller.VirtualMachineId,
-			"hot_add_remove":     controller.HotAddRemove,
-			"type":               controller.Type,
-			"label":              controller.Label,
-			"summary":            controller.Summary,
-			"virtual_disks":      controller.VirtualDisks,
-		}
-	}
-
-	sw := newStateWriter(d, "virtual-controllers")
-	sw.set("virtual_controllers", res)
-
-	return sw.diags
 }

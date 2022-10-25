@@ -2,8 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,9 +12,19 @@ func dataSourceGuestOperatingSystem() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: dataSourceGuestOperatingSystemRead,
+		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			gos, err := client.Compute().GuestOperatingSystem().Read(ctx, d.Get("machine_manager_id").(string), d.Get("moref").(string))
+			if gos != nil {
+				d.SetId(gos.Moref)
+			}
+			if err == nil && gos == nil {
+				return nil, fmt.Errorf("failed to find guest operating system")
+			}
+			return gos, err
+		}),
 
 		Schema: map[string]*schema.Schema{
+			// In
 			"moref": {
 				Type:     schema.TypeString,
 				Required: true,
@@ -22,6 +33,8 @@ func dataSourceGuestOperatingSystem() *schema.Resource {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+
+			// Out
 			"family": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -32,20 +45,4 @@ func dataSourceGuestOperatingSystem() *schema.Resource {
 			},
 		},
 	}
-}
-
-func dataSourceGuestOperatingSystemRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	client := getClient(meta)
-
-	gos, err := client.Compute().GuestOperatingSystem().Read(ctx, d.Get("machine_manager_id").(string), d.Get("moref").(string))
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	sw := newStateWriter(d, gos.Moref)
-	sw.set("moref", gos.Moref)
-	sw.set("family", gos.Family)
-	sw.set("full_name", gos.FullName)
-
-	return sw.diags
 }

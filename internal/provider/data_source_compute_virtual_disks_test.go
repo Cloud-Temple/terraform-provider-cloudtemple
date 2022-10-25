@@ -17,6 +17,12 @@ func TestAccDataSourceVirtualDisks(t *testing.T) {
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disks.foo", "virtual_disks.#", "1"),
 				),
 			},
+			{
+				Config: testAccDataSourceVirtualDisksMissing,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disks.foo", "virtual_disks.#", "0"),
+				),
+			},
 		},
 	})
 }
@@ -24,5 +30,11 @@ func TestAccDataSourceVirtualDisks(t *testing.T) {
 const testAccDataSourceVirtualDisks = `
 data "cloudtemple_compute_virtual_disks" "foo" {
   virtual_machine_id = "de2b8b80-8b90-414a-bc33-e12f61a4c05c"
+}
+`
+
+const testAccDataSourceVirtualDisksMissing = `
+data "cloudtemple_compute_virtual_disks" "foo" {
+  virtual_machine_id = "12345678-1234-5678-1234-567812345678"
 }
 `

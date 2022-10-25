@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -19,6 +20,10 @@ func TestAccDataSourcePersonalAccessToken(t *testing.T) {
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.0", "c83a22e9-70bb-485e-a463-78a99484e5bb"),
 				),
 			},
+			{
+				Config:      testAccDataSourcePersonalAccessTokenMissing,
+				ExpectError: regexp.MustCompile("failed to find personal access token with id"),
+			},
 		},
 	})
 }
@@ -35,5 +40,11 @@ resource "cloudtemple_iam_personal_access_token" "foo" {
 
 data "cloudtemple_iam_personal_access_token" "foo" {
   client_id = cloudtemple_iam_personal_access_token.foo.id
+}
+`
+
+const testAccDataSourcePersonalAccessTokenMissing = `
+data "cloudtemple_iam_personal_access_token" "foo" {
+  client_id = "12345678-1234-5678-1234-567812345678"
 }
 `
