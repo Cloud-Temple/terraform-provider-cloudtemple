@@ -93,8 +93,6 @@ func dataSourceUsersRead(ctx context.Context, d *schema.ResourceData, meta any) 
 		return diag.FromErr(err)
 	}
 
-	d.SetId("users")
-
 	lUsers := []interface{}{}
 	for _, u := range users {
 		lUsers = append(lUsers, map[string]interface{}{
@@ -109,7 +107,7 @@ func dataSourceUsersRead(ctx context.Context, d *schema.ResourceData, meta any) 
 		})
 	}
 
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, "users")
 	sw.set("users", lUsers)
 
 	return sw.diags

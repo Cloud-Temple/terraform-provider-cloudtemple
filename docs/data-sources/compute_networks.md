@@ -18,5 +18,19 @@ description: |-
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `networks` (List of Object) (see [below for nested schema](#nestedatt--networks))
+
+<a id="nestedatt--networks"></a>
+### Nested Schema for `networks`
+
+Read-Only:
+
+- `host_names` (List of String)
+- `host_number` (Number)
+- `id` (String)
+- `machine_manager_id` (String)
+- `moref` (String)
+- `name` (String)
+- `virtual_machines_number` (Number)
 
 

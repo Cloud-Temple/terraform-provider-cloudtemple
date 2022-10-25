@@ -17,6 +17,27 @@ description: |-
 
 ### Read-Only
 
+- `datastores` (List of Object) (see [below for nested schema](#nestedatt--datastores))
 - `id` (String) The ID of this resource.
+
+<a id="nestedatt--datastores"></a>
+### Nested Schema for `datastores`
+
+Read-Only:
+
+- `accessible` (Number)
+- `associated_folder` (String)
+- `free_capacity` (Number)
+- `hosts_names` (List of String)
+- `hosts_number` (Number)
+- `id` (String)
+- `machine_manager_id` (String)
+- `maintenance_status` (String)
+- `max_capacity` (Number)
+- `moref` (String)
+- `name` (String)
+- `type` (String)
+- `unique_id` (String)
+- `virtual_machines_number` (Number)
 
 

@@ -57,8 +57,6 @@ func dataSourceTenantsRead(ctx context.Context, d *schema.ResourceData, meta any
 		return diag.FromErr(err)
 	}
 
-	d.SetId("tenants")
-
 	lTenants := []interface{}{}
 	for _, t := range tenants {
 		lTenants = append(lTenants, map[string]interface{}{
@@ -69,7 +67,7 @@ func dataSourceTenantsRead(ctx context.Context, d *schema.ResourceData, meta any
 		})
 	}
 
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, "tenants")
 	sw.set("tenants", lTenants)
 
 	return sw.diags

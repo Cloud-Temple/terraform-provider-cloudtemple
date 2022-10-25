@@ -29,6 +29,9 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 	virtualMachine, err := client.Compute().VirtualMachine().Read(ctx, "de2b8b80-8b90-414a-bc33-e12f61a4c05c")
 	require.NoError(t, err)
 
+	// Skip checking the storage
+	virtualMachine.Storage = VirtualMachineStorage{}
+
 	expected := &VirtualMachine{
 		ID:                             "de2b8b80-8b90-414a-bc33-e12f61a4c05c",
 		Name:                           "virtual_machine_67_bob-clone",
@@ -176,10 +179,6 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 			{Key: "migrate.migrationId", Value: "0"},
 
 			{Key: "migrate.hostLog", Value: "virtual_machine_67_bob-clone-765a8751.hlog"},
-		},
-		Storage: VirtualMachineStorage{
-			Committed:   18339536494,
-			Uncommitted: 493,
 		},
 		BootOptions: VirtualMachineBootOptions{
 			Firmware:         "bios",

@@ -55,8 +55,7 @@ func dataSourcePersonalAccessTokenRead(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
-	d.SetId(token.ID)
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, token.ID)
 
 	sw.set("name", token.Name)
 	sw.set("roles", token.Roles)

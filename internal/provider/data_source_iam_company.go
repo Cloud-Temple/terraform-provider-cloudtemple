@@ -32,9 +32,7 @@ func dataSourceCompanyRead(ctx context.Context, d *schema.ResourceData, meta any
 		return diag.FromErr(err)
 	}
 
-	d.SetId(company.ID)
-
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, company.ID)
 	sw.set("name", company.Name)
 
 	return sw.diags

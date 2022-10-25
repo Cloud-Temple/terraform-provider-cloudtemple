@@ -18,5 +18,54 @@ description: |-
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `resource_pools` (List of Object) (see [below for nested schema](#nestedatt--resource_pools))
+
+<a id="nestedatt--resource_pools"></a>
+### Nested Schema for `resource_pools`
+
+Read-Only:
+
+- `id` (String)
+- `machine_manager_id` (String)
+- `metrics` (List of Object) (see [below for nested schema](#nestedobjatt--resource_pools--metrics))
+- `moref` (String)
+- `name` (String)
+- `parent` (List of Object) (see [below for nested schema](#nestedobjatt--resource_pools--parent))
+
+<a id="nestedobjatt--resource_pools--metrics"></a>
+### Nested Schema for `resource_pools.metrics`
+
+Read-Only:
+
+- `cpu` (List of Object) (see [below for nested schema](#nestedobjatt--resource_pools--metrics--cpu))
+- `memory` (List of Object) (see [below for nested schema](#nestedobjatt--resource_pools--metrics--memory))
+
+<a id="nestedobjatt--resource_pools--metrics--cpu"></a>
+### Nested Schema for `resource_pools.metrics.cpu`
+
+Read-Only:
+
+- `max_usage` (Number)
+- `reservation_used` (Number)
+
+
+<a id="nestedobjatt--resource_pools--metrics--memory"></a>
+### Nested Schema for `resource_pools.metrics.memory`
+
+Read-Only:
+
+- `ballooned_memory` (Number)
+- `max_usage` (Number)
+- `reservation_used` (Number)
+
+
+
+<a id="nestedobjatt--resource_pools--parent"></a>
+### Nested Schema for `resource_pools.parent`
+
+Read-Only:
+
+- `id` (String)
+- `type` (String)
 
 

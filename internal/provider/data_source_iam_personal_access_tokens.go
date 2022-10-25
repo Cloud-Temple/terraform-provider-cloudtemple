@@ -76,9 +76,7 @@ func dataSourcePersonalAccessTokensRead(ctx context.Context, d *schema.ResourceD
 		return diag.FromErr(err)
 	}
 
-	d.SetId("tokens")
-
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, "tokens")
 
 	mTokens := []interface{}{}
 	for _, t := range tokens {
@@ -96,5 +94,5 @@ func dataSourcePersonalAccessTokensRead(ctx context.Context, d *schema.ResourceD
 
 	sw.set("tokens", mTokens)
 
-	return nil
+	return sw.diags
 }

@@ -18,5 +18,17 @@ description: |-
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `virtual_switchs` (List of Object) (see [below for nested schema](#nestedatt--virtual_switchs))
+
+<a id="nestedatt--virtual_switchs"></a>
+### Nested Schema for `virtual_switchs`
+
+Read-Only:
+
+- `folder_id` (String)
+- `id` (String)
+- `machine_manager_id` (String)
+- `moref` (String)
+- `name` (String)
 
 

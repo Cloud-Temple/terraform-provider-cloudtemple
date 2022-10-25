@@ -74,9 +74,7 @@ func dataSourceUserRead(ctx context.Context, d *schema.ResourceData, meta any) d
 		return diag.FromErr(err)
 	}
 
-	d.SetId(userID)
-
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, userID)
 	sw.set("id", user.ID)
 	sw.set("internal_id", user.InternalID)
 	sw.set("name", user.Name)

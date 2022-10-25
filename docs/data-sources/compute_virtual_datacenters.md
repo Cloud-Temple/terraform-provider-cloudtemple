@@ -18,5 +18,16 @@ description: |-
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `virtual_datacenters` (List of Object) (see [below for nested schema](#nestedatt--virtual_datacenters))
+
+<a id="nestedatt--virtual_datacenters"></a>
+### Nested Schema for `virtual_datacenters`
+
+Read-Only:
+
+- `id` (String)
+- `machine_manager_id` (String)
+- `name` (String)
+- `tenant_id` (String)
 
 

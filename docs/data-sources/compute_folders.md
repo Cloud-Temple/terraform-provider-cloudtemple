@@ -17,6 +17,16 @@ description: |-
 
 ### Read-Only
 
+- `folders` (List of Object) (see [below for nested schema](#nestedatt--folders))
 - `id` (String) The ID of this resource.
+
+<a id="nestedatt--folders"></a>
+### Nested Schema for `folders`
+
+Read-Only:
+
+- `id` (String)
+- `machine_manager_id` (String)
+- `name` (String)
 
 

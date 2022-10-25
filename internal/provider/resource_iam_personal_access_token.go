@@ -90,8 +90,7 @@ func resourcePersonalAccessTokenCreate(ctx context.Context, d *schema.ResourceDa
 		return diag.FromErr(err)
 	}
 
-	d.SetId(token.ID)
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, token.ID)
 	sw.set("client_id", token.ID)
 	sw.set("secret_id", token.Secret)
 
@@ -114,7 +113,7 @@ func resourcePersonalAccessTokenRead(ctx context.Context, d *schema.ResourceData
 	}
 	expirationDate := time.Unix(i/1000, i%1000)
 
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, token.ID)
 	sw.set("name", token.Name)
 	sw.set("roles", stringSliceToInterfaceSlice(token.Roles))
 	sw.set("expiration_date", expirationDate.Format(time.RFC3339))

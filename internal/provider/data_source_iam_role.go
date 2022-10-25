@@ -39,9 +39,7 @@ func dataSourceRoleRead(ctx context.Context, d *schema.ResourceData, meta any) d
 		return diag.FromErr(err)
 	}
 
-	d.SetId(roleID)
-
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, roleID)
 	sw.set("name", role.Name)
 	return sw.diags
 }

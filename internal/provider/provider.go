@@ -29,16 +29,16 @@ func New(version string) func() *schema.Provider {
 		p := &schema.Provider{
 			Schema: map[string]*schema.Schema{
 				"address": {
-					Description: "The HTTP address to connect to the API. Defaults to `pp-shiva.cloud-temple.com`.",
+					Description: "The HTTP address to connect to the API. Defaults to `pp-shiva.cloud-temple.com`. Can also be specified with the environment variable `CLOUDTEMPLE_HTTP_ADDR`.",
 					Type:        schema.TypeString,
 					Optional:    true,
-					Default:     "pp-shiva.cloud-temple.com",
+					DefaultFunc: schema.EnvDefaultFunc("CLOUDTEMPLE_HTTP_ADDR", "pp-shiva.cloud-temple.com"),
 				},
 				"scheme": {
-					Description: "The URL scheme to used to connect to the API. Default to `https`.",
+					Description: "The URL scheme to used to connect to the API. Default to `https`. Can also be specified with the environment variable `CLOUDTEMPLE_HTTP_SCHEME`.",
 					Type:        schema.TypeString,
 					Optional:    true,
-					Default:     "https",
+					DefaultFunc: schema.EnvDefaultFunc("CLOUDTEMPLE_HTTP_SCHEME", "https"),
 				},
 				"client_id": {
 					Description: "The client ID to login to the API with. Can also be specified with the environment variable `CLOUDTEMPLE_CLIENT_ID`.",
@@ -56,22 +56,37 @@ func New(version string) func() *schema.Provider {
 			},
 			DataSourcesMap: map[string]*schema.Resource{
 				"cloudtemple_compute_content_libraries":       dataSourceContentLibraries(),
+				"cloudtemple_compute_content_library":         dataSourceContentLibrary(),
+				"cloudtemple_compute_datastore_cluster":       dataSourceDatastoreCluster(),
 				"cloudtemple_compute_datastore_clusters":      dataSourceDatastoreClusters(),
+				"cloudtemple_compute_datastore":               dataSourceDatastore(),
 				"cloudtemple_compute_datastores":              dataSourceDatastores(),
+				"cloudtemple_compute_folder":                  dataSourceFolder(),
 				"cloudtemple_compute_folders":                 dataSourceFolders(),
+				"cloudtemple_compute_guest_operating_system":  dataSourceGuestOperatingSystem(),
 				"cloudtemple_compute_guest_operating_systems": dataSourceGuestOperatingSystems(),
+				"cloudtemple_compute_host_cluster":            dataSourceHostCluster(),
 				"cloudtemple_compute_host_clusters":           dataSourceHostClusters(),
+				"cloudtemple_compute_host":                    dataSourceHost(),
 				"cloudtemple_compute_hosts":                   dataSourceHosts(),
+				"cloudtemple_compute_network_adapter":         dataSourceNetworkAdapter(),
 				"cloudtemple_compute_network_adapters":        dataSourceNetworkAdapters(),
+				"cloudtemple_compute_network":                 dataSourceNetwork(),
 				"cloudtemple_compute_networks":                dataSourceNetworks(),
+				"cloudtemple_compute_resource_pool":           dataSourceResourcePool(),
 				"cloudtemple_compute_resource_pools":          dataSourceResourcePools(),
 				"cloudtemple_compute_snapshots":               dataSourceSnapshots(),
-				"cloudtemple_compute_vcenters":                dataSourceVcenters(),
 				"cloudtemple_compute_virtual_controllers":     dataSourceVirtualControllers(),
+				"cloudtemple_compute_virtual_datacenter":      dataSourceVirtualDatacenter(),
 				"cloudtemple_compute_virtual_datacenters":     dataSourceVirtualDatacenters(),
+				"cloudtemple_compute_virtual_disk":            dataSourceVirtualDisk(),
 				"cloudtemple_compute_virtual_disks":           dataSourceVirtualDisks(),
+				"cloudtemple_compute_virtual_machine":         dataSourceVirtualMachine(),
 				"cloudtemple_compute_virtual_machines":        dataSourceVirtualMachines(),
+				"cloudtemple_compute_virtual_switch":          dataSourceVirtualSwitch(),
 				"cloudtemple_compute_virtual_switchs":         dataSourceVirtualSwitchs(),
+				"cloudtemple_compute_worker":                  dataSourceWorker(),
+				"cloudtemple_compute_workers":                 dataSourceWorkers(),
 				"cloudtemple_iam_company":                     dataSourceCompany(),
 				"cloudtemple_iam_features":                    dataSourceFeatures(),
 				"cloudtemple_iam_personal_access_token":       dataSourcePersonalAccessToken(),
@@ -171,7 +186,8 @@ type stateWriter struct {
 	diags diag.Diagnostics
 }
 
-func newStateWriter(d *schema.ResourceData) *stateWriter {
+func newStateWriter(d *schema.ResourceData, id string) *stateWriter {
+	d.SetId(id)
 	return &stateWriter{d: d}
 }
 

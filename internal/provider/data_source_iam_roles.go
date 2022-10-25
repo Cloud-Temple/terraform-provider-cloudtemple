@@ -45,8 +45,7 @@ func dataSourceRolesRead(ctx context.Context, d *schema.ResourceData, meta any) 
 		return diag.FromErr(err)
 	}
 
-	d.SetId("roles")
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, "roles")
 
 	lRoles := []interface{}{}
 	for _, r := range roles {

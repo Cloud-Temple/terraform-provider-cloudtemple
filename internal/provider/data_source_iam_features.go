@@ -80,7 +80,7 @@ func dataSourceFeaturesRead(ctx context.Context, d *schema.ResourceData, meta an
 		})
 	}
 
-	sw := newStateWriter(d)
+	sw := newStateWriter(d, "features")
 	sw.set("features", res)
 	return sw.diags
 }

@@ -18,3 +18,7 @@ fmt:
 .PHONY: build
 build:
 	go build
+
+.PHONY: generate
+generate:
+	go generate
