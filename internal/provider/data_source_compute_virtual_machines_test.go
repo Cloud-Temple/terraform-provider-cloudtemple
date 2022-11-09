@@ -14,7 +14,7 @@ func TestAccDataSourceVirtualMachines(t *testing.T) {
 			{
 				Config: testAccDataSourceVirtualMachines,
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machines.foo", "virtual_machines.#", "6"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machines.foo", "virtual_machines.#"),
 				),
 			},
 		},

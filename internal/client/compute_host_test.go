@@ -31,6 +31,7 @@ func TestCompute_HostRead(t *testing.T) {
 
 	// ignore metrics changes
 	host.Metrics = HostMetrics{}
+	host.VirtualMachines = nil
 
 	expected := &Host{
 		ID:               "8997db63-24d5-47f4-8cca-d5f5df199d1a",
@@ -38,28 +39,6 @@ func TestCompute_HostRead(t *testing.T) {
 		Moref:            "host-1046",
 		MachineManagerID: "",
 		Metrics:          HostMetrics{},
-		VirtualMachines: []HostVirtualMachinesStub{
-			{
-				ID:   "vm-1210",
-				Type: "VirtualMachine",
-			},
-			{
-				ID:   "vm-1148",
-				Type: "VirtualMachine",
-			},
-			{
-				ID:   "vm-1170",
-				Type: "VirtualMachine",
-			},
-			{
-				ID:   "vm-1243",
-				Type: "VirtualMachine",
-			},
-			{
-				ID:   "vm-1147",
-				Type: "VirtualMachine",
-			},
-		},
 	}
 	require.Equal(t, expected, host)
 }

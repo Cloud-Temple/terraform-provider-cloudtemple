@@ -224,7 +224,7 @@ func closeResponseBody(resp *http.Response) error {
 
 // requireOK is used to wrap doRequest and check for a 200
 func requireOK(resp *http.Response) error {
-	return requireHttpCodes(resp, 200)
+	return requireHttpCodes(resp, 200, 201)
 }
 
 // requireHttpCodes checks for the "allowable" http codes for a response

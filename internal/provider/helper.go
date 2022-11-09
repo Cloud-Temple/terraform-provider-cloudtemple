@@ -15,6 +15,10 @@ func readResource(read func(ctx context.Context, client *client.Client, d *schem
 		if err != nil {
 			return diag.FromErr(err)
 		}
+		if res == nil {
+			d.SetId("")
+			return nil
+		}
 
 		sw := newStateWriter(d)
 		sw.save(res, skip)

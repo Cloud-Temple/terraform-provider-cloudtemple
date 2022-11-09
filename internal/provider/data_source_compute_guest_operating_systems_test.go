@@ -14,7 +14,7 @@ func TestAccDataSourceGuestOperatingSystems(t *testing.T) {
 			{
 				Config: testAccDataSourceGuestOperatingSystems,
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_guest_operating_systems.foo", "guest_operating_systems.#", "82"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_guest_operating_systems.foo", "guest_operating_systems.#"),
 				),
 			},
 			{

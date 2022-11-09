@@ -13,6 +13,20 @@ func dataSourceDatastoreCluster() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			name := d.Get("name").(string)
+			if name != "" {
+				clusters, err := client.Compute().DatastoreCluster().List(ctx, "", "", "", "")
+				if err != nil {
+					return nil, fmt.Errorf("failed to find datastore cluster named %q: %s", name, err)
+				}
+				for _, c := range clusters {
+					if c.Name == name {
+						return c, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find datastore cluster named %q", name)
+			}
+
 			id := d.Get("id").(string)
 			cluster, err := client.Compute().DatastoreCluster().Read(ctx, id)
 			if err == nil && cluster == nil {
@@ -24,15 +38,19 @@ func dataSourceDatastoreCluster() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// In
 			"id": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"name"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
+			"name": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
 			},
 
 			// Out
-			"name": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"moref": {
 				Type:     schema.TypeString,
 				Computed: true,

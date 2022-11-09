@@ -101,6 +101,7 @@ func New(version string) func() *schema.Provider {
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				"cloudtemple_iam_personal_access_token": resourcePersonalAccessToken(),
+				"cloudtemple_compute_virtual_machine":   resourceVirtualMachine(),
 			},
 		}
 

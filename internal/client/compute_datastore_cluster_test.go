@@ -29,27 +29,16 @@ func TestCompute_DatastoreClusterRead(t *testing.T) {
 	datastoreCluster, err := client.Compute().DatastoreCluster().Read(ctx, "6b06b226-ef55-4a0a-92bc-7aa071681b1b")
 	require.NoError(t, err)
 
+	// Skip checking changes on metrics
+	datastoreCluster.Metrics = DatastoreClusterMetrics{}
+
 	expected := &DatastoreCluster{
 		ID:               "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
 		Name:             "sdrs001-LIVE_KOUKOU",
 		Moref:            "group-p1055",
 		MachineManagerId: "9dba240e-a605-4103-bac7-5336d3ffd124",
 		Datastores:       []string{"d439d467-943a-49f5-a022-c0c25b737022"},
-		Metrics: DatastoreClusterMetrics{
-			FreeCapacity:                  131042639872,
-			MaxCapacity:                   536602476544,
-			Enabled:                       true,
-			DefaultVmBehavior:             "manual",
-			LoadBalanceInterval:           480,
-			SpaceThresholdMode:            "utilization",
-			SpaceUtilizationThreshold:     80,
-			MinSpaceUtilizationDifference: 0,
-			ReservablePercentThreshold:    0,
-			ReservableThresholdMode:       "",
-			IoLatencyThreshold:            0,
-			IoLoadImbalanceThreshold:      0,
-			IoLoadBalanceEnabled:          false,
-		},
+		Metrics:          DatastoreClusterMetrics{},
 	}
 	require.Equal(t, expected, datastoreCluster)
 }

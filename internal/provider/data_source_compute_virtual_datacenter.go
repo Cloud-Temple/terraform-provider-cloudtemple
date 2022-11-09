@@ -13,6 +13,20 @@ func dataSourceVirtualDatacenter() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
+			name := d.Get("name").(string)
+			if name != "" {
+				dcs, err := client.Compute().VirtualDatacenter().List(ctx, "", "")
+				if err != nil {
+					return nil, fmt.Errorf("failed to find virtual datacenter named %q: %s", name, err)
+				}
+				for _, dc := range dcs {
+					if dc.Name == name {
+						return dc, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find virtual datacenter named %q", name)
+			}
+
 			id := d.Get("id").(string)
 			datacenter, err := client.Compute().VirtualDatacenter().Read(ctx, id)
 			if err == nil && datacenter == nil {
@@ -24,15 +38,19 @@ func dataSourceVirtualDatacenter() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// In
 			"id": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"name"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
+			"name": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
 			},
 
 			// Out
-			"name": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"machine_manager_id": {
 				Type:     schema.TypeString,
 				Computed: true,

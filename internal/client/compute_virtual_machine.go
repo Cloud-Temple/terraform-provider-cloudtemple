@@ -80,6 +80,38 @@ type VirtualMachineBootOptions struct {
 	BootRetryDelay   int    `terraform:"boot_retry_delay"`
 }
 
+type CreateVirtualMachineRequest struct {
+	DatacenterId              string `json:"datacenterId,omitempty"`
+	HostId                    string `json:"hostId,omitempty"`
+	HostClusterId             string `json:"hostClusterId,omitempty"`
+	DatastoreId               string `json:"datastoreId,omitempty"`
+	DatastoreClusterId        string `json:"datastoreClusterId,omitempty"`
+	Name                      string `json:"name,omitempty"`
+	Memory                    int    `json:"memory,omitempty"`
+	CPU                       int    `json:"cpu,omitempty"`
+	GuestOperatingSystemMoref string `json:"guestOperatingSystemMoref,omitempty"`
+}
+
+type UpdateVirtualMachineRequest struct {
+	Id          string       `json:"id"`
+	BootOptions *BootOptions `json:"bootOptions,omitempty"`
+}
+
+type BootOptions struct {
+	BootDelay        int    `json:"bootDelay"`
+	BootRetryDelay   int    `json:"bootRetryDelay"`
+	BootRetryEnabled bool   `json:"bootRetryEnabled"`
+	EnterBIOSSetup   bool   `json:"enterBIOSSetup"`
+	Firmware         string `json:"firmware"`
+}
+
+type PowerRequest struct {
+	ID             string `json:"id,omitempty"`
+	DatacenterId   string `json:"datacenterId,omitempty"`
+	PowerAction    string `json:"powerAction,omitempty"`
+	ForceEnterBIOS bool   `json:"forceEnterBIOS,omitempty"`
+}
+
 func (v *VirtualMachineClient) List(
 	ctx context.Context,
 	allOptions bool,
@@ -111,6 +143,17 @@ func (v *VirtualMachineClient) List(
 	return out, nil
 }
 
+func (v *VirtualMachineClient) Create(ctx context.Context, req *CreateVirtualMachineRequest) error {
+	r := v.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_machines")
+	r.obj = req
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return err
+	}
+	defer closeResponseBody(resp)
+	return requireOK(resp)
+}
+
 func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMachine, error) {
 	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_machines/"+id)
 	resp, err := v.c.doRequest(ctx, r)
@@ -129,4 +172,36 @@ func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMac
 	}
 
 	return &out, nil
+}
+
+func (v *VirtualMachineClient) Update(ctx context.Context, req *UpdateVirtualMachineRequest) error {
+	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines")
+	r.obj = req
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return err
+	}
+	defer closeResponseBody(resp)
+	return requireOK(resp)
+}
+
+func (v *VirtualMachineClient) Delete(ctx context.Context, id string) error {
+	r := v.c.newRequest("DELETE", "/api/compute/v1/vcenters/virtual_machines/"+id)
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return err
+	}
+	defer closeResponseBody(resp)
+	return requireOK(resp)
+}
+
+func (v *VirtualMachineClient) Power(ctx context.Context, req *PowerRequest) error {
+	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines/power")
+	r.obj = req
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return err
+	}
+	defer closeResponseBody(resp)
+	return requireOK(resp)
 }

@@ -31,6 +31,7 @@ func TestCompute_HostClusterRead(t *testing.T) {
 
 	// ignore changes to metrics
 	hostCluster.Metrics = HostClusterMetrics{}
+	hostCluster.VirtualMachinesNumber = 0
 
 	expected := &HostCluster{
 		ID:    "dde72065-60f4-4577-836d-6ea074384d62",
@@ -42,9 +43,8 @@ func TestCompute_HostClusterRead(t *testing.T) {
 				Type: "HostSystem",
 			},
 		},
-		Metrics:               HostClusterMetrics{},
-		VirtualMachinesNumber: 5,
-		MachineManagerId:      "",
+		Metrics:          HostClusterMetrics{},
+		MachineManagerId: "",
 	}
 	require.Equal(t, expected, hostCluster)
 }
