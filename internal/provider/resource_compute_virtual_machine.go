@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -302,7 +301,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 	c := getClient(meta)
 	name := d.Get("name").(string)
 
-	err := c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
+	activityId, err := c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
 		Name:                      name,
 		DatacenterId:              d.Get("virtual_datacenter_id").(string),
 		HostId:                    d.Get("host_id").(string),
@@ -317,24 +316,12 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		return diag.FromErr(err)
 	}
 
-	// Wait for the VM to be created
-	time.Sleep(15 * time.Second)
-	var vm *client.VirtualMachine
-	virtualMachines, err := c.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
+	activity, err := c.Activity().WaitForCompletion(ctx, activityId)
 	if err != nil {
 		return diag.FromErr(err)
 	}
-	for _, v := range virtualMachines {
-		if v.Name == name {
-			vm = v
-			break
-		}
-	}
-	if vm == nil {
-		return diag.Errorf("failed to find VM after creation")
-	}
 
-	d.SetId(vm.ID)
+	d.SetId(activity.ConcernedItems[0].ID)
 
 	if d.Get("power_state").(string) == "on" {
 		return computeVirtualMachineUpdate(ctx, d, meta)
@@ -379,7 +366,7 @@ func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, me
 		return diag.FromErr(err)
 	}
 
-	err = c.Compute().VirtualMachine().Update(ctx, &client.UpdateVirtualMachineRequest{
+	activityId, err := c.Compute().VirtualMachine().Update(ctx, &client.UpdateVirtualMachineRequest{
 		Id: d.Id(),
 		BootOptions: &client.BootOptions{
 			BootDelay:        0,
@@ -392,12 +379,20 @@ func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, me
 	if err != nil {
 		return diag.FromErr(err)
 	}
+	_, err = c.Activity().WaitForCompletion(ctx, activityId)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
-	err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
+	activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 		ID:           d.Id(),
 		DatacenterId: vm.VirtualDatacenterId,
 		PowerAction:  powerState,
 	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	_, err = c.Activity().WaitForCompletion(ctx, activityId)
 	if err != nil {
 		return diag.FromErr(err)
 	}
@@ -415,7 +410,7 @@ func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, me
 	}
 
 	if vm.PowerState == "running" {
-		err = c.Compute().VirtualMachine().Update(ctx, &client.UpdateVirtualMachineRequest{
+		activityId, err := c.Compute().VirtualMachine().Update(ctx, &client.UpdateVirtualMachineRequest{
 			Id: d.Id(),
 			BootOptions: &client.BootOptions{
 				BootDelay:        0,
@@ -428,8 +423,12 @@ func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, me
 		if err != nil {
 			return diag.FromErr(err)
 		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId)
+		if err != nil {
+			return diag.FromErr(err)
+		}
 
-		err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
+		activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 			ID:           d.Id(),
 			DatacenterId: vm.VirtualDatacenterId,
 			PowerAction:  "off",
@@ -437,15 +436,17 @@ func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, me
 		if err != nil {
 			return diag.FromErr(err)
 		}
-
-		// Wait for the VM to stop
-		time.Sleep(5 * time.Second)
+		_, err = c.Activity().WaitForCompletion(ctx, activityId)
+		if err != nil {
+			return diag.FromErr(err)
+		}
 	}
 
-	err = c.Compute().VirtualMachine().Delete(ctx, d.Id())
+	activityId, err := c.Compute().VirtualMachine().Delete(ctx, d.Id())
 	if err != nil {
 		return diag.FromErr(err)
 	}
+	_, err = c.Activity().WaitForCompletion(ctx, activityId)
 
-	return nil
+	return diag.FromErr(err)
 }

@@ -25,6 +25,10 @@ type Config struct {
 	Transport http.RoundTripper
 
 	ClientID, SecretID string
+
+	// this parameter will only be used during the tests and not exposed to
+	// clients
+	errorOnUnexpectedActivity bool
 }
 
 func DefaultConfig() *Config {
@@ -203,7 +207,34 @@ func (c *Client) doRequest(ctx context.Context, r *request) (*http.Response, err
 	if err != nil {
 		return nil, err
 	}
-	return c.doRequestWithToken(ctx, r, token.Raw)
+	resp, err := c.doRequestWithToken(ctx, r, token.Raw)
+	if err != nil {
+		return nil, err
+	}
+
+	if c.config.errorOnUnexpectedActivity && resp.Header.Get("Location") != "" {
+		return nil, fmt.Errorf("an unexpected Location header has been found")
+	}
+
+	return resp, nil
+}
+
+func (c *Client) doRequestAndReturnActivity(ctx context.Context, r *request) (string, error) {
+	token, err := c.token(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := c.doRequestWithToken(ctx, r, token.Raw)
+	if err != nil {
+		return "", err
+	}
+
+	defer closeResponseBody(resp)
+	if err := requireOK(resp); err != nil {
+		return "", err
+	}
+	return resp.Header.Get("Location"), nil
 }
 
 func (c *Client) doRequestWithToken(ctx context.Context, r *request, token string) (*http.Response, error) {

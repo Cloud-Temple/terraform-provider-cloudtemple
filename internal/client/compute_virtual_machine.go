@@ -1,6 +1,8 @@
 package client
 
-import "context"
+import (
+	"context"
+)
 
 type VirtualMachineClient struct {
 	c *Client
@@ -143,15 +145,10 @@ func (v *VirtualMachineClient) List(
 	return out, nil
 }
 
-func (v *VirtualMachineClient) Create(ctx context.Context, req *CreateVirtualMachineRequest) error {
+func (v *VirtualMachineClient) Create(ctx context.Context, req *CreateVirtualMachineRequest) (string, error) {
 	r := v.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_machines")
 	r.obj = req
-	resp, err := v.c.doRequest(ctx, r)
-	if err != nil {
-		return err
-	}
-	defer closeResponseBody(resp)
-	return requireOK(resp)
+	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMachine, error) {
@@ -174,34 +171,19 @@ func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMac
 	return &out, nil
 }
 
-func (v *VirtualMachineClient) Update(ctx context.Context, req *UpdateVirtualMachineRequest) error {
+func (v *VirtualMachineClient) Update(ctx context.Context, req *UpdateVirtualMachineRequest) (string, error) {
 	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines")
 	r.obj = req
-	resp, err := v.c.doRequest(ctx, r)
-	if err != nil {
-		return err
-	}
-	defer closeResponseBody(resp)
-	return requireOK(resp)
+	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
-func (v *VirtualMachineClient) Delete(ctx context.Context, id string) error {
+func (v *VirtualMachineClient) Delete(ctx context.Context, id string) (string, error) {
 	r := v.c.newRequest("DELETE", "/api/compute/v1/vcenters/virtual_machines/"+id)
-	resp, err := v.c.doRequest(ctx, r)
-	if err != nil {
-		return err
-	}
-	defer closeResponseBody(resp)
-	return requireOK(resp)
+	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
-func (v *VirtualMachineClient) Power(ctx context.Context, req *PowerRequest) error {
+func (v *VirtualMachineClient) Power(ctx context.Context, req *PowerRequest) (string, error) {
 	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines/power")
 	r.obj = req
-	resp, err := v.c.doRequest(ctx, r)
-	if err != nil {
-		return err
-	}
-	defer closeResponseBody(resp)
-	return requireOK(resp)
+	return v.c.doRequestAndReturnActivity(ctx, r)
 }

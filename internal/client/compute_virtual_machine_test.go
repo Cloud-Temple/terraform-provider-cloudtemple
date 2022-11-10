@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -141,12 +140,12 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 	}
 	require.Equal(t, expected, virtualMachine)
 }
+
 func TestCompute_VirtualMachineCreateDelete(t *testing.T) {
 	ctx := context.Background()
 
-	name := "test-client"
-	err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
-		Name:                      name,
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+		Name:                      "test-client",
 		DatacenterId:              "85d53d08-0fa9-491e-ab89-90919516df25",
 		HostClusterId:             "dde72065-60f4-4577-836d-6ea074384d62",
 		DatastoreClusterId:        "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
@@ -154,36 +153,70 @@ func TestCompute_VirtualMachineCreateDelete(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	time.Sleep(5 * time.Second)
-
-	// we need to find the uuid of this VM
-	var vm *VirtualMachine
-	virtualMachines, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
 	require.NoError(t, err)
 
-	for _, v := range virtualMachines {
-		if v.Name == name {
-			vm = v
-			break
-		}
-	}
-	require.NotNil(t, vm)
-
-	time.Sleep(5 * time.Second)
-
-	err = client.Compute().VirtualMachine().Delete(ctx, vm.ID)
+	activityId, err = client.Compute().VirtualMachine().Delete(ctx, activity.ConcernedItems[0].ID)
 	require.NoError(t, err)
 
-	// no we should not be able to find it anymore
-	vm = nil
-	virtualMachines, err = client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+}
+
+func TestCompute_UpdateAndPower(t *testing.T) {
+	ctx := context.Background()
+
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+		Name:                      "test-power",
+		DatacenterId:              "85d53d08-0fa9-491e-ab89-90919516df25",
+		HostClusterId:             "dde72065-60f4-4577-836d-6ea074384d62",
+		DatastoreClusterId:        "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
+		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
+	})
+	require.NoError(t, err)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
 	require.NoError(t, err)
 
-	for _, v := range virtualMachines {
-		if v.Name == name {
-			vm = v
-			break
-		}
-	}
-	require.Nil(t, vm)
+	instanceId := activity.ConcernedItems[0].ID
+
+	vm, err := client.Compute().VirtualMachine().Read(ctx, instanceId)
+	require.NoError(t, err)
+	require.Equal(t, "stopped", vm.PowerState)
+
+	activityId, err = client.Compute().VirtualMachine().Update(ctx, &UpdateVirtualMachineRequest{
+		Id: instanceId,
+		BootOptions: &BootOptions{
+			BootDelay:        0,
+			BootRetryDelay:   10000,
+			BootRetryEnabled: false,
+			EnterBIOSSetup:   false,
+			Firmware:         "bios",
+		},
+	})
+	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
+		ID:           instanceId,
+		DatacenterId: vm.VirtualDatacenterId,
+		PowerAction:  "on",
+	})
+	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
+		ID:           instanceId,
+		DatacenterId: vm.VirtualDatacenterId,
+		PowerAction:  "off",
+	})
+	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
+	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
 }

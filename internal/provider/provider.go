@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -57,6 +58,8 @@ func New(version string) func() *schema.Provider {
 				},
 			},
 			DataSourcesMap: map[string]*schema.Resource{
+				"cloudtemple_activity":                        dataSourceActivity(),
+				"cloudtemple_activities":                      dataSourceActivities(),
 				"cloudtemple_compute_content_libraries":       dataSourceContentLibraries(),
 				"cloudtemple_compute_content_library":         dataSourceContentLibrary(),
 				"cloudtemple_compute_datastore_cluster":       dataSourceDatastoreCluster(),
@@ -221,6 +224,9 @@ func (sw *stateWriter) save(obj interface{}, skip []string) {
 		typ = typ.Elem()
 		for _, field := range reflect.VisibleFields(typ) {
 			name, found := field.Tag.Lookup("terraform")
+			if name == "-" {
+				continue
+			}
 			if !found {
 				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
 				continue
@@ -241,6 +247,11 @@ func (sw *stateWriter) save(obj interface{}, skip []string) {
 }
 
 func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string, skipFields map[string]struct{}) interface{} {
+	// Convert time.Time to its string representation
+	if v.Type().String() == "time.Time" {
+		return v.Interface().(time.Time).Format(time.RFC3339)
+	}
+
 	k := v.Kind()
 	switch k {
 	case reflect.Bool, reflect.Int, reflect.String:
@@ -263,7 +274,7 @@ func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string
 			name, found := field.Tag.Lookup("terraform")
 
 			p := path + "." + name
-			if _, skip := skipFields[p]; skip {
+			if _, skip := skipFields[p]; skip || name == "-" {
 				continue
 			}
 

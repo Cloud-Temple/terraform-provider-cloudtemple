@@ -2,15 +2,11 @@ default: testacc
 
 # Run tests
 .PHONY: test
-test: testclient testprovider
+test: testclient testacc
 
 .PHONY: testclient
 testclient:
 	go test ./internal/client/... -v $(TESTARGS) -timeout 120m
-
-.PHONY: testprovider
-testprovider:
-	go test ./internal/provider/... -v $(TESTARGS) -timeout 120m
 
 # Run acceptance tests
 .PHONY: testacc

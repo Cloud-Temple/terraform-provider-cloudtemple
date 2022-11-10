@@ -39,6 +39,8 @@ func TestMain(m *testing.M) {
 	config.ClientID = os.Getenv(testClientIDEnvName)
 	config.SecretID = os.Getenv(testSecretIDEnvName)
 
+	config.errorOnUnexpectedActivity = true
+
 	c, err := NewClient(config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
