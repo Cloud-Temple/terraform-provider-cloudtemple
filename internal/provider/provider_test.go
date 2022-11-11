@@ -63,3 +63,23 @@ func TestUUIDValidation(t *testing.T) {
 		t.Run(name, checkUUID(name, resource))
 	}
 }
+
+func TestImport(t *testing.T) {
+	provider := New("dev")()
+
+	skip := map[string]struct{}{
+		// Access tokens cannot be imported because there is no way of getting the secret
+		"cloudtemple_iam_personal_access_token": {},
+	}
+
+	for name, resource := range provider.ResourcesMap {
+		t.Run(name, func(t *testing.T) {
+			if _, found := skip[name]; found {
+				return
+			}
+			if resource.Importer == nil {
+				t.Fatalf("no importer for %s", name)
+			}
+		})
+	}
+}
