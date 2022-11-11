@@ -20,6 +20,13 @@ func TestAccDataSourceNetwork(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourceNetworkName,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "id", "5e029210-b433-4c45-93be-092cef684edc"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "name", "VLAN_201"),
+				),
+			},
+			{
 				Config:      testAccDataSourceNetworkMissing,
 				ExpectError: regexp.MustCompile("failed to find network with id"),
 			},
@@ -30,6 +37,12 @@ func TestAccDataSourceNetwork(t *testing.T) {
 const testAccDataSourceNetwork = `
 data "cloudtemple_compute_network" "foo" {
   id = "5e029210-b433-4c45-93be-092cef684edc"
+}
+`
+
+const testAccDataSourceNetworkName = `
+data "cloudtemple_compute_network" "foo" {
+  name = "VLAN_201"
 }
 `
 

@@ -8,6 +8,8 @@ import (
 )
 
 func TestCompute_VirtualDiskList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	virtualDisks, err := client.Compute().VirtualDisk().List(ctx, "de2b8b80-8b90-414a-bc33-e12f61a4c05c")
 	require.NoError(t, err)
@@ -25,6 +27,8 @@ func TestCompute_VirtualDiskList(t *testing.T) {
 }
 
 func TestCompute_VirtualDiskRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	virtualDatacenter, err := client.Compute().VirtualDisk().Read(ctx, "d370b8cd-83eb-4315-a5d9-42157e2e4bb4")
 	require.NoError(t, err)

@@ -20,6 +20,13 @@ func TestAccDataSourceVirtualSwitch(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourceVirtualSwitchName,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "id", "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "name", "dvs002-ucs01_FLO-DC-EQX6"),
+				),
+			},
+			{
 				Config:      testAccDataSourceVirtualSwitchMissing,
 				ExpectError: regexp.MustCompile("failed to find virtual switch with id"),
 			},
@@ -30,6 +37,12 @@ func TestAccDataSourceVirtualSwitch(t *testing.T) {
 const testAccDataSourceVirtualSwitch = `
 data "cloudtemple_compute_virtual_switch" "foo" {
   id = "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4"
+}
+`
+
+const testAccDataSourceVirtualSwitchName = `
+data "cloudtemple_compute_virtual_switch" "foo" {
+  name = "dvs002-ucs01_FLO-DC-EQX6"
 }
 `
 

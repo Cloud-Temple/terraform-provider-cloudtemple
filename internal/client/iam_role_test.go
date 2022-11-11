@@ -8,6 +8,8 @@ import (
 )
 
 func TestIAM_RolesList(t *testing.T) {
+	t.Parallel()
+
 	roles, err := client.IAM().Role().List(context.Background())
 	require.NoError(t, err)
 
@@ -22,6 +24,8 @@ func TestIAM_RolesList(t *testing.T) {
 }
 
 func TestIAM_RolesRead(t *testing.T) {
+	t.Parallel()
+
 	roleID := testRole(t).ID
 	role, err := client.IAM().Role().Read(context.Background(), roleID)
 	require.NoError(t, err)

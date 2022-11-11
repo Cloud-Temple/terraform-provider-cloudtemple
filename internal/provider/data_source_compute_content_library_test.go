@@ -25,6 +25,13 @@ func TestAccDataSourceLibrary(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourceLibraryName,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "id", "355b654d-6ea2-4773-80ee-246d3f56964f"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "name", "PUBLIC"),
+				),
+			},
+			{
 				Config:      testAccDataSourceLibraryMissing,
 				ExpectError: regexp.MustCompile("failed to find content library with id"),
 			},
@@ -35,6 +42,12 @@ func TestAccDataSourceLibrary(t *testing.T) {
 const testAccDataSourceLibrary = `
 data "cloudtemple_compute_content_library" "foo" {
   id = "355b654d-6ea2-4773-80ee-246d3f56964f"
+}
+`
+
+const testAccDataSourceLibraryName = `
+data "cloudtemple_compute_content_library" "foo" {
+  name = "PUBLIC"
 }
 `
 

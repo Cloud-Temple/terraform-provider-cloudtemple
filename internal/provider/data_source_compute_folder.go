@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,26 +12,36 @@ func dataSourceFolder() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
-			id := d.Get("id").(string)
-			folder, err := client.Compute().Folder().Read(ctx, id)
-			if err == nil && folder == nil {
-				return nil, fmt.Errorf("failed to find folder with id %q", id)
-			}
-			return folder, err
+			return getBy(
+				ctx,
+				d,
+				"folder",
+				func(id string) (any, error) {
+					return client.Compute().Folder().Read(ctx, id)
+				},
+				func(d *schema.ResourceData) (any, error) {
+					return client.Compute().Folder().List(ctx, "", "")
+				},
+				[]string{"name"},
+			)
 		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
 			"id": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"name"},
+			},
+			"name": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"id"},
 			},
 
 			// Out
-			"name": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"machine_manager_id": {
 				Type:     schema.TypeString,
 				Computed: true,

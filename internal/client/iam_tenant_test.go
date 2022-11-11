@@ -9,6 +9,8 @@ import (
 )
 
 func TestIAM_Tenants(t *testing.T) {
+	t.Parallel()
+
 	tenants, err := client.IAM().Tenant().List(context.Background())
 	require.NoError(t, err)
 

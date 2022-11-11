@@ -15,7 +15,7 @@ func TestAccDataSourcePersonalAccessTokens(t *testing.T) {
 				Config: testAccDataSourcePersonalAccessTokens,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.#", "1"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.client_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.id"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.name", "Terraform"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.expiration_date", "1669762800000"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.roles.#"),

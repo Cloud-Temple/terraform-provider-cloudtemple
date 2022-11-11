@@ -9,6 +9,8 @@ import (
 )
 
 func TestActivity_List(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	activities, err := client.Activity().List(ctx, nil)
 	require.NoError(t, err)
@@ -26,6 +28,8 @@ func TestActivity_List(t *testing.T) {
 }
 
 func TestActivity_Read(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	activity, err := client.Activity().Read(ctx, "022ae273-552d-4588-a913-f8260638d3a4")
 	require.NoError(t, err)

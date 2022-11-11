@@ -8,6 +8,8 @@ import (
 )
 
 func TestCompute_HostClusterList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	hostClusters, err := client.Compute().HostCluster().List(ctx, "9dba240e-a605-4103-bac7-5336d3ffd124", "", "")
 	require.NoError(t, err)
@@ -25,6 +27,8 @@ func TestCompute_HostClusterList(t *testing.T) {
 }
 
 func TestCompute_HostClusterRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	hostCluster, err := client.Compute().HostCluster().Read(ctx, "dde72065-60f4-4577-836d-6ea074384d62")
 	require.NoError(t, err)

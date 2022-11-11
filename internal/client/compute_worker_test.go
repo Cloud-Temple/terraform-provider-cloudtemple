@@ -8,6 +8,8 @@ import (
 )
 
 func TestCompute_VCenterWorkerList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	vcenters, err := client.Compute().Worker().List(ctx, "")
 	require.NoError(t, err)
@@ -25,6 +27,8 @@ func TestCompute_VCenterWorkerList(t *testing.T) {
 }
 
 func TestCompute_VCenterWorkerRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	vcenter, err := client.Compute().Worker().Read(ctx, "9dba240e-a605-4103-bac7-5336d3ffd124")
 	require.NoError(t, err)

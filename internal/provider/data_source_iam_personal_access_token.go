@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,31 +12,57 @@ func dataSourcePersonalAccessToken() *schema.Resource {
 		Description: "",
 
 		ReadContext: readResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, []string, error) {
-			id := d.Get("client_id").(string)
-			token, err := client.IAM().PAT().Read(ctx, id)
-			if err == nil && token == nil {
-				return nil, nil, fmt.Errorf("failed to find personal access token with id %q", id)
-			}
-			if token != nil {
-				d.SetId(token.ID)
-			}
+			token, err := getBy(
+				ctx,
+				d,
+				"personal access token",
+				func(id string) (any, error) {
+					return client.IAM().PAT().Read(ctx, id)
+				},
+				func(d *schema.ResourceData) (any, error) {
+					userId, err := getUserID(ctx, client, d)
+					if err != nil {
+						return nil, err
+					}
+					tenantId, err := getTenantID(ctx, client, d)
+					if err != nil {
+						return nil, err
+					}
+					return client.IAM().PAT().List(ctx, userId, tenantId)
+				},
+				[]string{"name"},
+			)
 			return token, []string{"secret"}, err
 		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
-			"client_id": {
-				Description: "",
-				Type:        schema.TypeString,
-				Required:    true,
+			"id": {
+				Description:   "",
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"name"},
+			},
+			"name": {
+				Description:   "",
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"id"},
+			},
+			"user_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+			},
+			"tenant_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
 			},
 
 			// Out
-			"name": {
-				Description: "",
-				Type:        schema.TypeString,
-				Computed:    true,
-			},
 			"roles": {
 				Description: "",
 				Type:        schema.TypeList,

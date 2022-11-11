@@ -8,6 +8,8 @@ import (
 )
 
 func TestCompute_NetworkList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	networks, err := client.Compute().Network().List(ctx, "", "", "", "", "", "", "", "", true)
 	require.NoError(t, err)
@@ -25,6 +27,8 @@ func TestCompute_NetworkList(t *testing.T) {
 }
 
 func TestCompute_NetworkRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	network, err := client.Compute().Network().Read(ctx, "5e029210-b433-4c45-93be-092cef684edc")
 	require.NoError(t, err)

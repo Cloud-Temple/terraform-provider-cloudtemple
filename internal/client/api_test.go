@@ -89,6 +89,8 @@ func testRole(t *testing.T) *Role {
 }
 
 func TestAPI_token(t *testing.T) {
+	t.Parallel()
+
 	token, err := client.token(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, token)
@@ -96,6 +98,8 @@ func TestAPI_token(t *testing.T) {
 }
 
 func TestAPI_tokenCache(t *testing.T) {
+	t.Parallel()
+
 	token, err := client.token(context.Background())
 	require.NoError(t, err)
 

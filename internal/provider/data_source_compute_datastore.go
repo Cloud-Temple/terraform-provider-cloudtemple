@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,26 +12,36 @@ func dataSourceDatastore() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
-			id := d.Get("id").(string)
-			datastore, err := client.Compute().Datastore().Read(ctx, id)
-			if err == nil && datastore == nil {
-				return nil, fmt.Errorf("failed to find datastore with id %q", id)
-			}
-			return datastore, err
+			return getBy(
+				ctx,
+				d,
+				"datastore",
+				func(id string) (any, error) {
+					return client.Compute().Datastore().Read(ctx, id)
+				},
+				func(d *schema.ResourceData) (any, error) {
+					return client.Compute().Datastore().List(ctx, "", "", "", "", "")
+				},
+				[]string{"name"},
+			)
 		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
 			"id": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"name"},
+			},
+			"name": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"id"},
 			},
 
 			// Out
-			"name": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"moref": {
 				Type:     schema.TypeString,
 				Computed: true,

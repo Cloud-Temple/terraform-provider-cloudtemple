@@ -20,6 +20,9 @@ func TestAccDataSourceVirtualDatacenter(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourceVirtualDatacenterName,
+			},
+			{
 				Config:      testAccDataSourceVirtualDatacenterMissing,
 				ExpectError: regexp.MustCompile("failed to find virtual datacenter with id"),
 			},
@@ -30,6 +33,12 @@ func TestAccDataSourceVirtualDatacenter(t *testing.T) {
 const testAccDataSourceVirtualDatacenter = `
 data "cloudtemple_compute_virtual_datacenter" "foo" {
   id = "ac33c033-693b-4fc5-9196-26df77291dbb"
+}
+`
+
+const testAccDataSourceVirtualDatacenterName = `
+data "cloudtemple_compute_virtual_datacenter" "foo" {
+  name = "DC-EQX6"
 }
 `
 

@@ -20,6 +20,13 @@ func TestAccDataSourceFolder(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourceFolderName,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "id", "b41ea9b1-4cca-44ed-9a76-2b598de03781"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "name", "Datacenters"),
+				),
+			},
+			{
 				Config:      testAccDataSourceFolderMissing,
 				ExpectError: regexp.MustCompile("failed to find folder with id"),
 			},
@@ -30,6 +37,12 @@ func TestAccDataSourceFolder(t *testing.T) {
 const testAccDataSourceFolder = `
 data "cloudtemple_compute_folder" "foo" {
   id = "b41ea9b1-4cca-44ed-9a76-2b598de03781"
+}
+`
+
+const testAccDataSourceFolderName = `
+data "cloudtemple_compute_folder" "foo" {
+  name = "Datacenters"
 }
 `
 

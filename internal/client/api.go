@@ -85,8 +85,7 @@ type request struct {
 	url    *url.URL
 	params url.Values
 	body   io.Reader
-	// header http.Header
-	obj interface{}
+	obj    any
 }
 
 func (c *Client) newRequest(method, path string) *request {
@@ -305,13 +304,13 @@ func generateUnexpectedResponseCodeError(resp *http.Response) error {
 }
 
 // decodeBody is used to JSON decode a body
-func decodeBody(resp *http.Response, out interface{}) error {
+func decodeBody(resp *http.Response, out any) error {
 	dec := json.NewDecoder(resp.Body)
 	return dec.Decode(out)
 }
 
 // encodeBody is used to encode a request body
-func encodeBody(obj interface{}) (io.Reader, error) {
+func encodeBody(obj any) (io.Reader, error) {
 	buf := bytes.NewBuffer(nil)
 	enc := json.NewEncoder(buf)
 	if err := enc.Encode(obj); err != nil {

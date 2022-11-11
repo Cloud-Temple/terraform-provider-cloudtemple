@@ -9,6 +9,8 @@ import (
 )
 
 func TestIAM_PATList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tokens, err := client.IAM().PAT().List(ctx, testUserID(t), testTenantID(t))
 	require.NoError(t, err)
@@ -18,10 +20,22 @@ func TestIAM_PATList(t *testing.T) {
 }
 
 func TestIAM_PATRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	tokens, err := client.IAM().PAT().List(ctx, testUserID(t), testTenantID(t))
 	require.NoError(t, err)
-	require.Len(t, tokens, 1)
+
+	var id string
+	for _, token := range tokens {
+		if token.Name == "Terraform" {
+			id = token.ID
+			break
+		}
+	}
+	if id == "" {
+		t.Fatalf(`failed to find token named "Terraform"`)
+	}
 
 	token, err := client.IAM().PAT().Read(ctx, tokens[0].ID)
 	require.NoError(t, err)
@@ -30,6 +44,8 @@ func TestIAM_PATRead(t *testing.T) {
 }
 
 func TestIAM_PATCreateAndDelete(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	roles := []string{testRole(t).ID}
 	expirationDate := int(time.Now().UnixMilli() + 24*60*60*1000)

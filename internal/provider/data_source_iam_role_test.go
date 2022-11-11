@@ -20,6 +20,13 @@ func TestAccDataSourceRole(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourceRoleName,
+			},
+			{
+				Config:      testAccDataSourceRoleConflict,
+				ExpectError: regexp.MustCompile(`"id": conflicts with name`),
+			},
+			{
 				Config:      testAccDataSourceRoleMissing,
 				ExpectError: regexp.MustCompile("failed to find role with id"),
 			},
@@ -30,6 +37,19 @@ func TestAccDataSourceRole(t *testing.T) {
 const testAccDataSourceRole = `
 data "cloudtemple_iam_role" "foo" {
   id = "c83a22e9-70bb-485e-a463-78a99484e5bb"
+}
+`
+
+const testAccDataSourceRoleName = `
+data "cloudtemple_iam_role" "foo" {
+  name = "compute_read"
+}
+`
+
+const testAccDataSourceRoleConflict = `
+data "cloudtemple_iam_role" "foo" {
+  id   = "c83a22e9-70bb-485e-a463-78a99484e5bb"
+  name = "compute_read"
 }
 `
 

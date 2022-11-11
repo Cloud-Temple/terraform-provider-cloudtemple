@@ -8,6 +8,8 @@ import (
 )
 
 func TestCompute_VirtualMachineList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	virtualMachines, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
 	require.NoError(t, err)
@@ -25,6 +27,8 @@ func TestCompute_VirtualMachineList(t *testing.T) {
 }
 
 func TestCompute_VirtualMachineRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	virtualMachine, err := client.Compute().VirtualMachine().Read(ctx, "de2b8b80-8b90-414a-bc33-e12f61a4c05c")
 	require.NoError(t, err)
@@ -142,6 +146,8 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 }
 
 func TestCompute_VirtualMachineCreateDelete(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
@@ -164,6 +170,8 @@ func TestCompute_VirtualMachineCreateDelete(t *testing.T) {
 }
 
 func TestCompute_UpdateAndPower(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{

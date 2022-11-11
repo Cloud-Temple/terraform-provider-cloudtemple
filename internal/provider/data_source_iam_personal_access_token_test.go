@@ -21,6 +21,14 @@ func TestAccDataSourcePersonalAccessToken(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourcePersonalAccessTokenName,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "name", "test-terraform"),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.#", "1"),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.0", "c83a22e9-70bb-485e-a463-78a99484e5bb"),
+				),
+			},
+			{
 				Config:      testAccDataSourcePersonalAccessTokenMissing,
 				ExpectError: regexp.MustCompile("failed to find personal access token with id"),
 			},
@@ -32,19 +40,34 @@ const testAccDataSourcePersonalAccessToken = `
 resource "cloudtemple_iam_personal_access_token" "foo" {
   name            = "test-terraform"
   expiration_date = "2023-01-02T15:04:05Z"
-  
+
   roles = [
     "c83a22e9-70bb-485e-a463-78a99484e5bb"
   ]
 }
 
 data "cloudtemple_iam_personal_access_token" "foo" {
-  client_id = cloudtemple_iam_personal_access_token.foo.id
+  id = cloudtemple_iam_personal_access_token.foo.id
+}
+`
+
+const testAccDataSourcePersonalAccessTokenName = `
+resource "cloudtemple_iam_personal_access_token" "foo" {
+  name            = "test-terraform"
+  expiration_date = "2023-01-02T15:04:05Z"
+
+  roles = [
+    "c83a22e9-70bb-485e-a463-78a99484e5bb"
+  ]
+}
+
+data "cloudtemple_iam_personal_access_token" "foo" {
+  name = "test-terraform"
 }
 `
 
 const testAccDataSourcePersonalAccessTokenMissing = `
 data "cloudtemple_iam_personal_access_token" "foo" {
-  client_id = "12345678-1234-5678-1234-567812345678"
+  id = "12345678-1234-5678-1234-567812345678"
 }
 `

@@ -195,7 +195,7 @@ func newStateWriter(d *schema.ResourceData) *stateWriter {
 	return &stateWriter{d: d}
 }
 
-func (sw *stateWriter) set(key string, value interface{}) {
+func (sw *stateWriter) set(key string, value any) {
 	if key == "id" {
 		sw.d.SetId(value.(string))
 		return
@@ -206,7 +206,7 @@ func (sw *stateWriter) set(key string, value interface{}) {
 	}
 }
 
-func (sw *stateWriter) save(obj interface{}, skip []string) {
+func (sw *stateWriter) save(obj any, skip []string) {
 	skipFields := map[string]struct{}{}
 	for _, s := range skip {
 		skipFields[s] = struct{}{}
@@ -215,14 +215,17 @@ func (sw *stateWriter) save(obj interface{}, skip []string) {
 	typ := reflect.TypeOf(obj)
 	fields := map[string]reflect.Value{}
 
-	switch {
-	case typ.Kind() == reflect.Map:
+	switch typ.Kind() {
+	case reflect.Map:
 		for name, value := range obj.(map[string]interface{}) {
 			fields[name] = reflect.ValueOf(value)
 		}
-	case typ.Elem().Kind() == reflect.Struct:
-		typ = typ.Elem()
-		for _, field := range reflect.VisibleFields(typ) {
+	case reflect.Pointer:
+		item := reflect.ValueOf(obj).Elem()
+		if item.Kind() == reflect.Interface {
+			item = item.Elem()
+		}
+		for _, field := range reflect.VisibleFields(item.Type()) {
 			name, found := field.Tag.Lookup("terraform")
 			if name == "-" {
 				continue
@@ -231,7 +234,7 @@ func (sw *stateWriter) save(obj interface{}, skip []string) {
 				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
 				continue
 			}
-			fields[name] = reflect.ValueOf(obj).Elem().FieldByName(field.Name)
+			fields[name] = item.FieldByName(field.Name)
 		}
 	default:
 		sw.diags = append(sw.diags, diag.Errorf("unexpected type %s", typ.String())...)
@@ -242,11 +245,12 @@ func (sw *stateWriter) save(obj interface{}, skip []string) {
 			continue
 		}
 
-		sw.set(name, sw.convert(value, false, name, skipFields))
+		converted := sw.convert(value, false, name, skipFields)
+		sw.set(name, converted)
 	}
 }
 
-func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string, skipFields map[string]struct{}) interface{} {
+func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string, skipFields map[string]struct{}) any {
 	// Convert time.Time to its string representation
 	if v.Type().String() == "time.Time" {
 		return v.Interface().(time.Time).Format(time.RFC3339)

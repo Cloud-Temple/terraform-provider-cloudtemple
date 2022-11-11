@@ -8,6 +8,8 @@ import (
 )
 
 func TestCompute_ContentLibraryList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	contentLibraries, err := client.Compute().ContentLibrary().List(ctx, "", "", "")
 	require.NoError(t, err)
@@ -25,6 +27,8 @@ func TestCompute_ContentLibraryList(t *testing.T) {
 }
 
 func TestCompute_ContentLibraryRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	contentLibrary, err := client.Compute().ContentLibrary().Read(ctx, "355b654d-6ea2-4773-80ee-246d3f56964f")
 	require.NoError(t, err)

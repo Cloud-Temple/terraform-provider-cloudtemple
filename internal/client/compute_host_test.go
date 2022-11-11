@@ -8,6 +8,8 @@ import (
 )
 
 func TestCompute_HostList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	hosts, err := client.Compute().Host().List(ctx, "", "", "", "")
 	require.NoError(t, err)
@@ -25,6 +27,8 @@ func TestCompute_HostList(t *testing.T) {
 }
 
 func TestCompute_HostRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	host, err := client.Compute().Host().Read(ctx, "8997db63-24d5-47f4-8cca-d5f5df199d1a")
 	require.NoError(t, err)

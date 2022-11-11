@@ -16,7 +16,7 @@ func (i *IAM) PAT() *PATClient {
 }
 
 type Token struct {
-	ID             string   `terraform:"client_id"`
+	ID             string   `terraform:"id"`
 	Name           string   `terraform:"name"`
 	Secret         string   `terraform:"secret"`
 	Roles          []string `terraform:"roles"`

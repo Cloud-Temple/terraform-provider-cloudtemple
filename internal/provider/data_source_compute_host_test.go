@@ -20,6 +20,13 @@ func TestAccDataSourceHost(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourceHostName,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "id", "8997db63-24d5-47f4-8cca-d5f5df199d1a"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "name", "esx001-bob-ucs01-eqx6.cloud-temple.lan"),
+				),
+			},
+			{
 				Config:      testAccDataSourceHostMissing,
 				ExpectError: regexp.MustCompile("failed to find host with id"),
 			},
@@ -30,6 +37,12 @@ func TestAccDataSourceHost(t *testing.T) {
 const testAccDataSourceHost = `
 data "cloudtemple_compute_host" "foo" {
   id = "8997db63-24d5-47f4-8cca-d5f5df199d1a"
+}
+`
+
+const testAccDataSourceHostName = `
+data "cloudtemple_compute_host" "foo" {
+  name = "esx001-bob-ucs01-eqx6.cloud-temple.lan"
 }
 `
 

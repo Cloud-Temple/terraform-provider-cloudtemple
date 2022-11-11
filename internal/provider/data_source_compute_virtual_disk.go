@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,31 +12,45 @@ func dataSourceVirtualDisk() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
-			id := d.Get("id").(string)
-			disk, err := client.Compute().VirtualDisk().Read(ctx, id)
-			if err == nil && disk == nil {
-				return nil, fmt.Errorf("failed to find virtual disk with id %q", id)
-			}
-			return disk, err
+			return getBy(
+				ctx,
+				d,
+				"virtual disk",
+				func(id string) (any, error) {
+					return client.Compute().VirtualDisk().Read(ctx, id)
+				},
+				func(d *schema.ResourceData) (any, error) {
+					virtualMachineId := d.Get("virtual_machine_id").(string)
+					return client.Compute().VirtualDisk().List(ctx, virtualMachineId)
+				},
+				[]string{"name"},
+			)
 		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
 			"id": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"name"},
+			},
+			"name": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"id"},
+				RequiredWith:  []string{"virtual_machine_id"},
+			},
+			"virtual_machine_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				RequiredWith:  []string{"name"},
+				ConflictsWith: []string{"id"},
 			},
 
 			// Out
-			"virtual_machine_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"name": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},

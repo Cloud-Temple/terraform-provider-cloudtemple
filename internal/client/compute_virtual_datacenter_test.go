@@ -8,6 +8,8 @@ import (
 )
 
 func TestCompute_VirtualDatacenterList(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	virtualDatacenters, err := client.Compute().VirtualDatacenter().List(ctx, "", "")
 	require.NoError(t, err)
@@ -25,6 +27,8 @@ func TestCompute_VirtualDatacenterList(t *testing.T) {
 }
 
 func TestCompute_VirtualDatacenterRead(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 	virtualDatacenter, err := client.Compute().VirtualDatacenter().Read(ctx, "ac33c033-693b-4fc5-9196-26df77291dbb")
 	require.NoError(t, err)

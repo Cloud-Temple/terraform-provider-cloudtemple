@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,33 +12,56 @@ func dataSourceUser() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
-			id := d.Get("id").(string)
-			user, err := client.IAM().User().Read(ctx, id)
-			if err == nil && user == nil {
-				return nil, fmt.Errorf("failed to find user with id %q", id)
-			}
-			return user, err
+			return getBy(
+				ctx,
+				d,
+				"user",
+				func(id string) (any, error) {
+					return client.IAM().User().Read(ctx, id)
+				},
+				func(d *schema.ResourceData) (any, error) {
+					companyId, err := getCompanyID(ctx, client, d)
+					if err != nil {
+						return nil, err
+					}
+					return client.IAM().User().List(ctx, companyId)
+				},
+				[]string{"internal_id", "name", "email"},
+			)
 		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
 			"id": {
-				Description: "",
-				Type:        schema.TypeString,
-				Required:    true,
+				Description:   "",
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "internal_id", "name", "email"},
+				ConflictsWith: []string{"internal_id", "name", "email"},
+			},
+			"internal_id": {
+				Description:   "",
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "internal_id", "name", "email"},
+				ConflictsWith: []string{"id", "name", "email"},
+			},
+			"name": {
+				Description:   "",
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "internal_id", "name", "email"},
+				ConflictsWith: []string{"id", "internal_id", "email"},
+			},
+			"email": {
+				Description:   "",
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "internal_id", "name", "email"},
+				ConflictsWith: []string{"id", "internal_id", "name"},
 			},
 
 			// Out
-			"internal_id": {
-				Description: "",
-				Type:        schema.TypeString,
-				Computed:    true,
-			},
-			"name": {
-				Description: "",
-				Type:        schema.TypeString,
-				Computed:    true,
-			},
 			"type": {
 				Description: "",
 				Type:        schema.TypeString,
@@ -62,11 +84,6 @@ func dataSourceUser() *schema.Resource {
 			"email_verified": {
 				Description: "",
 				Type:        schema.TypeBool,
-				Computed:    true,
-			},
-			"email": {
-				Description: "",
-				Type:        schema.TypeString,
 				Computed:    true,
 			},
 		},

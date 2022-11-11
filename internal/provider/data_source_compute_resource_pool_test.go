@@ -20,6 +20,13 @@ func TestAccDataSourceResourcePool(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourceResourcePoolName,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "id", "d21f84fd-5063-4383-b2b0-65b9f25eac27"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "name", "Resources"),
+				),
+			},
+			{
 				Config:      testAccDataSourceResourcePoolMissing,
 				ExpectError: regexp.MustCompile("failed to find resource pool with id"),
 			},
@@ -30,6 +37,12 @@ func TestAccDataSourceResourcePool(t *testing.T) {
 const testAccDataSourceResourcePool = `
 data "cloudtemple_compute_resource_pool" "foo" {
   id = "d21f84fd-5063-4383-b2b0-65b9f25eac27"
+}
+`
+
+const testAccDataSourceResourcePoolName = `
+data "cloudtemple_compute_resource_pool" "foo" {
+  name = "Resources"
 }
 `
 
