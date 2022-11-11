@@ -408,45 +408,6 @@ func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, me
 func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
-	// If the VM is running we must first stop it
-	vm, err := c.Compute().VirtualMachine().Read(ctx, d.Id())
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
-	if vm.PowerState == "running" {
-		activityId, err := c.Compute().VirtualMachine().Update(ctx, &client.UpdateVirtualMachineRequest{
-			Id: d.Id(),
-			BootOptions: &client.BootOptions{
-				BootDelay:        0,
-				BootRetryDelay:   10000,
-				BootRetryEnabled: false,
-				EnterBIOSSetup:   false,
-				Firmware:         "bios",
-			},
-		})
-		if err != nil {
-			return diag.FromErr(err)
-		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
-			ID:           d.Id(),
-			DatacenterId: vm.VirtualDatacenterId,
-			PowerAction:  "off",
-		})
-		if err != nil {
-			return diag.FromErr(err)
-		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-	}
-
 	activityId, err := c.Compute().VirtualMachine().Delete(ctx, d.Id())
 	if err != nil {
 		return diag.FromErr(err)
