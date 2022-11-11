@@ -38,8 +38,8 @@ output "role" {
 
 Read-Only:
 
-- `client_id` (String)
 - `expiration_date` (String)
+- `id` (String)
 - `name` (String)
 - `roles` (List of String)
 
