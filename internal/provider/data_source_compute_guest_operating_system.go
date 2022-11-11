@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceGuestOperatingSystem() *schema.Resource {
@@ -30,8 +31,9 @@ func dataSourceGuestOperatingSystem() *schema.Resource {
 				Required: true,
 			},
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:         schema.TypeString,
+				Required:     true,
+				ValidateFunc: validation.IsUUID,
 			},
 
 			// Out

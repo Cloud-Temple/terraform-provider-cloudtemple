@@ -5,6 +5,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceWorker() *schema.Resource {
@@ -33,6 +34,7 @@ func dataSourceWorker() *schema.Resource {
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
+				ValidateFunc:  validation.IsUUID,
 			},
 			"name": {
 				Type:          schema.TypeString,

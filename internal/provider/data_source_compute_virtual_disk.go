@@ -5,6 +5,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceVirtualDisk() *schema.Resource {
@@ -34,6 +35,7 @@ func dataSourceVirtualDisk() *schema.Resource {
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
+				ValidateFunc:  validation.IsUUID,
 			},
 			"name": {
 				Type:          schema.TypeString,
@@ -47,6 +49,7 @@ func dataSourceVirtualDisk() *schema.Resource {
 				Optional:      true,
 				RequiredWith:  []string{"name"},
 				ConflictsWith: []string{"id"},
+				ValidateFunc:  validation.IsUUID,
 			},
 
 			// Out

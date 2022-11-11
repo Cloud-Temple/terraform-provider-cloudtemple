@@ -5,6 +5,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceUser() *schema.Resource {
@@ -38,6 +39,7 @@ func dataSourceUser() *schema.Resource {
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "internal_id", "name", "email"},
 				ConflictsWith: []string{"internal_id", "name", "email"},
+				ValidateFunc:  validation.IsUUID,
 			},
 			"internal_id": {
 				Description:   "",
@@ -45,6 +47,7 @@ func dataSourceUser() *schema.Resource {
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "internal_id", "name", "email"},
 				ConflictsWith: []string{"id", "name", "email"},
+				ValidateFunc:  validation.IsUUID,
 			},
 			"name": {
 				Description:   "",

@@ -5,6 +5,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourcePersonalAccessTokens() *schema.Resource {
@@ -31,14 +32,16 @@ func dataSourcePersonalAccessTokens() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// In
 			"user_id": {
-				Description: "",
-				Type:        schema.TypeString,
-				Optional:    true,
+				Description:  "",
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
 			},
 			"tenant_id": {
-				Description: "",
-				Type:        schema.TypeString,
-				Optional:    true,
+				Description:  "",
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
 			},
 
 			// Out

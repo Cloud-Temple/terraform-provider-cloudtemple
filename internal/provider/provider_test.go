@@ -1,9 +1,12 @@
 package provider
 
 import (
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 // providerFactories are used to instantiate a provider during acceptance testing.
@@ -23,20 +26,40 @@ func TestProvider(t *testing.T) {
 
 func testAccPreCheck(t *testing.T) {}
 
-// func getTestClient(t *testing.T) (*client.Client, string, string) {
-// 	config := client.DefaultConfig()
-// 	config.ClientID = os.Getenv("CLOUDTEMPLE_CLIENT_ID")
-// 	config.SecretID = os.Getenv("CLOUDTEMPLE_SECRET_ID")
+func TestUUIDValidation(t *testing.T) {
+	provider := New("dev")()
 
-// 	client, err := client.NewClient(config)
-// 	if err != nil {
-// 		t.Fatalf("fail to get test client: %s", err)
-// 	}
+	checkUUID := func(name string, r *schema.Resource) func(t *testing.T) {
+		expected := reflect.ValueOf(validation.IsUUID).Pointer()
 
-// 	lt, err := client.Token(context.Background())
-// 	if err != nil {
-// 		t.Fatalf("failed to get token: %s", err)
-// 	}
+		var validateSchema func(r *schema.Resource)
+		validateSchema = func(r *schema.Resource) {
+			for n, s := range r.Schema {
+				if !strings.HasSuffix(n, "id") {
+					return
+				}
+				if !s.Optional && !s.Required {
+					return
+				}
+				if reflect.ValueOf(s.ValidateFunc).Pointer() != expected {
+					t.Errorf("%s.%s ValidateFunc is incorrect", name, n)
+				}
+				if resource, ok := s.Elem.(*schema.Resource); ok {
+					validateSchema(resource)
+				}
+			}
+		}
 
-// 	return client, lt.UserID(), lt.TenantID()
-// }
+		return func(t *testing.T) {
+			validateSchema(r)
+		}
+	}
+
+	for name, datasource := range provider.DataSourcesMap {
+		t.Run(name, checkUUID("data."+name, datasource))
+	}
+
+	for name, resource := range provider.ResourcesMap {
+		t.Run(name, checkUUID(name, resource))
+	}
+}

@@ -5,6 +5,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceVirtualDatacenter() *schema.Resource {
@@ -33,6 +34,7 @@ func dataSourceVirtualDatacenter() *schema.Resource {
 				Optional:      true,
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
+				ValidateFunc:  validation.IsUUID,
 			},
 			"name": {
 				Type:          schema.TypeString,

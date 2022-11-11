@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceDatastoreCluster() *schema.Resource {
@@ -42,6 +43,7 @@ func dataSourceDatastoreCluster() *schema.Resource {
 				Optional:      true,
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
+				ValidateFunc:  validation.IsUUID,
 			},
 			"name": {
 				Type:          schema.TypeString,

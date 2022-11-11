@@ -5,6 +5,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceUsers() *schema.Resource {
@@ -27,9 +28,10 @@ func dataSourceUsers() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// In
 			"company_id": {
-				Description: "",
-				Type:        schema.TypeString,
-				Optional:    true,
+				Description:  "",
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
 			},
 
 			// Out
