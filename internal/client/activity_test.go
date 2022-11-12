@@ -57,3 +57,52 @@ func TestActivity_Read(t *testing.T) {
 
 	require.Equal(t, expected, activity)
 }
+
+func TestActivityClient_WaitForCompletion(t *testing.T) {
+	ctx := context.Background()
+
+	tests := map[string]struct {
+		id      string
+		want    *Activity
+		wantErr string
+	}{
+		"finished activity": {
+			id: "022ae273-552d-4588-a913-f8260638d3a4",
+			want: &Activity{
+				ID:           "022ae273-552d-4588-a913-f8260638d3a4",
+				TenantId:     "e225dbf8-e7c5-4664-a595-08edf3526080",
+				Description:  "Updating virtual machine test-terraform",
+				Type:         "ComputeActivity",
+				Tags:         []string{"compute", "vcenter", "virtual_machine", "update"},
+				CreationDate: time.Date(2022, time.November, 9, 15, 34, 34, 659000000, time.UTC),
+				State: map[string]ActivityState{
+					"completed": {
+						StartDate: "2022-11-09T15:34:34.660Z",
+						StopDate:  "2022-11-09T15:34:34.720Z",
+					},
+				},
+				ConcernedItems: []ActivityConcernedItem{
+					{
+						ID:   "6453cd41-1d08-4caf-935f-99c48be4a994",
+						Type: "virtual_machine",
+					},
+				},
+			},
+		},
+		"non-exisiting activity": {
+			id:      "12345678-1234-5678-1234-567812345678",
+			wantErr: `the activity "12345678-1234-5678-1234-567812345678" could not be found`,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := client.Activity().WaitForCompletion(ctx, tt.id)
+			if tt.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				require.ErrorContains(t, err, tt.wantErr)
+			}
+			require.Equal(t, tt.want, got)
+		})
+	}
+}

@@ -83,11 +83,20 @@ func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string) (*Act
 	b = retry.WithCappedDuration(30*time.Second, b)
 
 	var res *Activity
+	var count int
 
 	err := retry.Do(ctx, b, func(ctx context.Context) error {
+		count++
 		activity, err := c.Read(ctx, id)
 		if err != nil {
 			return retry.RetryableError(fmt.Errorf("an error occured while getting activity status: %v", err))
+		}
+		if activity == nil {
+			err := fmt.Errorf("the activity %q could not be found", id)
+			if count == 1 {
+				return retry.RetryableError(err)
+			}
+			return err
 		}
 		if len(activity.State) != 1 {
 			return retry.RetryableError(fmt.Errorf("unexpected state: %v", activity.State))
