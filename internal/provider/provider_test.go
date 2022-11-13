@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/stretchr/testify/require"
@@ -197,5 +198,45 @@ func TestImport(t *testing.T) {
 			}
 			require.NotNil(t, resource.Importer, "no importer for %s", name)
 		})
+	}
+}
+
+func TestExample(t *testing.T) {
+	t.Parallel()
+
+	provider := New("dev")()
+
+	test := func(typ, name string) func(t *testing.T) {
+		return func(t *testing.T) {
+			t.Parallel()
+
+			path := fmt.Sprintf("../../examples/%ss/%s/%s.tf", typ, name, typ)
+			require.FileExists(t, path)
+
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+
+			content := string(data)
+
+			require.Contains(t, content, name)
+
+			resource.Test(t, resource.TestCase{
+				PreCheck:          func() { testAccPreCheck(t) },
+				ProviderFactories: providerFactories,
+				Steps: []resource.TestStep{
+					{
+						Config: content,
+					},
+				},
+			})
+		}
+	}
+
+	for name := range provider.ResourcesMap {
+		t.Run(name, test("resource", name))
+	}
+
+	for name := range provider.DataSourcesMap {
+		t.Run("data.name", test("data-source", name))
 	}
 }

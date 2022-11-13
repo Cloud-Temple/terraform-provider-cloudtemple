@@ -13,12 +13,14 @@ To query this datasource you will need the `iam_read` role.
 ## Example Usage
 
 ```terraform
-data "cloudtemple_iam_role" "example" {
-  id = "b7a0d310-839e-419b-9e56-fb052eb17958"
+# Read a role using its ID
+data "cloudtemple_iam_role" "id" {
+  id = "c83a22e9-70bb-485e-a463-78a99484e5bb"
 }
 
-output "role" {
-  value = data.cloudtemple_iam_role.example
+# Read a role using its name
+data "cloudtemple_iam_role" "name" {
+  name = "compute_read"
 }
 ```
 

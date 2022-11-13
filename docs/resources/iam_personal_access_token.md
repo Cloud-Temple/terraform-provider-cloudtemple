@@ -15,9 +15,9 @@ To manage this resource you will need the `iam_offline_access` role.
 ```terraform
 resource "cloudtemple_iam_personal_access_token" "example" {
   name            = "this is a test of Terraform"
-  expiration_date = "2022-10-20T00:00:00Z"
+  expiration_date = "2023-10-20T00:00:00Z"
   roles = [
-    "b7a0d310-839e-419b-9e56-fb052eb17958"
+    "c83a22e9-70bb-485e-a463-78a99484e5bb"
   ]
 }
 

@@ -13,12 +13,14 @@ To query this datasource you will need the `iam_read` role.
 ## Example Usage
 
 ```terraform
-data "cloudtemple_iam_personal_access_token" "example" {
-  client_id = "a1f8c60d-1441-454e-a2c0-73e4be02537e"
+# Read a token using its ID
+data "cloudtemple_iam_personal_access_token" "id" {
+  id = "6f0ac881-bb3d-4c0b-8276-d38f71aa392d"
 }
 
-output "tokens" {
-  value = data.cloudtemple_iam_personal_access_token.example
+# Read a token using its name
+data "cloudtemple_iam_personal_access_token" "name" {
+  name = "Terraform"
 }
 ```
 

@@ -14,7 +14,7 @@ func TestAccDataSourceBackupSLAPolicies(t *testing.T) {
 			{
 				Config: testAccDataSourceBackupSLAPolicies,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policies.foo", "sla_policies.#", "10"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policies.foo", "sla_policies.#"),
 				),
 			},
 		},

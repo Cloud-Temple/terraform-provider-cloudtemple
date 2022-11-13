@@ -20,6 +20,13 @@ func TestAccDataSourceDatastoreCluster(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccDataSourceDatastoreClusterName,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "id", "6b06b226-ef55-4a0a-92bc-7aa071681b1b"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "name", "sdrs001-LIVE_KOUKOU"),
+				),
+			},
+			{
 				Config:      testAccDataSourceDatastoreClusterMissing,
 				ExpectError: regexp.MustCompile("failed to find datastore cluster with id"),
 			},
@@ -30,6 +37,12 @@ func TestAccDataSourceDatastoreCluster(t *testing.T) {
 const testAccDataSourceDatastoreCluster = `
 data "cloudtemple_compute_datastore_cluster" "foo" {
   id = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+}
+`
+
+const testAccDataSourceDatastoreClusterName = `
+data "cloudtemple_compute_datastore_cluster" "foo" {
+  name = "sdrs001-LIVE_KOUKOU"
 }
 `
 

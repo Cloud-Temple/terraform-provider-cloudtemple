@@ -1,5 +1,1 @@
-data "cloudtemple_iam_role" "example" {}
-
-output "role" {
-  value = data.cloudtemple_iam_role.example
-}
+data "cloudtemple_iam_personal_access_tokens" "foo" {}

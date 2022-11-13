@@ -32,8 +32,14 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
 }
 
 resource "cloudtemple_compute_virtual_machine" "foo" {
-  name        = "demo-terraform"
-  power_state = "off"
+  name = "test-terraform-example-vm"
+
+  memory                 = 8 * 1024 * 1024 * 1024
+  cpu                    = 2
+  num_cores_per_socket   = 1
+  cpu_hot_add_enabled    = true
+  cpu_hot_remove_enabled = true
+  memory_hot_add_enabled = true
 
   virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
@@ -55,18 +61,21 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 
 ### Optional
 
+- `content_library_item_id` (String)
 - `cpu` (Number)
+- `cpu_hot_add_enabled` (Boolean)
+- `cpu_hot_remove_enabled` (Boolean)
 - `datastore_id` (String)
 - `host_id` (String)
 - `memory` (Number)
+- `memory_hot_add_enabled` (Boolean)
+- `num_cores_per_socket` (Number)
 - `power_state` (String)
 
 ### Read-Only
 
 - `boot_options` (List of Object) (see [below for nested schema](#nestedatt--boot_options))
 - `consolidation_needed` (Boolean)
-- `cpu_hot_add_enabled` (Boolean)
-- `cpu_hot_remove_enabled` (Boolean)
 - `cpu_usage` (Number)
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
@@ -76,10 +85,8 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 - `machine_manager_id` (String)
 - `machine_manager_name` (String)
 - `machine_manager_type` (String)
-- `memory_hot_add_enabled` (Boolean)
 - `memory_usage` (Number)
 - `moref` (String)
-- `num_cores_per_socket` (Number)
 - `operating_system_name` (String)
 - `replication_config` (List of Object) (see [below for nested schema](#nestedatt--replication_config))
 - `snapshoted` (Boolean)

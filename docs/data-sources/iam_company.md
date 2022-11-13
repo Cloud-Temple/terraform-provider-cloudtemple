@@ -13,10 +13,9 @@ To query this datasource you will need the `iam_read` role.
 ## Example Usage
 
 ```terraform
-data "cloudtemple_iam_company" "company" {}
-
-output "company" {
-  value = data.cloudtemple_iam_company.company.name
+# Read a company
+data "cloudtemple_iam_company" "foo" {
+  id = "77a7d0a7-768d-4688-8c32-5fc539c5a859"
 }
 ```
 

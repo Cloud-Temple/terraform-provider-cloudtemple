@@ -11,8 +11,14 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
 }
 
 resource "cloudtemple_compute_virtual_machine" "foo" {
-  name        = "demo-terraform"
-  power_state = "off"
+  name = "test-terraform-example-vm"
+
+  memory                 = 8 * 1024 * 1024 * 1024
+  cpu                    = 2
+  num_cores_per_socket   = 1
+  cpu_hot_add_enabled    = true
+  cpu_hot_remove_enabled = true
+  memory_hot_add_enabled = true
 
   virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
