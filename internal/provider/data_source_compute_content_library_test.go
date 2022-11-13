@@ -14,7 +14,7 @@ func TestAccDataSourceLibrary(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceLibrary,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "id", "355b654d-6ea2-4773-80ee-246d3f56964f"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "name", "PUBLIC"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "machine_manager_id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
@@ -26,7 +26,7 @@ func TestAccDataSourceLibrary(t *testing.T) {
 			},
 			{
 				Config: testAccDataSourceLibraryName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "id", "355b654d-6ea2-4773-80ee-246d3f56964f"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "name", "PUBLIC"),
 				),

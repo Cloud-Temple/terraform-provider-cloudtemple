@@ -13,7 +13,7 @@ func TestAccDataSourceHosts(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceHosts,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_hosts.foo", "hosts.#", "3"),
 				),
 			},

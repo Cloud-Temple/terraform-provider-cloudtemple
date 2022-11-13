@@ -14,7 +14,7 @@ func TestAccDataSourceRole(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceRole,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_role.foo", "id", "c83a22e9-70bb-485e-a463-78a99484e5bb"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_role.foo", "name", "compute_read"),
 				),

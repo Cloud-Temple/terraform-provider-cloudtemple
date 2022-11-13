@@ -31,7 +31,6 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
   name = "sdrs001-LIVE_KOUKOU"
 }
 
-
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name        = "demo-terraform"
   power_state = "off"

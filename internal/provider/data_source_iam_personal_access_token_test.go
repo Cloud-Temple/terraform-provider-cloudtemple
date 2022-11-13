@@ -14,7 +14,7 @@ func TestAccDataSourcePersonalAccessToken(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourcePersonalAccessToken,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "name", "test-terraform"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.#", "1"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.0", "c83a22e9-70bb-485e-a463-78a99484e5bb"),
@@ -22,7 +22,7 @@ func TestAccDataSourcePersonalAccessToken(t *testing.T) {
 			},
 			{
 				Config: testAccDataSourcePersonalAccessTokenName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "name", "test-terraform"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.#", "1"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.0", "c83a22e9-70bb-485e-a463-78a99484e5bb"),

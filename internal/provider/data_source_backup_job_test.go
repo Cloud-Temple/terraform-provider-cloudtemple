@@ -14,7 +14,7 @@ func TestAccDataSourceBackupJob(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceBackupJob,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "id", "1004"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "name", "Hypervisor Inventory"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "display_name", "Hypervisor Inventory"),
@@ -25,7 +25,7 @@ func TestAccDataSourceBackupJob(t *testing.T) {
 			},
 			{
 				Config: testAccDataSourceBackupJobName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "id", "1004"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "name", "Hypervisor Inventory"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "display_name", "Hypervisor Inventory"),

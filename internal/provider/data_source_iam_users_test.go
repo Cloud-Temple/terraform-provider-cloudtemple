@@ -13,7 +13,7 @@ func TestAccDataSourceUsers(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceUsers,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_users.foo", "users.#"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_users.foo", "users.0.id"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_users.foo", "users.0.internal_id"),

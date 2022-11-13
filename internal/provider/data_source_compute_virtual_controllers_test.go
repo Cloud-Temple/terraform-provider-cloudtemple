@@ -13,13 +13,13 @@ func TestAccDataSourceVirtualControllers(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceVirtualControllers,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_controllers.foo", "virtual_controllers.#", "5"),
 				),
 			},
 			{
 				Config: testAccDataSourceVirtualControllersMissing,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_controllers.foo", "virtual_controllers.#", "0"),
 				),
 			},

@@ -14,14 +14,14 @@ func TestAccDataSourceWorker(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceWorker,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_worker.foo", "id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_worker.foo", "name", "vc-vstack-080-bob"),
 				),
 			},
 			{
 				Config: testAccDataSourceWorkerName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_worker.foo", "id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_worker.foo", "name", "vc-vstack-080-bob"),
 				),

@@ -14,7 +14,7 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccResourceVirtualMachine,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "virtual_datacenter_id", "85d53d08-0fa9-491e-ab89-90919516df25"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "host_cluster_id", "dde72065-60f4-4577-836d-6ea074384d62"),
@@ -36,13 +36,13 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 			},
 			{
 				Config: testAccResourceVirtualMachineRename,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform-rename"),
 				),
 			},
 			{
 				Config: testAccResourceVirtualMachinePowerOn,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform-rename"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "power_state", "on"),
 				),

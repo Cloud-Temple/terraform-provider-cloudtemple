@@ -14,7 +14,7 @@ func TestAccDataSourceGuestOperatingSystem(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceGuestOperatingSystem,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_guest_operating_system.foo", "id", "amazonlinux2_64Guest"),
 				),
 			},

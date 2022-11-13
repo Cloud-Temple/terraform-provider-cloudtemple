@@ -13,7 +13,7 @@ func TestAccDataSourceMetrics(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceMetrics,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_metrics.foo", "coverage.#", "1"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_metrics.foo", "history.#", "1"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_metrics.foo", "platform.#", "1"),

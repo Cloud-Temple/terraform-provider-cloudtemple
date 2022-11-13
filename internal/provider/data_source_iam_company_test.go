@@ -14,7 +14,7 @@ func TestAccDataSourceCompany(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceCompany,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_company.foo", "id", "77a7d0a7-768d-4688-8c32-5fc539c5a859"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_company.foo", "name", "Cloud Temple"),
 				),

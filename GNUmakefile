@@ -8,6 +8,10 @@ test: testclient testacc
 testclient:
 	go test ./internal/client/... -v $(TESTARGS) -timeout 120m
 
+.PHONY: testprovider
+testprovider:
+	go test ./internal/provider/... -v $(TESTARGS) -timeout 120m
+
 # Run acceptance tests
 .PHONY: testacc
 testacc:

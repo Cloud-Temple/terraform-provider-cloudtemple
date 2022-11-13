@@ -14,7 +14,7 @@ func TestAccDataSourceUser(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceUser,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", "37105598-4889-43da-82ea-cf60f2a36aee"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", "7b8ba092-52e3-4c21-a2f5-adca40a80d34"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", "Rémi Lapeyre"),
@@ -26,7 +26,7 @@ func TestAccDataSourceUser(t *testing.T) {
 			},
 			{
 				Config: testAccDataSourceUserName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", "37105598-4889-43da-82ea-cf60f2a36aee"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", "7b8ba092-52e3-4c21-a2f5-adca40a80d34"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", "Rémi Lapeyre"),
@@ -38,7 +38,7 @@ func TestAccDataSourceUser(t *testing.T) {
 			},
 			{
 				Config: testAccDataSourceUserInternalId,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", "37105598-4889-43da-82ea-cf60f2a36aee"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", "7b8ba092-52e3-4c21-a2f5-adca40a80d34"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", "Rémi Lapeyre"),
@@ -50,7 +50,7 @@ func TestAccDataSourceUser(t *testing.T) {
 			},
 			{
 				Config: testAccDataSourceUserEmail,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", "37105598-4889-43da-82ea-cf60f2a36aee"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", "7b8ba092-52e3-4c21-a2f5-adca40a80d34"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", "Rémi Lapeyre"),

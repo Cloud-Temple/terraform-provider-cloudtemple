@@ -48,10 +48,6 @@ func TestMain(m *testing.M) {
 	}
 
 	// Clean resources from previous tests run
-	names := map[string]struct{}{
-		"test-terraform":        {},
-		"test-terraform-rename": {},
-	}
 	ctx := context.Background()
 	vms, err := c.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
 	if err != nil {
@@ -59,29 +55,31 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	for _, vm := range vms {
-		if _, found := names[vm.Name]; found {
+		if strings.HasPrefix(vm.Name, "test-terraform") {
 			vm, err = c.Compute().VirtualMachine().Read(ctx, vm.ID)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 				os.Exit(1)
 			}
 
-			activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
-				ID:           vm.ID,
-				DatacenterId: vm.VirtualDatacenterId,
-				PowerAction:  "off",
-			})
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-				os.Exit(1)
-			}
-			_, err = c.Activity().WaitForCompletion(ctx, activityId)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to stop %s:%s\n", vm.Name, err.Error())
-				os.Exit(1)
+			if vm.PowerState == "running" {
+				activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
+					ID:           vm.ID,
+					DatacenterId: vm.VirtualDatacenterId,
+					PowerAction:  "off",
+				})
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+					os.Exit(1)
+				}
+				_, err = c.Activity().WaitForCompletion(ctx, activityId)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "failed to stop %s:%s\n", vm.Name, err.Error())
+					os.Exit(1)
+				}
 			}
 
-			activityId, err = c.Compute().VirtualMachine().Delete(ctx, vm.ID)
+			activityId, err := c.Compute().VirtualMachine().Delete(ctx, vm.ID)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 				os.Exit(1)
@@ -94,7 +92,7 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	names = map[string]struct{}{
+	names := map[string]struct{}{
 		"client-test": {},
 	}
 
@@ -185,12 +183,15 @@ func TestImport(t *testing.T) {
 	skip := map[string]struct{}{
 		// Access tokens cannot be imported because there is no way of getting the secret
 		"cloudtemple_iam_personal_access_token": {},
+
+		// TODO: we skip this one for now
+		"cloudtemple_compute_network_adapter": {},
 	}
 
 	for name, resource := range provider.ResourcesMap {
 		t.Run(name, func(t *testing.T) {
 			if _, found := skip[name]; found {
-				return
+				t.Skip()
 			}
 			if resource.Importer == nil {
 				t.Fatalf("no importer for %s", name)

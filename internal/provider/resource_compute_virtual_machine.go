@@ -341,9 +341,6 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	reader := readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
 		id := d.Id()
-		if id == "" {
-			panic("")
-		}
 		vm, err := client.Compute().VirtualMachine().Read(ctx, id)
 		if err == nil && vm == nil {
 			return nil, nil

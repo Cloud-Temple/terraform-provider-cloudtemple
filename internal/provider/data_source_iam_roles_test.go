@@ -13,7 +13,7 @@ func TestAccDataSourceRoles(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceRoles,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_roles.foo", "roles.0.id"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_roles.foo", "roles.0.name"),
 				),

@@ -13,7 +13,7 @@ func TestAccDataSourceNetworks(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceNetworks,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_networks.foo", "networks.#", "4"),
 				),
 			},

@@ -13,7 +13,7 @@ func TestAccDataSourceVirtualSwitchs(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceVirtualSwitchs,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switchs.foo", "virtual_switchs.#", "2"),
 				),
 			},

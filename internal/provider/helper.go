@@ -57,7 +57,7 @@ func readResource(read func(ctx context.Context, client *client.Client, d *schem
 		if err != nil {
 			return diag.FromErr(err)
 		}
-		if res == nil {
+		if res == nil || (reflect.ValueOf(res).Kind() == reflect.Ptr && reflect.ValueOf(res).IsNil()) {
 			d.SetId("")
 			return nil
 		}

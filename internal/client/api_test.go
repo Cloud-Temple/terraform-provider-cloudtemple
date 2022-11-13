@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -49,12 +50,6 @@ func TestMain(m *testing.M) {
 	client = c
 
 	// Clean resources from previous tests run
-	names := map[string]struct{}{
-		"test-power":         {},
-		"test-client":        {},
-		"test-client-rename": {},
-		"test-rename":        {},
-	}
 	ctx := context.Background()
 	vms, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
 	if err != nil {
@@ -62,23 +57,31 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	for _, vm := range vms {
-		if _, found := names[vm.Name]; found {
-			activityId, err := client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
-				ID:           vm.ID,
-				DatacenterId: vm.VirtualDatacenterId,
-				PowerAction:  "off",
-			})
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-				os.Exit(1)
-			}
-			_, err = client.Activity().WaitForCompletion(ctx, activityId)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "failed to stop %s:%s\n", vm.Name, err.Error())
-				os.Exit(1)
+		if strings.HasPrefix(vm.Name, "test-client") {
+			if vm.PowerState == "running" {
+				vm, err = client.Compute().VirtualMachine().Read(ctx, vm.ID)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+					os.Exit(1)
+				}
+
+				activityId, err := client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
+					ID:           vm.ID,
+					DatacenterId: vm.VirtualDatacenterId,
+					PowerAction:  "off",
+				})
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+					os.Exit(1)
+				}
+				_, err = client.Activity().WaitForCompletion(ctx, activityId)
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "failed to stop %s:%s\n", vm.Name, err.Error())
+					os.Exit(1)
+				}
 			}
 
-			activityId, err = client.Compute().VirtualMachine().Delete(ctx, vm.ID)
+			activityId, err := client.Compute().VirtualMachine().Delete(ctx, vm.ID)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 				os.Exit(1)
@@ -91,7 +94,7 @@ func TestMain(m *testing.M) {
 		}
 	}
 
-	names = map[string]struct{}{
+	names := map[string]struct{}{
 		"client-test": {},
 	}
 

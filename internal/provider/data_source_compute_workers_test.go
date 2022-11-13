@@ -13,7 +13,7 @@ func TestAccDataSourceWorkers(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceWorkers,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_workers.foo", "workers.#", "1"),
 				),
 			},

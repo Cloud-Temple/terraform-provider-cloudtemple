@@ -13,13 +13,13 @@ func TestAccDataSourceGuestOperatingSystems(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceGuestOperatingSystems,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_guest_operating_systems.foo", "guest_operating_systems.#"),
 				),
 			},
 			{
 				Config: testAccDataSourceGuestOperatingSystemsMissing,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_guest_operating_systems.foo", "guest_operating_systems.#", "0"),
 				),
 			},

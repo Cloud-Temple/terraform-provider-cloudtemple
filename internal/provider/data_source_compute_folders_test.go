@@ -13,7 +13,7 @@ func TestAccDataSourceFolders(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceFolders,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_folders.foo", "folders.#", "21"),
 				),
 			},

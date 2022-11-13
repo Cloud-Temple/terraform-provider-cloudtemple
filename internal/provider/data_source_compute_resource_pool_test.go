@@ -14,14 +14,14 @@ func TestAccDataSourceResourcePool(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceResourcePool,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "id", "d21f84fd-5063-4383-b2b0-65b9f25eac27"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "name", "Resources"),
 				),
 			},
 			{
 				Config: testAccDataSourceResourcePoolName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "id", "d21f84fd-5063-4383-b2b0-65b9f25eac27"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "name", "Resources"),
 				),

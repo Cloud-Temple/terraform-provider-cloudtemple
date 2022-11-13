@@ -13,13 +13,13 @@ func TestAccDataSourceNetworkAdapters(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceNetworkAdapters,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapters.foo", "network_adapters.#", "1"),
 				),
 			},
 			{
 				Config: testAccDataSourceNetworkAdaptersMissing,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapters.foo", "network_adapters.#", "0"),
 				),
 			},

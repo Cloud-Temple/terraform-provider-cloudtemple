@@ -13,7 +13,7 @@ func TestAccDataSourceStorages(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceStorages,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_storages.foo", "storages.#", "1"),
 				),
 			},

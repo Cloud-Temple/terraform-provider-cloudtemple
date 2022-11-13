@@ -42,6 +42,19 @@ func (n *NetworkAdapterClient) List(ctx context.Context, virtualMachineId string
 	return out, nil
 }
 
+type CreateNetworkAdapterRequest struct {
+	VirtualMachineId string `json:"virtualMachineId"`
+	NetworkId        string `json:"networkId"`
+	Type             string `json:"type"`
+	MacAddress       string `json:"macAddress,omitempty"`
+}
+
+func (n *NetworkAdapterClient) Create(ctx context.Context, req *CreateNetworkAdapterRequest) (string, error) {
+	r := n.c.newRequest("POST", "/api/compute/v1/vcenters/network_adapters")
+	r.obj = req
+	return n.c.doRequestAndReturnActivity(ctx, r)
+}
+
 func (n *NetworkAdapterClient) Read(ctx context.Context, id string) (*NetworkAdapter, error) {
 	r := n.c.newRequest("GET", "/api/compute/v1/vcenters/network_adapters/"+id)
 	resp, err := n.c.doRequest(ctx, r)
@@ -60,4 +73,35 @@ func (n *NetworkAdapterClient) Read(ctx context.Context, id string) (*NetworkAda
 	}
 
 	return &out, nil
+}
+
+type UpdateNetworkAdapterRequest struct {
+	ID           string `json:"id"`
+	NewNetworkId string `json:"newNetworkId"`
+	AutoConnect  bool   `json:"autoConnect"`
+	MacAddress   string `json:"macAddress,omitempty"`
+	MacType      string `json:"macType,omitempty"`
+}
+
+func (n *NetworkAdapterClient) Update(ctx context.Context, req *UpdateNetworkAdapterRequest) (string, error) {
+	r := n.c.newRequest("PATCH", "/api/compute/v1/vcenters/network_adapters")
+	r.obj = req
+	return n.c.doRequestAndReturnActivity(ctx, r)
+}
+
+func (n *NetworkAdapterClient) Delete(ctx context.Context, id string) (string, error) {
+	r := n.c.newRequest("DELETE", "/api/compute/v1/vcenters/network_adapters/"+id)
+	return n.c.doRequestAndReturnActivity(ctx, r)
+}
+
+func (n *NetworkAdapterClient) Connect(ctx context.Context, id string) (string, error) {
+	r := n.c.newRequest("PATCH", "/api/compute/v1/vcenters/network_adapters/connect")
+	r.obj = map[string]string{"id": id}
+	return n.c.doRequestAndReturnActivity(ctx, r)
+}
+
+func (n *NetworkAdapterClient) Disconnect(ctx context.Context, id string) (string, error) {
+	r := n.c.newRequest("PATCH", "/api/compute/v1/vcenters/network_adapters/disconnect")
+	r.obj = map[string]string{"id": id}
+	return n.c.doRequestAndReturnActivity(ctx, r)
 }

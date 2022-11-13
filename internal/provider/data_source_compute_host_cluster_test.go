@@ -14,7 +14,7 @@ func TestAccDataSourceHostCluster(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceHostCluster,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", "dde72065-60f4-4577-836d-6ea074384d62"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", "clu002-ucs01_FLO"),
 				),

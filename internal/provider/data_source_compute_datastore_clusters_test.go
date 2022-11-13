@@ -13,7 +13,7 @@ func TestAccDataSourceDatastoreClusters(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceDatastoreClusters,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_clusters.foo", "datastore_clusters.#", "2"),
 				),
 			},

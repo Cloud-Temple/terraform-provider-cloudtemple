@@ -14,14 +14,14 @@ func TestAccDataSourceVirtualSwitch(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceVirtualSwitch,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "id", "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "name", "dvs002-ucs01_FLO-DC-EQX6"),
 				),
 			},
 			{
 				Config: testAccDataSourceVirtualSwitchName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "id", "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "name", "dvs002-ucs01_FLO-DC-EQX6"),
 				),

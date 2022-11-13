@@ -13,7 +13,7 @@ func TestAccDataSourceResourcePools(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceResourcePools,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pools.foo", "resource_pools.#", "7"),
 				),
 			},

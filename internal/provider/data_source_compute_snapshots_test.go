@@ -13,13 +13,13 @@ func TestAccDataSourceSnapshots(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceSnapshots,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_snapshots.foo", "snapshots.#", "0"),
 				),
 			},
 			{
 				Config: testAccDataSourceSnapshotsMissing,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_snapshots.foo", "snapshots.#", "0"),
 				),
 			},

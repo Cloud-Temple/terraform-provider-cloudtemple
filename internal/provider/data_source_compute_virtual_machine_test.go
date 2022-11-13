@@ -14,14 +14,14 @@ func TestAccDataSourceVirtualMachine(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceVirtualMachine,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", "de2b8b80-8b90-414a-bc33-e12f61a4c05c"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", "virtual_machine_67_bob-clone"),
 				),
 			},
 			{
 				Config: testAccDataSourceVirtualMachineName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", "de2b8b80-8b90-414a-bc33-e12f61a4c05c"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", "virtual_machine_67_bob-clone"),
 				),

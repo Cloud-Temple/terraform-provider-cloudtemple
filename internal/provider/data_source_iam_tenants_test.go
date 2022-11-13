@@ -13,7 +13,7 @@ func TestAccDataSourceTenants(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceTenants,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_tenants.foo", "tenants.#", "1"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_tenants.foo", "tenants.0.id"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_tenants.foo", "tenants.0.name", "BOB"),

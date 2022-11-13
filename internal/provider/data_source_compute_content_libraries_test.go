@@ -13,7 +13,7 @@ func TestAccDataSourceLibraries(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceLibraries,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_libraries.foo", "content_libraries.#", "2"),
 				),
 			},

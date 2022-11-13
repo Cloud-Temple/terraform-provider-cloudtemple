@@ -13,7 +13,7 @@ func TestAccDataActivity(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataActivity,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "tenant_id", "e225dbf8-e7c5-4664-a595-08edf3526080"),
 					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "description", "Creating virtual machine test-power."),
 					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "type", "ComputeActivity"),

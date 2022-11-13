@@ -13,7 +13,7 @@ func TestAccDataSourceVirtualMachines(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceVirtualMachines,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machines.foo", "virtual_machines.#"),
 				),
 			},

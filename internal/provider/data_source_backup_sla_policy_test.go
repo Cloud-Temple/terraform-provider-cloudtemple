@@ -14,7 +14,7 @@ func TestAccDataSourceBackupSLAPolicy(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceBackupSLAPolicy,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "id", "442718ef-44a1-43d7-9b57-2d910d74e928"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "name", "SLA_ADMIN"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.#", "1"),
@@ -33,7 +33,7 @@ func TestAccDataSourceBackupSLAPolicy(t *testing.T) {
 			},
 			{
 				Config: testAccDataSourceBackupSLAPolicyName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "id", "442718ef-44a1-43d7-9b57-2d910d74e928"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "name", "SLA_ADMIN"),
 				),

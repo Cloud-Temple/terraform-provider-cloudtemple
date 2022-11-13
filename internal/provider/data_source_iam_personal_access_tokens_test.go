@@ -13,7 +13,7 @@ func TestAccDataSourcePersonalAccessTokens(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourcePersonalAccessTokens,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.#", "1"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.id"),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.name", "Terraform"),

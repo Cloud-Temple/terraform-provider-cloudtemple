@@ -14,7 +14,7 @@ func TestAccDataSourceBackupSPPServer(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceBackupSPPServer,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "id", "a3d46fb5-29af-4b98-a665-1e82a62fd6d3"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "name", "10"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "address", "10.1.11.32"),
@@ -22,7 +22,7 @@ func TestAccDataSourceBackupSPPServer(t *testing.T) {
 			},
 			{
 				Config: testAccDataSourceBackupSPPServerName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "id", "a3d46fb5-29af-4b98-a665-1e82a62fd6d3"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "name", "10"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "address", "10.1.11.32"),

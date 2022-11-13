@@ -13,7 +13,7 @@ func TestAccDataSourceVirtualDatacenters(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceVirtualDatacenters,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_datacenters.foo", "virtual_datacenters.#", "2"),
 				),
 			},

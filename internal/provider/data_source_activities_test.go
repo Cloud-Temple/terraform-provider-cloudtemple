@@ -13,7 +13,7 @@ func TestAccDataActivities(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataActivities,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.cloudtemple_activities.foo", "activities.#"),
 				),
 			},

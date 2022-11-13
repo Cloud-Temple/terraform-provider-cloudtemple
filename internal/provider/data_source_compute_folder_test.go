@@ -14,14 +14,14 @@ func TestAccDataSourceFolder(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceFolder,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "id", "b41ea9b1-4cca-44ed-9a76-2b598de03781"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "name", "Datacenters"),
 				),
 			},
 			{
 				Config: testAccDataSourceFolderName,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "id", "b41ea9b1-4cca-44ed-9a76-2b598de03781"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "name", "Datacenters"),
 				),

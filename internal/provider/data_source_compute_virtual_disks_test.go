@@ -13,13 +13,13 @@ func TestAccDataSourceVirtualDisks(t *testing.T) {
 		Steps: []resource.TestStep{
 			{
 				Config: testAccDataSourceVirtualDisks,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disks.foo", "virtual_disks.#", "1"),
 				),
 			},
 			{
 				Config: testAccDataSourceVirtualDisksMissing,
-				Check: resource.ComposeTestCheckFunc(
+				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disks.foo", "virtual_disks.#", "0"),
 				),
 			},
