@@ -95,8 +95,14 @@ type CreateVirtualMachineRequest struct {
 }
 
 type UpdateVirtualMachineRequest struct {
-	Id          string       `json:"id"`
-	BootOptions *BootOptions `json:"bootOptions,omitempty"`
+	Id            string       `json:"id"`
+	Ram           int          `json:"ram"`
+	Cpu           int          `json:"cpu"`
+	CorePerSocket int          `json:"corePerSocket"`
+	HotCpuAdd     bool         `json:"hotCpuAdd"`
+	HotCpuRemove  bool         `json:"hotCpuRemove"`
+	HotMemAdd     bool         `json:"hotMemAdd"`
+	BootOptions   *BootOptions `json:"bootOptions,omitempty"`
 }
 
 type BootOptions struct {

@@ -63,13 +63,28 @@ func resourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeInt,
 				Optional: true,
 				Default:  33554432,
-				ForceNew: true,
 			},
 			"cpu": {
 				Type:     schema.TypeInt,
 				Optional: true,
-				ForceNew: true,
 				Default:  1,
+			},
+			"num_cores_per_socket": {
+				Type:     schema.TypeInt,
+				Optional: true,
+				Default:  1,
+			},
+			"cpu_hot_add_enabled": {
+				Type:     schema.TypeBool,
+				Optional: true,
+			},
+			"cpu_hot_remove_enabled": {
+				Type:     schema.TypeBool,
+				Optional: true,
+			},
+			"memory_hot_add_enabled": {
+				Type:     schema.TypeBool,
+				Optional: true,
 			},
 			"guest_operating_system_moref": {
 				Type:     schema.TypeString,
@@ -116,24 +131,8 @@ func resourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			"num_cores_per_socket": {
-				Type:     schema.TypeInt,
-				Computed: true,
-			},
 			"operating_system_name": {
 				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"cpu_hot_add_enabled": {
-				Type:     schema.TypeBool,
-				Computed: true,
-			},
-			"cpu_hot_remove_enabled": {
-				Type:     schema.TypeBool,
-				Computed: true,
-			},
-			"memory_hot_add_enabled": {
-				Type:     schema.TypeBool,
 				Computed: true,
 			},
 			"cpu_usage": {
@@ -174,6 +173,35 @@ func resourceVirtualMachine() *schema.Resource {
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
+				},
+			},
+			"boot_options": {
+				Type:     schema.TypeList,
+				Computed: true,
+
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"firmware": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"boot_delay": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"enter_bios_setup": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+						"boot_retry_enabled": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+						"boot_retry_delay": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+					},
 				},
 			},
 			"replication_config": {
@@ -272,35 +300,6 @@ func resourceVirtualMachine() *schema.Resource {
 					},
 				},
 			},
-			"boot_options": {
-				Type:     schema.TypeList,
-				Computed: true,
-
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"firmware": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"boot_delay": {
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-						"enter_bios_setup": {
-							Type:     schema.TypeBool,
-							Computed: true,
-						},
-						"boot_retry_enabled": {
-							Type:     schema.TypeBool,
-							Computed: true,
-						},
-						"boot_retry_delay": {
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-					},
-				},
-			},
 		},
 	}
 }
@@ -331,11 +330,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 
 	d.SetId(activity.ConcernedItems[0].ID)
 
-	if d.Get("power_state").(string) == "on" {
-		return computeVirtualMachineUpdate(ctx, d, meta)
-	}
-
-	return computeVirtualMachineRead(ctx, d, meta)
+	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on")
 }
 
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
@@ -363,7 +358,35 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 }
 
 func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	return updateVirtualMachine(ctx, d, meta, d.HasChange("power_state"))
+}
+
+func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any, updatePower bool) diag.Diagnostics {
 	c := getClient(meta)
+
+	activityId, err := c.Compute().VirtualMachine().Update(ctx, &client.UpdateVirtualMachineRequest{
+		Id:            d.Id(),
+		Ram:           d.Get("memory").(int),
+		Cpu:           d.Get("cpu").(int),
+		CorePerSocket: d.Get("num_cores_per_socket").(int),
+		HotCpuAdd:     d.Get("cpu_hot_add_enabled").(bool),
+		HotCpuRemove:  d.Get("cpu_hot_remove_enabled").(bool),
+		HotMemAdd:     d.Get("memory_hot_add_enabled").(bool),
+		BootOptions: &client.BootOptions{
+			BootDelay:        0,
+			BootRetryDelay:   10000,
+			BootRetryEnabled: false,
+			EnterBIOSSetup:   false,
+			Firmware:         "bios",
+		},
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	_, err = c.Activity().WaitForCompletion(ctx, activityId)
+	if err != nil {
+		return diag.FromErr(err)
+	}
 
 	if d.HasChange("name") {
 		activityId, err := c.Compute().VirtualMachine().Rename(ctx, d.Id(), d.Get("name").(string))
@@ -376,28 +399,10 @@ func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, me
 		}
 	}
 
-	if d.HasChange("power_state") {
+	if updatePower {
 		powerState := d.Get("power_state").(string)
 
 		vm, err := c.Compute().VirtualMachine().Read(ctx, d.Id())
-		if err != nil {
-			return diag.FromErr(err)
-		}
-
-		activityId, err := c.Compute().VirtualMachine().Update(ctx, &client.UpdateVirtualMachineRequest{
-			Id: d.Id(),
-			BootOptions: &client.BootOptions{
-				BootDelay:        0,
-				BootRetryDelay:   10000,
-				BootRetryEnabled: false,
-				EnterBIOSSetup:   false,
-				Firmware:         "bios",
-			},
-		})
-		if err != nil {
-			return diag.FromErr(err)
-		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId)
 		if err != nil {
 			return diag.FromErr(err)
 		}

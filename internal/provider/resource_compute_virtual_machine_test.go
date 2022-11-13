@@ -35,6 +35,17 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 				},
 			},
 			{
+				Config: testAccResourceVirtualMachineUpdate,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "memory", "67108864"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "cpu", "2"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "num_cores_per_socket", "2"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "cpu_hot_add_enabled", "true"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "cpu_hot_remove_enabled", "true"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "memory_hot_add_enabled", "true"),
+				),
+			},
+			{
 				Config: testAccResourceVirtualMachineRename,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform-rename"),
@@ -64,6 +75,24 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 const testAccResourceVirtualMachine = `
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform"
+
+  virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"
+  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
+  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+  guest_operating_system_moref = "amazonlinux2_64Guest"
+}
+`
+
+const testAccResourceVirtualMachineUpdate = `
+resource "cloudtemple_compute_virtual_machine" "foo" {
+  name = "test-terraform"
+
+  memory                 = 2 * 33554432
+  cpu                    = 2
+  num_cores_per_socket   = 2
+  cpu_hot_add_enabled    = true
+  cpu_hot_remove_enabled = true
+  memory_hot_add_enabled = true
 
   virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"
   host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
