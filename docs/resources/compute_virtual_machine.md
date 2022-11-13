@@ -61,7 +61,6 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 
 ### Optional
 
-- `content_library_item_id` (String)
 - `cpu` (Number)
 - `cpu_hot_add_enabled` (Boolean)
 - `cpu_hot_remove_enabled` (Boolean)

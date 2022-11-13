@@ -56,7 +56,7 @@ func (n *NetworkAdapterClient) Create(ctx context.Context, req *CreateNetworkAda
 }
 
 func (n *NetworkAdapterClient) Read(ctx context.Context, id string) (*NetworkAdapter, error) {
-	r := n.c.newRequest("GET", "/api/compute/v1/vcenters/network_adapters/"+id)
+	r := n.c.newRequest("GET", "/api/compute/v1/vcenters/network_adapters/%s", id)
 	resp, err := n.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -90,7 +90,7 @@ func (n *NetworkAdapterClient) Update(ctx context.Context, req *UpdateNetworkAda
 }
 
 func (n *NetworkAdapterClient) Delete(ctx context.Context, id string) (string, error) {
-	r := n.c.newRequest("DELETE", "/api/compute/v1/vcenters/network_adapters/"+id)
+	r := n.c.newRequest("DELETE", "/api/compute/v1/vcenters/network_adapters/%s", id)
 	return n.c.doRequestAndReturnActivity(ctx, r)
 }
 

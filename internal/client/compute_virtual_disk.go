@@ -66,7 +66,7 @@ func (n *VirtualDiskClient) Create(ctx context.Context, req *CreateVirtualDiskRe
 }
 
 func (v *VirtualDiskClient) Read(ctx context.Context, id string) (*VirtualDisk, error) {
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_disks/"+id)
+	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_disks/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func (n *VirtualDiskClient) Update(ctx context.Context, req *UpdateVirtualDiskRe
 }
 
 func (n *VirtualDiskClient) Delete(ctx context.Context, id string) (string, error) {
-	r := n.c.newRequest("DELETE", "/api/compute/v1/vcenters/virtual_disks/"+id)
+	r := n.c.newRequest("DELETE", "/api/compute/v1/vcenters/virtual_disks/%s", id)
 	return n.c.doRequestAndReturnActivity(ctx, r)
 }
 

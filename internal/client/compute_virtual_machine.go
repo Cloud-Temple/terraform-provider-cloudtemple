@@ -158,7 +158,7 @@ func (v *VirtualMachineClient) Create(ctx context.Context, req *CreateVirtualMac
 }
 
 func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMachine, error) {
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_machines/"+id)
+	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_machines/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -184,7 +184,7 @@ func (v *VirtualMachineClient) Update(ctx context.Context, req *UpdateVirtualMac
 }
 
 func (v *VirtualMachineClient) Delete(ctx context.Context, id string) (string, error) {
-	r := v.c.newRequest("DELETE", "/api/compute/v1/vcenters/virtual_machines/"+id)
+	r := v.c.newRequest("DELETE", "/api/compute/v1/vcenters/virtual_machines/%s", id)
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 

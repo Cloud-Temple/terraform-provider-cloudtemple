@@ -62,7 +62,7 @@ func (c *BackupSLAPolicyClient) List(ctx context.Context, filters *struct{}) ([]
 }
 
 func (c *BackupSLAPolicyClient) Read(ctx context.Context, id string) (*BackupSLAPolicy, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/policies/"+id)
+	r := c.c.newRequest("GET", "/api/backup/v1/policies/%s", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

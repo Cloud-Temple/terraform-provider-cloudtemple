@@ -56,7 +56,7 @@ func (d *DatastoreClusterClient) List(ctx context.Context, machineManagerId stri
 }
 
 func (d *DatastoreClusterClient) Read(ctx context.Context, id string) (*DatastoreCluster, error) {
-	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastore_clusters/"+id)
+	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastore_clusters/%s", id)
 	resp, err := d.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

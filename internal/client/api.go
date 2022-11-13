@@ -88,14 +88,14 @@ type request struct {
 	obj    any
 }
 
-func (c *Client) newRequest(method, path string) *request {
+func (c *Client) newRequest(method, path string, args ...interface{}) *request {
 	r := &request{
 		config: &c.config,
 		method: method,
 		url: &url.URL{
 			Host:   c.config.Address,
 			Scheme: c.config.Scheme,
-			Path:   path,
+			Path:   fmt.Sprintf(path, args...),
 		},
 		params: make(map[string][]string),
 	}

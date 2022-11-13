@@ -51,7 +51,7 @@ func (v *WorkerClient) List(ctx context.Context, name string) ([]*Worker, error)
 }
 
 func (v *WorkerClient) Read(ctx context.Context, id string) (*Worker, error) {
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/"+id)
+	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

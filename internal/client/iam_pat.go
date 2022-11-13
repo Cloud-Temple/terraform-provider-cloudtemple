@@ -45,7 +45,7 @@ func (p *PATClient) List(ctx context.Context, userId string, tenantId string) ([
 }
 
 func (p *PATClient) Read(ctx context.Context, patID string) (*Token, error) {
-	r := p.c.newRequest("GET", "/api/iam/v2/personal_access_tokens/"+patID)
+	r := p.c.newRequest("GET", "/api/iam/v2/personal_access_tokens/%s", patID)
 	resp, err := p.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -103,7 +103,7 @@ func (p *PATClient) Create(ctx context.Context, name string, roles []string, exp
 }
 
 func (p *PATClient) Delete(ctx context.Context, patID string) error {
-	r := p.c.newRequest("DELETE", "/api/iam/v2/personal_access_tokens/"+patID)
+	r := p.c.newRequest("DELETE", "/api/iam/v2/personal_access_tokens/%s", patID)
 	resp, err := p.c.doRequest(ctx, r)
 	if err != nil {
 		return err

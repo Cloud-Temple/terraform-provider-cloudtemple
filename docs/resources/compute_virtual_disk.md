@@ -32,7 +32,7 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
 }
 
 resource "cloudtemple_compute_virtual_machine" "foo" {
-  name        = "test-terraform-example"
+  name        = "test-terraform-example-disk"
   power_state = "off"
 
   memory                 = 8 * 1024 * 1024 * 1024

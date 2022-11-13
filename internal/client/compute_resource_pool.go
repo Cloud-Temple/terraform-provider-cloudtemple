@@ -66,7 +66,7 @@ func (rp *ResourcePoolClient) List(
 }
 
 func (rp *ResourcePoolClient) Read(ctx context.Context, id string) (*ResourcePool, error) {
-	r := rp.c.newRequest("GET", "/api/compute/v1/vcenters/resource_pools/"+id)
+	r := rp.c.newRequest("GET", "/api/compute/v1/vcenters/resource_pools/%s", id)
 	resp, err := rp.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

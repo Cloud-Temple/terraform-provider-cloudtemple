@@ -52,7 +52,7 @@ func (n *NetworkClient) List(
 }
 
 func (n *NetworkClient) Read(ctx context.Context, id string) (*Network, error) {
-	r := n.c.newRequest("GET", "/api/compute/v1/vcenters/networks/"+id)
+	r := n.c.newRequest("GET", "/api/compute/v1/vcenters/networks/%s", id)
 	resp, err := n.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

@@ -37,7 +37,7 @@ func (c *BackupSPPServerClient) List(ctx context.Context, tenantId string) ([]*B
 }
 
 func (c *BackupSPPServerClient) Read(ctx context.Context, id string) (*BackupSPPServer, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/spp_servers/"+id)
+	r := c.c.newRequest("GET", "/api/backup/v1/spp_servers/%s", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

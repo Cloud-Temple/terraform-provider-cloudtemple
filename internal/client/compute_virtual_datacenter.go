@@ -42,7 +42,7 @@ func (v *VirtualDatacenterClient) List(
 }
 
 func (v *VirtualDatacenterClient) Read(ctx context.Context, id string) (*VirtualDatacenter, error) {
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_datacenters/"+id)
+	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_datacenters/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

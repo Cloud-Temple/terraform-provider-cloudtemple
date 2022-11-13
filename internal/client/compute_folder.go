@@ -41,7 +41,7 @@ func (f *FolderClient) List(
 }
 
 func (f *FolderClient) Read(ctx context.Context, id string) (*Folder, error) {
-	r := f.c.newRequest("GET", "/api/compute/v1/vcenters/folders/"+id)
+	r := f.c.newRequest("GET", "/api/compute/v1/vcenters/folders/%s", id)
 	resp, err := f.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

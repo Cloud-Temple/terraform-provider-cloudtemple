@@ -55,7 +55,7 @@ func (d *DatastoreClient) List(
 }
 
 func (d *DatastoreClient) Read(ctx context.Context, id string) (*Datastore, error) {
-	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastores/"+id)
+	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastores/%s", id)
 	resp, err := d.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

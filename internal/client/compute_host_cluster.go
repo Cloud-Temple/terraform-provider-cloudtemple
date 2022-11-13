@@ -60,7 +60,7 @@ func (h *HostClusterClient) List(
 }
 
 func (h *HostClusterClient) Read(ctx context.Context, id string) (*HostCluster, error) {
-	r := h.c.newRequest("GET", "/api/compute/v1/vcenters/host_clusters/"+id)
+	r := h.c.newRequest("GET", "/api/compute/v1/vcenters/host_clusters/%s", id)
 	resp, err := h.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

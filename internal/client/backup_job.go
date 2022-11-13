@@ -39,7 +39,7 @@ func (c *BackupJobClient) List(ctx context.Context, filter *struct{}) ([]*Backup
 }
 
 func (c *BackupJobClient) Read(ctx context.Context, id string) (*BackupJob, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/jobs/"+id)
+	r := c.c.newRequest("GET", "/api/backup/v1/jobs/%s", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
