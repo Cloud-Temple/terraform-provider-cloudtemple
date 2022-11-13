@@ -11,6 +11,7 @@ import (
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -184,8 +185,9 @@ func TestImport(t *testing.T) {
 		// Access tokens cannot be imported because there is no way of getting the secret
 		"cloudtemple_iam_personal_access_token": {},
 
-		// TODO: we skip this one for now
+		// TODO: we skip this ones for now
 		"cloudtemple_compute_network_adapter": {},
+		"cloudtemple_compute_virtual_disk":    {},
 	}
 
 	for name, resource := range provider.ResourcesMap {
@@ -193,9 +195,7 @@ func TestImport(t *testing.T) {
 			if _, found := skip[name]; found {
 				t.Skip()
 			}
-			if resource.Importer == nil {
-				t.Fatalf("no importer for %s", name)
-			}
+			require.NotNil(t, resource.Importer, "no importer for %s", name)
 		})
 	}
 }

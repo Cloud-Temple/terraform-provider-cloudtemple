@@ -118,6 +118,7 @@ func New(version string) func() *schema.Provider {
 			ResourcesMap: map[string]*schema.Resource{
 				"cloudtemple_iam_personal_access_token": documentResource(resourcePersonalAccessToken(), "iam_offline_access"),
 				"cloudtemple_compute_network_adapter":   documentResource(resourceNetworkAdapter(), "compute_write", "compute_read", "activity_read"),
+				"cloudtemple_compute_virtual_disk":      documentResource(resourceVirtualDisk(), "compute_write", "compute_read", "activity_read"),
 				"cloudtemple_compute_virtual_machine":   documentResource(resourceVirtualMachine(), "compute_write", "compute_read", "activity_read"),
 			},
 		}

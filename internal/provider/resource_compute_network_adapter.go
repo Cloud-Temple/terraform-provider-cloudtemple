@@ -7,6 +7,7 @@ import (
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/sethvargo/go-retry"
 )
 
@@ -22,13 +23,15 @@ func resourceNetworkAdapter() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// In
 			"virtual_machine_id": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Type:         schema.TypeString,
+				Required:     true,
+				ForceNew:     true,
+				ValidateFunc: validation.IsUUID,
 			},
 			"network_id": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:         schema.TypeString,
+				Required:     true,
+				ValidateFunc: validation.IsUUID,
 			},
 			"type": {
 				Type:     schema.TypeString,
