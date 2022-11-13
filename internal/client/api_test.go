@@ -50,8 +50,10 @@ func TestMain(m *testing.M) {
 
 	// Clean resources from previous tests run
 	names := map[string]struct{}{
-		"test-power":  {},
-		"test-client": {},
+		"test-power":         {},
+		"test-client":        {},
+		"test-client-rename": {},
+		"test-rename":        {},
 	}
 	ctx := context.Background()
 	vms, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
@@ -61,15 +63,29 @@ func TestMain(m *testing.M) {
 	}
 	for _, vm := range vms {
 		if _, found := names[vm.Name]; found {
-			activityId, err := client.Compute().VirtualMachine().Delete(ctx, vm.ID)
+			activityId, err := client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
+				ID:           vm.ID,
+				DatacenterId: vm.VirtualDatacenterId,
+				PowerAction:  "off",
+			})
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 				os.Exit(1)
 			}
-
 			_, err = client.Activity().WaitForCompletion(ctx, activityId)
 			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to stop %s:%s\n", vm.Name, err.Error())
+				os.Exit(1)
+			}
+
+			activityId, err = client.Compute().VirtualMachine().Delete(ctx, vm.ID)
+			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+				os.Exit(1)
+			}
+			_, err = client.Activity().WaitForCompletion(ctx, activityId)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "failed to delete %s: %s\n", vm.Name, err.Error())
 				os.Exit(1)
 			}
 		}

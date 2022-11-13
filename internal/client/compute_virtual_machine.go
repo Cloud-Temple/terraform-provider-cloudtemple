@@ -187,3 +187,12 @@ func (v *VirtualMachineClient) Power(ctx context.Context, req *PowerRequest) (st
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
+
+func (v *VirtualMachineClient) Rename(ctx context.Context, id string, name string) (string, error) {
+	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines/rename")
+	r.obj = map[string]string{
+		"id":   id,
+		"name": name,
+	}
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}

@@ -35,9 +35,15 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 				},
 			},
 			{
+				Config: testAccResourceVirtualMachineRename,
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform-rename"),
+				),
+			},
+			{
 				Config: testAccResourceVirtualMachinePowerOn,
 				Check: resource.ComposeTestCheckFunc(
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform-rename"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "power_state", "on"),
 				),
 			},
@@ -66,9 +72,24 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 }
 `
 
+const testAccResourceVirtualMachineRename = `
+resource "cloudtemple_compute_virtual_machine" "foo" {
+  name = "test-terraform-rename"
+
+  virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"
+  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
+  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+  guest_operating_system_moref = "amazonlinux2_64Guest"
+
+  lifecycle {
+	prevent_destroy = true
+  }
+}
+`
+
 const testAccResourceVirtualMachinePowerOn = `
 resource "cloudtemple_compute_virtual_machine" "foo" {
-  name        = "test-terraform"
+  name        = "test-terraform-rename"
   power_state = "on"
 
   virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"

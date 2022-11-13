@@ -233,7 +233,12 @@ func (c *Client) doRequestAndReturnActivity(ctx context.Context, r *request) (st
 	if err := requireOK(resp); err != nil {
 		return "", err
 	}
-	return resp.Header.Get("Location"), nil
+
+	activityId := resp.Header.Get("Location")
+	if activityId == "" {
+		return "", fmt.Errorf("no activity ID found in response")
+	}
+	return activityId, nil
 }
 
 func (c *Client) doRequestWithToken(ctx context.Context, r *request, token string) (*http.Response, error) {
