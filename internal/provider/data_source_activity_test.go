@@ -15,12 +15,12 @@ func TestAccDataActivity(t *testing.T) {
 				Config: testAccDataActivity,
 				Check: resource.ComposeTestCheckFunc(
 					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "tenant_id", "e225dbf8-e7c5-4664-a595-08edf3526080"),
-					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "description", "Updating virtual machine test-terraform"),
+					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "description", "Creating virtual machine test-power."),
 					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "type", "ComputeActivity"),
-					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "creation_date", "2022-11-09T15:34:34Z"),
+					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "creation_date", "2022-11-12T22:54:53Z"),
 					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "tags.#", "4"),
 					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "concerned_items.#", "1"),
-					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "concerned_items.0.id", "6453cd41-1d08-4caf-935f-99c48be4a994"),
+					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "concerned_items.0.id", "019751ae-15c2-468f-98a6-d7cbd90a83d0"),
 					resource.TestCheckResourceAttr("data.cloudtemple_activity.foo", "concerned_items.0.type", "virtual_machine"),
 				),
 			},
@@ -30,6 +30,6 @@ func TestAccDataActivity(t *testing.T) {
 
 const testAccDataActivity = `
 data "cloudtemple_activity" "foo" {
-  id = "022ae273-552d-4588-a913-f8260638d3a4"
+  id = "00791ba3-8cc0-4051-a654-9cd4d71eb48c"
 }
 `

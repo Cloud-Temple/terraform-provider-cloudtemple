@@ -26,11 +26,14 @@ func TestProvider(t *testing.T) {
 
 func testAccPreCheck(t *testing.T) {}
 
-func TestUUIDValidation(t *testing.T) {
+func TestIDValidation(t *testing.T) {
 	provider := New("dev")()
 
 	checkUUID := func(name string, r *schema.Resource) func(t *testing.T) {
-		expected := reflect.ValueOf(validation.IsUUID).Pointer()
+		expected := map[uintptr]struct{}{
+			reflect.ValueOf(validation.IsUUID).Pointer(): {},
+			reflect.ValueOf(IsNumber).Pointer():          {},
+		}
 
 		var validateSchema func(r *schema.Resource)
 		validateSchema = func(r *schema.Resource) {
@@ -41,7 +44,7 @@ func TestUUIDValidation(t *testing.T) {
 				if !s.Optional && !s.Required {
 					return
 				}
-				if reflect.ValueOf(s.ValidateFunc).Pointer() != expected {
+				if _, found := expected[reflect.ValueOf(s.ValidateFunc).Pointer()]; !found {
 					t.Errorf("%s.%s ValidateFunc is incorrect", name, n)
 				}
 				if resource, ok := s.Elem.(*schema.Resource); ok {
@@ -56,7 +59,7 @@ func TestUUIDValidation(t *testing.T) {
 	}
 
 	for name, datasource := range provider.DataSourcesMap {
-		t.Run(name, checkUUID("data."+name, datasource))
+		t.Run("data."+name, checkUUID("data."+name, datasource))
 	}
 
 	for name, resource := range provider.ResourcesMap {

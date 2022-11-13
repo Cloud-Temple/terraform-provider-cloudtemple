@@ -11,12 +11,12 @@ func (c *BackupClient) Job() *BackupJobClient {
 }
 
 type BackupJob struct {
-	ID          string
-	Name        string
-	DisplayName string
-	Type        string
-	Status      string
-	PolicyId    string
+	ID          string `terraform:"id"`
+	Name        string `terraform:"name"`
+	DisplayName string `terraform:"display_name"`
+	Type        string `terraform:"type"`
+	Status      string `terraform:"status"`
+	PolicyId    string `terraform:"policy_id"`
 }
 
 func (c *BackupJobClient) List(ctx context.Context, filter *struct{}) ([]*BackupJob, error) {

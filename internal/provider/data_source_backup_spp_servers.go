@@ -2,60 +2,38 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
-func dataSourceActivity() *schema.Resource {
+func dataSourceBackupSPPServers() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
-			id := d.Get("id").(string)
-			activity, err := client.Activity().Read(ctx, id)
-			if err == nil && activity == nil {
-				return nil, fmt.Errorf("failed to find activity with id %q", id)
+			tenantId, err := getTenantID(ctx, client, d)
+			if err != nil {
+				return nil, err
 			}
-			return activity, err
+			sppServers, err := client.Backup().SPPServer().List(ctx, tenantId)
+			return map[string]interface{}{
+				"id":          "spp_servers",
+				"spp_servers": sppServers,
+			}, err
 		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
-			"id": {
+			"tenant_id": {
 				Type:         schema.TypeString,
-				Required:     true,
+				Optional:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 
 			// Out
-			"tenant_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"description": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"type": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"creation_date": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"tags": {
-				Type:     schema.TypeList,
-				Computed: true,
-
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
-				},
-			},
-			"concerned_items": {
+			"spp_servers": {
 				Type:     schema.TypeList,
 				Computed: true,
 
@@ -65,7 +43,11 @@ func dataSourceActivity() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
-						"type": {
+						"name": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"address": {
 							Type:     schema.TypeString,
 							Computed: true,
 						},

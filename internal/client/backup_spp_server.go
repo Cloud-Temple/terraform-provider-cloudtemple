@@ -11,9 +11,9 @@ func (c *BackupClient) SPPServer() *BackupSPPServerClient {
 }
 
 type BackupSPPServer struct {
-	ID      string
-	Name    string
-	Address string
+	ID      string `terraform:"id"`
+	Name    string `terraform:"name"`
+	Address string `terraform:"address"`
 }
 
 func (c *BackupSPPServerClient) List(ctx context.Context, tenantId string) ([]*BackupSPPServer, error) {

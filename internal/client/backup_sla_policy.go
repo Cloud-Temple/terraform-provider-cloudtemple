@@ -11,34 +11,35 @@ func (c *BackupClient) SLAPolicy() *BackupSLAPolicyClient {
 }
 
 type BackupSLAPolicy struct {
-	ID          string
-	Name        string
-	SubPolicies []*BackupSLASubPolicy
+	ID          string                `terraform:"id"`
+	Name        string                `terraform:"name"`
+	SubPolicies []*BackupSLASubPolicy `terraform:"sub_policies"`
 }
 
 type BackupSLASubPolicy struct {
-	Type          string
-	Retention     BackupSLAPolicyRetention
-	UseEncryption bool
-	Software      bool
-	Trigger       BackupSLAPolicyTrigger
-	Site          string
+	Type          string                   `terraform:"type"`
+	UseEncryption bool                     `terraform:"use_encryption"`
+	Software      bool                     `terraform:"software"`
+	Site          string                   `terraform:"site"`
+	Retention     BackupSLAPolicyRetention `terraform:"retention"`
+	Trigger       BackupSLAPolicyTrigger   `terraform:"trigger"`
+	Target        BackupSLAPolicyTarget    `terraform:"target"`
 }
 
 type BackupSLAPolicyTarget struct {
-	ID           string
-	Href         string
-	ResourceType string
+	ID           string `terraform:"id"`
+	Href         string `terraform:"href"`
+	ResourceType string `terraform:"resource_type"`
 }
 
 type BackupSLAPolicyRetention struct {
-	Age int
+	Age int `terraform:"age"`
 }
 
 type BackupSLAPolicyTrigger struct {
-	Frequency    int
-	Type         string
-	ActivateDate int
+	Frequency    int    `terraform:"frequency"`
+	Type         string `terraform:"type"`
+	ActivateDate int    `terraform:"activate_date"`
 }
 
 func (c *BackupSLAPolicyClient) List(ctx context.Context, filters *struct{}) ([]*BackupSLAPolicy, error) {

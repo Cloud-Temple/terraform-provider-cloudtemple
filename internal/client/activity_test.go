@@ -19,7 +19,7 @@ func TestActivity_List(t *testing.T) {
 
 	var found bool
 	for _, a := range activities {
-		if a.ID == "022ae273-552d-4588-a913-f8260638d3a4" {
+		if a.ID == "00791ba3-8cc0-4051-a654-9cd4d71eb48c" {
 			found = true
 			break
 		}
@@ -31,25 +31,25 @@ func TestActivity_Read(t *testing.T) {
 	t.Parallel()
 
 	ctx := context.Background()
-	activity, err := client.Activity().Read(ctx, "022ae273-552d-4588-a913-f8260638d3a4")
+	activity, err := client.Activity().Read(ctx, "00791ba3-8cc0-4051-a654-9cd4d71eb48c")
 	require.NoError(t, err)
 
 	expected := &Activity{
-		ID:           "022ae273-552d-4588-a913-f8260638d3a4",
+		ID:           "00791ba3-8cc0-4051-a654-9cd4d71eb48c",
 		TenantId:     "e225dbf8-e7c5-4664-a595-08edf3526080",
-		Description:  "Updating virtual machine test-terraform",
+		Description:  "Creating virtual machine test-power.",
 		Type:         "ComputeActivity",
-		Tags:         []string{"compute", "vcenter", "virtual_machine", "update"},
-		CreationDate: time.Date(2022, time.November, 9, 15, 34, 34, 659000000, time.UTC),
+		Tags:         []string{"compute", "vcenter", "virtual_machine", "create"},
+		CreationDate: time.Date(2022, time.November, 12, 22, 54, 53, 72000000, time.UTC),
 		State: map[string]ActivityState{
 			"completed": {
-				StartDate: "2022-11-09T15:34:34.660Z",
-				StopDate:  "2022-11-09T15:34:34.720Z",
+				StartDate: "2022-11-12T22:54:53.073Z",
+				StopDate:  "2022-11-12T22:54:57.379Z",
 			},
 		},
 		ConcernedItems: []ActivityConcernedItem{
 			{
-				ID:   "6453cd41-1d08-4caf-935f-99c48be4a994",
+				ID:   "019751ae-15c2-468f-98a6-d7cbd90a83d0",
 				Type: "virtual_machine",
 			},
 		},
@@ -67,23 +67,23 @@ func TestActivityClient_WaitForCompletion(t *testing.T) {
 		wantErr string
 	}{
 		"finished activity": {
-			id: "022ae273-552d-4588-a913-f8260638d3a4",
+			id: "00791ba3-8cc0-4051-a654-9cd4d71eb48c",
 			want: &Activity{
-				ID:           "022ae273-552d-4588-a913-f8260638d3a4",
+				ID:           "00791ba3-8cc0-4051-a654-9cd4d71eb48c",
 				TenantId:     "e225dbf8-e7c5-4664-a595-08edf3526080",
-				Description:  "Updating virtual machine test-terraform",
+				Description:  "Creating virtual machine test-power.",
 				Type:         "ComputeActivity",
-				Tags:         []string{"compute", "vcenter", "virtual_machine", "update"},
-				CreationDate: time.Date(2022, time.November, 9, 15, 34, 34, 659000000, time.UTC),
+				Tags:         []string{"compute", "vcenter", "virtual_machine", "create"},
+				CreationDate: time.Date(2022, time.November, 12, 22, 54, 53, 72000000, time.UTC),
 				State: map[string]ActivityState{
 					"completed": {
-						StartDate: "2022-11-09T15:34:34.660Z",
-						StopDate:  "2022-11-09T15:34:34.720Z",
+						StartDate: "2022-11-12T22:54:53.073Z",
+						StopDate:  "2022-11-12T22:54:57.379Z",
 					},
 				},
 				ConcernedItems: []ActivityConcernedItem{
 					{
-						ID:   "6453cd41-1d08-4caf-935f-99c48be4a994",
+						ID:   "019751ae-15c2-468f-98a6-d7cbd90a83d0",
 						Type: "virtual_machine",
 					},
 				},

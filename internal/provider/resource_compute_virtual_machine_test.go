@@ -23,11 +23,16 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 				),
 			},
 			{
-				Config:                  testAccResourceVirtualMachine,
-				ResourceName:            "cloudtemple_compute_virtual_machine.foo",
-				ImportState:             true,
-				ImportStateVerify:       true,
-				ImportStateVerifyIgnore: []string{"datastore_cluster_id", "guest_operating_system_moref", "host_cluster_id"},
+				Config:            testAccResourceVirtualMachine,
+				ResourceName:      "cloudtemple_compute_virtual_machine.foo",
+				ImportState:       true,
+				ImportStateVerify: true,
+				ImportStateVerifyIgnore: []string{
+					"datastore_cluster_id",
+					"guest_operating_system_moref",
+					"host_cluster_id",
+					"extra_config",
+				},
 			},
 			{
 				Config: testAccResourceVirtualMachinePowerOn,

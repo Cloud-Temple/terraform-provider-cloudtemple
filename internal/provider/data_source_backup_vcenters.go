@@ -2,60 +2,35 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
-func dataSourceActivity() *schema.Resource {
+func dataSourceBackupVCenters() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData) (interface{}, error) {
-			id := d.Get("id").(string)
-			activity, err := client.Activity().Read(ctx, id)
-			if err == nil && activity == nil {
-				return nil, fmt.Errorf("failed to find activity with id %q", id)
-			}
-			return activity, err
+			sppServerId := d.Get("spp_server_id").(string)
+			vcenters, err := client.Backup().VCenter().List(ctx, sppServerId)
+			return map[string]interface{}{
+				"id":       "vcenters",
+				"vcenters": vcenters,
+			}, err
 		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
-			"id": {
+			"spp_server_id": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 
 			// Out
-			"tenant_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"description": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"type": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"creation_date": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"tags": {
-				Type:     schema.TypeList,
-				Computed: true,
-
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
-				},
-			},
-			"concerned_items": {
+			"vcenters": {
 				Type:     schema.TypeList,
 				Computed: true,
 
@@ -65,7 +40,19 @@ func dataSourceActivity() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
-						"type": {
+						"internal_id": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"instance_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"spp_server_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"name": {
 							Type:     schema.TypeString,
 							Computed: true,
 						},

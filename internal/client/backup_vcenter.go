@@ -11,11 +11,11 @@ func (c *BackupClient) VCenter() *BackupVCenterClient {
 }
 
 type BackupVCenter struct {
-	ID          string
-	InternalId  int
-	InstanceId  string
-	SppServerId string
-	Name        string
+	ID          string `terraform:"id"`
+	InternalId  int    `terraform:"internal_id"`
+	InstanceId  string `terraform:"instance_id"`
+	SppServerId string `terraform:"spp_server_id"`
+	Name        string `terraform:"name"`
 }
 
 func (c *BackupVCenterClient) List(ctx context.Context, sppServerId string) ([]*BackupVCenter, error) {

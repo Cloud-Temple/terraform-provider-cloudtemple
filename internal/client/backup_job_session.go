@@ -11,30 +11,30 @@ func (c *BackupClient) JobSession() *BackupJobSessionClient {
 }
 
 type BackupJobSession struct {
-	ID            string
-	JobName       string
-	SlaPolicyType string
-	JobId         string
-	Type          string
-	Duration      int
-	Start         int
-	End           int
-	Status        string
-	Statistics    BackupStatistics
-	SLAPolicies   []*BackupSLAPolicyStub
+	ID            string                 `terraform:"id"`
+	JobName       string                 `terraform:"job_name"`
+	SlaPolicyType string                 `terraform:"sla_policy_type"`
+	JobId         string                 `terraform:"job_id"`
+	Type          string                 `terraform:"type"`
+	Duration      int                    `terraform:"duration"`
+	Start         int                    `terraform:"start"`
+	End           int                    `terraform:"end"`
+	Status        string                 `terraform:"status"`
+	Statistics    BackupStatistics       `terraform:"statistics"`
+	SLAPolicies   []*BackupSLAPolicyStub `terraform:"sla_policies"`
 }
 
 type BackupStatistics struct {
-	Total   int
-	Success int
-	Failed  int
-	Skipped int
+	Total   int `terraform:"total"`
+	Success int `terraform:"success"`
+	Failed  int `terraform:"failed"`
+	Skipped int `terraform:"skipped"`
 }
 
 type BackupSLAPolicyStub struct {
-	ID   string
-	Name string
-	HREF string
+	ID   string `terraform:"id"`
+	Name string `terraform:"name"`
+	HREF string `terraform:"href"`
 }
 
 func (c *BackupJobSessionClient) List(ctx context.Context, filter *struct{}) ([]*BackupJobSession, error) {

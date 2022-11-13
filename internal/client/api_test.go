@@ -75,6 +75,30 @@ func TestMain(m *testing.M) {
 		}
 	}
 
+	names = map[string]struct{}{
+		"client-test": {},
+	}
+
+	lt, err := client.Token(context.Background())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+		os.Exit(1)
+	}
+	tokens, err := client.IAM().PAT().List(ctx, lt.UserID(), lt.TenantID())
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+		os.Exit(1)
+	}
+	for _, token := range tokens {
+		if _, found := names[token.Name]; found {
+			err := client.IAM().PAT().Delete(ctx, token.ID)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+				os.Exit(1)
+			}
+		}
+	}
+
 	os.Exit(m.Run())
 }
 

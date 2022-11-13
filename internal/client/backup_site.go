@@ -11,8 +11,8 @@ func (c *BackupClient) Site() *BackupSiteClient {
 }
 
 type BackupSite struct {
-	ID   string
-	Name string
+	ID   string `terraform:"id"`
+	Name string `terraform:"name"`
 }
 
 func (c *BackupSiteClient) List(ctx context.Context) ([]*BackupSite, error) {

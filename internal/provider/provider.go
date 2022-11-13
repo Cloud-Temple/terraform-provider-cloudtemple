@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -58,8 +59,19 @@ func New(version string) func() *schema.Provider {
 				},
 			},
 			DataSourcesMap: map[string]*schema.Resource{
-				"cloudtemple_activity":                        dataSourceActivity(),
 				"cloudtemple_activities":                      dataSourceActivities(),
+				"cloudtemple_activity":                        dataSourceActivity(),
+				"cloudtemple_backup_job_sessions":             dataSourceBackupJobSessions(),
+				"cloudtemple_backup_job":                      dataSourceBackupJob(),
+				"cloudtemple_backup_jobs":                     dataSourceBackupJobs(),
+				"cloudtemple_backup_metrics":                  dataSourceBackupMetrics(),
+				"cloudtemple_backup_sites":                    dataSourceBackupSites(),
+				"cloudtemple_backup_sla_policies":             dataSourceBackupSLAPolicies(),
+				"cloudtemple_backup_sla_policy":               dataSourceBackupSLAPolicy(),
+				"cloudtemple_backup_spp_server":               dataSourceBackupSPPServer(),
+				"cloudtemple_backup_spp_servers":              dataSourceBackupSPPServers(),
+				"cloudtemple_backup_storages":                 dataSourceBackupStorages(),
+				"cloudtemple_backup_vcenters":                 dataSourceBackupVCenters(),
 				"cloudtemple_compute_content_libraries":       dataSourceContentLibraries(),
 				"cloudtemple_compute_content_library":         dataSourceContentLibrary(),
 				"cloudtemple_compute_datastore_cluster":       dataSourceDatastoreCluster(),
@@ -294,7 +306,22 @@ func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string
 		return []interface{}{body}
 
 	default:
-		sw.diags = append(sw.diags, diag.Errorf("unknown kind %q", k.String())...)
+		sw.diags = append(sw.diags, diag.Errorf("%s unknown kind %q", path, k.String())...)
 		return nil
 	}
+}
+
+// IsNumber is a ValidateFunc that ensures a string can be parsed as a number
+func IsNumber(i interface{}, k string) (warnings []string, errors []error) {
+	v, ok := i.(string)
+	if !ok {
+		errors = append(errors, fmt.Errorf("expected type of %q to be string", k))
+		return
+	}
+
+	if _, err := strconv.Atoi(v); err != nil {
+		errors = append(errors, fmt.Errorf("expected %q to be a valid number, got %v", k, v))
+	}
+
+	return warnings, errors
 }

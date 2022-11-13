@@ -14,12 +14,12 @@ func (c *BackupClient) Metrics() *BackupMetricsClient {
 }
 
 type BackupMetricsHistory struct {
-	TotalRuns     int
-	SucessPercent int
-	Failed        int
-	Warning       int
-	Success       int
-	Running       int
+	TotalRuns     int `terraform:"total_runs"`
+	SucessPercent int `terraform:"sucess_percent"`
+	Failed        int `terraform:"failed"`
+	Warning       int `terraform:"warning"`
+	Success       int `terraform:"success"`
+	Running       int `terraform:"running"`
 }
 
 func (c *BackupMetricsClient) History(ctx context.Context, rang int) (*BackupMetricsHistory, error) {
@@ -44,10 +44,10 @@ func (c *BackupMetricsClient) History(ctx context.Context, rang int) (*BackupMet
 }
 
 type BackupMetricsCoverage struct {
-	FailedResources      int
-	ProtectedResources   int
-	UnprotectedResources int
-	TotalResources       int
+	FailedResources      int `terraform:"failed_resources"`
+	ProtectedResources   int `terraform:"protected_resources"`
+	UnprotectedResources int `terraform:"unprotected_resources"`
+	TotalResources       int `terraform:"total_resources"`
 }
 
 func (c *BackupMetricsClient) Coverage(ctx context.Context) (*BackupMetricsCoverage, error) {
@@ -70,12 +70,12 @@ func (c *BackupMetricsClient) Coverage(ctx context.Context) (*BackupMetricsCover
 }
 
 type BackupMetricsVirtualMachines struct {
-	InSPP               int
-	InCompute           int
-	WithBackup          int
-	InSLA               int
-	InOffloadingSLA     int
-	TSMOffloadingFactor int
+	InSPP               int `terraform:"in_spp"`
+	InCompute           int `terraform:"in_compute"`
+	WithBackup          int `terraform:"with_backup"`
+	InSLA               int `terraform:"in_sla"`
+	InOffloadingSLA     int `terraform:"in_offloading_sla"`
+	TSMOffloadingFactor int `terraform:"tsm_offloading_factor"`
 }
 
 func (c *BackupMetricsClient) VirtualMachines(ctx context.Context) (*BackupMetricsVirtualMachines, error) {
@@ -98,9 +98,9 @@ func (c *BackupMetricsClient) VirtualMachines(ctx context.Context) (*BackupMetri
 }
 
 type BackupMetricsPolicies struct {
-	Name                string
-	TriggerType         string
-	NumberOfProtectedVM int
+	Name                string `terraform:"name"`
+	TriggerType         string `terraform:"trigger_type"`
+	NumberOfProtectedVM int    `terraform:"number_of_protected_vm"`
 }
 
 func (c *BackupMetricsClient) Policies(ctx context.Context) ([]*BackupMetricsPolicies, error) {
@@ -123,12 +123,12 @@ func (c *BackupMetricsClient) Policies(ctx context.Context) ([]*BackupMetricsPol
 }
 
 type BackupMetricsPlatform struct {
-	Version        string
-	Build          string
-	Date           string
-	Product        string
-	Epoch          int
-	DeploymentType string
+	Version        string `terraform:"version"`
+	Build          string `terraform:"build"`
+	Date           string `terraform:"date"`
+	Product        string `terraform:"product"`
+	Epoch          int    `terraform:"epoch"`
+	DeploymentType string `terraform:"deployment_type"`
 }
 
 func (c *BackupMetricsClient) Platform(ctx context.Context) (*BackupMetricsPlatform, error) {
@@ -151,7 +151,7 @@ func (c *BackupMetricsClient) Platform(ctx context.Context) (*BackupMetricsPlatf
 }
 
 type BackupMetricsPlatformCPU struct {
-	CPUUtil int
+	CPUUtil int `terraform:"cpu_util"`
 }
 
 func (c *BackupMetricsClient) PlatformCPU(ctx context.Context) (*BackupMetricsPlatformCPU, error) {

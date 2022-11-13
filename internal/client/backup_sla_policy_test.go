@@ -50,6 +50,11 @@ func TestBackupSLAPolicyClient_Read(t *testing.T) {
 					Type:         "DAILY",
 					ActivateDate: 1568617200000,
 				},
+				Target: BackupSLAPolicyTarget{
+					ID:           "1000",
+					Href:         "https://spp1-ctlabs-eqx6.backup.cloud-temple.lan/api/site/1000",
+					ResourceType: "site",
+				},
 			},
 		},
 	}
