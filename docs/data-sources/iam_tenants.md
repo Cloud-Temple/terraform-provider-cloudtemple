@@ -3,12 +3,12 @@
 page_title: "cloudtemple_iam_tenants Data Source - terraform-provider-cloudtemple"
 subcategory: ""
 description: |-
-  
+  To query this datasource you will need the iam_read role.
 ---
 
 # cloudtemple_iam_tenants (Data Source)
 
-
+To query this datasource you will need the `iam_read` role.
 
 ## Example Usage
 

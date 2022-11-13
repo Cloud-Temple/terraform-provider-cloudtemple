@@ -3,12 +3,12 @@
 page_title: "cloudtemple_compute_content_library Data Source - terraform-provider-cloudtemple"
 subcategory: ""
 description: |-
-  
+  To query this datasource you will need the compute_read role.
 ---
 
 # cloudtemple_compute_content_library (Data Source)
 
-
+To query this datasource you will need the `compute_read` role.
 
 
 

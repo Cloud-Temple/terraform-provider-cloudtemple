@@ -3,12 +3,12 @@
 page_title: "cloudtemple_backup_job Data Source - terraform-provider-cloudtemple"
 subcategory: ""
 description: |-
-  
+  To query this datasource you will need the backup_read role.
 ---
 
 # cloudtemple_backup_job (Data Source)
 
-
+To query this datasource you will need the `backup_read` role.
 
 
 

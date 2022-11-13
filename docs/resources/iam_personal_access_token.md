@@ -3,12 +3,12 @@
 page_title: "cloudtemple_iam_personal_access_token Resource - terraform-provider-cloudtemple"
 subcategory: ""
 description: |-
-  
+  To manage this resource you will need the iam_offline_access role.
 ---
 
 # cloudtemple_iam_personal_access_token (Resource)
 
-
+To manage this resource you will need the `iam_offline_access` role.
 
 ## Example Usage
 

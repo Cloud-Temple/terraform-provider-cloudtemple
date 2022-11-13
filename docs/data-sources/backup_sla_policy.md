@@ -3,12 +3,12 @@
 page_title: "cloudtemple_backup_sla_policy Data Source - terraform-provider-cloudtemple"
 subcategory: ""
 description: |-
-  
+  To query this datasource you will need the backup_read role.
 ---
 
 # cloudtemple_backup_sla_policy (Data Source)
 
-
+To query this datasource you will need the `backup_read` role.
 
 
 

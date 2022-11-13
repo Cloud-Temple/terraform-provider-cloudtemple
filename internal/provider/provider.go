@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -59,64 +60,64 @@ func New(version string) func() *schema.Provider {
 				},
 			},
 			DataSourcesMap: map[string]*schema.Resource{
-				"cloudtemple_activities":                      dataSourceActivities(),
-				"cloudtemple_activity":                        dataSourceActivity(),
-				"cloudtemple_backup_job_sessions":             dataSourceBackupJobSessions(),
-				"cloudtemple_backup_job":                      dataSourceBackupJob(),
-				"cloudtemple_backup_jobs":                     dataSourceBackupJobs(),
-				"cloudtemple_backup_metrics":                  dataSourceBackupMetrics(),
-				"cloudtemple_backup_sites":                    dataSourceBackupSites(),
-				"cloudtemple_backup_sla_policies":             dataSourceBackupSLAPolicies(),
-				"cloudtemple_backup_sla_policy":               dataSourceBackupSLAPolicy(),
-				"cloudtemple_backup_spp_server":               dataSourceBackupSPPServer(),
-				"cloudtemple_backup_spp_servers":              dataSourceBackupSPPServers(),
-				"cloudtemple_backup_storages":                 dataSourceBackupStorages(),
-				"cloudtemple_backup_vcenters":                 dataSourceBackupVCenters(),
-				"cloudtemple_compute_content_libraries":       dataSourceContentLibraries(),
-				"cloudtemple_compute_content_library":         dataSourceContentLibrary(),
-				"cloudtemple_compute_datastore_cluster":       dataSourceDatastoreCluster(),
-				"cloudtemple_compute_datastore_clusters":      dataSourceDatastoreClusters(),
-				"cloudtemple_compute_datastore":               dataSourceDatastore(),
-				"cloudtemple_compute_datastores":              dataSourceDatastores(),
-				"cloudtemple_compute_folder":                  dataSourceFolder(),
-				"cloudtemple_compute_folders":                 dataSourceFolders(),
-				"cloudtemple_compute_guest_operating_system":  dataSourceGuestOperatingSystem(),
-				"cloudtemple_compute_guest_operating_systems": dataSourceGuestOperatingSystems(),
-				"cloudtemple_compute_host_cluster":            dataSourceHostCluster(),
-				"cloudtemple_compute_host_clusters":           dataSourceHostClusters(),
-				"cloudtemple_compute_host":                    dataSourceHost(),
-				"cloudtemple_compute_hosts":                   dataSourceHosts(),
-				"cloudtemple_compute_network_adapter":         dataSourceNetworkAdapter(),
-				"cloudtemple_compute_network_adapters":        dataSourceNetworkAdapters(),
-				"cloudtemple_compute_network":                 dataSourceNetwork(),
-				"cloudtemple_compute_networks":                dataSourceNetworks(),
-				"cloudtemple_compute_resource_pool":           dataSourceResourcePool(),
-				"cloudtemple_compute_resource_pools":          dataSourceResourcePools(),
-				"cloudtemple_compute_snapshots":               dataSourceSnapshots(),
-				"cloudtemple_compute_virtual_controllers":     dataSourceVirtualControllers(),
-				"cloudtemple_compute_virtual_datacenter":      dataSourceVirtualDatacenter(),
-				"cloudtemple_compute_virtual_datacenters":     dataSourceVirtualDatacenters(),
-				"cloudtemple_compute_virtual_disk":            dataSourceVirtualDisk(),
-				"cloudtemple_compute_virtual_disks":           dataSourceVirtualDisks(),
-				"cloudtemple_compute_virtual_machine":         dataSourceVirtualMachine(),
-				"cloudtemple_compute_virtual_machines":        dataSourceVirtualMachines(),
-				"cloudtemple_compute_virtual_switch":          dataSourceVirtualSwitch(),
-				"cloudtemple_compute_virtual_switchs":         dataSourceVirtualSwitchs(),
-				"cloudtemple_compute_worker":                  dataSourceWorker(),
-				"cloudtemple_compute_workers":                 dataSourceWorkers(),
-				"cloudtemple_iam_company":                     dataSourceCompany(),
-				"cloudtemple_iam_features":                    dataSourceFeatures(),
-				"cloudtemple_iam_personal_access_token":       dataSourcePersonalAccessToken(),
-				"cloudtemple_iam_personal_access_tokens":      dataSourcePersonalAccessTokens(),
-				"cloudtemple_iam_role":                        dataSourceRole(),
-				"cloudtemple_iam_roles":                       dataSourceRoles(),
-				"cloudtemple_iam_tenants":                     dataSourceTenants(),
-				"cloudtemple_iam_user":                        dataSourceUser(),
-				"cloudtemple_iam_users":                       dataSourceUsers(),
+				"cloudtemple_activities":                      documentDatasource(dataSourceActivities(), "activity_read"),
+				"cloudtemple_activity":                        documentDatasource(dataSourceActivity(), "activity_read"),
+				"cloudtemple_backup_job_sessions":             documentDatasource(dataSourceBackupJobSessions(), "backup_read"),
+				"cloudtemple_backup_job":                      documentDatasource(dataSourceBackupJob(), "backup_read"),
+				"cloudtemple_backup_jobs":                     documentDatasource(dataSourceBackupJobs(), "backup_read"),
+				"cloudtemple_backup_metrics":                  documentDatasource(dataSourceBackupMetrics(), "backup_read"),
+				"cloudtemple_backup_sites":                    documentDatasource(dataSourceBackupSites(), "backup_read"),
+				"cloudtemple_backup_sla_policies":             documentDatasource(dataSourceBackupSLAPolicies(), "backup_read"),
+				"cloudtemple_backup_sla_policy":               documentDatasource(dataSourceBackupSLAPolicy(), "backup_read"),
+				"cloudtemple_backup_spp_server":               documentDatasource(dataSourceBackupSPPServer(), "backup_read"),
+				"cloudtemple_backup_spp_servers":              documentDatasource(dataSourceBackupSPPServers(), "backup_read"),
+				"cloudtemple_backup_storages":                 documentDatasource(dataSourceBackupStorages(), "backup_read"),
+				"cloudtemple_backup_vcenters":                 documentDatasource(dataSourceBackupVCenters(), "backup_read"),
+				"cloudtemple_compute_content_libraries":       documentDatasource(dataSourceContentLibraries(), "compute_read"),
+				"cloudtemple_compute_content_library":         documentDatasource(dataSourceContentLibrary(), "compute_read"),
+				"cloudtemple_compute_datastore_cluster":       documentDatasource(dataSourceDatastoreCluster(), "compute_read"),
+				"cloudtemple_compute_datastore_clusters":      documentDatasource(dataSourceDatastoreClusters(), "compute_read"),
+				"cloudtemple_compute_datastore":               documentDatasource(dataSourceDatastore(), "compute_read"),
+				"cloudtemple_compute_datastores":              documentDatasource(dataSourceDatastores(), "compute_read"),
+				"cloudtemple_compute_folder":                  documentDatasource(dataSourceFolder(), "compute_read"),
+				"cloudtemple_compute_folders":                 documentDatasource(dataSourceFolders(), "compute_read"),
+				"cloudtemple_compute_guest_operating_system":  documentDatasource(dataSourceGuestOperatingSystem(), "compute_read"),
+				"cloudtemple_compute_guest_operating_systems": documentDatasource(dataSourceGuestOperatingSystems(), "compute_read"),
+				"cloudtemple_compute_host_cluster":            documentDatasource(dataSourceHostCluster(), "compute_read"),
+				"cloudtemple_compute_host_clusters":           documentDatasource(dataSourceHostClusters(), "compute_read"),
+				"cloudtemple_compute_host":                    documentDatasource(dataSourceHost(), "compute_read"),
+				"cloudtemple_compute_hosts":                   documentDatasource(dataSourceHosts(), "compute_read"),
+				"cloudtemple_compute_network_adapter":         documentDatasource(dataSourceNetworkAdapter(), "compute_read"),
+				"cloudtemple_compute_network_adapters":        documentDatasource(dataSourceNetworkAdapters(), "compute_read"),
+				"cloudtemple_compute_network":                 documentDatasource(dataSourceNetwork(), "compute_read"),
+				"cloudtemple_compute_networks":                documentDatasource(dataSourceNetworks(), "compute_read"),
+				"cloudtemple_compute_resource_pool":           documentDatasource(dataSourceResourcePool(), "compute_read"),
+				"cloudtemple_compute_resource_pools":          documentDatasource(dataSourceResourcePools(), "compute_read"),
+				"cloudtemple_compute_snapshots":               documentDatasource(dataSourceSnapshots(), "compute_read"),
+				"cloudtemple_compute_virtual_controllers":     documentDatasource(dataSourceVirtualControllers(), "compute_read"),
+				"cloudtemple_compute_virtual_datacenter":      documentDatasource(dataSourceVirtualDatacenter(), "compute_read"),
+				"cloudtemple_compute_virtual_datacenters":     documentDatasource(dataSourceVirtualDatacenters(), "compute_read"),
+				"cloudtemple_compute_virtual_disk":            documentDatasource(dataSourceVirtualDisk(), "compute_read"),
+				"cloudtemple_compute_virtual_disks":           documentDatasource(dataSourceVirtualDisks(), "compute_read"),
+				"cloudtemple_compute_virtual_machine":         documentDatasource(dataSourceVirtualMachine(), "compute_read"),
+				"cloudtemple_compute_virtual_machines":        documentDatasource(dataSourceVirtualMachines(), "compute_read"),
+				"cloudtemple_compute_virtual_switch":          documentDatasource(dataSourceVirtualSwitch(), "compute_read"),
+				"cloudtemple_compute_virtual_switchs":         documentDatasource(dataSourceVirtualSwitchs(), "compute_read"),
+				"cloudtemple_compute_worker":                  documentDatasource(dataSourceWorker(), "compute_read"),
+				"cloudtemple_compute_workers":                 documentDatasource(dataSourceWorkers(), "compute_read"),
+				"cloudtemple_iam_company":                     documentDatasource(dataSourceCompany(), "iam_read"),
+				"cloudtemple_iam_features":                    documentDatasource(dataSourceFeatures(), "iam_read"),
+				"cloudtemple_iam_personal_access_token":       documentDatasource(dataSourcePersonalAccessToken(), "iam_read"),
+				"cloudtemple_iam_personal_access_tokens":      documentDatasource(dataSourcePersonalAccessTokens(), "iam_read"),
+				"cloudtemple_iam_role":                        documentDatasource(dataSourceRole(), "iam_read"),
+				"cloudtemple_iam_roles":                       documentDatasource(dataSourceRoles(), "iam_read"),
+				"cloudtemple_iam_tenants":                     documentDatasource(dataSourceTenants(), "iam_read"),
+				"cloudtemple_iam_user":                        documentDatasource(dataSourceUser(), "iam_read"),
+				"cloudtemple_iam_users":                       documentDatasource(dataSourceUsers(), "iam_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
-				"cloudtemple_iam_personal_access_token": resourcePersonalAccessToken(),
-				"cloudtemple_compute_virtual_machine":   resourceVirtualMachine(),
+				"cloudtemple_iam_personal_access_token": documentResource(resourcePersonalAccessToken(), "iam_offline_access"),
+				"cloudtemple_compute_virtual_machine":   documentResource(resourceVirtualMachine(), "compute_write", "compute_read", "activity_read"),
 			},
 		}
 
@@ -324,4 +325,27 @@ func IsNumber(i interface{}, k string) (warnings []string, errors []error) {
 	}
 
 	return warnings, errors
+}
+
+func documentDatasource(r *schema.Resource, roles ...string) *schema.Resource {
+	return documentPermissions("To query this datasource", r, roles...)
+}
+
+func documentResource(r *schema.Resource, roles ...string) *schema.Resource {
+	return documentPermissions("To manage this resource", r, roles...)
+}
+
+func documentPermissions(prefix string, r *schema.Resource, roles ...string) *schema.Resource {
+	if len(roles) == 1 {
+		r.Description += fmt.Sprintf("\n%s you will need the `%s` role.", prefix, roles[0])
+
+	} else {
+		r.Description += fmt.Sprintf("\n%s you will need the following roles:\n", prefix)
+		for i, r := range roles {
+			roles[i] = fmt.Sprintf("  - `%s`", r)
+		}
+		r.Description += strings.Join(roles, "\n")
+	}
+
+	return r
 }

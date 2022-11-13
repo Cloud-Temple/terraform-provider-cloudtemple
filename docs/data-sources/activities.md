@@ -3,12 +3,12 @@
 page_title: "cloudtemple_activities Data Source - terraform-provider-cloudtemple"
 subcategory: ""
 description: |-
-  
+  To query this datasource you will need the activity_read role.
 ---
 
 # cloudtemple_activities (Data Source)
 
-
+To query this datasource you will need the `activity_read` role.
 
 
 

@@ -3,12 +3,18 @@
 page_title: "cloudtemple_compute_virtual_machine Resource - terraform-provider-cloudtemple"
 subcategory: ""
 description: |-
-  
+  To manage this resource you will need the following roles:
+    - compute_write
+    - compute_read
+    - activity_read
 ---
 
 # cloudtemple_compute_virtual_machine (Resource)
 
-
+To manage this resource you will need the following roles:
+  - `compute_write`
+  - `compute_read`
+  - `activity_read`
 
 ## Example Usage
 
