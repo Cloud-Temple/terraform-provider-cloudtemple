@@ -133,6 +133,8 @@ func configure(version string, p *schema.Provider) func(context.Context, *schema
 
 		config.ClientID = d.Get("client_id").(string)
 		config.SecretID = d.Get("secret_id").(string)
+		config.Address = d.Get("address").(string)
+		config.Scheme = d.Get("scheme").(string)
 
 		client, err := client.NewClient(config)
 		if err != nil {
