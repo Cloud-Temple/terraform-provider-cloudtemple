@@ -150,17 +150,21 @@ func TestIDValidation(t *testing.T) {
 		var validateSchema func(r *schema.Resource)
 		validateSchema = func(r *schema.Resource) {
 			for n, s := range r.Schema {
-				if !strings.HasSuffix(n, "id") {
-					return
+				if strings.HasSuffix(n, "ids") && (s.Optional || s.Required) {
+					if _, found := expected[reflect.ValueOf(s.Elem.(*schema.Schema).ValidateFunc).Pointer()]; !found {
+						t.Errorf("%s.%s ValidateFunc is incorrect", name, n)
+					}
+					if resource, ok := s.Elem.(*schema.Resource); ok {
+						validateSchema(resource)
+					}
 				}
-				if !s.Optional && !s.Required {
-					return
-				}
-				if _, found := expected[reflect.ValueOf(s.ValidateFunc).Pointer()]; !found {
-					t.Errorf("%s.%s ValidateFunc is incorrect", name, n)
-				}
-				if resource, ok := s.Elem.(*schema.Resource); ok {
-					validateSchema(resource)
+				if strings.HasSuffix(n, "id") && (s.Optional || s.Required) {
+					if _, found := expected[reflect.ValueOf(s.ValidateFunc).Pointer()]; !found {
+						t.Errorf("%s.%s ValidateFunc is incorrect", name, n)
+					}
+					if resource, ok := s.Elem.(*schema.Resource); ok {
+						validateSchema(resource)
+					}
 				}
 			}
 		}

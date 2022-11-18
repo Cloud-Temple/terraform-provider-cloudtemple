@@ -77,7 +77,7 @@ func computeNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, me
 		Type:             d.Get("type").(string),
 	})
 	if err != nil {
-		return diag.Errorf("the network adapter could not be created: %v", err)
+		return diag.Errorf("the network adapter could not be created: %s", err)
 	}
 	activity, err := c.Activity().WaitForCompletion(ctx, activityId)
 	if err != nil {

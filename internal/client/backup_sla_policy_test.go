@@ -24,6 +24,13 @@ func TestBackupSLAPolicyClient_List(t *testing.T) {
 		}
 	}
 	require.True(t, found)
+
+	slaPolicies, err = client.Backup().SLAPolicy().List(ctx, &BackupSLAPolicyFilter{
+		VirtualMachineId: "12345678-1234-5678-1234-567812345678",
+	})
+	require.NoError(t, err)
+
+	require.Len(t, slaPolicies, 0)
 }
 
 func TestBackupSLAPolicyClient_Read(t *testing.T) {
@@ -60,4 +67,65 @@ func TestBackupSLAPolicyClient_Read(t *testing.T) {
 	}
 
 	require.Equal(t, expected, slaPolicy)
+}
+
+func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+		Name:                      "test-client-assign-vm",
+		DatacenterId:              "85d53d08-0fa9-491e-ab89-90919516df25",
+		HostClusterId:             "dde72065-60f4-4577-836d-6ea074384d62",
+		DatastoreClusterId:        "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
+		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
+	})
+	require.NoError(t, err)
+
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	instanceId := activity.ConcernedItems[0].ID
+
+	jobs, err := client.Backup().Job().List(ctx, &BackupJobFilter{
+		Type: "catalog",
+	})
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+
+	activityId, err = client.Backup().Job().Run(ctx, &BackupJobRunRequest{
+		JobId: jobs[0].ID,
+	})
+	require.NoError(t, err)
+
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	_, err = client.Backup().Job().WaitForCompletion(ctx, jobs[0].ID)
+	require.NoError(t, err)
+
+	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &BackupAssignVirtualMachineRequest{
+		VirtualMachineIds: []string{instanceId},
+		SLAPolicies:       []string{"442718ef-44a1-43d7-9b57-2d910d74e928"},
+	})
+	require.NoError(t, err)
+
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &BackupAssignVirtualMachineRequest{
+		VirtualMachineIds: []string{instanceId},
+		SLAPolicies:       []string{},
+	})
+	require.NoError(t, err)
+
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
+	require.NoError(t, err)
+
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
 }

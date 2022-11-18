@@ -140,11 +140,6 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		disk,
 	)
 
-	// activityId, err = client.Compute().VirtualDisk().Unmount(ctx, diskId)
-	// require.NoError(t, err)
-	// _, err = client.Activity().WaitForCompletion(ctx, activityId)
-	// require.NoError(t, err)
-
 	activityId, err = client.Compute().VirtualDisk().Mount(ctx, vm.ID, "[ds002-bob-svc1-stor4-th3] test-client-disk_2/test-client-disk.vmdk")
 	require.NoError(t, err)
 	_, err = client.Activity().WaitForCompletion(ctx, activityId)

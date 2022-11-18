@@ -89,7 +89,7 @@ func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string) (*Act
 		count++
 		activity, err := c.Read(ctx, id)
 		if err != nil {
-			return retry.RetryableError(fmt.Errorf("an error occured while getting activity status: %v", err))
+			return retry.RetryableError(fmt.Errorf("an error occured while getting activity status: %s", err))
 		}
 		if activity == nil {
 			err := fmt.Errorf("the activity %q could not be found", id)

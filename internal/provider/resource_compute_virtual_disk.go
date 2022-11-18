@@ -116,7 +116,7 @@ func computeVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta 
 		DatastoreClusterId: d.Get("datastore_cluster_id").(string),
 	})
 	if err != nil {
-		return diag.Errorf("the virtual disk could not be created: %v", err)
+		return diag.Errorf("the virtual disk could not be created: %s", err)
 	}
 	activity, err := c.Activity().WaitForCompletion(ctx, activityId)
 	if err != nil {

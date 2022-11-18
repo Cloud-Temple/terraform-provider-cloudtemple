@@ -114,10 +114,11 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_iam_users":                       documentDatasource(dataSourceUsers(), "iam_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
-				"cloudtemple_iam_personal_access_token": documentResource(resourcePersonalAccessToken(), "iam_offline_access"),
-				"cloudtemple_compute_network_adapter":   documentResource(resourceNetworkAdapter(), "compute_write", "compute_read", "activity_read"),
-				"cloudtemple_compute_virtual_disk":      documentResource(resourceVirtualDisk(), "compute_write", "compute_read", "activity_read"),
-				"cloudtemple_compute_virtual_machine":   documentResource(resourceVirtualMachine(), "compute_write", "compute_read", "activity_read"),
+				"cloudtemple_backup_sla_policy_assignment": documentResource(resourceBackupSLAPolicyAssignment(), "backup_read", "backup_write", "activity_read"),
+				"cloudtemple_compute_network_adapter":      documentResource(resourceNetworkAdapter(), "compute_write", "compute_read", "activity_read"),
+				"cloudtemple_compute_virtual_disk":         documentResource(resourceVirtualDisk(), "compute_write", "compute_read", "activity_read"),
+				"cloudtemple_compute_virtual_machine":      documentResource(resourceVirtualMachine(), "compute_write", "compute_read", "activity_read"),
+				"cloudtemple_iam_personal_access_token":    documentResource(resourcePersonalAccessToken(), "iam_offline_access"),
 			},
 		}
 
@@ -148,7 +149,7 @@ func configure(version string, p *schema.Provider) func(context.Context, *schema
 		// to the user
 		_, err = client.Token(ctx)
 		if err != nil {
-			return nil, diag.Errorf("failed to login: %v", err)
+			return nil, diag.Errorf("failed to login: %s", err)
 		}
 
 		return client, nil
@@ -167,7 +168,7 @@ func getUserID(ctx context.Context, client *client.Client, d *schema.ResourceDat
 
 	l, err := client.Token(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get token: %v", err)
+		return "", fmt.Errorf("failed to get token: %s", err)
 	}
 
 	return l.UserID(), nil
@@ -181,7 +182,7 @@ func getTenantID(ctx context.Context, client *client.Client, d *schema.ResourceD
 
 	l, err := client.Token(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get token: %v", err)
+		return "", fmt.Errorf("failed to get token: %s", err)
 	}
 
 	return l.TenantID(), nil
@@ -195,7 +196,7 @@ func getCompanyID(ctx context.Context, client *client.Client, d *schema.Resource
 
 	l, err := client.Token(ctx)
 	if err != nil {
-		return "", fmt.Errorf("failed to get token: %v", err)
+		return "", fmt.Errorf("failed to get token: %s", err)
 	}
 
 	return l.CompanyID(), nil

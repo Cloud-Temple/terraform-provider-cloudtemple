@@ -24,11 +24,16 @@ func TestBackupJobClient_List(t *testing.T) {
 		}
 	}
 	require.True(t, found)
+
+	jobs, err = client.Backup().Job().List(ctx, &BackupJobFilter{
+		Type: "catalog",
+	})
+	require.NoError(t, err)
+
+	require.Len(t, jobs, 1)
 }
 
 func TestBackupJobClient_Read(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	job, err := client.Backup().Job().Read(ctx, "1004")
 	require.NoError(t, err)

@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -127,6 +129,32 @@ func (c *Client) newRequest(method, path string, args ...interface{}) *request {
 	}
 
 	return r
+}
+
+func (r *request) addFilter(filter any) {
+	f := reflect.ValueOf(filter).Elem()
+	if !f.IsValid() || f.IsZero() {
+		return
+	}
+
+	for _, field := range reflect.VisibleFields(f.Type()) {
+		name, found := field.Tag.Lookup("filter")
+		if !found {
+			continue
+		}
+		field := f.FieldByName(field.Name)
+		if !field.IsValid() || field.IsZero() {
+			continue
+		}
+		switch typ := field.Type().String(); typ {
+		case "string":
+			r.params.Add(name, field.Interface().(string))
+		case "*bool":
+			r.params.Add(name, strconv.FormatBool(*field.Interface().(*bool)))
+		default:
+			panic(fmt.Sprintf("unknown type: %q", typ))
+		}
+	}
 }
 
 func (r *request) toHTTP(ctx context.Context, token, userAgent string) (*http.Request, error) {

@@ -42,8 +42,15 @@ type BackupSLAPolicyTrigger struct {
 	ActivateDate int    `terraform:"activate_date"`
 }
 
-func (c *BackupSLAPolicyClient) List(ctx context.Context, filters *struct{}) ([]*BackupSLAPolicy, error) {
+type BackupSLAPolicyFilter struct {
+	VirtualMachineId string `filter:"virtualMachineId"`
+	VirtualDiskId    string `filter:"virtualDiskId"`
+	Assignable       *bool  `filter:"assignable"`
+}
+
+func (c *BackupSLAPolicyClient) List(ctx context.Context, filter *BackupSLAPolicyFilter) ([]*BackupSLAPolicy, error) {
 	r := c.c.newRequest("GET", "/api/backup/v1/policies")
+	r.addFilter(filter)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -79,4 +86,15 @@ func (c *BackupSLAPolicyClient) Read(ctx context.Context, id string) (*BackupSLA
 	}
 
 	return &out, nil
+}
+
+type BackupAssignVirtualMachineRequest struct {
+	VirtualMachineIds []string `json:"virtualMachineIds"`
+	SLAPolicies       []string `json:"slaPolicies"`
+}
+
+func (c *BackupSLAPolicyClient) AssignVirtualMachine(ctx context.Context, req *BackupAssignVirtualMachineRequest) (string, error) {
+	r := c.c.newRequest("POST", "/api/backup/v1/policies/assign/virtual_machine")
+	r.obj = req
+	return c.c.doRequestAndReturnActivity(ctx, r)
 }
