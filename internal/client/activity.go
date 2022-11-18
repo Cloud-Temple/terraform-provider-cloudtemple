@@ -31,6 +31,7 @@ type ActivityState struct {
 	StartDate   string
 	StopDate    string
 	Reason      string
+	Result      string
 	Progression float64
 }
 

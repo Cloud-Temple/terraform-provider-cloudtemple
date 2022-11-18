@@ -70,8 +70,19 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 				ExpectError: regexp.MustCompile(`NOT_ALLOWED_IN_CURRENT_STATE`),
 			},
 			{
-				// We stop the VM so that we can destroy it
+				// We stop the VM so that we can destroy it later
 				Config: testAccResourceVirtualMachine,
+			},
+			{
+				Config: testAccResourceVirtualMachineClone,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "name", "test-terraform-cloned"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "virtual_datacenter_id", "85d53d08-0fa9-491e-ab89-90919516df25"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "host_cluster_id", "dde72065-60f4-4577-836d-6ea074384d62"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "datastore_cluster_id", "6b06b226-ef55-4a0a-92bc-7aa071681b1b"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "tags.%", "1"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "tags.environment", "cloned"),
+				),
 			},
 		},
 	})
@@ -138,5 +149,33 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
   datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
   guest_operating_system_moref = "amazonlinux2_64Guest"
+}
+`
+
+const testAccResourceVirtualMachineClone = `
+resource "cloudtemple_compute_virtual_machine" "foo" {
+  name = "test-terraform"
+
+  virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"
+  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
+  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+  guest_operating_system_moref = "amazonlinux2_64Guest"
+
+  tags = {
+	"environment" = "test"
+  }
+}
+
+resource "cloudtemple_compute_virtual_machine" "cloned" {
+  name = "test-terraform-cloned"
+
+  clone_virtual_machine_id     = cloudtemple_compute_virtual_machine.foo.id
+  virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"
+  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
+  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+
+  tags = {
+	"environment" = "cloned"
+  }
 }
 `

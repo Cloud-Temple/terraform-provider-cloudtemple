@@ -29,20 +29,40 @@ func resourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeString,
 				Required: true,
 			},
+			"clone_virtual_machine_id": {
+				Type:          schema.TypeString,
+				Description:   "The ID of the virtual machine to clone. Conflicts with `guest_operating_system_moref`.",
+				Optional:      true,
+				ForceNew:      true,
+				ConflictsWith: []string{"guest_operating_system_moref"},
+				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref"},
+				ValidateFunc:  validation.IsUUID,
+			},
+			"guest_operating_system_moref": {
+				Type:          schema.TypeString,
+				Description:   "The operating system to launch the virtual machine with. Conflicts with `clone_virtual_machine_id`.",
+				Optional:      true,
+				ForceNew:      true,
+				ConflictsWith: []string{"clone_virtual_machine_id"},
+				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref"},
+			},
 			"virtual_datacenter_id": {
 				Type:         schema.TypeString,
+				Description:  "The datacenter to start the virtual machine in.",
 				Required:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 			"host_id": {
 				Type:         schema.TypeString,
+				Description:  "The host to start the virtual machine on.",
 				Optional:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 			"host_cluster_id": {
 				Type:         schema.TypeString,
+				Description:  "The host cluster to start the virtual machine on.",
 				Required:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
@@ -60,14 +80,16 @@ func resourceVirtualMachine() *schema.Resource {
 				ValidateFunc: validation.IsUUID,
 			},
 			"memory": {
-				Type:     schema.TypeInt,
-				Optional: true,
-				Default:  33554432,
+				Type:        schema.TypeInt,
+				Description: "The quantity of memory to start the virtual machine with.",
+				Optional:    true,
+				Default:     33554432,
 			},
 			"cpu": {
-				Type:     schema.TypeInt,
-				Optional: true,
-				Default:  1,
+				Type:        schema.TypeInt,
+				Description: "The number of CPUs to start the virtual machine with.",
+				Optional:    true,
+				Default:     1,
 			},
 			"num_cores_per_socket": {
 				Type:     schema.TypeInt,
@@ -86,20 +108,17 @@ func resourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeBool,
 				Optional: true,
 			},
-			"guest_operating_system_moref": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
-			},
 			"power_state": {
 				Type:         schema.TypeString,
+				Description:  "Whether to start the virtual machine.",
 				Optional:     true,
 				Default:      "off",
 				ValidateFunc: validation.StringInSlice([]string{"on", "off"}, false),
 			},
 			"tags": {
-				Type:     schema.TypeMap,
-				Optional: true,
+				Type:        schema.TypeMap,
+				Description: "The tags to attach to the virtual machine.",
+				Optional:    true,
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
@@ -316,29 +335,55 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 	c := getClient(meta)
 	name := d.Get("name").(string)
 
-	activityId, err := c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
-		Name:                      name,
-		DatacenterId:              d.Get("virtual_datacenter_id").(string),
-		HostId:                    d.Get("host_id").(string),
-		HostClusterId:             d.Get("host_cluster_id").(string),
-		DatastoreId:               d.Get("datastore_id").(string),
-		DatastoreClusterId:        d.Get("datastore_cluster_id").(string),
-		Memory:                    d.Get("memory").(int),
-		CPU:                       d.Get("cpu").(int),
-		GuestOperatingSystemMoref: d.Get("guest_operating_system_moref").(string),
-	})
-	if err != nil {
-		return diag.Errorf("failed to create virtual machine: %s", err)
+	var activityId string
+	var err error
+	cloneVirtualMachineId := d.Get("clone_virtual_machine_id").(string)
+	if cloneVirtualMachineId == "" {
+		activityId, err = c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
+			Name:                      name,
+			DatacenterId:              d.Get("virtual_datacenter_id").(string),
+			HostId:                    d.Get("host_id").(string),
+			HostClusterId:             d.Get("host_cluster_id").(string),
+			DatastoreId:               d.Get("datastore_id").(string),
+			DatastoreClusterId:        d.Get("datastore_cluster_id").(string),
+			Memory:                    d.Get("memory").(int),
+			CPU:                       d.Get("cpu").(int),
+			GuestOperatingSystemMoref: d.Get("guest_operating_system_moref").(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to create virtual machine: %s", err)
+		}
+
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId)
+		if err != nil {
+			return diag.Errorf("failed to create virtual machine: %s", err)
+		}
+
+		d.SetId(activity.ConcernedItems[0].ID)
+	} else {
+		activityId, err = c.Compute().VirtualMachine().Clone(ctx, &client.CloneVirtualMachineRequest{
+			Name:              name,
+			VirtualMachineId:  cloneVirtualMachineId,
+			PowerOn:           d.Get("power_state").(string) == "on",
+			DatacenterId:      d.Get("virtual_datacenter_id").(string),
+			HostClusterId:     d.Get("host_cluster_id").(string),
+			HostId:            d.Get("host_id").(string),
+			DatatoreClusterId: d.Get("datastore_cluster_id").(string),
+			DatastoreId:       d.Get("datastore_id").(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to clone virtual machine: %s", err)
+		}
+
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId)
+		if err != nil {
+			return diag.Errorf("failed to clone virtual machine: %s", err)
+		}
+
+		d.SetId(activity.State["completed"].Result)
 	}
 
-	activity, err := c.Activity().WaitForCompletion(ctx, activityId)
-	if err != nil {
-		return diag.Errorf("failed to create virtual machine: %s", err)
-	}
-
-	d.SetId(activity.ConcernedItems[0].ID)
-
-	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on")
+	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on" && cloneVirtualMachineId == "")
 }
 
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {

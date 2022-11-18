@@ -41,14 +41,16 @@ func TestBackupMetricsClient_Policies(t *testing.T) {
 	require.GreaterOrEqual(t, len(policiesMetrics), 1)
 
 	expected := &BackupMetricsPolicies{
-		Name:                "SLA_DAILY",
-		TriggerType:         "DAILY",
-		NumberOfProtectedVM: 3,
+		Name:        "SLA_DAILY",
+		TriggerType: "DAILY",
 	}
 
 	var found bool
 	for _, pm := range policiesMetrics {
 		if pm.Name == "SLA_DAILY" {
+			// Ignore some fields
+			pm.NumberOfProtectedVM = 0
+
 			require.Equal(t, expected, pm)
 
 			found = true

@@ -82,29 +82,6 @@ type VirtualMachineBootOptions struct {
 	BootRetryDelay   int    `terraform:"boot_retry_delay"`
 }
 
-type CreateVirtualMachineRequest struct {
-	DatacenterId              string `json:"datacenterId,omitempty"`
-	HostId                    string `json:"hostId,omitempty"`
-	HostClusterId             string `json:"hostClusterId,omitempty"`
-	DatastoreId               string `json:"datastoreId,omitempty"`
-	DatastoreClusterId        string `json:"datastoreClusterId,omitempty"`
-	Name                      string `json:"name,omitempty"`
-	Memory                    int    `json:"memory,omitempty"`
-	CPU                       int    `json:"cpu,omitempty"`
-	GuestOperatingSystemMoref string `json:"guestOperatingSystemMoref,omitempty"`
-}
-
-type UpdateVirtualMachineRequest struct {
-	Id            string       `json:"id"`
-	Ram           int          `json:"ram"`
-	Cpu           int          `json:"cpu"`
-	CorePerSocket int          `json:"corePerSocket"`
-	HotCpuAdd     bool         `json:"hotCpuAdd"`
-	HotCpuRemove  bool         `json:"hotCpuRemove"`
-	HotMemAdd     bool         `json:"hotMemAdd"`
-	BootOptions   *BootOptions `json:"bootOptions,omitempty"`
-}
-
 type BootOptions struct {
 	BootDelay        int    `json:"bootDelay"`
 	BootRetryDelay   int    `json:"bootRetryDelay"`
@@ -151,6 +128,18 @@ func (v *VirtualMachineClient) List(
 	return out, nil
 }
 
+type CreateVirtualMachineRequest struct {
+	DatacenterId              string `json:"datacenterId,omitempty"`
+	HostId                    string `json:"hostId,omitempty"`
+	HostClusterId             string `json:"hostClusterId,omitempty"`
+	DatastoreId               string `json:"datastoreId,omitempty"`
+	DatastoreClusterId        string `json:"datastoreClusterId,omitempty"`
+	Name                      string `json:"name,omitempty"`
+	Memory                    int    `json:"memory,omitempty"`
+	CPU                       int    `json:"cpu,omitempty"`
+	GuestOperatingSystemMoref string `json:"guestOperatingSystemMoref,omitempty"`
+}
+
 func (v *VirtualMachineClient) Create(ctx context.Context, req *CreateVirtualMachineRequest) (string, error) {
 	r := v.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_machines")
 	r.obj = req
@@ -177,6 +166,17 @@ func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMac
 	return &out, nil
 }
 
+type UpdateVirtualMachineRequest struct {
+	Id            string       `json:"id"`
+	Ram           int          `json:"ram"`
+	Cpu           int          `json:"cpu"`
+	CorePerSocket int          `json:"corePerSocket"`
+	HotCpuAdd     bool         `json:"hotCpuAdd"`
+	HotCpuRemove  bool         `json:"hotCpuRemove"`
+	HotMemAdd     bool         `json:"hotMemAdd"`
+	BootOptions   *BootOptions `json:"bootOptions,omitempty"`
+}
+
 func (v *VirtualMachineClient) Update(ctx context.Context, req *UpdateVirtualMachineRequest) (string, error) {
 	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines")
 	r.obj = req
@@ -200,5 +200,22 @@ func (v *VirtualMachineClient) Rename(ctx context.Context, id string, name strin
 		"id":   id,
 		"name": name,
 	}
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+type CloneVirtualMachineRequest struct {
+	Name              string `json:"name"`
+	VirtualMachineId  string `json:"-"`
+	PowerOn           bool   `json:"powerOn"`
+	DatacenterId      string `json:"datacenterId,omitempty"`
+	HostClusterId     string `json:"hostClusterId,omitempty"`
+	HostId            string `json:"hostId,omitempty"`
+	DatatoreClusterId string `json:"datastoreClusterId,omitempty"`
+	DatastoreId       string `json:"datastoreId,omitempty"`
+}
+
+func (v *VirtualMachineClient) Clone(ctx context.Context, req *CloneVirtualMachineRequest) (string, error) {
+	r := v.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_machines/%s/clone", req.VirtualMachineId)
+	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }

@@ -259,3 +259,47 @@ func TestVirtualMachineClient_Rename(t *testing.T) {
 	_, err = client.Activity().WaitForCompletion(ctx, activityId)
 	require.NoError(t, err)
 }
+
+func TestVirtualMachineClient_Clone(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+		Name:                      "test-client-clone",
+		DatacenterId:              "85d53d08-0fa9-491e-ab89-90919516df25",
+		HostClusterId:             "dde72065-60f4-4577-836d-6ea074384d62",
+		DatastoreClusterId:        "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
+		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
+	})
+	require.NoError(t, err)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	instanceId := activity.ConcernedItems[0].ID
+
+	activityId, err = client.Compute().VirtualMachine().Clone(ctx, &CloneVirtualMachineRequest{
+		Name:              "test-client-cloned",
+		VirtualMachineId:  instanceId,
+		DatacenterId:      "85d53d08-0fa9-491e-ab89-90919516df25",
+		HostClusterId:     "dde72065-60f4-4577-836d-6ea074384d62",
+		DatatoreClusterId: "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
+	})
+	require.NoError(t, err)
+	activity, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	vm, err := client.Compute().VirtualMachine().Read(ctx, activity.State["completed"].Result)
+	require.NoError(t, err)
+	require.Equal(t, "test-client-cloned", vm.Name)
+
+	activityId, err = client.Compute().VirtualMachine().Delete(ctx, vm.ID)
+	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
+	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+}

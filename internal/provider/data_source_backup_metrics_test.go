@@ -18,7 +18,7 @@ func TestAccDataSourceMetrics(t *testing.T) {
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_metrics.foo", "history.#", "1"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_metrics.foo", "platform.#", "1"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_metrics.foo", "platform_cpu.#", "1"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_metrics.foo", "policies.#", "1"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_metrics.foo", "policies.#"),
 					resource.TestCheckResourceAttr("data.cloudtemple_backup_metrics.foo", "virtual_machines.#", "1"),
 				),
 			},

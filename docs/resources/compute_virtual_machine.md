@@ -59,23 +59,24 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 ### Required
 
 - `datastore_cluster_id` (String)
-- `guest_operating_system_moref` (String)
-- `host_cluster_id` (String)
+- `host_cluster_id` (String) The host cluster to start the virtual machine on.
 - `name` (String)
-- `virtual_datacenter_id` (String)
+- `virtual_datacenter_id` (String) The datacenter to start the virtual machine in.
 
 ### Optional
 
-- `cpu` (Number)
+- `clone_virtual_machine_id` (String) The ID of the virtual machine to clone. Conflicts with `guest_operating_system_moref`.
+- `cpu` (Number) The number of CPUs to start the virtual machine with.
 - `cpu_hot_add_enabled` (Boolean)
 - `cpu_hot_remove_enabled` (Boolean)
 - `datastore_id` (String)
-- `host_id` (String)
-- `memory` (Number)
+- `guest_operating_system_moref` (String) The operating system to launch the virtual machine with. Conflicts with `clone_virtual_machine_id`.
+- `host_id` (String) The host to start the virtual machine on.
+- `memory` (Number) The quantity of memory to start the virtual machine with.
 - `memory_hot_add_enabled` (Boolean)
 - `num_cores_per_socket` (Number)
-- `power_state` (String)
-- `tags` (Map of String)
+- `power_state` (String) Whether to start the virtual machine.
+- `tags` (Map of String) The tags to attach to the virtual machine.
 
 ### Read-Only
 
