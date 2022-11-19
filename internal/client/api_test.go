@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -177,4 +178,23 @@ func TestAPI_tokenCache(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, token.Raw, newToken.Raw)
+}
+
+func TestAPI_tokenExpiration(t *testing.T) {
+	t.Parallel()
+
+	if os.Getenv("CLIENT_RUN_LONG_TESTS") == "" {
+		t.Skip("Set the CLIENT_RUN_LONG_TESTS environment variable to run this test")
+	}
+
+	token, err := client.token(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, token)
+
+	time.Sleep(28 * time.Minute)
+	newToken, err := client.token(context.Background())
+	require.NoError(t, err)
+	require.NotNil(t, token)
+
+	require.NotEqual(t, token.Raw, newToken.Raw)
 }

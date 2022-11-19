@@ -1,5 +1,9 @@
 ## 0.3.0 (Unreleased)
 
+IMPROVEMENTS:
+
+  * The Go client used by the Terraform provider now automatically renew the API token before expiration.
+
 
 ## 0.2.0 (November 18, 2022)
 

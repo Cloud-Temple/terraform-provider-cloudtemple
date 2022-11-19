@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/hashicorp/go-cleanhttp"
@@ -198,7 +199,12 @@ func (c *Client) token(ctx context.Context) (*jwt.Token, error) {
 	defer c.lock.Unlock()
 
 	if c.savedToken != nil {
-		return c.savedToken, nil
+		expireAt := c.savedToken.Claims.(jwt.MapClaims)["exp"].(float64)
+		tm := time.Unix(int64(expireAt), 0)
+
+		if time.Until(tm) > 5*time.Minute {
+			return c.savedToken, nil
+		}
 	}
 
 	r := c.newRequest("POST", "/api/iam/v2/auth/personal_access_token")
