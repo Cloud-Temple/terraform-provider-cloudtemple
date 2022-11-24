@@ -58,7 +58,7 @@ Read-Only:
 - `template` (Boolean)
 - `tools` (String)
 - `tools_version` (Number)
-- `triggered_alarms` (List of String)
+- `triggered_alarms` (List of Object) (see [below for nested schema](#nestedobjatt--virtual_machines--triggered_alarms))
 - `virtual_datacenter_id` (String)
 
 <a id="nestedobjatt--virtual_machines--boot_options"></a>
@@ -115,5 +115,14 @@ Read-Only:
 
 - `committed` (Number)
 - `uncommitted` (Number)
+
+
+<a id="nestedobjatt--virtual_machines--triggered_alarms"></a>
+### Nested Schema for `virtual_machines.triggered_alarms`
+
+Read-Only:
+
+- `id` (String)
+- `status` (String)
 
 

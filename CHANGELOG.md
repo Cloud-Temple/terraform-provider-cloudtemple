@@ -1,5 +1,13 @@
 ## 0.3.0 (Unreleased)
 
+
+## 0.2.1 (November 24, 2022)
+
+BUG FIXES:
+
+  * The `triggered_alarms` attribute of the `cloudtemple_compute_virtual_machine` resource is now a list of objects with `id` and `status` attributes.
+  * The `triggered_alarms` attribute of the `cloudtemple_compute_virtual_machine` and `cloudtemple_compute_virtual_machines` datasources is now a list of objects with `id` and `status` attributes.
+
 IMPROVEMENTS:
 
   * The Go client used by the Terraform provider now automatically renew the API token before expiration.

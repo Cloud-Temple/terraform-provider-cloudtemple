@@ -22,6 +22,7 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "guest_operating_system_moref", "amazonlinux2_64Guest"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "tags.%", "1"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "tags.environment", "test"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "triggered_alarms.#", "0"),
 				),
 			},
 			{

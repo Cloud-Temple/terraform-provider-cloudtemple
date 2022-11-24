@@ -206,14 +206,10 @@ func TestImport(t *testing.T) {
 }
 
 func TestExample(t *testing.T) {
-	t.Parallel()
-
 	provider := New("dev")()
 
 	test := func(typ, name string) func(t *testing.T) {
 		return func(t *testing.T) {
-			t.Parallel()
-
 			path := fmt.Sprintf("../../examples/%ss/%s/%s.tf", typ, name, typ)
 			require.FileExists(t, path)
 

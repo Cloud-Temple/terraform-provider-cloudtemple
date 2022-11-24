@@ -101,7 +101,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 - `template` (Boolean)
 - `tools` (String)
 - `tools_version` (Number)
-- `triggered_alarms` (List of String)
+- `triggered_alarms` (List of Object) (see [below for nested schema](#nestedatt--triggered_alarms))
 
 <a id="nestedatt--boot_options"></a>
 ### Nested Schema for `boot_options`
@@ -157,5 +157,14 @@ Read-Only:
 
 - `committed` (Number)
 - `uncommitted` (Number)
+
+
+<a id="nestedatt--triggered_alarms"></a>
+### Nested Schema for `triggered_alarms`
+
+Read-Only:
+
+- `id` (String)
+- `status` (String)
 
 

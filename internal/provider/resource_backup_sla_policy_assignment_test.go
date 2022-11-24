@@ -44,7 +44,7 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
 }
 
 resource "cloudtemple_compute_virtual_machine" "foo" {
-  name = "test-terraform-network-adapter"
+  name = "test-terraform-sla-policy"
 
   virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id

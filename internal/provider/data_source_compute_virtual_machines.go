@@ -139,8 +139,17 @@ func dataSourceVirtualMachines() *schema.Resource {
 							Type:     schema.TypeList,
 							Computed: true,
 
-							Elem: &schema.Schema{
-								Type: schema.TypeString,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"id": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+									"status": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+								},
 							},
 						},
 						"replication_config": {

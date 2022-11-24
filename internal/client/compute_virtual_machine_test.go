@@ -63,7 +63,7 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 		DistributedVirtualPortGroupIds: []string{},
 		SppMode:                        "production",
 		Snapshoted:                     false,
-		TriggeredAlarms:                []string{},
+		TriggeredAlarms:                []VirtualMachineTriggeredAlarm{},
 		ReplicationConfig: VirtualMachineReplicationConfig{
 			Generation:            31,
 			VmReplicationId:       "GID-37249b75-7b18-4e33-bdbc-9c96774b7a71",

@@ -11,7 +11,7 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
 }
 
 resource "cloudtemple_compute_virtual_machine" "foo" {
-  name = "test-terraform-sla-policy"
+  name = "hello-world"
 
   memory                 = 8 * 1024 * 1024 * 1024
   cpu                    = 2

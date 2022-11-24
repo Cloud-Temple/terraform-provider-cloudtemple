@@ -39,11 +39,16 @@ type VirtualMachine struct {
 	DistributedVirtualPortGroupIds []string                        `terraform:"distributed_virtual_port_group_ids"`
 	SppMode                        string                          `terraform:"spp_mode"`
 	Snapshoted                     bool                            `terraform:"snapshoted"`
-	TriggeredAlarms                []string                        `terraform:"triggered_alarms"`
+	TriggeredAlarms                []VirtualMachineTriggeredAlarm  `terraform:"triggered_alarms"`
 	ReplicationConfig              VirtualMachineReplicationConfig `terraform:"replication_config"`
 	ExtraConfig                    []VirtualMachineExtraConfig     `terraform:"extra_config"`
 	Storage                        VirtualMachineStorage           `terraform:"storage"`
 	BootOptions                    VirtualMachineBootOptions       `terraform:"boot_options"`
+}
+
+type VirtualMachineTriggeredAlarm struct {
+	ID     string `type:"id"`
+	Status string `type:"status"`
 }
 
 type VirtualMachineReplicationConfig struct {
