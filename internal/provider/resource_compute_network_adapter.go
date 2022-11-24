@@ -81,7 +81,7 @@ func computeNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, me
 	}
 	activity, err := c.Activity().WaitForCompletion(ctx, activityId)
 	if err != nil {
-		return diag.Errorf("failed to create network adapter: %s", err)
+		return diag.Errorf("failed to create network adapter, %s", err)
 	}
 
 	d.SetId(activity.ConcernedItems[0].ID)
@@ -115,7 +115,7 @@ func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, me
 	})
 	_, err = c.Activity().WaitForCompletion(ctx, activityId)
 	if err != nil {
-		return diag.Errorf("failed to update network adapter: %s", err)
+		return diag.Errorf("failed to update network adapter, %s", err)
 	}
 
 	if d.HasChange("connected") {
@@ -143,7 +143,7 @@ func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, me
 			return err
 		})
 		if err != nil {
-			return diag.Errorf("failed to %s network adapter: %s", msg, err)
+			return diag.Errorf("failed to %s network adapter, %s", msg, err)
 		}
 	}
 
@@ -158,7 +158,7 @@ func computeNetworkAdapterDelete(ctx context.Context, d *schema.ResourceData, me
 		return diag.Errorf("failed to delete network adapter: %s", err)
 	}
 	if _, err = c.Activity().WaitForCompletion(ctx, activityId); err != nil {
-		return diag.Errorf("failed to delete network adapter: %s", err)
+		return diag.Errorf("failed to delete network adapter, %s", err)
 	}
 	return nil
 }

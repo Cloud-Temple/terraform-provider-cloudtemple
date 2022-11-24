@@ -1,5 +1,8 @@
-## 0.3.0 (Unreleased)
+## 0.2.2 (Unreleased)
 
+IMPROVEMENTS:
+
+  * Error messages returned while waiting for an activity to finish now give detailed information about the error.
 
 ## 0.2.1 (November 24, 2022)
 

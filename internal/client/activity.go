@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/sethvargo/go-retry"
@@ -79,6 +80,72 @@ func (c *ActivityClient) Read(ctx context.Context, id string) (*Activity, error)
 	return &out, nil
 }
 
+type ActivityCompletionError struct {
+	message  string
+	activity *Activity
+}
+
+const activityErrorMessage = `
+
+  Description: %s
+  Tenant ID: %q
+  Created at %s
+  Type: %s
+  Tags: %s
+
+  Concerned Items:
+%s
+
+%s`
+
+func (a *ActivityCompletionError) Error() string {
+	message := a.message
+	if message == "" {
+		message = fmt.Sprintf("an error occured while waiting for completion of activity %q:", a.activity.ID)
+	}
+
+	if a.activity != nil {
+		var concernedItemMessage []string
+		for _, concernedItem := range a.activity.ConcernedItems {
+			concernedItemMessage = append(
+				concernedItemMessage,
+				fmt.Sprintf("    - ID: %q\n      Type: %s", concernedItem.ID, concernedItem.Type),
+			)
+		}
+		if len(concernedItemMessage) == 0 {
+			concernedItemMessage = []string{"    none"}
+		}
+
+		var stateMessage []string
+		for name, state := range a.activity.State {
+			stateMessage = append(
+				stateMessage,
+				fmt.Sprintf(
+					"  State: %s\n    Result: %s\n    Reason: %s\n    Started at %s\n    Stopped at %s",
+					name,
+					state.Result,
+					state.Reason,
+					state.StartDate,
+					state.StopDate,
+				),
+			)
+		}
+
+		message += fmt.Sprintf(
+			activityErrorMessage,
+			a.activity.Description,
+			a.activity.TenantId,
+			a.activity.CreationDate.String(),
+			a.activity.Type,
+			strings.Join(a.activity.Tags, ", "),
+			strings.Join(concernedItemMessage, "\n"),
+			strings.Join(stateMessage, "\n"),
+		)
+	}
+
+	return message
+}
+
 func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string) (*Activity, error) {
 	b := retry.NewFibonacci(1 * time.Second)
 	b = retry.WithCappedDuration(30*time.Second, b)
@@ -90,17 +157,24 @@ func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string) (*Act
 		count++
 		activity, err := c.Read(ctx, id)
 		if err != nil {
-			return retry.RetryableError(fmt.Errorf("an error occured while getting activity status: %s", err))
+			return retry.RetryableError(&ActivityCompletionError{
+				message:  fmt.Sprintf("an error occured while getting the status of activity %q: %s", id, err),
+				activity: activity,
+			})
 		}
 		if activity == nil {
-			err := fmt.Errorf("the activity %q could not be found", id)
+			err := &ActivityCompletionError{
+				message: fmt.Sprintf("the activity %q could not be found", id),
+			}
 			if count == 1 {
 				return retry.RetryableError(err)
 			}
 			return err
 		}
 		if len(activity.State) != 1 {
-			return retry.RetryableError(fmt.Errorf("unexpected state: %v", activity.State))
+			return retry.RetryableError(&ActivityCompletionError{
+				message: fmt.Sprintf("unexpected state for activity %q: %v", id, activity.State),
+			})
 		}
 		res = activity
 		for state := range activity.State {
@@ -108,9 +182,14 @@ func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string) (*Act
 			case "completed":
 				return nil
 			case "failed":
-				return fmt.Errorf("the activity has failed: %v", activity.State["failed"].Reason)
+				return &ActivityCompletionError{
+					activity: activity,
+				}
 			default:
-				return retry.RetryableError(fmt.Errorf("unexpected state: %v", state))
+				return retry.RetryableError(&ActivityCompletionError{
+					message:  fmt.Sprintf("unexpected state for activity %q: %v", id, state),
+					activity: activity,
+				})
 			}
 		}
 		return nil

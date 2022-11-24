@@ -85,7 +85,7 @@ func computeBackupSLAPolicyAssignmentUpdate(ctx context.Context, d *schema.Resou
 
 	_, err = c.Activity().WaitForCompletion(ctx, activityId)
 	if err != nil {
-		return diag.Errorf("failed to update catalog: %s", err)
+		return diag.Errorf("failed to update catalog, %s", err)
 	}
 
 	_, err = c.Backup().Job().WaitForCompletion(ctx, jobs[0].ID)
@@ -108,7 +108,7 @@ func computeBackupSLAPolicyAssignmentUpdate(ctx context.Context, d *schema.Resou
 	}
 	_, err = c.Activity().WaitForCompletion(ctx, activityId)
 	if err != nil {
-		return diag.Errorf("failed to assign SLA policies: %s", err)
+		return diag.Errorf("failed to assign SLA policies, %s", err)
 	}
 
 	d.SetId(instanceId)
@@ -129,7 +129,7 @@ func computeBackupSLAPolicyAssignmentDelete(ctx context.Context, d *schema.Resou
 	}
 	_, err = c.Activity().WaitForCompletion(ctx, activityId)
 	if err != nil {
-		return diag.Errorf("failed to remove SLA policies: %s", err)
+		return diag.Errorf("failed to remove SLA policies, %s", err)
 	}
 
 	d.SetId(instanceId)
