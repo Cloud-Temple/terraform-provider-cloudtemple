@@ -57,7 +57,7 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	for _, vm := range vms {
-		if strings.HasPrefix(vm.Name, "test-terraform") {
+		if strings.HasPrefix(vm.Name, "test-terraform") || vm.Name == "hello-world" {
 			vm, err = c.Compute().VirtualMachine().Read(ctx, vm.ID)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err.Error())

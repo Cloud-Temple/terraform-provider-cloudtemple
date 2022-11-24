@@ -1,8 +1,11 @@
-## 0.2.2 (Unreleased)
+## 0.3.0 (Unreleased)
+
+## 0.2.2 (November 24, 2022)
 
 IMPROVEMENTS:
 
   * Error messages returned while waiting for an activity to finish now give detailed information about the error.
+  * The provider will now log HTTP requests and responses when [`TF_LOG`](https://developer.hashicorp.com/terraform/cli/config/environment-variables) is set to `DEBUG` or higher.
 
 ## 0.2.1 (November 24, 2022)
 

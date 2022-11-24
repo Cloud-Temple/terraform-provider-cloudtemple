@@ -3,13 +3,16 @@ package provider
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"reflect"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/logging"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -128,6 +131,21 @@ func New(version string) func() *schema.Provider {
 	}
 }
 
+type loggingHttpTransport struct {
+	transport http.RoundTripper
+}
+
+func (t *loggingHttpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	ctx := req.Context()
+	if strings.Contains(req.URL.Path, "personal_access_token") {
+		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "tf_http_req_body")
+		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "tf_http_res_body")
+	}
+	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "Authorization")
+	req = req.WithContext(ctx)
+	return t.transport.RoundTrip(req)
+}
+
 func configure(version string, p *schema.Provider) func(context.Context, *schema.ResourceData) (any, diag.Diagnostics) {
 	return func(ctx context.Context, d *schema.ResourceData) (any, diag.Diagnostics) {
 		config := client.DefaultConfig()
@@ -136,6 +154,10 @@ func configure(version string, p *schema.Provider) func(context.Context, *schema
 		config.SecretID = d.Get("secret_id").(string)
 		config.Address = d.Get("address").(string)
 		config.Scheme = d.Get("scheme").(string)
+
+		config.Transport = &loggingHttpTransport{
+			transport: logging.NewLoggingHTTPTransport(config.Transport),
+		}
 
 		client, err := client.NewClient(config)
 		if err != nil {
