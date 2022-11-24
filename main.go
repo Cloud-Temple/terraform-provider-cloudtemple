@@ -34,7 +34,7 @@ func main() {
 
 	opts := &plugin.ServeOpts{
 		Debug:        debugMode,
-		ProviderAddr: "registry.terraform.io/cloudtemple/cloudtemple",
+		ProviderAddr: "registry.terraform.io/Cloud-Temple/cloudtemple",
 		ProviderFunc: provider.New(version),
 	}
 
