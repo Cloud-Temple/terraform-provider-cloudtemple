@@ -159,13 +159,13 @@ func TestCompute_VirtualMachineCreateDelete(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, activity.ConcernedItems[0].ID)
 	require.NoError(t, err)
 
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }
 
@@ -182,7 +182,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
 	})
 	require.NoError(t, err)
-	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	instanceId := activity.ConcernedItems[0].ID
@@ -202,7 +202,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 		},
 	})
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
@@ -211,7 +211,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 		PowerAction:  "on",
 	})
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
@@ -220,12 +220,12 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 		PowerAction:  "off",
 	})
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }
 
@@ -242,12 +242,12 @@ func TestVirtualMachineClient_Rename(t *testing.T) {
 		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
 	})
 	require.NoError(t, err)
-	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Rename(ctx, activity.ConcernedItems[0].ID, "test-client-rename-success")
 	require.NoError(t, err)
-	activity, err = client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	vm, err := client.Compute().VirtualMachine().Read(ctx, activity.ConcernedItems[0].ID)
@@ -256,7 +256,7 @@ func TestVirtualMachineClient_Rename(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, activity.ConcernedItems[0].ID)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }
 
@@ -273,7 +273,7 @@ func TestVirtualMachineClient_Clone(t *testing.T) {
 		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
 	})
 	require.NoError(t, err)
-	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	instanceId := activity.ConcernedItems[0].ID
@@ -286,7 +286,7 @@ func TestVirtualMachineClient_Clone(t *testing.T) {
 		DatatoreClusterId: "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
 	})
 	require.NoError(t, err)
-	activity, err = client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	vm, err := client.Compute().VirtualMachine().Read(ctx, activity.State["completed"].Result)
@@ -295,11 +295,11 @@ func TestVirtualMachineClient_Clone(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, vm.ID)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }

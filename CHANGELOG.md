@@ -1,5 +1,10 @@
 ## 0.3.0 (Unreleased)
 
+IMPROVEMENTS:
+
+  * The provider now periodically logs information regarding the state of the activity or job running while waiting for them to complete
+
+
 ## 0.2.2 (November 24, 2022)
 
 IMPROVEMENTS:

@@ -21,7 +21,7 @@ func TestTagClient(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	instanceId := activity.ConcernedItems[0].ID
@@ -84,6 +84,6 @@ func TestTagClient(t *testing.T) {
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
 	require.NoError(t, err)
 
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }

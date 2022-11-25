@@ -83,7 +83,7 @@ func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	instanceId := activity.ConcernedItems[0].ID
@@ -99,10 +99,10 @@ func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
-	_, err = client.Backup().Job().WaitForCompletion(ctx, jobs[0].ID)
+	_, err = client.Backup().Job().WaitForCompletion(ctx, jobs[0].ID, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &BackupAssignVirtualMachineRequest{
@@ -111,7 +111,7 @@ func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &BackupAssignVirtualMachineRequest{
@@ -120,12 +120,12 @@ func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
 	require.NoError(t, err)
 
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }

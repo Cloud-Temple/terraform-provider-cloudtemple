@@ -118,7 +118,7 @@ func computeVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta 
 	if err != nil {
 		return diag.Errorf("the virtual disk could not be created: %s", err)
 	}
-	activity, err := c.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to create virtual disk, %s", err)
 	}
@@ -147,7 +147,7 @@ func computeVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta 
 	if err != nil {
 		return diag.Errorf("failed to update virtual disk: %s", err)
 	}
-	_, err = c.Activity().WaitForCompletion(ctx, activityId)
+	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to update virtual disk, %s", err)
 	}
@@ -162,7 +162,7 @@ func computeVirtualDiskDelete(ctx context.Context, d *schema.ResourceData, meta 
 	if err != nil {
 		return diag.Errorf("failed to delete virtual disk: %s", err)
 	}
-	if _, err = c.Activity().WaitForCompletion(ctx, activityId); err != nil {
+	if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
 		return diag.Errorf("failed to delete virtual disk, %s", err)
 	}
 	return nil

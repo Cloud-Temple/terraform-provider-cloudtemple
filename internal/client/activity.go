@@ -146,7 +146,7 @@ func (a *ActivityCompletionError) Error() string {
 	return message
 }
 
-func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string) (*Activity, error) {
+func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string, options *WaiterOptions) (*Activity, error) {
 	b := retry.NewFibonacci(1 * time.Second)
 	b = retry.WithCappedDuration(30*time.Second, b)
 
@@ -157,7 +157,7 @@ func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string) (*Act
 		count++
 		activity, err := c.Read(ctx, id)
 		if err != nil {
-			return retry.RetryableError(&ActivityCompletionError{
+			return options.retryableError(&ActivityCompletionError{
 				message:  fmt.Sprintf("an error occured while getting the status of activity %q: %s", id, err),
 				activity: activity,
 			})
@@ -167,12 +167,12 @@ func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string) (*Act
 				message: fmt.Sprintf("the activity %q could not be found", id),
 			}
 			if count == 1 {
-				return retry.RetryableError(err)
+				return options.retryableError(err)
 			}
-			return err
+			return options.error(err)
 		}
 		if len(activity.State) != 1 {
-			return retry.RetryableError(&ActivityCompletionError{
+			return options.retryableError(&ActivityCompletionError{
 				message: fmt.Sprintf("unexpected state for activity %q: %v", id, activity.State),
 			})
 		}
@@ -180,20 +180,22 @@ func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string) (*Act
 		for state := range activity.State {
 			switch state {
 			case "completed":
+				options.log(fmt.Sprintf("the activity %q is completed", id))
 				return nil
 			case "failed":
-				return &ActivityCompletionError{
+				return options.error(&ActivityCompletionError{
 					activity: activity,
-				}
+				})
 			default:
-				return retry.RetryableError(&ActivityCompletionError{
+				return options.retryableError(&ActivityCompletionError{
 					message:  fmt.Sprintf("unexpected state for activity %q: %v", id, state),
 					activity: activity,
 				})
 			}
 		}
-		return nil
 
+		options.log(fmt.Sprintf("no state found for activity %q", id))
+		return nil
 	})
 
 	return res, err

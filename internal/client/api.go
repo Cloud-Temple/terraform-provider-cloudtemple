@@ -383,3 +383,23 @@ func encodeBody(obj any) (io.Reader, error) {
 	}
 	return buf, nil
 }
+
+type WaiterOptions struct {
+	Logger func(msg string)
+}
+
+func (w *WaiterOptions) log(msg string) {
+	if w != nil && w.Logger != nil {
+		w.Logger(msg)
+	}
+}
+
+func (w *WaiterOptions) error(err error) error {
+	w.log(fmt.Sprintf("got non-retryable error: %s", err.Error()))
+	return err
+}
+
+func (w *WaiterOptions) retryableError(err error) error {
+	w.log(fmt.Sprintf("got retryable error: %s", err.Error()))
+	return err
+}

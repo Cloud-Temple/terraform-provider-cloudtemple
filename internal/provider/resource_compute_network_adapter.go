@@ -79,7 +79,7 @@ func computeNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, me
 	if err != nil {
 		return diag.Errorf("the network adapter could not be created: %s", err)
 	}
-	activity, err := c.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to create network adapter, %s", err)
 	}
@@ -113,7 +113,7 @@ func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, me
 		MacAddress:   macAddress,
 		MacType:      macType,
 	})
-	_, err = c.Activity().WaitForCompletion(ctx, activityId)
+	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to update network adapter, %s", err)
 	}
@@ -139,7 +139,7 @@ func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, me
 			if err != nil {
 				return err
 			}
-			_, err = c.Activity().WaitForCompletion(ctx, activityId)
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 			return err
 		})
 		if err != nil {
@@ -157,7 +157,7 @@ func computeNetworkAdapterDelete(ctx context.Context, d *schema.ResourceData, me
 	if err != nil {
 		return diag.Errorf("failed to delete network adapter: %s", err)
 	}
-	if _, err = c.Activity().WaitForCompletion(ctx, activityId); err != nil {
+	if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
 		return diag.Errorf("failed to delete network adapter, %s", err)
 	}
 	return nil

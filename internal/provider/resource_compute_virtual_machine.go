@@ -363,7 +363,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			return diag.Errorf("failed to create virtual machine: %s", err)
 		}
 
-		activity, err := c.Activity().WaitForCompletion(ctx, activityId)
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
 			return diag.Errorf("failed to create virtual machine, %s", err)
 		}
@@ -384,7 +384,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			return diag.Errorf("failed to clone virtual machine: %s", err)
 		}
 
-		activity, err := c.Activity().WaitForCompletion(ctx, activityId)
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
 			return diag.Errorf("failed to clone virtual machine, %s", err)
 		}
@@ -447,7 +447,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 	if err != nil {
 		return diag.Errorf("failed to update virtual machine: %s", err)
 	}
-	_, err = c.Activity().WaitForCompletion(ctx, activityId)
+	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to update virtual machine, %s", err)
 	}
@@ -461,7 +461,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		if err != nil {
 			return diag.Errorf("failed to rename virtual machine, %s", err)
 		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId)
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
 			return diag.Errorf("failed to rename virtual machine, %s", err)
 		}
@@ -483,7 +483,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		if err != nil {
 			return diag.Errorf("failed to power %s virtual machine: %s", powerState, err)
 		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId)
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
 			return diag.Errorf("failed to power %s virtual machine, %s", powerState, err)
 		}
@@ -499,7 +499,7 @@ func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, me
 	if err != nil {
 		return diag.Errorf("failed to delete virtual machine: %s", err)
 	}
-	if _, err = c.Activity().WaitForCompletion(ctx, activityId); err != nil {
+	if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
 		return diag.Errorf("failed to delete virtual machine, %s", err)
 	}
 	return nil

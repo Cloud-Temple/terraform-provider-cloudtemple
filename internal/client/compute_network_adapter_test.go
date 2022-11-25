@@ -60,7 +60,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
 	})
 	require.NoError(t, err)
-	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	vm, err := client.Compute().VirtualMachine().Read(ctx, activity.ConcernedItems[0].ID)
@@ -73,7 +73,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 		MacAddress:       "00:50:57:CB:89:B7",
 	})
 	require.NoError(t, err)
-	activity, err = client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	networkAdapterId := activity.ConcernedItems[0].ID
@@ -102,7 +102,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 		ForceEnterBIOS: false,
 	})
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	// Connecting a network adapter can fail right after the VM has been powered
@@ -116,14 +116,14 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		_, err = client.Activity().WaitForCompletion(ctx, activityId)
+		_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 		return err
 	})
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().NetworkAdapter().Disconnect(ctx, networkAdapterId)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().NetworkAdapter().Update(ctx, &UpdateNetworkAdapterRequest{
@@ -132,7 +132,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 		NewNetworkId: "cb5d4885-e112-42e9-9842-db4c8fc78f9b",
 	})
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	networkAdapter, err = client.Compute().NetworkAdapter().Read(ctx, networkAdapterId)
@@ -147,11 +147,11 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 		ForceEnterBIOS: false,
 	})
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, vm.ID)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }

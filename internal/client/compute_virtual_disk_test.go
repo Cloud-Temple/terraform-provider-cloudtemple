@@ -65,7 +65,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
 	})
 	require.NoError(t, err)
-	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	vm, err := client.Compute().VirtualMachine().Read(ctx, activity.ConcernedItems[0].ID)
@@ -79,7 +79,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		DatastoreClusterId: "1a996110-2746-4725-958f-f6fceef05b32",
 	})
 	require.NoError(t, err)
-	activity, err = client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	diskId := activity.ConcernedItems[0].ID
@@ -113,7 +113,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		NewCapacity: 2 * 10737418240,
 	})
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	disk, err = client.Compute().VirtualDisk().Read(ctx, diskId)
@@ -142,17 +142,17 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualDisk().Mount(ctx, vm.ID, "[ds002-bob-svc1-stor4-th3] test-client-disk_2/test-client-disk.vmdk")
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualDisk().Delete(ctx, diskId)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, vm.ID)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }
 
@@ -168,7 +168,7 @@ func TestVirtualDiskClient_Unmount(t *testing.T) {
 		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
 	})
 	require.NoError(t, err)
-	activity, err := client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	vm, err := client.Compute().VirtualMachine().Read(ctx, activity.ConcernedItems[0].ID)
@@ -182,18 +182,18 @@ func TestVirtualDiskClient_Unmount(t *testing.T) {
 		DatastoreClusterId: "1a996110-2746-4725-958f-f6fceef05b32",
 	})
 	require.NoError(t, err)
-	activity, err = client.Activity().WaitForCompletion(ctx, activityId)
+	activity, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	diskId := activity.ConcernedItems[0].ID
 
 	activityId, err = client.Compute().VirtualDisk().Unmount(ctx, diskId)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, vm.ID)
 	require.NoError(t, err)
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }

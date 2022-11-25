@@ -57,9 +57,9 @@ func TestBackupJobClient_Run(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
-	_, err = client.Backup().Job().WaitForCompletion(ctx, "1004")
+	_, err = client.Backup().Job().WaitForCompletion(ctx, "1004", nil)
 	require.NoError(t, err)
 }

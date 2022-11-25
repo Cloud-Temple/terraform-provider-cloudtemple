@@ -74,7 +74,7 @@ func TestMain(m *testing.M) {
 					fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 					os.Exit(1)
 				}
-				_, err = c.Activity().WaitForCompletion(ctx, activityId)
+				_, err = c.Activity().WaitForCompletion(ctx, activityId, nil)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "failed to stop %s:%s\n", vm.Name, err.Error())
 					os.Exit(1)
@@ -86,7 +86,7 @@ func TestMain(m *testing.M) {
 				fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 				os.Exit(1)
 			}
-			_, err = c.Activity().WaitForCompletion(ctx, activityId)
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, nil)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "failed to delete %s: %s\n", vm.Name, err.Error())
 				os.Exit(1)

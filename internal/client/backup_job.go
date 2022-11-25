@@ -112,7 +112,7 @@ func (b *BackupJobCompletionError) Error() string {
 	)
 }
 
-func (c *BackupJobClient) WaitForCompletion(ctx context.Context, id string) (*BackupJob, error) {
+func (c *BackupJobClient) WaitForCompletion(ctx context.Context, id string, options *WaiterOptions) (*BackupJob, error) {
 	b := retry.NewFibonacci(1 * time.Second)
 	b = retry.WithCappedDuration(30*time.Second, b)
 
@@ -123,7 +123,7 @@ func (c *BackupJobClient) WaitForCompletion(ctx context.Context, id string) (*Ba
 		count++
 		job, err := c.Read(ctx, id)
 		if err != nil {
-			return retry.RetryableError(&BackupJobCompletionError{
+			return options.retryableError(&BackupJobCompletionError{
 				message: fmt.Sprintf("an error occured while getting job %q status: %s", id, err),
 				job:     job,
 			})
@@ -133,24 +133,25 @@ func (c *BackupJobClient) WaitForCompletion(ctx context.Context, id string) (*Ba
 				message: fmt.Sprintf("the job %q could not be found", id),
 			}
 			if count == 1 {
-				return retry.RetryableError(err)
+				return options.retryableError(err)
 			}
-			return err
+			return options.error(err)
 		}
 		res = job
 		switch job.Status {
 		case "IDLE":
+			options.log(fmt.Sprintf("the job %q is completed", id))
 			return nil
 		case "RUNNING":
-			return retry.RetryableError(&BackupJobCompletionError{
+			return options.retryableError(&BackupJobCompletionError{
 				message: fmt.Sprintf("the job %q is still running", id),
 				job:     job,
 			})
 		default:
-			return &BackupJobCompletionError{
+			return options.error(&BackupJobCompletionError{
 				message: fmt.Sprintf("the job %q has failed", id),
 				job:     job,
-			}
+			})
 		}
 	})
 

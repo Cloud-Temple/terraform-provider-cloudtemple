@@ -374,3 +374,11 @@ func documentPermissions(prefix string, r *schema.Resource, roles ...string) *sc
 
 	return r
 }
+
+func getWaiterOptions(ctx context.Context) *client.WaiterOptions {
+	return &client.WaiterOptions{
+		Logger: func(msg string) {
+			tflog.Debug(ctx, msg)
+		},
+	}
+}
