@@ -72,14 +72,44 @@ func (c *BackupJobClient) Read(ctx context.Context, id string) (*BackupJob, erro
 }
 
 type BackupJobRunRequest struct {
-	PolicyId string `json:"policyId,omitempty"`
 	JobId    string `json:"jobId"`
+	PolicyId string `json:"policyId,omitempty"`
 }
 
 func (c *BackupJobClient) Run(ctx context.Context, req *BackupJobRunRequest) (string, error) {
 	r := c.c.newRequest("POST", "/api/backup/v1/jobs/run")
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
+}
+
+type BackupJobCompletionError struct {
+	message string
+	job     *BackupJob
+}
+
+const backupJobCompletionErrorMessage = `%s:
+
+  Status: %s
+  Name: %s
+  Display name: %s
+  Type: %s
+  PolicyId: %q
+`
+
+func (b *BackupJobCompletionError) Error() string {
+	if b.job == nil {
+		return b.message
+	}
+
+	return fmt.Sprintf(
+		backupJobCompletionErrorMessage,
+		b.message,
+		b.job.Status,
+		b.job.Name,
+		b.job.DisplayName,
+		b.job.Type,
+		b.job.PolicyId,
+	)
 }
 
 func (c *BackupJobClient) WaitForCompletion(ctx context.Context, id string) (*BackupJob, error) {
@@ -93,10 +123,15 @@ func (c *BackupJobClient) WaitForCompletion(ctx context.Context, id string) (*Ba
 		count++
 		job, err := c.Read(ctx, id)
 		if err != nil {
-			return retry.RetryableError(fmt.Errorf("an error occured while getting job status: %s", err))
+			return retry.RetryableError(&BackupJobCompletionError{
+				message: fmt.Sprintf("an error occured while getting job %q status: %s", id, err),
+				job:     job,
+			})
 		}
 		if job == nil {
-			err := fmt.Errorf("the job %q could not be found", id)
+			err := &BackupJobCompletionError{
+				message: fmt.Sprintf("the job %q could not be found", id),
+			}
 			if count == 1 {
 				return retry.RetryableError(err)
 			}
@@ -107,9 +142,15 @@ func (c *BackupJobClient) WaitForCompletion(ctx context.Context, id string) (*Ba
 		case "IDLE":
 			return nil
 		case "RUNNING":
-			return retry.RetryableError(fmt.Errorf("the job is running"))
+			return retry.RetryableError(&BackupJobCompletionError{
+				message: fmt.Sprintf("the job %q is still running", id),
+				job:     job,
+			})
 		default:
-			return fmt.Errorf("the job has failed: %v", job.Status)
+			return &BackupJobCompletionError{
+				message: fmt.Sprintf("the job %q has failed", id),
+				job:     job,
+			}
 		}
 	})
 

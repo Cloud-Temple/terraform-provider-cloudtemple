@@ -48,3 +48,18 @@ func TestBackupJobClient_Read(t *testing.T) {
 	}
 	require.Equal(t, expected, job)
 }
+
+func TestBackupJobClient_Run(t *testing.T) {
+	ctx := context.Background()
+
+	activityId, err := client.Backup().Job().Run(ctx, &BackupJobRunRequest{
+		JobId: "1004",
+	})
+	require.NoError(t, err)
+
+	_, err = client.Activity().WaitForCompletion(ctx, activityId)
+	require.NoError(t, err)
+
+	_, err = client.Backup().Job().WaitForCompletion(ctx, "1004")
+	require.NoError(t, err)
+}

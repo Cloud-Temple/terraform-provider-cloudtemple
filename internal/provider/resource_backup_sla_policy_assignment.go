@@ -90,7 +90,7 @@ func computeBackupSLAPolicyAssignmentUpdate(ctx context.Context, d *schema.Resou
 
 	_, err = c.Backup().Job().WaitForCompletion(ctx, jobs[0].ID)
 	if err != nil {
-		return diag.Errorf("failed to update catalog: %s", err)
+		return diag.Errorf("failed to update catalog, %s", err)
 	}
 
 	// Now we can assign the policies
