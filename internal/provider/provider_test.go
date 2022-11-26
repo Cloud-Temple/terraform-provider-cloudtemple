@@ -57,7 +57,22 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 	for _, vm := range vms {
-		if strings.HasPrefix(vm.Name, "test-terraform") || vm.Name == "hello-world" {
+		toDestroy := strings.HasPrefix(vm.Name, "test-terraform") || vm.Name == "hello-world"
+
+		tags, err := c.Tag().Resource().Read(ctx, vm.ID)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err.Error())
+			os.Exit(1)
+		}
+
+		for _, tag := range tags {
+			if tag.Key == "created_by" && tag.Value == "Terraform" {
+				toDestroy = true
+				break
+			}
+		}
+
+		if toDestroy {
 			vm, err = c.Compute().VirtualMachine().Read(ctx, vm.ID)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err.Error())

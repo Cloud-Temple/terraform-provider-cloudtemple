@@ -362,26 +362,28 @@ func IsNumber(i interface{}, k string) (warnings []string, errors []error) {
 }
 
 func documentDatasource(r *schema.Resource, roles ...string) *schema.Resource {
-	return documentPermissions("To query this datasource", r, roles...)
+	documentPermissions("To query this datasource", r, roles...)
+	return r
 }
 
 func documentResource(r *schema.Resource, roles ...string) *schema.Resource {
-	return documentPermissions("To manage this resource", r, roles...)
+	documentPermissions("To manage this resource", r, roles...)
+	return r
 }
 
-func documentPermissions(prefix string, r *schema.Resource, roles ...string) *schema.Resource {
+func documentPermissions(prefix string, r *schema.Resource, roles ...string) {
+	r.Description = strings.TrimSpace(r.Description)
+
 	if len(roles) == 1 {
-		r.Description += fmt.Sprintf("\n%s you will need the `%s` role.", prefix, roles[0])
+		r.Description += fmt.Sprintf("\n\n%s you will need the `%s` role.", prefix, roles[0])
 
 	} else {
-		r.Description += fmt.Sprintf("\n%s you will need the following roles:\n", prefix)
+		r.Description += fmt.Sprintf("\n\n%s you will need the following roles:\n", prefix)
 		for i, r := range roles {
 			roles[i] = fmt.Sprintf("  - `%s`", r)
 		}
 		r.Description += strings.Join(roles, "\n")
 	}
-
-	return r
 }
 
 func getWaiterOptions(ctx context.Context) *client.WaiterOptions {

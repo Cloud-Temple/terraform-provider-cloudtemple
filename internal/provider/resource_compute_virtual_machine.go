@@ -12,7 +12,13 @@ import (
 
 func resourceVirtualMachine() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: `Provision a virtual machine. This allows instances to be created, updated, and deleted.
+
+Virtual machines can be created using three different methods:
+
+  - by creating a new instance with ` + "`guest_operating_system_moref`" + `
+  - by cloning an existing virtual machine with ` + "`clone_virtual_machine_id`" + `
+  - by deploying a content library item with ` + "`content_library_id` and `content_library_item_id`",
 
 		CreateContext: computeVirtualMachineCreate,
 		ReadContext:   computeVirtualMachineRead,
@@ -29,22 +35,41 @@ func resourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeString,
 				Required: true,
 			},
-			"clone_virtual_machine_id": {
+			"content_library_id": {
 				Type:          schema.TypeString,
-				Description:   "The ID of the virtual machine to clone. Conflicts with `guest_operating_system_moref`.",
+				Description:   "The ID of the content library to clone from. Conflicts with `guest_operating_system_moref` and `clone_virtual_machine_id`.",
 				Optional:      true,
 				ForceNew:      true,
-				ConflictsWith: []string{"guest_operating_system_moref"},
-				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref"},
+				RequiredWith:  []string{"content_library_item_id"},
+				ConflictsWith: []string{"clone_virtual_machine_id", "guest_operating_system_moref"},
+				ValidateFunc:  validation.IsUUID,
+			},
+			"content_library_item_id": {
+				Type:          schema.TypeString,
+				Description:   "The ID of the content library item to clone. Conflicts with `guest_operating_system_moref` and `clone_virtual_machine_id`.",
+				Optional:      true,
+				ForceNew:      true,
+				RequiredWith:  []string{"content_library_id"},
+				ConflictsWith: []string{"guest_operating_system_moref", "clone_virtual_machine_id"},
+				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
+				ValidateFunc:  validation.IsUUID,
+			},
+			"clone_virtual_machine_id": {
+				Type:          schema.TypeString,
+				Description:   "The ID of the virtual machine to clone. Conflicts with `guest_operating_system_moref` and `content_library_item_id`.",
+				Optional:      true,
+				ForceNew:      true,
+				ConflictsWith: []string{"guest_operating_system_moref", "content_library_item_id"},
+				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
 				ValidateFunc:  validation.IsUUID,
 			},
 			"guest_operating_system_moref": {
 				Type:          schema.TypeString,
-				Description:   "The operating system to launch the virtual machine with. Conflicts with `clone_virtual_machine_id`.",
+				Description:   "The operating system to launch the virtual machine with. Conflicts with `clone_virtual_machine_id` and `content_library_item_id`.",
 				Optional:      true,
 				ForceNew:      true,
-				ConflictsWith: []string{"clone_virtual_machine_id"},
-				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref"},
+				ConflictsWith: []string{"clone_virtual_machine_id", "content_library_item_id"},
+				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
 			},
 			"virtual_datacenter_id": {
 				Type:         schema.TypeString,
@@ -75,7 +100,7 @@ func resourceVirtualMachine() *schema.Resource {
 			},
 			"datastore_cluster_id": {
 				Type:         schema.TypeString,
-				Required:     true,
+				Optional:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
 			},
@@ -346,30 +371,11 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 
 	var activityId string
 	var err error
+	var fromScratch bool
 	cloneVirtualMachineId := d.Get("clone_virtual_machine_id").(string)
-	if cloneVirtualMachineId == "" {
-		activityId, err = c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
-			Name:                      name,
-			DatacenterId:              d.Get("virtual_datacenter_id").(string),
-			HostId:                    d.Get("host_id").(string),
-			HostClusterId:             d.Get("host_cluster_id").(string),
-			DatastoreId:               d.Get("datastore_id").(string),
-			DatastoreClusterId:        d.Get("datastore_cluster_id").(string),
-			Memory:                    d.Get("memory").(int),
-			CPU:                       d.Get("cpu").(int),
-			GuestOperatingSystemMoref: d.Get("guest_operating_system_moref").(string),
-		})
-		if err != nil {
-			return diag.Errorf("failed to create virtual machine: %s", err)
-		}
+	contentLibraryItemId := d.Get("content_library_item_id").(string)
 
-		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		if err != nil {
-			return diag.Errorf("failed to create virtual machine, %s", err)
-		}
-
-		d.SetId(activity.ConcernedItems[0].ID)
-	} else {
+	if cloneVirtualMachineId != "" {
 		activityId, err = c.Compute().VirtualMachine().Clone(ctx, &client.CloneVirtualMachineRequest{
 			Name:              name,
 			VirtualMachineId:  cloneVirtualMachineId,
@@ -390,9 +396,60 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 
 		d.SetId(activity.State["completed"].Result)
+
+	} else if contentLibraryItemId != "" {
+		datastoreId := d.Get("datastore_id").(string)
+		if datastoreId == "" {
+			return diag.Errorf("'datastore_id' is required when 'content_library_item_id' is used.")
+		}
+
+		activityId, err = c.Compute().ContentLibrary().Deploy(ctx, &client.ComputeContentLibraryItemDeployRequest{
+			Name:                 name,
+			ContentLibraryId:     d.Get("content_library_id").(string),
+			ContentLibraryItemId: d.Get("content_library_item_id").(string),
+			HostClusterId:        d.Get("host_cluster_id").(string),
+			HostId:               d.Get("host_id").(string),
+			DatastoreId:          d.Get("datastore_id").(string),
+			DatacenterId:         d.Get("virtual_datacenter_id").(string),
+			PowerOn:              d.Get("power_state").(string) == "on",
+		})
+		if err != nil {
+			return diag.Errorf("failed to deploy content library item: %s", err)
+		}
+
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to deploy content library item: %s", err)
+		}
+
+		d.SetId(activity.State["completed"].Result)
+
+	} else {
+		fromScratch = true
+		activityId, err = c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
+			Name:                      name,
+			DatacenterId:              d.Get("virtual_datacenter_id").(string),
+			HostId:                    d.Get("host_id").(string),
+			HostClusterId:             d.Get("host_cluster_id").(string),
+			DatastoreId:               d.Get("datastore_id").(string),
+			DatastoreClusterId:        d.Get("datastore_cluster_id").(string),
+			Memory:                    d.Get("memory").(int),
+			CPU:                       d.Get("cpu").(int),
+			GuestOperatingSystemMoref: d.Get("guest_operating_system_moref").(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to create virtual machine, %s", err)
+		}
+
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to create virtual machine: %s", err)
+		}
+
+		d.SetId(activity.ConcernedItems[0].ID)
 	}
 
-	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on" && cloneVirtualMachineId == "")
+	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on" && fromScratch)
 }
 
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {

@@ -85,6 +85,16 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "tags.environment", "cloned"),
 				),
 			},
+			{
+				Config: testAccResourceVirtualMachineContentLibraryDeploy,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "name", "test-terraform-content-library-deployed"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "virtual_datacenter_id", "85d53d08-0fa9-491e-ab89-90919516df25"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "host_cluster_id", "dde72065-60f4-4577-836d-6ea074384d62"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "tags.%", "1"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "tags.environment", "cloned-from-content-library"),
+				),
+			},
 		},
 	})
 }
@@ -177,6 +187,32 @@ resource "cloudtemple_compute_virtual_machine" "cloned" {
 
   tags = {
 	"environment" = "cloned"
+  }
+}
+`
+
+const testAccResourceVirtualMachineContentLibraryDeploy = `
+data "cloudtemple_compute_content_library" "foo" {
+  name = "PUBLIC"
+}
+
+data "cloudtemple_compute_content_library_item" "foo" {
+  content_library_id = data.cloudtemple_compute_content_library.foo.id
+  name               = "20211115132417_master_linux-centos-8"
+}
+
+resource "cloudtemple_compute_virtual_machine" "content-library-deployed" {
+  name = "test-terraform-content-library-deployed"
+
+  content_library_id      = data.cloudtemple_compute_content_library.foo.id
+  content_library_item_id = data.cloudtemple_compute_content_library_item.foo.id
+
+  virtual_datacenter_id = "85d53d08-0fa9-491e-ab89-90919516df25"
+  host_cluster_id       = "dde72065-60f4-4577-836d-6ea074384d62"
+  datastore_id          = "d439d467-943a-49f5-a022-c0c25b737022"
+
+  tags = {
+	"environment" = "cloned-from-content-library"
   }
 }
 `
