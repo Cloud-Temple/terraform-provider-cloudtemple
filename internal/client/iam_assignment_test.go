@@ -8,8 +8,6 @@ import (
 )
 
 func TestIAM_AssignmentList(t *testing.T) {
-	t.Parallel()
-
 	userId := testUserID(t)
 	tenantID := testTenantID(t)
 	assignments, err := client.IAM().Assignment().List(context.Background(), userId, tenantID, "")

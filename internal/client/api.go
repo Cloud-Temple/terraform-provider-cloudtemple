@@ -17,6 +17,7 @@ import (
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/hashicorp/go-cleanhttp"
+	"github.com/sethvargo/go-retry"
 )
 
 const (
@@ -401,5 +402,5 @@ func (w *WaiterOptions) error(err error) error {
 
 func (w *WaiterOptions) retryableError(err error) error {
 	w.log(fmt.Sprintf("got retryable error: %s", err.Error()))
-	return err
+	return retry.RetryableError(err)
 }

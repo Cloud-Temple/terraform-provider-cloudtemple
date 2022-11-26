@@ -9,8 +9,6 @@ import (
 )
 
 func TestIAM_PATList(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	tokens, err := client.IAM().PAT().List(ctx, testUserID(t), testTenantID(t))
 	require.NoError(t, err)
@@ -20,8 +18,6 @@ func TestIAM_PATList(t *testing.T) {
 }
 
 func TestIAM_PATRead(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	tokens, err := client.IAM().PAT().List(ctx, testUserID(t), testTenantID(t))
 	require.NoError(t, err)
@@ -44,8 +40,6 @@ func TestIAM_PATRead(t *testing.T) {
 }
 
 func TestIAM_PATCreateAndDelete(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	roles := []string{testRole(t).ID}
 	expirationDate := int(time.Now().UnixMilli() + 24*60*60*1000)

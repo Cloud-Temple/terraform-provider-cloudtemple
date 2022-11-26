@@ -1,5 +1,10 @@
 ## 0.3.0 (Unreleased)
 
+NEW FEATURES:
+
+  * The `cloudtemple_compute_content_library_item` datasource can now be used to read an item from the given content library.
+  * The `cloudtemple_compute_content_library_items` datasource can now be used to read all items in a given content library.
+
 IMPROVEMENTS:
 
   * The provider now periodically logs information regarding the state of the activity or job running while waiting for them to complete

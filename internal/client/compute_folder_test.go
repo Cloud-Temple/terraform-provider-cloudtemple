@@ -8,8 +8,6 @@ import (
 )
 
 func TestCompute_FolderList(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	folders, err := client.Compute().Folder().List(ctx, "", "")
 	require.NoError(t, err)
@@ -27,8 +25,6 @@ func TestCompute_FolderList(t *testing.T) {
 }
 
 func TestCompute_FolderRead(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	folder, err := client.Compute().Folder().Read(ctx, "b41ea9b1-4cca-44ed-9a76-2b598de03781")
 	require.NoError(t, err)

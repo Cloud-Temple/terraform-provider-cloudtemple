@@ -8,32 +8,24 @@ import (
 )
 
 func TestBackupMetricsClient_History(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	_, err := client.Backup().Metrics().History(ctx, 4)
 	require.NoError(t, err)
 }
 
 func TestBackupMetricsClient_Coverage(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	_, err := client.Backup().Metrics().Coverage(ctx)
 	require.NoError(t, err)
 }
 
 func TestBackupMetricsClient_VirtualMachines(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	_, err := client.Backup().Metrics().VirtualMachines(ctx)
 	require.NoError(t, err)
 }
 
 func TestBackupMetricsClient_Policies(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	policiesMetrics, err := client.Backup().Metrics().Policies(ctx)
 	require.NoError(t, err)
@@ -61,8 +53,6 @@ func TestBackupMetricsClient_Policies(t *testing.T) {
 }
 
 func TestBackupMetricsClient_Platform(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	platformMetrics, err := client.Backup().Metrics().Platform(ctx)
 	require.NoError(t, err)
@@ -80,8 +70,6 @@ func TestBackupMetricsClient_Platform(t *testing.T) {
 }
 
 func TestBackupMetricsClient_PlatformCPU(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	_, err := client.Backup().Metrics().PlatformCPU(ctx)
 	require.NoError(t, err)

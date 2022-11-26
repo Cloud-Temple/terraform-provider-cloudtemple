@@ -9,8 +9,6 @@ import (
 )
 
 func TestIAM_Users(t *testing.T) {
-	t.Parallel()
-
 	companyID := os.Getenv(testCompanyIDEnvName)
 	users, err := client.IAM().User().List(context.Background(), companyID)
 	require.NoError(t, err)
@@ -38,8 +36,6 @@ func TestIAM_Users(t *testing.T) {
 }
 
 func TestIAM_User(t *testing.T) {
-	t.Parallel()
-
 	user, err := client.IAM().User().Read(context.Background(), "37105598-4889-43da-82ea-cf60f2a36aee")
 	require.NoError(t, err)
 

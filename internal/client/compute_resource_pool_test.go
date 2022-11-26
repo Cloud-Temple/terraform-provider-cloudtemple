@@ -8,8 +8,6 @@ import (
 )
 
 func TestCompute_ResourcePoolList(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	resourcePools, err := client.Compute().ResourcePool().List(ctx, "", "", "")
 	require.NoError(t, err)
@@ -27,8 +25,6 @@ func TestCompute_ResourcePoolList(t *testing.T) {
 }
 
 func TestCompute_ResourcePoolRead(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	resourcePool, err := client.Compute().ResourcePool().Read(ctx, "d21f84fd-5063-4383-b2b0-65b9f25eac27")
 	require.NoError(t, err)

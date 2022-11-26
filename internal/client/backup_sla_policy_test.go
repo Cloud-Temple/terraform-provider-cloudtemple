@@ -8,8 +8,6 @@ import (
 )
 
 func TestBackupSLAPolicyClient_List(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	slaPolicies, err := client.Backup().SLAPolicy().List(ctx, nil)
 	require.NoError(t, err)
@@ -34,8 +32,6 @@ func TestBackupSLAPolicyClient_List(t *testing.T) {
 }
 
 func TestBackupSLAPolicyClient_Read(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	slaPolicy, err := client.Backup().SLAPolicy().Read(ctx, "442718ef-44a1-43d7-9b57-2d910d74e928")
 	require.NoError(t, err)
@@ -70,8 +66,6 @@ func TestBackupSLAPolicyClient_Read(t *testing.T) {
 }
 
 func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{

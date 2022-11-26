@@ -160,8 +160,6 @@ func testRole(t *testing.T) *Role {
 }
 
 func TestAPI_token(t *testing.T) {
-	t.Parallel()
-
 	token, err := client.token(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, token)
@@ -169,8 +167,6 @@ func TestAPI_token(t *testing.T) {
 }
 
 func TestAPI_tokenCache(t *testing.T) {
-	t.Parallel()
-
 	token, err := client.token(context.Background())
 	require.NoError(t, err)
 
@@ -181,8 +177,6 @@ func TestAPI_tokenCache(t *testing.T) {
 }
 
 func TestAPI_tokenExpiration(t *testing.T) {
-	t.Parallel()
-
 	if os.Getenv("CLIENT_RUN_LONG_TESTS") == "" {
 		t.Skip("Set the CLIENT_RUN_LONG_TESTS environment variable to run this test")
 	}

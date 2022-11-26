@@ -8,8 +8,6 @@ import (
 )
 
 func TestIAM_Features(t *testing.T) {
-	t.Parallel()
-
 	features, err := client.IAM().Feature().List(context.Background())
 	require.NoError(t, err)
 
@@ -27,8 +25,6 @@ func TestIAM_Features(t *testing.T) {
 }
 
 func TestIAM_FeatureAssignments(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	tenants, err := client.IAM().Tenant().List(ctx)
 	require.NoError(t, err)

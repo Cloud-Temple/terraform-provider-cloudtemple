@@ -8,8 +8,6 @@ import (
 )
 
 func TestBackupStorageClient_List(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	storages, err := client.Backup().Storage().List(ctx)
 	require.NoError(t, err)

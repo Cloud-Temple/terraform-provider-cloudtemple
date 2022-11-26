@@ -8,8 +8,6 @@ import (
 )
 
 func TestBackupVCenterClient_List(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	vcenters, err := client.Backup().VCenter().List(ctx, "a3d46fb5-29af-4b98-a665-1e82a62fd6d3")
 	require.NoError(t, err)

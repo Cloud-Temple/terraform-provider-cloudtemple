@@ -75,6 +75,8 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_backup_storages":                 documentDatasource(dataSourceBackupStorages(), "backup_read"),
 				"cloudtemple_backup_vcenters":                 documentDatasource(dataSourceBackupVCenters(), "backup_read"),
 				"cloudtemple_compute_content_libraries":       documentDatasource(dataSourceContentLibraries(), "compute_read"),
+				"cloudtemple_compute_content_library_item":    documentDatasource(dataSourceContentLibraryItem(), "compute_read"),
+				"cloudtemple_compute_content_library_items":   documentDatasource(dataSourceContentLibraryItems(), "compute_read"),
 				"cloudtemple_compute_content_library":         documentDatasource(dataSourceContentLibrary(), "compute_read"),
 				"cloudtemple_compute_datastore_cluster":       documentDatasource(dataSourceDatastoreCluster(), "compute_read"),
 				"cloudtemple_compute_datastore_clusters":      documentDatasource(dataSourceDatastoreClusters(), "compute_read"),
@@ -238,9 +240,16 @@ func (sw *stateWriter) set(key string, value any) {
 		sw.d.SetId(value.(string))
 		return
 	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			sw.diags = append(sw.diags, diag.Errorf("failed to set %q: %v", key, r)...)
+		}
+	}()
+
 	err := sw.d.Set(key, value)
 	if err != nil {
-		sw.diags = append(sw.diags, diag.Errorf("failed to  set '%s': %v", key, err)...)
+		sw.diags = append(sw.diags, diag.Errorf("failed to set %q: %v", key, err)...)
 	}
 }
 

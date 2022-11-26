@@ -8,8 +8,6 @@ import (
 )
 
 func TestBackupJobSessionClient_List(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	jobSessions, err := client.Backup().JobSession().List(ctx, nil)
 	require.NoError(t, err)

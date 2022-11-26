@@ -9,8 +9,6 @@ import (
 )
 
 func TestIAM_Company(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	companyID := os.Getenv(testCompanyIDEnvName)
 	company, err := client.IAM().Company().Read(ctx, companyID)

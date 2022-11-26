@@ -10,8 +10,6 @@ import (
 )
 
 func TestCompute_NetworkAdapterList(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	networkAdapters, err := client.Compute().NetworkAdapter().List(ctx, "de2b8b80-8b90-414a-bc33-e12f61a4c05c")
 	require.NoError(t, err)
@@ -29,8 +27,6 @@ func TestCompute_NetworkAdapterList(t *testing.T) {
 }
 
 func TestCompute_NetworkAdapterRead(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	networkAdapter, err := client.Compute().NetworkAdapter().Read(ctx, "c74060bf-ebb3-455a-b0b0-d0dcb79f3d86")
 	require.NoError(t, err)
@@ -49,8 +45,6 @@ func TestCompute_NetworkAdapterRead(t *testing.T) {
 }
 
 func TestNetworkAdapterClient_Create(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
 		Name:                      "test-client-network-adapter",

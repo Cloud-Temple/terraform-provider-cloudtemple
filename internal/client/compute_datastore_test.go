@@ -8,8 +8,6 @@ import (
 )
 
 func TestCompute_DatastoreList(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	datastores, err := client.Compute().Datastore().List(ctx, "", "", "", "", "")
 	require.NoError(t, err)
@@ -27,8 +25,6 @@ func TestCompute_DatastoreList(t *testing.T) {
 }
 
 func TestCompute_DatastoreRead(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	datastore, err := client.Compute().Datastore().Read(ctx, "d439d467-943a-49f5-a022-c0c25b737022")
 	require.NoError(t, err)

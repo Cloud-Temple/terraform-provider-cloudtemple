@@ -67,16 +67,16 @@ func (c *ContentLibraryClient) Read(ctx context.Context, id string) (*ContentLib
 }
 
 type ContentLibraryItem struct {
-	ID               string
-	ContentLibraryId string
-	Name             string
-	Description      string
-	Type             string
-	CreationTime     time.Time
-	Size             int
-	Stored           bool
-	LastModifiedTime string
-	OvfProperties    []string
+	ID               string    `terraform:"id"`
+	ContentLibraryId string    `terraform:"content_library_id"`
+	Name             string    `terraform:"name"`
+	Description      string    `terraform:"description"`
+	Type             string    `terraform:"type"`
+	CreationTime     time.Time `terraform:"creation_time"`
+	Size             int       `terraform:"size"`
+	Stored           bool      `terraform:"stored"`
+	LastModifiedTime string    `terraform:"last_modified_time"`
+	OvfProperties    []string  `terraform:"ovf_properties"`
 }
 
 func (c *ContentLibraryClient) ListItems(ctx context.Context, id string) ([]*ContentLibraryItem, error) {
@@ -117,4 +117,33 @@ func (c *ContentLibraryClient) ReadItem(ctx context.Context, contentLibraryId, c
 	}
 
 	return &out, nil
+}
+
+type ComputeContentLibraryItemDeployRequest struct {
+	ContentLibraryId     string          `json:"-"`
+	ContentLibraryItemId string          `json:"contentLibraryItemId"`
+	Name                 string          `json:"name"`
+	HostClusterId        string          `json:"hostClusterId,omitempty"`
+	HostId               string          `json:"hostId,omitempty"`
+	DatastoreId          string          `json:"datastoreId,"`
+	DatacenterId         string          `json:"datacenterId,omitempty"`
+	PowerOn              bool            `json:"powerOn"`
+	DeployOptions        []*DeployOption `json:"deployOptions,omitempty"`
+	NetworkData          []*NetworkData  `json:"networkData,omitempty"`
+}
+
+type DeployOption struct {
+	ID    string `json:"id"`
+	Value string `json:"value"`
+}
+
+type NetworkData struct {
+	NetworkAdapterId string `json:"networkAdapterId"`
+	NetworkId        string `json:"networkId"`
+}
+
+func (c *ContentLibraryClient) Deploy(ctx context.Context, req *ComputeContentLibraryItemDeployRequest) (string, error) {
+	r := c.c.newRequest("POST", "/api/compute/v1/vcenters/content_libraries/%s/items", req.ContentLibraryId)
+	r.obj = req
+	return c.c.doRequestAndReturnActivity(ctx, r)
 }

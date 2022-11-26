@@ -8,8 +8,6 @@ import (
 )
 
 func TestCompute_VirtualControllerList(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	virtualControllers, err := client.Compute().VirtualController().List(ctx, "de2b8b80-8b90-414a-bc33-e12f61a4c05c", "")
 	require.NoError(t, err)

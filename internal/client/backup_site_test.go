@@ -8,8 +8,6 @@ import (
 )
 
 func TestBackupSiteClient_List(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	backupSites, err := client.Backup().Site().List(ctx)
 	require.NoError(t, err)

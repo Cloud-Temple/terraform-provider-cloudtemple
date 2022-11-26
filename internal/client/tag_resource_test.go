@@ -8,8 +8,6 @@ import (
 )
 
 func TestTagClient(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{

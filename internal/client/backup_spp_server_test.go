@@ -8,8 +8,6 @@ import (
 )
 
 func TestBackupSPPServerClient_List(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	sppServers, err := client.Backup().SPPServer().List(ctx, "e225dbf8-e7c5-4664-a595-08edf3526080")
 	require.NoError(t, err)
@@ -27,8 +25,6 @@ func TestBackupSPPServerClient_List(t *testing.T) {
 }
 
 func TestBackupSPPServerClient_Read(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	slaPolicy, err := client.Backup().SPPServer().Read(ctx, "a3d46fb5-29af-4b98-a665-1e82a62fd6d3")
 	require.NoError(t, err)

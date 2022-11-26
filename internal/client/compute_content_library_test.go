@@ -111,3 +111,33 @@ func TestContentLibraryClient_ReadItem(t *testing.T) {
 		item,
 	)
 }
+
+func TestContentLibraryClient_Clone(t *testing.T) {
+	t.Parallel()
+
+	ctx := context.Background()
+	activityId, err := client.Compute().ContentLibrary().Deploy(ctx, &ComputeContentLibraryItemDeployRequest{
+		ContentLibraryId:     "355b654d-6ea2-4773-80ee-246d3f56964f",
+		ContentLibraryItemId: "8faded09-9f8b-4e27-a978-768f72f8e5f8",
+		Name:                 "test-client-content-library-deploy",
+		HostClusterId:        "dde72065-60f4-4577-836d-6ea074384d62",
+		DatacenterId:         "85d53d08-0fa9-491e-ab89-90919516df25",
+		DatastoreId:          "d439d467-943a-49f5-a022-c0c25b737022",
+	})
+	require.NoError(t, err)
+
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
+	require.NoError(t, err)
+
+	instanceId := activity.State["completed"].Result
+	require.NotZero(t, instanceId)
+
+	vm, err := client.Compute().VirtualMachine().Read(ctx, instanceId)
+	require.NoError(t, err)
+	require.Equal(t, "test-client-content-library-deploy", vm.Name)
+
+	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
+	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
+	require.NoError(t, err)
+}

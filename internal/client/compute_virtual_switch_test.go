@@ -8,8 +8,6 @@ import (
 )
 
 func TestCompute_VirtualSwitchList(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	virtualSwitchs, err := client.Compute().VirtualSwitch().List(ctx, "", "", "")
 	require.NoError(t, err)
@@ -27,8 +25,6 @@ func TestCompute_VirtualSwitchList(t *testing.T) {
 }
 
 func TestCompute_VirtualSwitchRead(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	virtualSwitch, err := client.Compute().VirtualSwitch().Read(ctx, "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4")
 	require.NoError(t, err)
