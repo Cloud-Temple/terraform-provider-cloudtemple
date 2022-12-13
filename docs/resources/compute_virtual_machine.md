@@ -10,6 +10,8 @@ description: |-
     - compute_write
     - compute_read
     - activity_read
+    - tag_read
+    - tag_write
 ---
 
 # cloudtemple_compute_virtual_machine (Resource)
@@ -26,6 +28,8 @@ To manage this resource you will need the following roles:
   - `compute_write`
   - `compute_read`
   - `activity_read`
+  - `tag_read`
+  - `tag_write`
 
 ## Example Usage
 
@@ -57,7 +61,6 @@ resource "cloudtemple_compute_virtual_machine" "scratch" {
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
   guest_operating_system_moref = "amazonlinux2_64Guest"
-
 
   tags = {
     created_by = "Terraform"
@@ -104,6 +107,10 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
   datastore_cluster_id  = data.cloudtemple_compute_datastore_cluster.koukou.id
   datastore_id          = data.cloudtemple_compute_datastore.ds.id
 
+  deploy_options = {
+    trak_sshpublickey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKpZ5juF5a/CXV9nQ0PANptTG9Gh3J0aj6yVjkF0fSkC remi@cloud-temple.com"
+  }
+
   tags = {
     created_by = "Terraform"
   }
@@ -129,6 +136,7 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 - `cpu_hot_remove_enabled` (Boolean)
 - `datastore_cluster_id` (String)
 - `datastore_id` (String)
+- `deploy_options` (Map of String)
 - `guest_operating_system_moref` (String) The operating system to launch the virtual machine with. Conflicts with `clone_virtual_machine_id` and `content_library_item_id`.
 - `host_id` (String) The host to start the virtual machine on.
 - `memory` (Number) The quantity of memory to start the virtual machine with.

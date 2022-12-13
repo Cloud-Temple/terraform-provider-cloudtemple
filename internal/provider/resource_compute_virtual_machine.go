@@ -54,6 +54,16 @@ Virtual machines can be created using three different methods:
 				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
 				ValidateFunc:  validation.IsUUID,
 			},
+			"deploy_options": {
+				Type:          schema.TypeMap,
+				ForceNew:      true,
+				Optional:      true,
+				ConflictsWith: []string{"guest_operating_system_moref", "clone_virtual_machine_id"},
+
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
 			"clone_virtual_machine_id": {
 				Type:          schema.TypeString,
 				Description:   "The ID of the virtual machine to clone. Conflicts with `guest_operating_system_moref` and `content_library_item_id`.",
@@ -403,6 +413,14 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			return diag.Errorf("'datastore_id' is required when 'content_library_item_id' is used.")
 		}
 
+		var deployOptions []*client.DeployOption
+		for k, v := range d.Get("deploy_options").(map[string]interface{}) {
+			deployOptions = append(deployOptions, &client.DeployOption{
+				ID:    k,
+				Value: v.(string),
+			})
+		}
+
 		activityId, err = c.Compute().ContentLibrary().Deploy(ctx, &client.ComputeContentLibraryItemDeployRequest{
 			Name:                 name,
 			ContentLibraryId:     d.Get("content_library_id").(string),
@@ -412,6 +430,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			DatastoreId:          d.Get("datastore_id").(string),
 			DatacenterId:         d.Get("virtual_datacenter_id").(string),
 			PowerOn:              d.Get("power_state").(string) == "on",
+			DeployOptions:        deployOptions,
 		})
 		if err != nil {
 			return diag.Errorf("failed to deploy content library item: %s", err)

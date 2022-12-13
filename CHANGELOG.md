@@ -1,4 +1,10 @@
-## 0.3.0 (Unreleased)
+## 0.3.1 (December 13, 2022)
+
+IMPROVEMENTS:
+
+  * The `cloudtemple_compute_virtual_machine` resource now can have additional `deploy_options` specified when deploying an item of a content library.
+
+## 0.3.0 (December 12, 2022)
 
 NEW FEATURES:
 

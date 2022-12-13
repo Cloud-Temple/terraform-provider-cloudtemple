@@ -15,7 +15,7 @@ To query this datasource you will need the `iam_read` role.
 ```terraform
 # Read a token using its ID
 data "cloudtemple_iam_personal_access_token" "id" {
-  id = "6f0ac881-bb3d-4c0b-8276-d38f71aa392d"
+  id = "b0232f77-54eb-49d2-abea-39b312db42c5"
 }
 
 # Read a token using its name

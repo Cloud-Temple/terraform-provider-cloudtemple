@@ -80,24 +80,24 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 
 	disk, err := client.Compute().VirtualDisk().Read(ctx, diskId)
 	require.NoError(t, err)
+
+	// Ignore some fields that change often for the test
+	disk.DatastoreId = ""
+	disk.DatastoreName = ""
+	disk.DiskPath = ""
+
 	require.Equal(
 		t,
 		&VirtualDisk{
-			ID:                  diskId,
-			VirtualMachineId:    vm.ID,
-			MachineManagerId:    "9dba240e-a605-4103-bac7-5336d3ffd124",
-			Name:                "Hard disk 1",
-			Capacity:            10737418240,
-			DiskUnitNumber:      0,
-			ControllerBusNumber: 0,
-			DatastoreId:         "24371f16-b480-40d3-9587-82f97933abca",
-			DatastoreName:       "ds002-bob-svc1-stor4-th3",
-			InstantAccess:       false,
-			NativeId:            diskId,
-			DiskPath:            "[ds002-bob-svc1-stor4-th3] test-client-disk_2/test-client-disk.vmdk",
-			ProvisioningType:    "dynamic",
-			DiskMode:            "persistent",
-			Editable:            true,
+			ID:               diskId,
+			VirtualMachineId: vm.ID,
+			MachineManagerId: "9dba240e-a605-4103-bac7-5336d3ffd124",
+			Name:             "Hard disk 1",
+			Capacity:         10737418240,
+			NativeId:         diskId,
+			ProvisioningType: "dynamic",
+			DiskMode:         "persistent",
+			Editable:         true,
 		},
 		disk,
 	)
@@ -112,29 +112,30 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 
 	disk, err = client.Compute().VirtualDisk().Read(ctx, diskId)
 	require.NoError(t, err)
+
+	// Ignore some fields that change often for the test
+	diskPath := disk.DiskPath
+	disk.DatastoreId = ""
+	disk.DatastoreName = ""
+	disk.DiskPath = ""
+
 	require.Equal(
 		t,
 		&VirtualDisk{
-			ID:                  diskId,
-			VirtualMachineId:    vm.ID,
-			MachineManagerId:    "9dba240e-a605-4103-bac7-5336d3ffd124",
-			Name:                "Hard disk 1",
-			Capacity:            21474836480,
-			DiskUnitNumber:      0,
-			ControllerBusNumber: 0,
-			DatastoreId:         "24371f16-b480-40d3-9587-82f97933abca",
-			DatastoreName:       "ds002-bob-svc1-stor4-th3",
-			InstantAccess:       false,
-			NativeId:            diskId,
-			DiskPath:            "[ds002-bob-svc1-stor4-th3] test-client-disk_2/test-client-disk.vmdk",
-			ProvisioningType:    "dynamic",
-			DiskMode:            "persistent",
-			Editable:            true,
+			ID:               diskId,
+			VirtualMachineId: vm.ID,
+			MachineManagerId: "9dba240e-a605-4103-bac7-5336d3ffd124",
+			Name:             "Hard disk 1",
+			Capacity:         21474836480,
+			NativeId:         diskId,
+			ProvisioningType: "dynamic",
+			DiskMode:         "persistent",
+			Editable:         true,
 		},
 		disk,
 	)
 
-	activityId, err = client.Compute().VirtualDisk().Mount(ctx, vm.ID, "[ds002-bob-svc1-stor4-th3] test-client-disk_2/test-client-disk.vmdk")
+	activityId, err = client.Compute().VirtualDisk().Mount(ctx, vm.ID, diskPath)
 	require.NoError(t, err)
 	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
