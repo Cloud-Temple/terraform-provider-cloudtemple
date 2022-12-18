@@ -85,33 +85,28 @@ Virtual machines can be created using three different methods:
 				Type:         schema.TypeString,
 				Description:  "The datacenter to start the virtual machine in.",
 				Required:     true,
-				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 			"host_id": {
 				Type:         schema.TypeString,
 				Description:  "The host to start the virtual machine on.",
 				Optional:     true,
-				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 			"host_cluster_id": {
 				Type:         schema.TypeString,
 				Description:  "The host cluster to start the virtual machine on.",
 				Required:     true,
-				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 			"datastore_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
-				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 			"datastore_cluster_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
-				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 			"memory": {
@@ -540,6 +535,25 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
 			return diag.Errorf("failed to rename virtual machine, %s", err)
+		}
+	}
+
+	if d.HasChange("virtual_datacenter_id") || d.HasChange("host_id") || d.HasChange("host_cluster_id") || d.HasChange("datastore_id") || d.HasChange("datastore_cluster_id") {
+		activityId, err := c.Compute().VirtualMachine().Relocate(ctx, &client.RelocateVirtualMachineRequest{
+			VirtualMachines:    []string{d.Id()},
+			Priority:           "highPriority",
+			DatacenterId:       d.Get("virtual_datacenter_id").(string),
+			HostId:             d.Get("host_id").(string),
+			HostClusterId:      d.Get("host_cluster_id").(string),
+			DatastoreId:        d.Get("datastore_id").(string),
+			DatastoreClusterId: d.Get("datastore_cluster_id").(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to relocate virtual machine, %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to relocate virtual machine, %s", err)
 		}
 	}
 

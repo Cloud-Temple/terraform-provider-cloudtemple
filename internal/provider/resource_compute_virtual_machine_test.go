@@ -26,6 +26,19 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 				),
 			},
 			{
+				Config: testAccResourceVirtualMachineRelocate,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "virtual_datacenter_id", "ac33c033-693b-4fc5-9196-26df77291dbb"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "host_cluster_id", "083b0ed7-8b0f-4cec-be47-78f48b457e6a"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "datastore_cluster_id", "1a996110-2746-4725-958f-f6fceef05b32"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "guest_operating_system_moref", "amazonlinux2_64Guest"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "tags.%", "1"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "tags.environment", "test"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "triggered_alarms.#", "0"),
+				),
+			},
+			{
 				Config:            testAccResourceVirtualMachine,
 				ResourceName:      "cloudtemple_compute_virtual_machine.foo",
 				ImportState:       true,
@@ -114,6 +127,21 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 }
 `
 
+const testAccResourceVirtualMachineRelocate = `
+resource "cloudtemple_compute_virtual_machine" "foo" {
+  name = "test-terraform"
+
+  virtual_datacenter_id        = "ac33c033-693b-4fc5-9196-26df77291dbb"
+  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
+  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
+  guest_operating_system_moref = "amazonlinux2_64Guest"
+
+  tags = {
+    "environment" = "test"
+  }
+}
+`
+
 const testAccResourceVirtualMachineUpdate = `
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform"
@@ -125,9 +153,9 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   cpu_hot_remove_enabled = true
   memory_hot_add_enabled = true
 
-  virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"
-  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
-  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+  virtual_datacenter_id        = "ac33c033-693b-4fc5-9196-26df77291dbb"
+  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
+  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
   guest_operating_system_moref = "amazonlinux2_64Guest"
 
   tags = {
@@ -140,9 +168,9 @@ const testAccResourceVirtualMachineRename = `
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform-rename"
 
-  virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"
-  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
-  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+  virtual_datacenter_id        = "ac33c033-693b-4fc5-9196-26df77291dbb"
+  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
+  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
   guest_operating_system_moref = "amazonlinux2_64Guest"
 
   lifecycle {
@@ -156,9 +184,9 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   name        = "test-terraform-rename"
   power_state = "on"
 
-  virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"
-  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
-  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+  virtual_datacenter_id        = "ac33c033-693b-4fc5-9196-26df77291dbb"
+  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
+  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
   guest_operating_system_moref = "amazonlinux2_64Guest"
 }
 `
@@ -167,9 +195,9 @@ const testAccResourceVirtualMachineClone = `
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform"
 
-  virtual_datacenter_id        = "85d53d08-0fa9-491e-ab89-90919516df25"
-  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
-  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+  virtual_datacenter_id        = "ac33c033-693b-4fc5-9196-26df77291dbb"
+  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
+  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
   guest_operating_system_moref = "amazonlinux2_64Guest"
 
   tags = {

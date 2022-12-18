@@ -1,3 +1,9 @@
+## 0.4.0 (December 18, 2022)
+
+IMPROVEMENTS:
+
+  * The `cloudtemple_compute_virtual_machine` resource will now relocate the virtual machine when one of `virtual_datacenter_id`, `host_id`, `host_cluster_id`, `datastore_id` or `datastore_cluster_id` is changed instead of deleting and recreating it.
+
 ## 0.3.1 (December 13, 2022)
 
 IMPROVEMENTS:

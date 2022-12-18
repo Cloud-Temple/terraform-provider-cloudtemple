@@ -224,3 +224,28 @@ func (v *VirtualMachineClient) Clone(ctx context.Context, req *CloneVirtualMachi
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
+
+type RelocateVirtualMachineRequest struct {
+	VirtualMachines    []string         `json:"virtualMachines"`
+	Priority           string           `json:"priority"`
+	DatacenterId       string           `json:"datacenterId,omitempty"`
+	HostId             string           `json:"hostId,omitempty"`
+	HostClusterId      string           `json:"hostClusterId,omitempty"`
+	DatastoreId        string           `json:"datastoreId,omitempty"`
+	DatastoreClusterId string           `json:"datastoreClusterId,omitempty"`
+	NetworkData        []*NetworkData   `json:"networkData,omitempty"`
+	DiskPlacements     []*DiskPlacement `json:"diskPlacements,omitempty"`
+}
+
+type DiskPlacement struct {
+	VirtualDiskId      string `json:"virtualDiskId"`
+	VirtualMachineId   string `json:"virtualMachineId"`
+	DatastoreId        string `json:"datastoreId"`
+	DatastoreClusterId string `json:"datastoreClusterId"`
+}
+
+func (v *VirtualMachineClient) Relocate(ctx context.Context, req *RelocateVirtualMachineRequest) (string, error) {
+	r := v.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_machines/relocate")
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}

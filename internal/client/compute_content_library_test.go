@@ -9,8 +9,6 @@ import (
 )
 
 func TestCompute_ContentLibraryList(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	contentLibraries, err := client.Compute().ContentLibrary().List(ctx, "", "", "")
 	require.NoError(t, err)
@@ -28,8 +26,6 @@ func TestCompute_ContentLibraryList(t *testing.T) {
 }
 
 func TestCompute_ContentLibraryRead(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	contentLibrary, err := client.Compute().ContentLibrary().Read(ctx, "355b654d-6ea2-4773-80ee-246d3f56964f")
 	require.NoError(t, err)
@@ -48,8 +44,6 @@ func TestCompute_ContentLibraryRead(t *testing.T) {
 }
 
 func TestContentLibraryClient_ListItems(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	items, err := client.Compute().ContentLibrary().ListItems(ctx, "355b654d-6ea2-4773-80ee-246d3f56964f")
 	require.NoError(t, err)
@@ -86,8 +80,6 @@ func TestContentLibraryClient_ListItems(t *testing.T) {
 }
 
 func TestContentLibraryClient_ReadItem(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	item, err := client.Compute().ContentLibrary().ReadItem(ctx, "355b654d-6ea2-4773-80ee-246d3f56964f", "8faded09-9f8b-4e27-a978-768f72f8e5f8")
 	require.NoError(t, err)
@@ -113,8 +105,6 @@ func TestContentLibraryClient_ReadItem(t *testing.T) {
 }
 
 func TestContentLibraryClient_Clone(t *testing.T) {
-	t.Parallel()
-
 	ctx := context.Background()
 	activityId, err := client.Compute().ContentLibrary().Deploy(ctx, &ComputeContentLibraryItemDeployRequest{
 		ContentLibraryId:     "355b654d-6ea2-4773-80ee-246d3f56964f",
