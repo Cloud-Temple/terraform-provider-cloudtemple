@@ -1,3 +1,11 @@
+## 0.4.1 (December 22, 2022)
+
+BUG FIXES:
+
+  * The `cloudtemple_compute_network_adapter` resource will now clean up broken network adapters when an error occurs while creating it.
+  * The `cloudtemple_compute_virtual_disk` resource will now clean up broken virtual disks when an error occurs while creating it.
+  * The `cloudtemple_compute_virtual_machine` resource will now clean up broken virtual machines when an error occurs while creating it.
+
 ## 0.4.0 (December 18, 2022)
 
 IMPROVEMENTS:

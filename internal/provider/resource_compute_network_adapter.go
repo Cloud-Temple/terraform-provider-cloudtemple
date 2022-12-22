@@ -80,11 +80,10 @@ func computeNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, me
 		return diag.Errorf("the network adapter could not be created: %s", err)
 	}
 	activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	setIdFromActivityConcernedItems(d, activity)
 	if err != nil {
 		return diag.Errorf("failed to create network adapter, %s", err)
 	}
-
-	d.SetId(activity.ConcernedItems[0].ID)
 
 	// We have to use update to set mac_type
 	return computeNetworkAdapterUpdate(ctx, d, meta)

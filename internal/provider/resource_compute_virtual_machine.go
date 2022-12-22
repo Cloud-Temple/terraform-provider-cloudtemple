@@ -396,11 +396,10 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 
 		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		setIdFromActivityState(d, activity)
 		if err != nil {
 			return diag.Errorf("failed to clone virtual machine, %s", err)
 		}
-
-		d.SetId(activity.State["completed"].Result)
 
 	} else if contentLibraryItemId != "" {
 		datastoreId := d.Get("datastore_id").(string)
@@ -432,11 +431,10 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 
 		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		setIdFromActivityState(d, activity)
 		if err != nil {
 			return diag.Errorf("failed to deploy content library item: %s", err)
 		}
-
-		d.SetId(activity.State["completed"].Result)
 
 	} else {
 		fromScratch = true
@@ -456,11 +454,10 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 
 		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		setIdFromActivityConcernedItems(d, activity)
 		if err != nil {
 			return diag.Errorf("failed to create virtual machine: %s", err)
 		}
-
-		d.SetId(activity.ConcernedItems[0].ID)
 	}
 
 	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on" && fromScratch)

@@ -393,3 +393,25 @@ func getWaiterOptions(ctx context.Context) *client.WaiterOptions {
 		},
 	}
 }
+
+func setIdFromActivityState(d *schema.ResourceData, activity *client.Activity) {
+	if activity == nil || len(activity.State) != 1 {
+		return
+	}
+
+	for _, state := range activity.State {
+		if state.Result != "" {
+			d.SetId(state.Result)
+		}
+	}
+}
+
+func setIdFromActivityConcernedItems(d *schema.ResourceData, activity *client.Activity) {
+	if activity == nil || len(activity.ConcernedItems) == 0 {
+		return
+	}
+
+	if activity.ConcernedItems[0].ID != "" {
+		d.SetId(activity.ConcernedItems[0].ID)
+	}
+}

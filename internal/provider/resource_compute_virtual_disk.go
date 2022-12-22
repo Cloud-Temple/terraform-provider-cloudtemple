@@ -119,11 +119,10 @@ func computeVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta 
 		return diag.Errorf("the virtual disk could not be created: %s", err)
 	}
 	activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	setIdFromActivityConcernedItems(d, activity)
 	if err != nil {
 		return diag.Errorf("failed to create virtual disk, %s", err)
 	}
-
-	d.SetId(activity.ConcernedItems[0].ID)
 
 	return computeVirtualDiskRead(ctx, d, meta)
 }
