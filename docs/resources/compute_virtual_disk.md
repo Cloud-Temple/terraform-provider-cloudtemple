@@ -6,6 +6,8 @@ description: |-
   To manage this resource you will need the following roles:
     - compute_write
     - compute_read
+    - compute_management_read
+    - compute_management_write
     - activity_read
 ---
 
@@ -14,6 +16,8 @@ description: |-
 To manage this resource you will need the following roles:
   - `compute_write`
   - `compute_read`
+  - `compute_management_read`
+  - `compute_management_write`
   - `activity_read`
 
 ## Example Usage
