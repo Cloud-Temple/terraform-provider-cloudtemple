@@ -1,3 +1,9 @@
+## 0.4.2 (February 3, 2023)
+
+BUG FIXES:
+
+  * Fixed a panic occuring in `cloudtemple_compute_virtual_machine` when an error happened while reading a virtual machine information.
+
 ## 0.4.1 (December 22, 2022)
 
 BUG FIXES:

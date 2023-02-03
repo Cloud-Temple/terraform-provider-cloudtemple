@@ -467,7 +467,10 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 	reader := readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 		id := d.Id()
 		vm, err := client.Compute().VirtualMachine().Read(ctx, id)
-		if err == nil && vm == nil {
+		if err != nil {
+			return nil, err
+		}
+		if vm == nil {
 			return nil, nil
 		}
 
@@ -483,7 +486,7 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 
 		readTags(ctx, sw, client, d.Id())
 
-		return vm, err
+		return vm, nil
 	})
 
 	return reader(ctx, d, meta)
