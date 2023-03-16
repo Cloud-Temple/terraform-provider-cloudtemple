@@ -30,7 +30,7 @@ type Datastore struct {
 func (d *DatastoreClient) List(
 	ctx context.Context,
 	machineManagerId string,
-	DatacenterId string,
+	datacenterId string,
 	hostId string,
 	datastoreClusterId string,
 	hostClusterId string) ([]*Datastore, error) {

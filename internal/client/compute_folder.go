@@ -19,7 +19,7 @@ type Folder struct {
 func (f *FolderClient) List(
 	ctx context.Context,
 	machineManagerId string,
-	DatacenterId string) ([]*Folder, error) {
+	datacenterId string) ([]*Folder, error) {
 
 	// TODO: filters
 	r := f.c.newRequest("GET", "/api/compute/v1/vcenters/folders")

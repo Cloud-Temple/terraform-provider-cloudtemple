@@ -23,7 +23,7 @@ type Network struct {
 func (n *NetworkClient) List(
 	ctx context.Context,
 	machineManagerId string,
-	DatacenterId string,
+	datacenterId string,
 	virtualMachineId string,
 	typ string,
 	virtualSwitchId string,

@@ -35,7 +35,7 @@ type DatastoreClusterMetrics struct {
 	IoLoadBalanceEnabled          bool   `terraform:"io_load_balance_enabled"`
 }
 
-func (d *DatastoreClusterClient) List(ctx context.Context, machineManagerId string, DatacenterId string, hostId string, hostClusterId string) ([]*DatastoreCluster, error) {
+func (d *DatastoreClusterClient) List(ctx context.Context, machineManagerId string, datacenterId string, hostId string, hostClusterId string) ([]*DatastoreCluster, error) {
 	// TODO: filters
 	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastore_clusters")
 	resp, err := d.c.doRequest(ctx, r)

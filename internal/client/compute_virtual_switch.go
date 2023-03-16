@@ -21,7 +21,7 @@ type VirtualSwitch struct {
 func (v *VirtualSwitchClient) List(
 	ctx context.Context,
 	machineManagerId string,
-	DatacenterId string,
+	datacenterId string,
 	hostClusterId string) ([]*VirtualSwitch, error) {
 
 	// TODO: filters
