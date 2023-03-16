@@ -124,7 +124,7 @@ func dataSourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeInt,
 				Computed: true,
 			},
-			"virtual_datacenter_id": {
+			"datacenter_id": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},

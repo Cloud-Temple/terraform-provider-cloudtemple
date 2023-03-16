@@ -37,6 +37,7 @@ data "cloudtemple_compute_virtual_machine" "name" {
 - `cpu_hot_add_enabled` (Boolean)
 - `cpu_hot_remove_enabled` (Boolean)
 - `cpu_usage` (Number)
+- `datacenter_id` (String)
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
 - `extra_config` (List of Object) (see [below for nested schema](#nestedatt--extra_config))
@@ -60,7 +61,6 @@ data "cloudtemple_compute_virtual_machine" "name" {
 - `tools` (String)
 - `tools_version` (Number)
 - `triggered_alarms` (List of Object) (see [below for nested schema](#nestedatt--triggered_alarms))
-- `virtual_datacenter_id` (String)
 
 <a id="nestedatt--boot_options"></a>
 ### Nested Schema for `boot_options`

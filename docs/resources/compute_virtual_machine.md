@@ -57,7 +57,7 @@ resource "cloudtemple_compute_virtual_machine" "scratch" {
   cpu_hot_remove_enabled = true
   memory_hot_add_enabled = true
 
-  virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
+  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
   guest_operating_system_moref = "amazonlinux2_64Guest"
@@ -73,9 +73,9 @@ resource "cloudtemple_compute_virtual_machine" "cloned" {
 
   clone_virtual_machine_id = cloudtemple_compute_virtual_machine.scratch.id
 
-  virtual_datacenter_id = data.cloudtemple_compute_virtual_datacenter.dc.id
-  host_cluster_id       = data.cloudtemple_compute_host_cluster.flo.id
-  datastore_cluster_id  = data.cloudtemple_compute_datastore_cluster.koukou.id
+  datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
+  host_cluster_id      = data.cloudtemple_compute_host_cluster.flo.id
+  datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.koukou.id
 
   tags = {
     created_by = "Terraform"
@@ -102,10 +102,10 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
   content_library_id      = data.cloudtemple_compute_content_library.public.id
   content_library_item_id = data.cloudtemple_compute_content_library_item.centos.id
 
-  virtual_datacenter_id = data.cloudtemple_compute_virtual_datacenter.dc.id
-  host_cluster_id       = data.cloudtemple_compute_host_cluster.flo.id
-  datastore_cluster_id  = data.cloudtemple_compute_datastore_cluster.koukou.id
-  datastore_id          = data.cloudtemple_compute_datastore.ds.id
+  datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
+  host_cluster_id      = data.cloudtemple_compute_host_cluster.flo.id
+  datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.koukou.id
+  datastore_id         = data.cloudtemple_compute_datastore.ds.id
 
   deploy_options = {
     trak_sshpublickey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKpZ5juF5a/CXV9nQ0PANptTG9Gh3J0aj6yVjkF0fSkC remi@cloud-temple.com"
@@ -122,9 +122,9 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 
 ### Required
 
+- `datacenter_id` (String) The datacenter to start the virtual machine in.
 - `host_cluster_id` (String) The host cluster to start the virtual machine on.
 - `name` (String)
-- `virtual_datacenter_id` (String) The datacenter to start the virtual machine in.
 
 ### Optional
 

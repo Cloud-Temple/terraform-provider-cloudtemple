@@ -96,7 +96,7 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform-network-adapter"
 
-  virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
+  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
   guest_operating_system_moref = "amazonlinux2_64Guest"
@@ -130,7 +130,7 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
 resource "cloudtemple_compute_virtual_machine" "bar" {
   name = "test-terraform-network-adapter"
 
-  virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
+  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
   guest_operating_system_moref = "amazonlinux2_64Guest"
@@ -165,7 +165,7 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
   name        = "test-terraform-network-adapter-connected"
   power_state = "on"
 
-  virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
+  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
   guest_operating_system_moref = "amazonlinux2_64Guest"
@@ -201,7 +201,7 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
   name        = "test-terraform-network-adapter-connected"
   power_state = "on"
 
-  virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
+  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
   guest_operating_system_moref = "amazonlinux2_64Guest"
@@ -235,7 +235,7 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
 resource "cloudtemple_compute_virtual_machine" "bar" {
   name        = "test-terraform-network-adapter-connected"
 
-  virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
+  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
   guest_operating_system_moref = "amazonlinux2_64Guest"
