@@ -43,7 +43,7 @@ type ResourcePoolMemoryMetrics struct {
 func (rp *ResourcePoolClient) List(
 	ctx context.Context,
 	machineManagerID string,
-	virtualDatacenterID string,
+	DatacenterID string,
 	hostClusterID string) ([]*ResourcePool, error) {
 
 	// TODO: filters

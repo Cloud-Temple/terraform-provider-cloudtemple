@@ -35,7 +35,7 @@ type VirtualMachine struct {
 	MemoryUsage                    int                             `terraform:"memory_usage"`
 	Tools                          string                          `terraform:"tools"`
 	ToolsVersion                   int                             `terraform:"tools_version"`
-	VirtualDatacenterId            string                          `terraform:"virtual_datacenter_id"`
+	DatacenterId                   string                          `terraform:"virtual_datacenter_id"`
 	DistributedVirtualPortGroupIds []string                        `terraform:"distributed_virtual_port_group_ids"`
 	SppMode                        string                          `terraform:"spp_mode"`
 	Snapshoted                     bool                            `terraform:"snapshoted"`

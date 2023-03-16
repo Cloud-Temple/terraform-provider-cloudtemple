@@ -567,7 +567,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 
 		activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 			ID:           d.Id(),
-			DatacenterId: vm.VirtualDatacenterId,
+			DatacenterId: vm.DatacenterId,
 			PowerAction:  powerState,
 		})
 		if err != nil {

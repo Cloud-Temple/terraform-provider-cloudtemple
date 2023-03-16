@@ -37,7 +37,7 @@ type HostClusterMetrics struct {
 func (h *HostClusterClient) List(
 	ctx context.Context,
 	machineManagerId string,
-	virtualDatacenterId string,
+	DatacenterId string,
 	datastoreId string) ([]*HostCluster, error) {
 
 	// TODO: filters

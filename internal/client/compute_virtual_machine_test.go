@@ -55,7 +55,7 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 		MemoryUsage:                    10485760,
 		Tools:                          "toolsNotInstalled",
 		ToolsVersion:                   0,
-		VirtualDatacenterId:            "85d53d08-0fa9-491e-ab89-90919516df25",
+		DatacenterId:                   "85d53d08-0fa9-491e-ab89-90919516df25",
 		DistributedVirtualPortGroupIds: []string{},
 		SppMode:                        "production",
 		Snapshoted:                     false,
@@ -199,7 +199,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
 		ID:           instanceId,
-		DatacenterId: vm.VirtualDatacenterId,
+		DatacenterId: vm.DatacenterId,
 		PowerAction:  "on",
 	})
 	require.NoError(t, err)
@@ -208,7 +208,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
 		ID:           instanceId,
-		DatacenterId: vm.VirtualDatacenterId,
+		DatacenterId: vm.DatacenterId,
 		PowerAction:  "off",
 	})
 	require.NoError(t, err)
@@ -321,7 +321,7 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 
 	vm, err := client.Compute().VirtualMachine().Read(ctx, instanceId)
 	require.NoError(t, err)
-	require.Equal(t, "ac33c033-693b-4fc5-9196-26df77291dbb", vm.VirtualDatacenterId)
+	require.Equal(t, "ac33c033-693b-4fc5-9196-26df77291dbb", vm.DatacenterId)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
 	require.NoError(t, err)
