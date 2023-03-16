@@ -82,7 +82,7 @@ func TestMain(m *testing.M) {
 			if vm.PowerState == "running" {
 				activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 					ID:           vm.ID,
-					DatacenterId: vm.VirtualDatacenterId,
+					DatacenterId: vm.DatacenterId,
 					PowerAction:  "off",
 				})
 				if err != nil {

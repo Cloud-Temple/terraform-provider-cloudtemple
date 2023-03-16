@@ -81,7 +81,7 @@ Virtual machines can be created using three different methods:
 				ConflictsWith: []string{"clone_virtual_machine_id", "content_library_item_id"},
 				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
 			},
-			"virtual_datacenter_id": {
+			"datacenter_id": {
 				Type:         schema.TypeString,
 				Description:  "The datacenter to start the virtual machine in.",
 				Required:     true,
@@ -385,7 +385,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			Name:              name,
 			VirtualMachineId:  cloneVirtualMachineId,
 			PowerOn:           d.Get("power_state").(string) == "on",
-			DatacenterId:      d.Get("virtual_datacenter_id").(string),
+			DatacenterId:      d.Get("datacenter_id").(string),
 			HostClusterId:     d.Get("host_cluster_id").(string),
 			HostId:            d.Get("host_id").(string),
 			DatatoreClusterId: d.Get("datastore_cluster_id").(string),
@@ -422,7 +422,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			HostClusterId:        d.Get("host_cluster_id").(string),
 			HostId:               d.Get("host_id").(string),
 			DatastoreId:          d.Get("datastore_id").(string),
-			DatacenterId:         d.Get("virtual_datacenter_id").(string),
+			DatacenterId:         d.Get("datacenter_id").(string),
 			PowerOn:              d.Get("power_state").(string) == "on",
 			DeployOptions:        deployOptions,
 		})
@@ -440,7 +440,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		fromScratch = true
 		activityId, err = c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
 			Name:                      name,
-			DatacenterId:              d.Get("virtual_datacenter_id").(string),
+			DatacenterId:              d.Get("datacenter_id").(string),
 			HostId:                    d.Get("host_id").(string),
 			HostClusterId:             d.Get("host_cluster_id").(string),
 			DatastoreId:               d.Get("datastore_id").(string),
@@ -538,11 +538,11 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 	}
 
-	if d.HasChange("virtual_datacenter_id") || d.HasChange("host_id") || d.HasChange("host_cluster_id") || d.HasChange("datastore_id") || d.HasChange("datastore_cluster_id") {
+	if d.HasChange("datacenter_id") || d.HasChange("host_id") || d.HasChange("host_cluster_id") || d.HasChange("datastore_id") || d.HasChange("datastore_cluster_id") {
 		activityId, err := c.Compute().VirtualMachine().Relocate(ctx, &client.RelocateVirtualMachineRequest{
 			VirtualMachines:    []string{d.Id()},
 			Priority:           "highPriority",
-			DatacenterId:       d.Get("virtual_datacenter_id").(string),
+			DatacenterId:       d.Get("datacenter_id").(string),
 			HostId:             d.Get("host_id").(string),
 			HostClusterId:      d.Get("host_cluster_id").(string),
 			DatastoreId:        d.Get("datastore_id").(string),
@@ -567,7 +567,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 
 		activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 			ID:           d.Id(),
-			DatacenterId: vm.VirtualDatacenterId,
+			DatacenterId: vm.DatacenterId,
 			PowerAction:  powerState,
 		})
 		if err != nil {

@@ -54,7 +54,7 @@ type HostVirtualMachinesStub struct {
 func (h *HostClient) List(
 	ctx context.Context,
 	machineManagerID string,
-	virtualDatacenterID string,
+	DatacenterID string,
 	hostClusterID string,
 	datastoreID string) ([]*Host, error) {
 

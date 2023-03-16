@@ -41,7 +41,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   cpu_hot_remove_enabled = true
   memory_hot_add_enabled = true
 
-  virtual_datacenter_id        = data.cloudtemple_compute_virtual_datacenter.dc.id
+  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.dc.id
   host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
   guest_operating_system_moref = "amazonlinux2_64Guest"

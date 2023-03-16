@@ -1,3 +1,11 @@
+## 0.5.0 (March 16, 2023)
+
+BUG FIXES:
+
+  * The `datacenter_id` replaces the `virtual_datacenter_id` argument in the `compute_virtual_machine` resource. `virtual_datacenter_id` was deprecated and has been removed.
+
+  * The `datacenter_id` replaces the `virtual_datacenter_id` attribute in the `compute_virtual_machine` and `compute_virtual_machines` datasources. `virtual_datacenter_id` was deprecated and has been removed.
+
 ## 0.4.2 (February 3, 2023)
 
 BUG FIXES:

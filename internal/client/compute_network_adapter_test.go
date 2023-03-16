@@ -91,7 +91,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
 		ID:             vm.ID,
-		DatacenterId:   vm.VirtualDatacenterId,
+		DatacenterId:   vm.DatacenterId,
 		PowerAction:    "on",
 		ForceEnterBIOS: false,
 	})
@@ -136,7 +136,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
 		ID:             vm.ID,
-		DatacenterId:   vm.VirtualDatacenterId,
+		DatacenterId:   vm.DatacenterId,
 		PowerAction:    "off",
 		ForceEnterBIOS: false,
 	})

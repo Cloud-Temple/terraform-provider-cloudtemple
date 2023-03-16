@@ -35,6 +35,7 @@ Read-Only:
 - `cpu_hot_add_enabled` (Boolean)
 - `cpu_hot_remove_enabled` (Boolean)
 - `cpu_usage` (Number)
+- `datacenter_id` (String)
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
 - `extra_config` (List of Object) (see [below for nested schema](#nestedobjatt--virtual_machines--extra_config))
@@ -59,7 +60,6 @@ Read-Only:
 - `tools` (String)
 - `tools_version` (Number)
 - `triggered_alarms` (List of Object) (see [below for nested schema](#nestedobjatt--virtual_machines--triggered_alarms))
-- `virtual_datacenter_id` (String)
 
 <a id="nestedobjatt--virtual_machines--boot_options"></a>
 ### Nested Schema for `virtual_machines.boot_options`
