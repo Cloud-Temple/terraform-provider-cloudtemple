@@ -74,8 +74,8 @@ resource "cloudtemple_compute_virtual_disk" "foo" {
 ### Optional
 
 - `controller_id` (String)
-- `datastore_cluster_id` (String)
-- `datastore_id` (String)
+- `datastore_cluster_id` (String) The ID of the datastore cluster. Conflict with `datastore_id`.
+- `datastore_id` (String) The ID of the datastore. Conflict with `datastore_cluster_id`.
 
 ### Read-Only
 
