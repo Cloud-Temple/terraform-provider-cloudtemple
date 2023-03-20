@@ -73,4 +73,10 @@ resource "cloudtemple_compute_network_adapter" "foo" {
 - `id` (String) The ID of this resource.
 - `name` (String)
 
+## Import
 
+Import is supported using the following syntax:
+
+```shell
+$ terraform import cloudtemple_compute_network_adapter.foo c74060bf-ebb3-455a-b0b0-d0dcb79f3d86
+```

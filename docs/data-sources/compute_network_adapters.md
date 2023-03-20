@@ -41,6 +41,7 @@ Read-Only:
 - `mac_address` (String)
 - `mac_type` (String)
 - `name` (String)
+- `network_id` (String)
 - `type` (String)
 - `virtual_machine_id` (String)
 

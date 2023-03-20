@@ -47,6 +47,10 @@ func dataSourceNetworkAdapters() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
+						"network_id": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
 						"type": {
 							Type:     schema.TypeString,
 							Computed: true,

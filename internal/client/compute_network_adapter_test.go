@@ -35,6 +35,7 @@ func TestCompute_NetworkAdapterRead(t *testing.T) {
 		ID:               "c74060bf-ebb3-455a-b0b0-d0dcb79f3d86",
 		VirtualMachineId: "de2b8b80-8b90-414a-bc33-e12f61a4c05c",
 		Name:             "Network adapter 1",
+		NetworkId:        "cb5d4885-e112-42e9-9842-db4c8fc78f9b",
 		Type:             "VMXNET3",
 		MacType:          "ASSIGNED",
 		MacAddress:       "00:50:56:85:44:2e",
