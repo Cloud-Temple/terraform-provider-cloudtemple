@@ -104,6 +104,7 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "name", "test-terraform-content-library-deployed"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "datacenter_id", "85d53d08-0fa9-491e-ab89-90919516df25"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "host_cluster_id", "dde72065-60f4-4577-836d-6ea074384d62"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "guest_operating_system_moref", "centos8_64Guest"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "tags.%", "1"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "tags.environment", "cloned-from-content-library"),
 				),
@@ -238,6 +239,8 @@ resource "cloudtemple_compute_virtual_machine" "content-library-deployed" {
   datacenter_id         = "85d53d08-0fa9-491e-ab89-90919516df25"
   host_cluster_id       = "dde72065-60f4-4577-836d-6ea074384d62"
   datastore_id          = "d439d467-943a-49f5-a022-c0c25b737022"
+
+  guest_operating_system_moref = "centos8_64Guest"
 
   deploy_options = {
 	trak_sshpublickey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKpZ5juF5a/CXV9nQ0PANptTG9Gh3J0aj6yVjkF0fSkC remi@lenstra.fr"
