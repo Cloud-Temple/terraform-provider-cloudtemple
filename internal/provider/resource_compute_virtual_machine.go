@@ -585,7 +585,26 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
-	activityId, err := c.Compute().VirtualMachine().Delete(ctx, d.Id())
+	vm, err := c.Compute().VirtualMachine().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to read virtual effect: %s", err)
+	}
+
+	activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
+		ID:           d.Id(),
+		DatacenterId: vm.DatacenterId,
+		PowerAction:  "off",
+	})
+
+	if err != nil {
+		return diag.Errorf("failed to power %s virtual machine: %s", "off", err)
+	}
+
+	if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
+		return diag.Errorf("failed to delete virtual machine: %s", err)
+	}
+
+	activityId, err = c.Compute().VirtualMachine().Delete(ctx, d.Id())
 	if err != nil {
 		return diag.Errorf("failed to delete virtual machine: %s", err)
 	}

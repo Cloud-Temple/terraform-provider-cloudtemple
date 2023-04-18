@@ -47,7 +47,7 @@ func (rp *ResourcePoolClient) List(
 	hostClusterID string) ([]*ResourcePool, error) {
 
 	// TODO: filters
-	r := rp.c.newRequest("GET", "/api/compute/v1/vcenters/resource_pools")
+	r := rp.c.newRequest("GET", "/compute/v1/vcenters/resource_pools")
 	resp, err := rp.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -66,7 +66,7 @@ func (rp *ResourcePoolClient) List(
 }
 
 func (rp *ResourcePoolClient) Read(ctx context.Context, id string) (*ResourcePool, error) {
-	r := rp.c.newRequest("GET", "/api/compute/v1/vcenters/resource_pools/%s", id)
+	r := rp.c.newRequest("GET", "/compute/v1/vcenters/resource_pools/%s", id)
 	resp, err := rp.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

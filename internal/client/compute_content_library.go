@@ -28,7 +28,7 @@ type DatastoreLink struct {
 
 func (c *ContentLibraryClient) List(ctx context.Context, machineManagerID string, datacenterID string, hostID string) ([]*ContentLibrary, error) {
 	// TODO: filters
-	r := c.c.newRequest("GET", "/api/compute/v1/vcenters/content_libraries")
+	r := c.c.newRequest("GET", "/compute/v1/vcenters/content_libraries")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (c *ContentLibraryClient) List(ctx context.Context, machineManagerID string
 }
 
 func (c *ContentLibraryClient) Read(ctx context.Context, id string) (*ContentLibrary, error) {
-	r := c.c.newRequest("GET", "/api/compute/v1/vcenters/content_libraries/%s", id)
+	r := c.c.newRequest("GET", "/compute/v1/vcenters/content_libraries/%s", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -80,7 +80,7 @@ type ContentLibraryItem struct {
 }
 
 func (c *ContentLibraryClient) ListItems(ctx context.Context, id string) ([]*ContentLibraryItem, error) {
-	r := c.c.newRequest("GET", "/api/compute/v1/vcenters/content_libraries/%s/items", id)
+	r := c.c.newRequest("GET", "/compute/v1/vcenters/content_libraries/%s/items", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func (c *ContentLibraryClient) ListItems(ctx context.Context, id string) ([]*Con
 }
 
 func (c *ContentLibraryClient) ReadItem(ctx context.Context, contentLibraryId, contentLibraryItemId string) (*ContentLibraryItem, error) {
-	r := c.c.newRequest("GET", "/api/compute/v1/vcenters/content_libraries/%s/items/%s", contentLibraryId, contentLibraryItemId)
+	r := c.c.newRequest("GET", "/compute/v1/vcenters/content_libraries/%s/items/%s", contentLibraryId, contentLibraryItemId)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -143,7 +143,7 @@ type NetworkData struct {
 }
 
 func (c *ContentLibraryClient) Deploy(ctx context.Context, req *ComputeContentLibraryItemDeployRequest) (string, error) {
-	r := c.c.newRequest("POST", "/api/compute/v1/vcenters/content_libraries/%s/items", req.ContentLibraryId)
+	r := c.c.newRequest("POST", "/compute/v1/vcenters/content_libraries/%s/items", req.ContentLibraryId)
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }

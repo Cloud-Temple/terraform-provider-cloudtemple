@@ -37,7 +37,7 @@ type DatastoreClusterMetrics struct {
 
 func (d *DatastoreClusterClient) List(ctx context.Context, machineManagerId string, datacenterId string, hostId string, hostClusterId string) ([]*DatastoreCluster, error) {
 	// TODO: filters
-	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastore_clusters")
+	r := d.c.newRequest("GET", "/compute/v1/vcenters/datastore_clusters")
 	resp, err := d.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -56,7 +56,7 @@ func (d *DatastoreClusterClient) List(ctx context.Context, machineManagerId stri
 }
 
 func (d *DatastoreClusterClient) Read(ctx context.Context, id string) (*DatastoreCluster, error) {
-	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastore_clusters/%s", id)
+	r := d.c.newRequest("GET", "/compute/v1/vcenters/datastore_clusters/%s", id)
 	resp, err := d.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

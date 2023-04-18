@@ -36,7 +36,7 @@ func (d *DatastoreClient) List(
 	hostClusterId string) ([]*Datastore, error) {
 
 	// TODO: filters
-	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastores")
+	r := d.c.newRequest("GET", "/compute/v1/vcenters/datastores")
 	resp, err := d.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -55,7 +55,7 @@ func (d *DatastoreClient) List(
 }
 
 func (d *DatastoreClient) Read(ctx context.Context, id string) (*Datastore, error) {
-	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastores/%s", id)
+	r := d.c.newRequest("GET", "/compute/v1/vcenters/datastores/%s", id)
 	resp, err := d.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

@@ -29,7 +29,7 @@ type VirtualDisk struct {
 }
 
 func (v *VirtualDiskClient) List(ctx context.Context, virtualMachineId string) ([]*VirtualDisk, error) {
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_disks")
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_disks")
 	r.params.Add("virtualMachineId", virtualMachineId)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
@@ -60,13 +60,13 @@ type CreateVirtualDiskRequest struct {
 }
 
 func (n *VirtualDiskClient) Create(ctx context.Context, req *CreateVirtualDiskRequest) (string, error) {
-	r := n.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_disks")
+	r := n.c.newRequest("POST", "/compute/v1/vcenters/virtual_disks")
 	r.obj = req
 	return n.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (v *VirtualDiskClient) Read(ctx context.Context, id string) (*VirtualDisk, error) {
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_disks/%s", id)
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_disks/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -92,18 +92,18 @@ type UpdateVirtualDiskRequest struct {
 }
 
 func (n *VirtualDiskClient) Update(ctx context.Context, req *UpdateVirtualDiskRequest) (string, error) {
-	r := n.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_disks")
+	r := n.c.newRequest("PATCH", "/compute/v1/vcenters/virtual_disks")
 	r.obj = req
 	return n.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (n *VirtualDiskClient) Delete(ctx context.Context, id string) (string, error) {
-	r := n.c.newRequest("DELETE", "/api/compute/v1/vcenters/virtual_disks/%s", id)
+	r := n.c.newRequest("DELETE", "/compute/v1/vcenters/virtual_disks/%s", id)
 	return n.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (n *VirtualDiskClient) Mount(ctx context.Context, virtualMachineId string, path string) (string, error) {
-	r := n.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_disks/mount")
+	r := n.c.newRequest("POST", "/compute/v1/vcenters/virtual_disks/mount")
 	r.obj = map[string]string{
 		"virtualMachineId": virtualMachineId,
 		"path":             path,
@@ -112,7 +112,7 @@ func (n *VirtualDiskClient) Mount(ctx context.Context, virtualMachineId string, 
 }
 
 func (n *VirtualDiskClient) Unmount(ctx context.Context, id string) (string, error) {
-	r := n.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_disks/unmount")
+	r := n.c.newRequest("POST", "/compute/v1/vcenters/virtual_disks/unmount")
 	r.obj = map[string]string{"virtualDiskId": id}
 	return n.c.doRequestAndReturnActivity(ctx, r)
 }

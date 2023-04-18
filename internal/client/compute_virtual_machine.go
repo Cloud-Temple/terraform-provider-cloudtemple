@@ -115,7 +115,7 @@ func (v *VirtualMachineClient) List(
 	vmwareToolsVersions []int) ([]*VirtualMachine, error) {
 
 	// TODO: filters
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_machines")
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_machines")
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -146,13 +146,13 @@ type CreateVirtualMachineRequest struct {
 }
 
 func (v *VirtualMachineClient) Create(ctx context.Context, req *CreateVirtualMachineRequest) (string, error) {
-	r := v.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_machines")
+	r := v.c.newRequest("POST", "/compute/v1/vcenters/virtual_machines")
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMachine, error) {
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_machines/%s", id)
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_machines/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -183,24 +183,24 @@ type UpdateVirtualMachineRequest struct {
 }
 
 func (v *VirtualMachineClient) Update(ctx context.Context, req *UpdateVirtualMachineRequest) (string, error) {
-	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines")
+	r := v.c.newRequest("PATCH", "/compute/v1/vcenters/virtual_machines")
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (v *VirtualMachineClient) Delete(ctx context.Context, id string) (string, error) {
-	r := v.c.newRequest("DELETE", "/api/compute/v1/vcenters/virtual_machines/%s", id)
+	r := v.c.newRequest("DELETE", "/compute/v1/vcenters/virtual_machines/%s", id)
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (v *VirtualMachineClient) Power(ctx context.Context, req *PowerRequest) (string, error) {
-	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines/power")
+	r := v.c.newRequest("PATCH", "/compute/v1/vcenters/virtual_machines/power")
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (v *VirtualMachineClient) Rename(ctx context.Context, id string, name string) (string, error) {
-	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines/rename")
+	r := v.c.newRequest("PATCH", "/compute/v1/vcenters/virtual_machines/rename")
 	r.obj = map[string]string{
 		"id":   id,
 		"name": name,
@@ -220,7 +220,7 @@ type CloneVirtualMachineRequest struct {
 }
 
 func (v *VirtualMachineClient) Clone(ctx context.Context, req *CloneVirtualMachineRequest) (string, error) {
-	r := v.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_machines/%s/clone", req.VirtualMachineId)
+	r := v.c.newRequest("POST", "/compute/v1/vcenters/virtual_machines/%s/clone", req.VirtualMachineId)
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
@@ -245,7 +245,7 @@ type DiskPlacement struct {
 }
 
 func (v *VirtualMachineClient) Relocate(ctx context.Context, req *RelocateVirtualMachineRequest) (string, error) {
-	r := v.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_machines/relocate")
+	r := v.c.newRequest("POST", "/compute/v1/vcenters/virtual_machines/relocate")
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }

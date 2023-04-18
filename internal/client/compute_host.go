@@ -59,7 +59,7 @@ func (h *HostClient) List(
 	datastoreID string) ([]*Host, error) {
 
 	// TODO: filters
-	r := h.c.newRequest("GET", "/api/compute/v1/vcenters/hosts")
+	r := h.c.newRequest("GET", "/compute/v1/vcenters/hosts")
 	resp, err := h.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ func (h *HostClient) List(
 }
 
 func (h *HostClient) Read(ctx context.Context, id string) (*Host, error) {
-	r := h.c.newRequest("GET", "/api/compute/v1/vcenters/hosts/%s", id)
+	r := h.c.newRequest("GET", "/compute/v1/vcenters/hosts/%s", id)
 	resp, err := h.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

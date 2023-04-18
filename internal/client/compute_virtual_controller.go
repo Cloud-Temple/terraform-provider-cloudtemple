@@ -26,7 +26,7 @@ func (v *VirtualControllerClient) List(
 	types string) ([]*VirtualController, error) {
 
 	// TODO: filters
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_controllers")
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_controllers")
 	r.params.Add("virtualMachineId", virtualMachineId)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
