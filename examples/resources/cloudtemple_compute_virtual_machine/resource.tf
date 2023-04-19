@@ -30,7 +30,7 @@ resource "cloudtemple_compute_virtual_machine" "from_scratch" {
   tags = {
     created_by = "Terraform"
   }
- 
+
   lifecycle {
     prevent_destroy = true
   }

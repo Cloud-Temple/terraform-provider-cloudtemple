@@ -34,21 +34,21 @@ To manage this resource you will need the following roles:
 ## Example Usage
 
 ```terraform
-data "cloudtemple_compute_virtual_datacenter" "dc" {
-  name = "DC-EQX6"
+data "cloudtemple_compute_virtual_datacenter" "TH3S" {
+  name = "DC-TH3S"
 }
 
-data "cloudtemple_compute_host_cluster" "flo" {
-  name = "clu002-ucs01_FLO"
+data "cloudtemple_compute_host_cluster" "CLU_001" {
+  name = "clu001-ucs12"
 }
 
-data "cloudtemple_compute_datastore_cluster" "koukou" {
-  name = "sdrs001-LIVE_KOUKOU"
+data "cloudtemple_compute_datastore_cluster" "SDRS_001" {
+  name = "sdrs001-LIVE_"
 }
 
 # Deploying a new virtual machine with a given operating system
-resource "cloudtemple_compute_virtual_machine" "scratch" {
-  name = "from-scratch"
+resource "cloudtemple_compute_virtual_machine" "from_scratch" {
+  name = "from_scratch"
 
   memory                 = 8 * 1024 * 1024 * 1024
   cpu                    = 2
@@ -56,14 +56,19 @@ resource "cloudtemple_compute_virtual_machine" "scratch" {
   cpu_hot_add_enabled    = true
   cpu_hot_remove_enabled = true
   memory_hot_add_enabled = true
+  power_state            = "off"
 
-  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.dc.id
-  host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
-  datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
+  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.TH3S.id
+  host_cluster_id              = data.cloudtemple_compute_host_cluster.CLU_001.id
+  datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.SDRS_001.id
   guest_operating_system_moref = "amazonlinux2_64Guest"
 
   tags = {
     created_by = "Terraform"
+  }
+
+  lifecycle {
+    prevent_destroy = true
   }
 }
 
