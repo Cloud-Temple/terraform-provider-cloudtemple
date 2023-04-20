@@ -14,6 +14,7 @@ type NetworkAdapter struct {
 	ID               string `terraform:"id"`
 	VirtualMachineId string `terraform:"virtual_machine_id"`
 	Name             string `terraform:"name"`
+	NetworkId        string `terraform:"network_id"`
 	Type             string `terraform:"type"`
 	MacType          string `terraform:"mac_type"`
 	MacAddress       string `terraform:"mac_address"`

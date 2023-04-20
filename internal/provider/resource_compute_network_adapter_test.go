@@ -76,6 +76,12 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "name", "Network adapter 1"),
 				),
 			},
+			{
+				Config:            testAccResourceNetworkAdapter,
+				ResourceName:      "cloudtemple_compute_network_adapter.foo",
+				ImportState:       true,
+				ImportStateVerify: true,
+			},
 		},
 	})
 }

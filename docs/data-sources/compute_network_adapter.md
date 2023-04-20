@@ -38,6 +38,7 @@ data "cloudtemple_compute_network_adapter" "name" {
 - `id` (String) The ID of this resource.
 - `mac_address` (String)
 - `mac_type` (String)
+- `network_id` (String)
 - `type` (String)
 
 

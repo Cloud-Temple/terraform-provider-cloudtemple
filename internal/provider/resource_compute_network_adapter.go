@@ -20,6 +20,10 @@ func resourceNetworkAdapter() *schema.Resource {
 		UpdateContext: computeNetworkAdapterUpdate,
 		DeleteContext: computeNetworkAdapterDelete,
 
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
+
 		Schema: map[string]*schema.Schema{
 			// In
 			"virtual_machine_id": {
