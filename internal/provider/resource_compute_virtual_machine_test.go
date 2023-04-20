@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -78,14 +77,8 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 				),
 			},
 			{
-				// Trying to destroy a running VM will not work
-				Destroy:     true,
-				Config:      testAccResourceVirtualMachinePowerOn,
-				ExpectError: regexp.MustCompile(`NOT_ALLOWED_IN_CURRENT_STATE`),
-			},
-			{
-				// We stop the VM so that we can destroy it later
-				Config: testAccResourceVirtualMachine,
+				Destroy: true,
+				Config:  testAccResourceVirtualMachinePowerOn,
 			},
 			{
 				Config: testAccResourceVirtualMachineClone,
