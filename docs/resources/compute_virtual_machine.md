@@ -128,16 +128,16 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 
 ### Optional
 
-- `clone_virtual_machine_id` (String) The ID of the virtual machine to clone. Conflicts with `guest_operating_system_moref` and `content_library_item_id`.
-- `content_library_id` (String) The ID of the content library to clone from. Conflicts with `guest_operating_system_moref` and `clone_virtual_machine_id`.
-- `content_library_item_id` (String) The ID of the content library item to clone. Conflicts with `guest_operating_system_moref` and `clone_virtual_machine_id`.
+- `clone_virtual_machine_id` (String) The ID of the virtual machine to clone. Conflict with `content_library_item_id`.
+- `content_library_id` (String) The ID of the content library to clone from. Conflict with `clone_virtual_machine_id`.
+- `content_library_item_id` (String) The ID of the content library item to clone. Conflict with `clone_virtual_machine_id`.
 - `cpu` (Number) The number of CPUs to start the virtual machine with.
 - `cpu_hot_add_enabled` (Boolean)
 - `cpu_hot_remove_enabled` (Boolean)
 - `datastore_cluster_id` (String)
 - `datastore_id` (String)
 - `deploy_options` (Map of String)
-- `guest_operating_system_moref` (String) The operating system to launch the virtual machine with. Conflicts with `clone_virtual_machine_id` and `content_library_item_id`.
+- `guest_operating_system_moref` (String) The operating system to launch the virtual machine with.
 - `host_id` (String) The host to start the virtual machine on.
 - `memory` (Number) The quantity of memory to start the virtual machine with.
 - `memory_hot_add_enabled` (Boolean)

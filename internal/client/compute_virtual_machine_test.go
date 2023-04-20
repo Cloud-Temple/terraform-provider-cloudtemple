@@ -46,6 +46,7 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 		HardwareVersion:                "vmx-14",
 		NumCoresPerSocket:              1,
 		OperatingSystemName:            "Ubuntu Linux (64-bit)",
+		OperatingSystemMoref:           "ubuntu64Guest",
 		Cpu:                            1,
 		CpuHotAddEnabled:               false,
 		CpuHotRemoveEnabled:            false,
@@ -322,6 +323,39 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 	vm, err := client.Compute().VirtualMachine().Read(ctx, instanceId)
 	require.NoError(t, err)
 	require.Equal(t, "ac33c033-693b-4fc5-9196-26df77291dbb", vm.DatacenterId)
+
+	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
+	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
+	require.NoError(t, err)
+}
+
+func TestVirtualMachineClient_Guest(t *testing.T) {
+	ctx := context.Background()
+
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+		Name:                      "test-client-clone",
+		DatacenterId:              "85d53d08-0fa9-491e-ab89-90919516df25",
+		HostClusterId:             "dde72065-60f4-4577-836d-6ea074384d62",
+		DatastoreClusterId:        "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
+		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
+	})
+	require.NoError(t, err)
+	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
+	require.NoError(t, err)
+
+	instanceId := activity.ConcernedItems[0].ID
+
+	activityId, err = client.Compute().VirtualMachine().Guest(ctx, instanceId, &UpdateGuestRequest{
+		GuestOperatingSystemMoref: "vmwarePhoton64Guest",
+	})
+	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
+	require.NoError(t, err)
+
+	vm, err := client.Compute().VirtualMachine().Read(ctx, instanceId)
+	require.NoError(t, err)
+	require.Equal(t, "vmwarePhoton64Guest", vm.OperatingSystemMoref)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, instanceId)
 	require.NoError(t, err)

@@ -26,6 +26,7 @@ type VirtualMachine struct {
 	HardwareVersion                string                          `terraform:"hardware_version"`
 	NumCoresPerSocket              int                             `terraform:"num_cores_per_socket"`
 	OperatingSystemName            string                          `terraform:"operating_system_name"`
+	OperatingSystemMoref           string                          `terraform:"guest_operating_system_moref"`
 	Cpu                            int                             `terraform:"cpu"`
 	CpuHotAddEnabled               bool                            `terraform:"cpu_hot_add_enabled"`
 	CpuHotRemoveEnabled            bool                            `terraform:"cpu_hot_remove_enabled"`
@@ -246,6 +247,16 @@ type DiskPlacement struct {
 
 func (v *VirtualMachineClient) Relocate(ctx context.Context, req *RelocateVirtualMachineRequest) (string, error) {
 	r := v.c.newRequest("POST", "/api/compute/v1/vcenters/virtual_machines/relocate")
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+type UpdateGuestRequest struct {
+	GuestOperatingSystemMoref string `json:"guestOperatingSystemMoref"`
+}
+
+func (v *VirtualMachineClient) Guest(ctx context.Context, id string, req *UpdateGuestRequest) (string, error) {
+	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines/%s/guest", id)
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }

@@ -37,20 +37,20 @@ Virtual machines can be created using three different methods:
 			},
 			"content_library_id": {
 				Type:          schema.TypeString,
-				Description:   "The ID of the content library to clone from. Conflicts with `guest_operating_system_moref` and `clone_virtual_machine_id`.",
+				Description:   "The ID of the content library to clone from. Conflict with `clone_virtual_machine_id`.",
 				Optional:      true,
 				ForceNew:      true,
 				RequiredWith:  []string{"content_library_item_id"},
-				ConflictsWith: []string{"clone_virtual_machine_id", "guest_operating_system_moref"},
+				ConflictsWith: []string{"clone_virtual_machine_id"},
 				ValidateFunc:  validation.IsUUID,
 			},
 			"content_library_item_id": {
 				Type:          schema.TypeString,
-				Description:   "The ID of the content library item to clone. Conflicts with `guest_operating_system_moref` and `clone_virtual_machine_id`.",
+				Description:   "The ID of the content library item to clone. Conflict with `clone_virtual_machine_id`.",
 				Optional:      true,
 				ForceNew:      true,
 				RequiredWith:  []string{"content_library_id"},
-				ConflictsWith: []string{"guest_operating_system_moref", "clone_virtual_machine_id"},
+				ConflictsWith: []string{"clone_virtual_machine_id"},
 				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
 				ValidateFunc:  validation.IsUUID,
 			},
@@ -58,7 +58,7 @@ Virtual machines can be created using three different methods:
 				Type:          schema.TypeMap,
 				ForceNew:      true,
 				Optional:      true,
-				ConflictsWith: []string{"guest_operating_system_moref", "clone_virtual_machine_id"},
+				ConflictsWith: []string{"clone_virtual_machine_id"},
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
@@ -66,20 +66,18 @@ Virtual machines can be created using three different methods:
 			},
 			"clone_virtual_machine_id": {
 				Type:          schema.TypeString,
-				Description:   "The ID of the virtual machine to clone. Conflicts with `guest_operating_system_moref` and `content_library_item_id`.",
+				Description:   "The ID of the virtual machine to clone. Conflict with `content_library_item_id`.",
 				Optional:      true,
 				ForceNew:      true,
-				ConflictsWith: []string{"guest_operating_system_moref", "content_library_item_id"},
+				ConflictsWith: []string{"content_library_item_id"},
 				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
 				ValidateFunc:  validation.IsUUID,
 			},
 			"guest_operating_system_moref": {
-				Type:          schema.TypeString,
-				Description:   "The operating system to launch the virtual machine with. Conflicts with `clone_virtual_machine_id` and `content_library_item_id`.",
-				Optional:      true,
-				ForceNew:      true,
-				ConflictsWith: []string{"clone_virtual_machine_id", "content_library_item_id"},
-				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
+				Type:         schema.TypeString,
+				Description:  "The operating system to launch the virtual machine with.",
+				Optional:     true,
+				AtLeastOneOf: []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
 			},
 			"datacenter_id": {
 				Type:         schema.TypeString,
@@ -535,6 +533,19 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
 			return diag.Errorf("failed to rename virtual machine, %s", err)
+		}
+	}
+
+	if d.HasChange("guest_operating_system_moref") {
+		activityId, err := c.Compute().VirtualMachine().Guest(ctx, d.Id(), &client.UpdateGuestRequest{
+			GuestOperatingSystemMoref: d.Get("guest_operating_system_moref").(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to update virtual machine guest operating system, %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update virtual machine guest operating system, %s", err)
 		}
 	}
 
