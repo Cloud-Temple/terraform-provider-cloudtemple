@@ -33,13 +33,13 @@ func TestBackupMetricsClient_Policies(t *testing.T) {
 	require.GreaterOrEqual(t, len(policiesMetrics), 1)
 
 	expected := &BackupMetricsPolicies{
-		Name:        "SLA_DAILY",
+		Name:        "sla001-daily-th3s",
 		TriggerType: "DAILY",
 	}
 
 	var found bool
 	for _, pm := range policiesMetrics {
-		if pm.Name == "SLA_DAILY" {
+		if pm.Name == "sla001-daily-th3s" {
 			// Ignore some fields
 			pm.NumberOfProtectedVM = 0
 
@@ -58,11 +58,11 @@ func TestBackupMetricsClient_Platform(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := &BackupMetricsPlatform{
-		Version:        "10.1.12",
-		Build:          "124",
-		Date:           "Wed Sep  7 14:02:15 EDT 2022",
+		Version:        "10.1.14",
+		Build:          "158",
+		Date:           "Thu Mar  2 12:22:05 EST 2023",
 		Product:        "Spectrum Protect Plus",
-		Epoch:          1662573735000,
+		Epoch:          1677777725000,
 		DeploymentType: "standard",
 	}
 

@@ -9,14 +9,14 @@ import (
 
 func TestCompute_HostClusterList(t *testing.T) {
 	ctx := context.Background()
-	hostClusters, err := client.Compute().HostCluster().List(ctx, "9dba240e-a605-4103-bac7-5336d3ffd124", "", "")
+	hostClusters, err := client.Compute().HostCluster().List(ctx, nil)
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(hostClusters), 1)
 
 	var found bool
 	for _, hc := range hostClusters {
-		if hc.ID == "dde72065-60f4-4577-836d-6ea074384d62" {
+		if hc.ID == "bd5d8bf4-953a-46fb-9997-45467ba1ae6f" {
 			found = true
 			break
 		}
@@ -26,7 +26,7 @@ func TestCompute_HostClusterList(t *testing.T) {
 
 func TestCompute_HostClusterRead(t *testing.T) {
 	ctx := context.Background()
-	hostCluster, err := client.Compute().HostCluster().Read(ctx, "dde72065-60f4-4577-836d-6ea074384d62")
+	hostCluster, err := client.Compute().HostCluster().Read(ctx, "bd5d8bf4-953a-46fb-9997-45467ba1ae6f")
 	require.NoError(t, err)
 
 	// ignore changes to metrics
@@ -34,17 +34,20 @@ func TestCompute_HostClusterRead(t *testing.T) {
 	hostCluster.VirtualMachinesNumber = 0
 
 	expected := &HostCluster{
-		ID:    "dde72065-60f4-4577-836d-6ea074384d62",
-		Name:  "clu002-ucs01_FLO",
-		Moref: "domain-c1041",
+		ID:    "bd5d8bf4-953a-46fb-9997-45467ba1ae6f",
+		Name:  "clu001-ucs12",
+		Moref: "domain-c1008",
 		Hosts: []HostClusterHostStub{
 			{
-				ID:   "host-1046",
+				ID:   "host-1022",
+				Type: "HostSystem",
+			},
+			{
+				ID:   "host-1015",
 				Type: "HostSystem",
 			},
 		},
-		Metrics:          HostClusterMetrics{},
-		MachineManagerId: "",
+		Metrics: HostClusterMetrics{},
 	}
 	require.Equal(t, expected, hostCluster)
 }

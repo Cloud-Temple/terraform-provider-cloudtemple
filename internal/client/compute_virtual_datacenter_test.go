@@ -9,7 +9,7 @@ import (
 
 func TestCompute_VirtualDatacenterList(t *testing.T) {
 	ctx := context.Background()
-	virtualDatacenters, err := client.Compute().VirtualDatacenter().List(ctx, "", "")
+	virtualDatacenters, err := client.Compute().VirtualDatacenter().List(ctx, nil)
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(virtualDatacenters), 1)

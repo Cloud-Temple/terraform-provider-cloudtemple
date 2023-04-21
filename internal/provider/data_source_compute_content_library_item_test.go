@@ -15,28 +15,24 @@ func TestAccDataSourceLibraryItem(t *testing.T) {
 			{
 				Config: testAccDataSourceLibraryItem,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "content_library_id", "355b654d-6ea2-4773-80ee-246d3f56964f"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", "8faded09-9f8b-4e27-a978-768f72f8e5f8"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", "20211115132417_master_linux-centos-8"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "description", "Centos 8"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", "ovf"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "creation_time", "2021-12-02T03:26:39Z"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "size", "1706045044"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "content_library_id", "25db620e-ffb1-4152-a786-b36041fe00c8"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", "8d34ec8a-488a-4757-84d0-ae7bc2c3659f"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", "runnable-ubuntu-template"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "description", "Template ubuntu"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", "vm-template"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "stored", "true"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "last_modified_time"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "ovf_properties.#", "0"),
 				),
 			},
 			{
 				Config: testAccDataSourceLibraryItemName,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", "8faded09-9f8b-4e27-a978-768f72f8e5f8"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", "20211115132417_master_linux-centos-8"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "description", "Centos 8"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", "ovf"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", "8d34ec8a-488a-4757-84d0-ae7bc2c3659f"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", "runnable-ubuntu-template"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "description", "Template ubuntu"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", "vm-template"),
 					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "stored", "true"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "last_modified_time"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "ovf_properties.#", "0"),
 				),
 			},
 			{
@@ -49,29 +45,29 @@ func TestAccDataSourceLibraryItem(t *testing.T) {
 
 const testAccDataSourceLibraryItem = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "PUBLIC"
+  name = "local-vc-vstack-001-t0001"
 }
 
 data "cloudtemple_compute_content_library_item" "foo" {
   content_library_id = data.cloudtemple_compute_content_library.foo.id
-  id                 = "8faded09-9f8b-4e27-a978-768f72f8e5f8"
+  id                 = "8d34ec8a-488a-4757-84d0-ae7bc2c3659f"
 }
 `
 
 const testAccDataSourceLibraryItemName = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "PUBLIC"
+  name = "local-vc-vstack-001-t0001"
 }
 
 data "cloudtemple_compute_content_library_item" "foo" {
   content_library_id = data.cloudtemple_compute_content_library.foo.id
-  name               = "20211115132417_master_linux-centos-8"
+  name               = "runnable-ubuntu-template"
 }
 `
 
 const testAccDataSourceLibraryItemMissing = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "PUBLIC"
+  name = "local-vc-vstack-001-t0001"
 }
 
 data "cloudtemple_compute_content_library_item" "foo" {

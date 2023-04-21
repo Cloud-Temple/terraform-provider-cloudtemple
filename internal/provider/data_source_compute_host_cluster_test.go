@@ -15,15 +15,15 @@ func TestAccDataSourceHostCluster(t *testing.T) {
 			{
 				Config: testAccDataSourceHostCluster,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", "dde72065-60f4-4577-836d-6ea074384d62"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", "clu002-ucs01_FLO"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", "c80c4667-2f2d-4087-852b-995b0d5f1f2e"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", "clu001-ucs12"),
 				),
 			},
 			{
 				Config: testAccDataSourceHostClusterName,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", "dde72065-60f4-4577-836d-6ea074384d62"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", "clu002-ucs01_FLO"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", "c80c4667-2f2d-4087-852b-995b0d5f1f2e"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", "clu001-ucs12"),
 				),
 			},
 			{
@@ -36,13 +36,14 @@ func TestAccDataSourceHostCluster(t *testing.T) {
 
 const testAccDataSourceHostCluster = `
 data "cloudtemple_compute_host_cluster" "foo" {
-  id = "dde72065-60f4-4577-836d-6ea074384d62"
+  id = "c80c4667-2f2d-4087-852b-995b0d5f1f2e"
 }
 `
 
 const testAccDataSourceHostClusterName = `
 data "cloudtemple_compute_host_cluster" "foo" {
-  name = "clu002-ucs01_FLO"
+  name               = "clu001-ucs12"
+	machine_manager_id = "8afdb4e8-b68d-4bb8-a606-3dc47cc2da0e"
 }
 `
 

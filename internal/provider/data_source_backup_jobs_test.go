@@ -14,7 +14,7 @@ func TestAccDataBackupJobs(t *testing.T) {
 			{
 				Config: testAccDataBackupJobs,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_jobs.foo", "jobs.#", "9"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_jobs.foo", "jobs.#", "10"),
 				),
 			},
 		},

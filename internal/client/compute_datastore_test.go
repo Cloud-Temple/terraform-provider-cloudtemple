@@ -9,14 +9,16 @@ import (
 
 func TestCompute_DatastoreList(t *testing.T) {
 	ctx := context.Background()
-	datastores, err := client.Compute().Datastore().List(ctx, "", "", "", "", "")
+	datastores, err := client.Compute().Datastore().List(ctx, &DatastoreFilter{
+		DatacenterId: "7b56f202-83e3-4112-9771-8fb001fbac3e",
+	})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(datastores), 1)
 
 	var found bool
 	for _, dc := range datastores {
-		if dc.ID == "d439d467-943a-49f5-a022-c0c25b737022" {
+		if dc.ID == "88fb9089-cf33-47f0-938a-fe792f4a9039" {
 			found = true
 			break
 		}
@@ -26,7 +28,7 @@ func TestCompute_DatastoreList(t *testing.T) {
 
 func TestCompute_DatastoreRead(t *testing.T) {
 	ctx := context.Background()
-	datastore, err := client.Compute().Datastore().Read(ctx, "d439d467-943a-49f5-a022-c0c25b737022")
+	datastore, err := client.Compute().Datastore().Read(ctx, "88fb9089-cf33-47f0-938a-fe792f4a9039")
 	require.NoError(t, err)
 
 	// Skip checking changes on metrics

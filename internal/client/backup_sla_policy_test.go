@@ -16,7 +16,7 @@ func TestBackupSLAPolicyClient_List(t *testing.T) {
 
 	var found bool
 	for _, sl := range slaPolicies {
-		if sl.ID == "442718ef-44a1-43d7-9b57-2d910d74e928" {
+		if sl.ID == "10c6a0f7-076b-43aa-9230-bc975dcb1f30" {
 			found = true
 			break
 		}
@@ -33,29 +33,24 @@ func TestBackupSLAPolicyClient_List(t *testing.T) {
 
 func TestBackupSLAPolicyClient_Read(t *testing.T) {
 	ctx := context.Background()
-	slaPolicy, err := client.Backup().SLAPolicy().Read(ctx, "442718ef-44a1-43d7-9b57-2d910d74e928")
+	slaPolicy, err := client.Backup().SLAPolicy().Read(ctx, "10c6a0f7-076b-43aa-9230-bc975dcb1f30")
 	require.NoError(t, err)
 
 	expected := &BackupSLAPolicy{
-		ID:   "442718ef-44a1-43d7-9b57-2d910d74e928",
-		Name: "SLA_ADMIN",
+		ID:   "10c6a0f7-076b-43aa-9230-bc975dcb1f30",
+		Name: "nobackup",
 		SubPolicies: []*BackupSLASubPolicy{
 			{
 				Type:          "REPLICATION",
 				UseEncryption: false,
 				Software:      true,
-				Site:          "DC-EQX6",
+				Site:          "DC-TH3S",
 				Retention: BackupSLAPolicyRetention{
 					Age: 15,
 				},
-				Trigger: BackupSLAPolicyTrigger{
-					Frequency:    1,
-					Type:         "DAILY",
-					ActivateDate: 1568617200000,
-				},
 				Target: BackupSLAPolicyTarget{
 					ID:           "1000",
-					Href:         "https://spp1-ctlabs-eqx6.backup.cloud-temple.lan/api/site/1000",
+					Href:         "https://10.12.8.1/api/site/1000",
 					ResourceType: "site",
 				},
 			},
