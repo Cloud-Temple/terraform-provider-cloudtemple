@@ -27,16 +27,22 @@ type Datastore struct {
 	AssociatedFolder      string   `terraform:"associated_folder"`
 }
 
+type DatastoreFilter struct {
+	Name               string `filter:"name"`
+	MachineManagerId   string `filter:"machineManagerId"`
+	DatacenterId       string `filter:"datacenterId"`
+	HostId             string `filter:"hostId"`
+	HostClusterId      string `filter:"hostClusterId"`
+	DatastoreClusterId string `filter:"datastoreClusterId"`
+}
+
 func (d *DatastoreClient) List(
 	ctx context.Context,
-	machineManagerId string,
-	datacenterId string,
-	hostId string,
-	datastoreClusterId string,
-	hostClusterId string) ([]*Datastore, error) {
+	filter *DatastoreFilter) ([]*Datastore, error) {
 
 	// TODO: filters
 	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastores")
+	r.addFilter(filter)
 	resp, err := d.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

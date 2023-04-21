@@ -12,16 +12,22 @@ func dataSourceDatastore() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 			return getBy(
 				ctx,
 				d,
 				"datastore",
 				func(id string) (any, error) {
-					return client.Compute().Datastore().Read(ctx, id)
+					return c.Compute().Datastore().Read(ctx, id)
 				},
 				func(d *schema.ResourceData) (any, error) {
-					return client.Compute().Datastore().List(ctx, "", "", "", "", "")
+					return c.Compute().Datastore().List(ctx, &client.DatastoreFilter{
+						Name:             d.Get("name").(string),
+						MachineManagerId: d.Get("machine_manager_id").(string),
+						DatacenterId:     d.Get("datacenter_id").(string),
+						HostId:           d.Get("host_id").(string),
+						HostClusterId:    d.Get("host_cluster_id").(string),
+					})
 				},
 				[]string{"name"},
 			)
@@ -39,6 +45,33 @@ func dataSourceDatastore() *schema.Resource {
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"id"},
+			},
+			"machine_manager_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"id"},
+			},
+			"datacenter_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"id"},
+			},
+			"host_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"id"},
+			},
+			"host_cluster_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
 			},
@@ -65,10 +98,6 @@ func dataSourceDatastore() *schema.Resource {
 				Computed: true,
 			},
 			"unique_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"machine_manager_id": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},

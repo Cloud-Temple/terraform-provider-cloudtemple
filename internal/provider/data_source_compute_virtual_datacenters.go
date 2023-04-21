@@ -12,7 +12,7 @@ func dataSourceVirtualDatacenters() *schema.Resource {
 		Description: "",
 
 		ReadContext: readResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, []string, error) {
-			datacenters, err := client.Compute().VirtualDatacenter().List(ctx, "", "")
+			datacenters, err := client.Compute().VirtualDatacenter().List(ctx, nil)
 			return map[string]interface{}{
 				"id":                  "virtual_datacenters",
 				"virtual_datacenters": datacenters,

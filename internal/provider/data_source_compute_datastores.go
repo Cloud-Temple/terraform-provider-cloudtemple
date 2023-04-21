@@ -11,8 +11,8 @@ func dataSourceDatastores() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			datastores, err := client.Compute().Datastore().List(ctx, "", "", "", "", "")
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+			datastores, err := c.Compute().Datastore().List(ctx, nil)
 			return map[string]interface{}{
 				"id":         "datastores",
 				"datastores": datastores,
@@ -65,10 +65,6 @@ func dataSourceDatastores() *schema.Resource {
 						},
 						"type": {
 							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"virtual_machines_number": {
-							Type:     schema.TypeInt,
 							Computed: true,
 						},
 						"hosts_number": {

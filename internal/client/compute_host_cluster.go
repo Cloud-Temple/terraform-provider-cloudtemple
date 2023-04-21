@@ -20,6 +20,13 @@ type HostCluster struct {
 	MachineManagerId      string                `terraform:"machine_manager_id"`
 }
 
+type HostClusterFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerId string `filter:"machineManagerId"`
+	DatacenterId     string `filter:"datacenterId"`
+	DatastoreId      string `filter:"datastoreId"`
+}
+
 type HostClusterHostStub struct {
 	ID   string `terraform:"id"`
 	Type string `terraform:"type"`
@@ -36,12 +43,11 @@ type HostClusterMetrics struct {
 
 func (h *HostClusterClient) List(
 	ctx context.Context,
-	machineManagerId string,
-	datacenterId string,
-	datastoreId string) ([]*HostCluster, error) {
+	filter *HostClusterFilter) ([]*HostCluster, error) {
 
 	// TODO: filters
 	r := h.c.newRequest("GET", "/api/compute/v1/vcenters/host_clusters")
+	r.addFilter(filter)
 	resp, err := h.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

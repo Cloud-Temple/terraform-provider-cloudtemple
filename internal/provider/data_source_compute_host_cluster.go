@@ -13,10 +13,15 @@ func dataSourceHostCluster() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 			name := d.Get("name").(string)
 			if name != "" {
-				hostClusters, err := client.Compute().HostCluster().List(ctx, "", "", "")
+				hostClusters, err := c.Compute().HostCluster().List(ctx, &client.HostClusterFilter{
+					Name:             name,
+					MachineManagerId: d.Get("machine_manager_id").(string),
+					DatacenterId:     d.Get("datacenter_id").(string),
+					DatastoreId:      d.Get("datastore_id").(string),
+				})
 				if err != nil {
 					return nil, fmt.Errorf("failed to find host cluster named %q: %s", name, err)
 				}
@@ -29,7 +34,7 @@ func dataSourceHostCluster() *schema.Resource {
 			}
 
 			id := d.Get("id").(string)
-			cluster, err := client.Compute().HostCluster().Read(ctx, id)
+			cluster, err := c.Compute().HostCluster().Read(ctx, id)
 			if err == nil && cluster == nil {
 				return nil, fmt.Errorf("failed to find host cluster with id %q", id)
 			}
@@ -48,6 +53,26 @@ func dataSourceHostCluster() *schema.Resource {
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
+			"machine_manager_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
+			"datacenter_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
+			"datastore_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
 			},
@@ -111,10 +136,10 @@ func dataSourceHostCluster() *schema.Resource {
 				Type:     schema.TypeInt,
 				Computed: true,
 			},
-			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
+			// "machine_manager_id": {
+			// 	Type:     schema.TypeString,
+			// 	Computed: true,
+			// },
 		},
 	}
 }

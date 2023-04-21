@@ -11,8 +11,13 @@ func dataSourceDatastoreClusters() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			datastoreClusters, err := client.Compute().DatastoreCluster().List(ctx, "", "", "", "")
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+			datastoreClusters, err := c.Compute().DatastoreCluster().List(ctx, &client.DatastoreClusterFilter{
+				MachineManagerId: d.Get("machine_manager_id").(string),
+				DatacenterId:     d.Get("datacenter_id").(string),
+				HostId:           d.Get("host_id").(string),
+				HostClusterId:    d.Get("host_cluster_id").(string),
+			})
 			return map[string]interface{}{
 				"id":                 "datastore_clusters",
 				"datastore_clusters": datastoreClusters,

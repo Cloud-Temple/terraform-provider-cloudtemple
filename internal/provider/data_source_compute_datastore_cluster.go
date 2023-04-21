@@ -13,10 +13,16 @@ func dataSourceDatastoreCluster() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 			name := d.Get("name").(string)
 			if name != "" {
-				clusters, err := client.Compute().DatastoreCluster().List(ctx, "", "", "", "")
+				clusters, err := c.Compute().DatastoreCluster().List(ctx, &client.DatastoreClusterFilter{
+					Name:             name,
+					MachineManagerId: d.Get("machine_manager_id").(string),
+					DatacenterId:     d.Get("datacenter_id").(string),
+					HostId:           d.Get("host_id").(string),
+					HostClusterId:    d.Get("host_cluster_id").(string),
+				})
 				if err != nil {
 					return nil, fmt.Errorf("failed to find datastore cluster named %q: %s", name, err)
 				}
@@ -29,7 +35,7 @@ func dataSourceDatastoreCluster() *schema.Resource {
 			}
 
 			id := d.Get("id").(string)
-			cluster, err := client.Compute().DatastoreCluster().Read(ctx, id)
+			cluster, err := c.Compute().DatastoreCluster().Read(ctx, id)
 			if err == nil && cluster == nil {
 				return nil, fmt.Errorf("failed to find datastore cluster with id %q", id)
 			}
@@ -51,13 +57,36 @@ func dataSourceDatastoreCluster() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
 			},
+			"machine_manager_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
+			"datacenter_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
+			"host_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
+			"host_cluster_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
 
 			// Out
 			"moref": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"machine_manager_id": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},

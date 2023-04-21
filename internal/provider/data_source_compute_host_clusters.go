@@ -11,8 +11,12 @@ func dataSourceHostClusters() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			hcs, err := client.Compute().HostCluster().List(ctx, "", "", "")
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+			hcs, err := c.Compute().HostCluster().List(ctx, &client.HostClusterFilter{
+				MachineManagerId: d.Get("machine_manager_id").(string),
+				DatacenterId:     d.Get("datacenter_id").(string),
+				DatastoreId:      d.Get("datastore_id").(string),
+			})
 			return map[string]interface{}{
 				"id":            "host_clusters",
 				"host_clusters": hcs,
