@@ -29,13 +29,16 @@ data "cloudtemple_compute_datastore_cluster" "name" {
 
 ### Optional
 
+- `datacenter_id` (String)
+- `host_cluster_id` (String)
+- `host_id` (String)
+- `machine_manager_id` (String)
 - `name` (String)
 
 ### Read-Only
 
 - `datastores` (List of String)
 - `id` (String) The ID of this resource.
-- `machine_manager_id` (String)
 - `metrics` (List of Object) (see [below for nested schema](#nestedatt--metrics))
 - `moref` (String)
 

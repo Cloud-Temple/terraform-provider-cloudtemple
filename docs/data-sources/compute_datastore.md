@@ -29,6 +29,10 @@ data "cloudtemple_compute_datastore" "name" {
 
 ### Optional
 
+- `datacenter_id` (String)
+- `host_cluster_id` (String)
+- `host_id` (String)
+- `machine_manager_id` (String)
 - `name` (String)
 
 ### Read-Only
@@ -39,7 +43,6 @@ data "cloudtemple_compute_datastore" "name" {
 - `hosts_names` (List of String)
 - `hosts_number` (Number)
 - `id` (String) The ID of this resource.
-- `machine_manager_id` (String)
 - `maintenance_status` (String)
 - `max_capacity` (Number)
 - `moref` (String)
