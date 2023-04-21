@@ -14,7 +14,7 @@ func TestAccDataSourceBackupVCenters(t *testing.T) {
 			{
 				Config: testAccDataSourceBackupVCenters,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_vcenters.foo", "vcenters.#", "1"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_vcenters.foo", "vcenters.#", "2"),
 				),
 			},
 		},
@@ -23,6 +23,6 @@ func TestAccDataSourceBackupVCenters(t *testing.T) {
 
 const testAccDataSourceBackupVCenters = `
 data "cloudtemple_backup_vcenters" "foo" {
-  spp_server_id = "a3d46fb5-29af-4b98-a665-1e82a62fd6d3"
+  spp_server_id = "a34d230c-dd0f-4fa9-a099-bec7d8609bd4"
 }
 `

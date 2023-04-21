@@ -27,12 +27,12 @@ data "cloudtemple_compute_virtual_datacenter" "name" {
 
 ### Optional
 
+- `machine_manager_id` (String)
 - `name` (String)
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `machine_manager_id` (String)
 - `tenant_id` (String)
 
 

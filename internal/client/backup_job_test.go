@@ -28,7 +28,7 @@ func TestBackupJobClient_List(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.Len(t, jobs, 1)
+	require.Len(t, jobs, 2)
 }
 
 func TestBackupJobClient_Read(t *testing.T) {

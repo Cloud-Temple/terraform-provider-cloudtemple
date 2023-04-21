@@ -15,17 +15,17 @@ func TestAccDataSourceBackupSPPServer(t *testing.T) {
 			{
 				Config: testAccDataSourceBackupSPPServer,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "id", "a3d46fb5-29af-4b98-a665-1e82a62fd6d3"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "name", "10"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "address", "10.1.11.32"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "id", "a34d230c-dd0f-4fa9-a099-bec7d8609bd4"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "name", "spp01-rec-th3s"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "address", "spp01-rec-th3s.rbackup"),
 				),
 			},
 			{
 				Config: testAccDataSourceBackupSPPServerName,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "id", "a3d46fb5-29af-4b98-a665-1e82a62fd6d3"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "name", "10"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "address", "10.1.11.32"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "id", "a34d230c-dd0f-4fa9-a099-bec7d8609bd4"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "name", "spp01-rec-th3s"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "address", "spp01-rec-th3s.rbackup"),
 				),
 			},
 			{
@@ -38,13 +38,13 @@ func TestAccDataSourceBackupSPPServer(t *testing.T) {
 
 const testAccDataSourceBackupSPPServer = `
 data "cloudtemple_backup_spp_server" "foo" {
-  id = "a3d46fb5-29af-4b98-a665-1e82a62fd6d3"
+  id = "a34d230c-dd0f-4fa9-a099-bec7d8609bd4"
 }
 `
 
 const testAccDataSourceBackupSPPServerName = `
 data "cloudtemple_backup_spp_server" "foo" {
-  name = "10"
+  name = "spp01-rec-th3s"
 }
 `
 

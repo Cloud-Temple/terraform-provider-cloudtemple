@@ -19,6 +19,14 @@ type DatastoreCluster struct {
 	Metrics          DatastoreClusterMetrics `terraform:"metrics"`
 }
 
+type DatastoreClusterFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerId string `filter:"machineManagerId"`
+	DatacenterId     string `filter:"datacenterId"`
+	HostId           string `filter:"hostId"`
+	HostClusterId    string `filter:"hostClusterId"`
+}
+
 type DatastoreClusterMetrics struct {
 	FreeCapacity                  int    `terraform:"free_capacity"`
 	MaxCapacity                   int    `terraform:"max_capacity"`
@@ -35,9 +43,10 @@ type DatastoreClusterMetrics struct {
 	IoLoadBalanceEnabled          bool   `terraform:"io_load_balance_enabled"`
 }
 
-func (d *DatastoreClusterClient) List(ctx context.Context, machineManagerId string, datacenterId string, hostId string, hostClusterId string) ([]*DatastoreCluster, error) {
+func (d *DatastoreClusterClient) List(ctx context.Context, filter *DatastoreClusterFilter) ([]*DatastoreCluster, error) {
 	// TODO: filters
 	r := d.c.newRequest("GET", "/api/compute/v1/vcenters/datastore_clusters")
+	r.addFilter(filter)
 	resp, err := d.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

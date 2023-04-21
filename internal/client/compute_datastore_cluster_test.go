@@ -9,7 +9,7 @@ import (
 
 func TestCompute_DatastoreClusterList(t *testing.T) {
 	ctx := context.Background()
-	datastoreClusters, err := client.Compute().DatastoreCluster().List(ctx, "", "", "", "")
+	datastoreClusters, err := client.Compute().DatastoreCluster().List(ctx, nil)
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(datastoreClusters), 1)

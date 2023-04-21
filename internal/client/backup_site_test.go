@@ -16,7 +16,7 @@ func TestBackupSiteClient_List(t *testing.T) {
 
 	var backupSite *BackupSite
 	for _, bs := range backupSites {
-		if bs.ID == "7e76f68f-3392-401b-9c3a-d504af96643d" {
+		if bs.ID == "98e75cf9-6b3c-4422-8d4e-826a032c2bf1" {
 			backupSite = bs
 			break
 		}
@@ -24,8 +24,8 @@ func TestBackupSiteClient_List(t *testing.T) {
 	require.NotNil(t, backupSite)
 
 	expected := &BackupSite{
-		ID:   "7e76f68f-3392-401b-9c3a-d504af96643d",
-		Name: "DC-EQX6",
+		ID:   "98e75cf9-6b3c-4422-8d4e-826a032c2bf1",
+		Name: "DC-TH3S",
 	}
 	require.Equal(t, expected, backupSite)
 }

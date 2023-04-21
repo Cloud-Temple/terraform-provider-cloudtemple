@@ -17,13 +17,18 @@ type VirtualDatacenter struct {
 	TenantID         string `terraform:"tenant_id"`
 }
 
+type VirtualDatacenterFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerId string `filter:"machineManagerId"`
+}
+
 func (v *VirtualDatacenterClient) List(
 	ctx context.Context,
-	machineManagerId string,
-	name string) ([]*VirtualDatacenter, error) {
+	filter *VirtualDatacenterFilter) ([]*VirtualDatacenter, error) {
 
 	// TODO: filters
 	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_datacenters")
+	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

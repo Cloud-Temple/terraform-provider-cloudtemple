@@ -76,8 +76,15 @@ func computeBackupSLAPolicyAssignmentUpdate(ctx context.Context, d *schema.Resou
 		return diag.Errorf("failed to find catalog job: %s", err)
 	}
 
+	var job = &client.BackupJob{}
+	for _, currJob := range jobs {
+		if currJob.Name == "Hypervisor Inventory" {
+			job = currJob
+		}
+	}
+
 	activityId, err := c.Backup().Job().Run(ctx, &client.BackupJobRunRequest{
-		JobId: jobs[0].ID,
+		JobId: job.ID,
 	})
 	if err != nil {
 		return diag.Errorf("failed to update catalog: %s", err)
@@ -88,7 +95,7 @@ func computeBackupSLAPolicyAssignmentUpdate(ctx context.Context, d *schema.Resou
 		return diag.Errorf("failed to update catalog, %s", err)
 	}
 
-	_, err = c.Backup().Job().WaitForCompletion(ctx, jobs[0].ID, getWaiterOptions(ctx))
+	_, err = c.Backup().Job().WaitForCompletion(ctx, job.ID, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to update catalog, %s", err)
 	}

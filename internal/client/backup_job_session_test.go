@@ -16,7 +16,7 @@ func TestBackupJobSessionClient_List(t *testing.T) {
 
 	var jobSession *BackupJobSession
 	for _, jb := range jobSessions {
-		if jb.ID == "1668240000212" {
+		if jb.ID == "1681977600058" {
 			jobSession = jb
 			break
 		}
@@ -24,26 +24,20 @@ func TestBackupJobSessionClient_List(t *testing.T) {
 	require.NotNil(t, jobSession)
 
 	expected := &BackupJobSession{
-		ID:            "1668240000212",
-		JobName:       "vmware_SLA_CATALOG_SPP",
+		ID:            "1681977600058",
+		JobName:       "catalog_SLA_CATALOG_SPP",
 		SlaPolicyType: "protection",
-		JobId:         "1166",
+		JobId:         "1003",
 		Type:          "protection",
-		Duration:      69102,
-		Start:         1668240001081,
-		End:           1668240070183,
-		Status:        "FAILED",
-		Statistics: BackupStatistics{
-			Total:   1,
-			Success: 0,
-			Failed:  1,
-			Skipped: 0,
-		},
+		Duration:      23036,
+		Start:         1681977600551,
+		End:           1681977623587,
+		Status:        "COMPLETED",
 		SLAPolicies: []*BackupSLAPolicyStub{
 			{
-				ID:   "2115",
+				ID:   "2103",
 				Name: "SLA_CATALOG_SPP",
-				HREF: "https://spp1-ctlabs-eqx6.backup.cloud-temple.lan/api/spec/storageprofile/2115",
+				HREF: "https://10.12.8.1/api/spec/storageprofile/2103",
 			},
 		},
 	}
