@@ -655,10 +655,26 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 			return diag.Errorf("failed to read virtual effect: %s", err)
 		}
 
+		var recommendation []*client.VirtualMachinePowerRecommendation
+		if powerState == "on" {
+			recommendation, err = c.Compute().VirtualMachine().Recommendation(ctx, &client.VirtualMachineRecommendationFilter{
+				Id:            d.Id(),
+				DatacenterId:  vm.DatacenterId,
+				HostClusterId: vm.HostClusterId,
+			})
+			if err != nil {
+				return diag.Errorf("failed to find power recommendations: %s", err)
+			}
+		}
+
 		activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 			ID:           d.Id(),
 			DatacenterId: vm.DatacenterId,
 			PowerAction:  powerState,
+			Recommendation: &client.VirtualMachinePowerRecommendation{
+				Key:           recommendation[0].Key,
+				HostClusterId: recommendation[0].HostClusterId,
+			},
 		})
 		if err != nil {
 			return diag.Errorf("failed to power %s virtual machine: %s", powerState, err)
