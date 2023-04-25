@@ -152,7 +152,7 @@ Virtual machines can be created using three different methods:
 					Type: schema.TypeString,
 				},
 			},
-			"sla_policies": {
+			"backup_sla_policies": {
 				Type:     schema.TypeSet,
 				Required: true,
 
@@ -466,7 +466,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			return diag.Errorf("failed to create virtual machine: %s", err)
 		}
 
-		if len(d.Get("sla_policies").(*schema.Set).List()) > 0 {
+		if len(d.Get("backup_sla_policies").(*schema.Set).List()) > 0 {
 			// First we need to update the catalog
 			jobs, err := c.Backup().Job().List(ctx, &client.BackupJobFilter{
 				Type: "catalog",
@@ -500,7 +500,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			}
 
 			slaPolicies := []string{}
-			for _, policy := range d.Get("sla_policies").(*schema.Set).List() {
+			for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
 				slaPolicies = append(slaPolicies, policy.(string))
 			}
 			activityId, err = c.Backup().SLAPolicy().AssignVirtualMachine(ctx, &client.BackupAssignVirtualMachineRequest{
@@ -628,9 +628,9 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 	}
 
-	if d.HasChange("sla_policies") {
+	if d.HasChange("backup_sla_policies") {
 		slaPolicies := []string{}
-		for _, policy := range d.Get("sla_policies").(*schema.Set).List() {
+		for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
 			slaPolicies = append(slaPolicies, policy.(string))
 		}
 		activityId, err = c.Backup().SLAPolicy().AssignVirtualMachine(ctx, &client.BackupAssignVirtualMachineRequest{

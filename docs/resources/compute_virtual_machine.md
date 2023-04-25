@@ -122,10 +122,10 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 
 ### Required
 
+- `backup_sla_policies` (Set of String)
 - `datacenter_id` (String) The datacenter to start the virtual machine in.
 - `host_cluster_id` (String) The host cluster to start the virtual machine on.
 - `name` (String)
-- `sla_policies` (Set of String)
 
 ### Optional
 
