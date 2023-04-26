@@ -107,10 +107,6 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
   datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.koukou.id
   datastore_id         = data.cloudtemple_compute_datastore.ds.id
 
-  deploy_options = {
-    trak_sshpublickey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKpZ5juF5a/CXV9nQ0PANptTG9Gh3J0aj6yVjkF0fSkC remi@cloud-temple.com"
-  }
-
   tags = {
     created_by = "Terraform"
   }
