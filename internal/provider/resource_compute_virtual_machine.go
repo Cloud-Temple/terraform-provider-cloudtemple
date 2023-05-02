@@ -522,9 +522,9 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 }
 
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	reader := readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+	reader := readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 		id := d.Id()
-		vm, err := client.Compute().VirtualMachine().Read(ctx, id)
+		vm, err := c.Compute().VirtualMachine().Read(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -542,7 +542,22 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 			return nil, fmt.Errorf("unknown power state %q", vm.PowerState)
 		}
 
-		readTags(ctx, sw, client, d.Id())
+		// Normalize the backup_sla_policies
+		slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
+			VirtualMachineId: d.Id(),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		slaPoliciesIds := []string{}
+		for _, slaPolicy := range slaPolicies {
+			slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
+		}
+
+		sw.set("backup_sla_policies", slaPoliciesIds)
+
+		readTags(ctx, sw, c, d.Id())
 
 		return vm, nil
 	})
@@ -655,9 +670,9 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 			return diag.Errorf("failed to read virtual effect: %s", err)
 		}
 
-		var recommendation []*client.VirtualMachinePowerRecommendation
+		var recommendations []*client.VirtualMachinePowerRecommendation
 		if powerState == "on" {
-			recommendation, err = c.Compute().VirtualMachine().Recommendation(ctx, &client.VirtualMachineRecommendationFilter{
+			recommendations, err = c.Compute().VirtualMachine().Recommendation(ctx, &client.VirtualMachineRecommendationFilter{
 				Id:            d.Id(),
 				DatacenterId:  vm.DatacenterId,
 				HostClusterId: vm.HostClusterId,
@@ -667,14 +682,21 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 			}
 		}
 
+		var recommendation *client.VirtualMachinePowerRecommendation
+		if len(recommendations) > 0 {
+			recommendation = &client.VirtualMachinePowerRecommendation{
+				Key:           recommendations[0].Key,
+				HostClusterId: recommendations[0].HostClusterId,
+			}
+		} else {
+			recommendation = nil
+		}
+
 		activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
-			ID:           d.Id(),
-			DatacenterId: vm.DatacenterId,
-			PowerAction:  powerState,
-			Recommendation: &client.VirtualMachinePowerRecommendation{
-				Key:           recommendation[0].Key,
-				HostClusterId: recommendation[0].HostClusterId,
-			},
+			ID:             d.Id(),
+			DatacenterId:   vm.DatacenterId,
+			PowerAction:    powerState,
+			Recommendation: recommendation,
 		})
 		if err != nil {
 			return diag.Errorf("failed to power %s virtual machine: %s", powerState, err)

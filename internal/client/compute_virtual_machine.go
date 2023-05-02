@@ -102,7 +102,7 @@ type PowerRequest struct {
 	DatacenterId   string                             `json:"datacenterId,omitempty"`
 	PowerAction    string                             `json:"powerAction,omitempty"`
 	ForceEnterBIOS bool                               `json:"forceEnterBIOS,omitempty"`
-	Recommendation *VirtualMachinePowerRecommendation `json:"recommendation"`
+	Recommendation *VirtualMachinePowerRecommendation `json:"recommendation,omitempty"`
 }
 
 func (v *VirtualMachineClient) List(
