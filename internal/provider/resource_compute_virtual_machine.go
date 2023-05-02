@@ -153,9 +153,9 @@ Virtual machines can be created using three different methods:
 				},
 			},
 			"backup_sla_policies": {
-				Type:     schema.TypeSet,
-				Required: true,
-
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Description: "The IDs of the SLA policies to assign to the virtual machine.",
 				Elem: &schema.Schema{
 					Type:         schema.TypeString,
 					ValidateFunc: validation.IsUUID,
