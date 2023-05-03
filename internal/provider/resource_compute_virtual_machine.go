@@ -465,56 +465,56 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		if err != nil {
 			return diag.Errorf("failed to create virtual machine: %s", err)
 		}
+	}
 
-		if len(d.Get("backup_sla_policies").(*schema.Set).List()) > 0 {
-			// First we need to update the catalog
-			jobs, err := c.Backup().Job().List(ctx, &client.BackupJobFilter{
-				Type: "catalog",
-			})
-			if err != nil {
-				return diag.Errorf("failed to find catalog job: %s", err)
-			}
+	if len(d.Get("backup_sla_policies").(*schema.Set).List()) > 0 {
+		// First we need to update the catalog
+		jobs, err := c.Backup().Job().List(ctx, &client.BackupJobFilter{
+			Type: "catalog",
+		})
+		if err != nil {
+			return diag.Errorf("failed to find catalog job: %s", err)
+		}
 
-			var job = &client.BackupJob{}
-			for _, currJob := range jobs {
-				if currJob.Name == "Hypervisor Inventory" {
-					job = currJob
-				}
+		var job = &client.BackupJob{}
+		for _, currJob := range jobs {
+			if currJob.Name == "Hypervisor Inventory" {
+				job = currJob
 			}
+		}
 
-			activityId, err := c.Backup().Job().Run(ctx, &client.BackupJobRunRequest{
-				JobId: job.ID,
-			})
-			if err != nil {
-				return diag.Errorf("failed to update catalog: %s", err)
-			}
+		activityId, err := c.Backup().Job().Run(ctx, &client.BackupJobRunRequest{
+			JobId: job.ID,
+		})
+		if err != nil {
+			return diag.Errorf("failed to update catalog: %s", err)
+		}
 
-			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to update catalog, %s", err)
-			}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update catalog, %s", err)
+		}
 
-			_, err = c.Backup().Job().WaitForCompletion(ctx, job.ID, getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to update catalog, %s", err)
-			}
+		_, err = c.Backup().Job().WaitForCompletion(ctx, job.ID, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update catalog, %s", err)
+		}
 
-			slaPolicies := []string{}
-			for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
-				slaPolicies = append(slaPolicies, policy.(string))
-			}
-			activityId, err = c.Backup().SLAPolicy().AssignVirtualMachine(ctx, &client.BackupAssignVirtualMachineRequest{
-				VirtualMachineIds: []string{d.Id()},
-				SLAPolicies:       slaPolicies,
-			})
-			if err != nil {
-				return diag.Errorf("failed to assign policies to virtual machine, %s", err)
-			}
+		slaPolicies := []string{}
+		for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
+			slaPolicies = append(slaPolicies, policy.(string))
+		}
+		activityId, err = c.Backup().SLAPolicy().AssignVirtualMachine(ctx, &client.BackupAssignVirtualMachineRequest{
+			VirtualMachineIds: []string{d.Id()},
+			SLAPolicies:       slaPolicies,
+		})
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual machine, %s", err)
+		}
 
-			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to assign policies to virtual machine, %s", err)
-			}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual machine, %s", err)
 		}
 	}
 
