@@ -116,6 +116,10 @@ func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, me
 		MacAddress:   macAddress,
 		MacType:      macType,
 	})
+	if err != nil {
+		return diag.Errorf("failed to update network adapter, %s", err)
+	}
+
 	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to update network adapter, %s", err)

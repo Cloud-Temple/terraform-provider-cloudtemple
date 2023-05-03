@@ -118,13 +118,13 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 
 ### Required
 
-- `backup_sla_policies` (Set of String)
 - `datacenter_id` (String) The datacenter to start the virtual machine in.
 - `host_cluster_id` (String) The host cluster to start the virtual machine on.
 - `name` (String)
 
 ### Optional
 
+- `backup_sla_policies` (Set of String) The IDs of the SLA policies to assign to the virtual machine.
 - `clone_virtual_machine_id` (String) The ID of the virtual machine to clone. Conflict with `content_library_item_id`.
 - `content_library_id` (String) The ID of the content library to clone from. Conflict with `clone_virtual_machine_id`.
 - `content_library_item_id` (String) The ID of the content library item to clone. Conflict with `clone_virtual_machine_id`.
