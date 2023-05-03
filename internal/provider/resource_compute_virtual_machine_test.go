@@ -235,10 +235,6 @@ resource "cloudtemple_compute_virtual_machine" "content-library-deployed" {
 
   guest_operating_system_moref = "centos8_64Guest"
 
-  deploy_options = {
-	trak_sshpublickey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKpZ5juF5a/CXV9nQ0PANptTG9Gh3J0aj6yVjkF0fSkC remi@lenstra.fr"
-  }
-
   tags = {
 	"environment" = "cloned-from-content-library"
   }

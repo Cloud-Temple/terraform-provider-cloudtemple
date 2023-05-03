@@ -77,6 +77,7 @@ Virtual machines can be created using three different methods:
 				Type:         schema.TypeString,
 				Description:  "The operating system to launch the virtual machine with.",
 				Optional:     true,
+				Computed:     true,
 				AtLeastOneOf: []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
 			},
 			"datacenter_id": {
@@ -150,6 +151,15 @@ Virtual machines can be created using three different methods:
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
+				},
+			},
+			"backup_sla_policies": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Description: "The IDs of the SLA policies to assign to the virtual machine.",
+				Elem: &schema.Schema{
+					Type:         schema.TypeString,
+					ValidateFunc: validation.IsUUID,
 				},
 			},
 
@@ -458,13 +468,64 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 	}
 
+	if len(d.Get("backup_sla_policies").(*schema.Set).List()) > 0 {
+		// First we need to update the catalog
+		jobs, err := c.Backup().Job().List(ctx, &client.BackupJobFilter{
+			Type: "catalog",
+		})
+		if err != nil {
+			return diag.Errorf("failed to find catalog job: %s", err)
+		}
+
+		var job = &client.BackupJob{}
+		for _, currJob := range jobs {
+			if currJob.Name == "Hypervisor Inventory" {
+				job = currJob
+			}
+		}
+
+		activityId, err := c.Backup().Job().Run(ctx, &client.BackupJobRunRequest{
+			JobId: job.ID,
+		})
+		if err != nil {
+			return diag.Errorf("failed to update catalog: %s", err)
+		}
+
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update catalog, %s", err)
+		}
+
+		_, err = c.Backup().Job().WaitForCompletion(ctx, job.ID, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update catalog, %s", err)
+		}
+
+		slaPolicies := []string{}
+		for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
+			slaPolicies = append(slaPolicies, policy.(string))
+		}
+		activityId, err = c.Backup().SLAPolicy().AssignVirtualMachine(ctx, &client.BackupAssignVirtualMachineRequest{
+			VirtualMachineIds: []string{d.Id()},
+			SLAPolicies:       slaPolicies,
+		})
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual machine, %s", err)
+		}
+
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual machine, %s", err)
+		}
+	}
+
 	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on" && fromScratch)
 }
 
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	reader := readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+	reader := readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 		id := d.Id()
-		vm, err := client.Compute().VirtualMachine().Read(ctx, id)
+		vm, err := c.Compute().VirtualMachine().Read(ctx, id)
 		if err != nil {
 			return nil, err
 		}
@@ -482,7 +543,22 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 			return nil, fmt.Errorf("unknown power state %q", vm.PowerState)
 		}
 
-		readTags(ctx, sw, client, d.Id())
+		// Normalize the backup_sla_policies
+		slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
+			VirtualMachineId: d.Id(),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		slaPoliciesIds := []string{}
+		for _, slaPolicy := range slaPolicies {
+			slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
+		}
+
+		sw.set("backup_sla_policies", slaPoliciesIds)
+
+		readTags(ctx, sw, c, d.Id())
 
 		return vm, nil
 	})
@@ -568,6 +644,25 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 	}
 
+	if d.HasChange("backup_sla_policies") {
+		slaPolicies := []string{}
+		for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
+			slaPolicies = append(slaPolicies, policy.(string))
+		}
+		activityId, err = c.Backup().SLAPolicy().AssignVirtualMachine(ctx, &client.BackupAssignVirtualMachineRequest{
+			VirtualMachineIds: []string{d.Id()},
+			SLAPolicies:       slaPolicies,
+		})
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual machine, %s", err)
+		}
+
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual machine, %s", err)
+		}
+	}
+
 	if updatePower {
 		powerState := d.Get("power_state").(string)
 
@@ -576,10 +671,33 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 			return diag.Errorf("failed to read virtual effect: %s", err)
 		}
 
+		var recommendations []*client.VirtualMachinePowerRecommendation
+		if powerState == "on" {
+			recommendations, err = c.Compute().VirtualMachine().Recommendation(ctx, &client.VirtualMachineRecommendationFilter{
+				Id:            d.Id(),
+				DatacenterId:  vm.DatacenterId,
+				HostClusterId: vm.HostClusterId,
+			})
+			if err != nil {
+				return diag.Errorf("failed to find power recommendations: %s", err)
+			}
+		}
+
+		var recommendation *client.VirtualMachinePowerRecommendation
+		if len(recommendations) > 0 {
+			recommendation = &client.VirtualMachinePowerRecommendation{
+				Key:           recommendations[0].Key,
+				HostClusterId: recommendations[0].HostClusterId,
+			}
+		} else {
+			recommendation = nil
+		}
+
 		activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
-			ID:           d.Id(),
-			DatacenterId: vm.DatacenterId,
-			PowerAction:  powerState,
+			ID:             d.Id(),
+			DatacenterId:   vm.DatacenterId,
+			PowerAction:    powerState,
+			Recommendation: recommendation,
 		})
 		if err != nil {
 			return diag.Errorf("failed to power %s virtual machine: %s", powerState, err)

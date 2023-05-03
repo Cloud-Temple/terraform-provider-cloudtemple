@@ -107,10 +107,6 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
   datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.koukou.id
   datastore_id         = data.cloudtemple_compute_datastore.ds.id
 
-  deploy_options = {
-    trak_sshpublickey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKpZ5juF5a/CXV9nQ0PANptTG9Gh3J0aj6yVjkF0fSkC remi@cloud-temple.com"
-  }
-
   tags = {
     created_by = "Terraform"
   }
@@ -128,6 +124,7 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 
 ### Optional
 
+- `backup_sla_policies` (Set of String) The IDs of the SLA policies to assign to the virtual machine.
 - `clone_virtual_machine_id` (String) The ID of the virtual machine to clone. Conflict with `content_library_item_id`.
 - `content_library_id` (String) The ID of the content library to clone from. Conflict with `clone_virtual_machine_id`.
 - `content_library_item_id` (String) The ID of the content library item to clone. Conflict with `clone_virtual_machine_id`.

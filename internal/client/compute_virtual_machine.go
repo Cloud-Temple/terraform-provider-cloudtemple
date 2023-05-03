@@ -37,6 +37,7 @@ type VirtualMachine struct {
 	Tools                          string                          `terraform:"tools"`
 	ToolsVersion                   int                             `terraform:"tools_version"`
 	DatacenterId                   string                          `terraform:"datacenter_id"`
+	HostClusterId                  string                          `terraform:"host_cluster_id"`
 	DistributedVirtualPortGroupIds []string                        `terraform:"distributed_virtual_port_group_ids"`
 	SppMode                        string                          `terraform:"spp_mode"`
 	Snapshoted                     bool                            `terraform:"snapshoted"`
@@ -97,10 +98,11 @@ type BootOptions struct {
 }
 
 type PowerRequest struct {
-	ID             string `json:"id,omitempty"`
-	DatacenterId   string `json:"datacenterId,omitempty"`
-	PowerAction    string `json:"powerAction,omitempty"`
-	ForceEnterBIOS bool   `json:"forceEnterBIOS,omitempty"`
+	ID             string                             `json:"id,omitempty"`
+	DatacenterId   string                             `json:"datacenterId,omitempty"`
+	PowerAction    string                             `json:"powerAction,omitempty"`
+	ForceEnterBIOS bool                               `json:"forceEnterBIOS,omitempty"`
+	Recommendation *VirtualMachinePowerRecommendation `json:"recommendation,omitempty"`
 }
 
 func (v *VirtualMachineClient) List(
@@ -259,4 +261,39 @@ func (v *VirtualMachineClient) Guest(ctx context.Context, id string, req *Update
 	r := v.c.newRequest("PATCH", "/api/compute/v1/vcenters/virtual_machines/%s/guest", id)
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+type VirtualMachineRecommendationFilter struct {
+	Id            string `filter:"virtualMachineId"`
+	DatacenterId  string `filter:"datacenterId"`
+	HostClusterId string `filter:"hostClusterId"`
+}
+
+type VirtualMachinePowerRecommendation struct {
+	Key             int    `json:"key"`
+	HostClusterId   string `json:"hostClusterId"`
+	HostId          string `json:"hostId"`
+	HostClusterName string `json:"hostClusterName"`
+	HostName        string `json:"hostName"`
+}
+
+func (v *VirtualMachineClient) Recommendation(ctx context.Context, filter *VirtualMachineRecommendationFilter) ([]*VirtualMachinePowerRecommendation, error) {
+	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_machines/power/recommendations")
+	r.addFilter(filter)
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	found, err := requireNotFoundOrOK(resp, 403)
+	if err != nil || !found {
+		return nil, err
+	}
+
+	var out []*VirtualMachinePowerRecommendation
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
