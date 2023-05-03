@@ -77,6 +77,7 @@ Virtual machines can be created using three different methods:
 				Type:         schema.TypeString,
 				Description:  "The operating system to launch the virtual machine with.",
 				Optional:     true,
+				Computed:     true,
 				AtLeastOneOf: []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
 			},
 			"datacenter_id": {
