@@ -15,39 +15,39 @@ func TestAccDataSourceWorker(t *testing.T) {
 			{
 				Config: testAccDataSourceWorker,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_worker.foo", "id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_worker.foo", "name", "vc-vstack-080-bob"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "name", "vc-vstack-080-bob"),
 				),
 			},
 			{
 				Config: testAccDataSourceWorkerName,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_worker.foo", "id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_worker.foo", "name", "vc-vstack-080-bob"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "name", "vc-vstack-080-bob"),
 				),
 			},
 			{
 				Config:      testAccDataSourceWorkerMissing,
-				ExpectError: regexp.MustCompile("failed to find worker with id"),
+				ExpectError: regexp.MustCompile("failed to find machine_manager with id"),
 			},
 		},
 	})
 }
 
 const testAccDataSourceWorker = `
-data "cloudtemple_compute_worker" "foo" {
+data "cloudtemple_compute_machine_manager" "foo" {
   id = "9dba240e-a605-4103-bac7-5336d3ffd124"
 }
 `
 
 const testAccDataSourceWorkerName = `
-data "cloudtemple_compute_worker" "foo" {
+data "cloudtemple_compute_machine_manager" "foo" {
   name = "vc-vstack-080-bob"
 }
 `
 
 const testAccDataSourceWorkerMissing = `
-data "cloudtemple_compute_worker" "foo" {
+data "cloudtemple_compute_machine_manager" "foo" {
   id = "12345678-1234-5678-1234-567812345678"
 }
 `

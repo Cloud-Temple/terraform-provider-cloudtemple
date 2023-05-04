@@ -1,1 +1,1 @@
-data "cloudtemple_compute_workers" "foo" {}
+data "cloudtemple_compute_machine_managers" "foo" {}
