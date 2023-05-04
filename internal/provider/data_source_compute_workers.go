@@ -14,14 +14,14 @@ func dataSourceWorkers() *schema.Resource {
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 			workers, err := client.Compute().Worker().List(ctx, "")
 			return map[string]interface{}{
-				"id":      "workers",
-				"workers": workers,
+				"id":               "machine_managers",
+				"machine_managers": workers,
 			}, err
 		}),
 
 		Schema: map[string]*schema.Schema{
 			// Out
-			"workers": {
+			"machine_managers": {
 				Type:     schema.TypeList,
 				Computed: true,
 

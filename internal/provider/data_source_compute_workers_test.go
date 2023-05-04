@@ -14,7 +14,7 @@ func TestAccDataSourceWorkers(t *testing.T) {
 			{
 				Config: testAccDataSourceWorkers,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_workers.foo", "workers.#", "1"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_managers.foo", "machine_managers.#", "1"),
 				),
 			},
 		},
@@ -22,5 +22,5 @@ func TestAccDataSourceWorkers(t *testing.T) {
 }
 
 const testAccDataSourceWorkers = `
-data "cloudtemple_compute_workers" "foo" {}
+data "cloudtemple_compute_managers" "foo" {}
 `
