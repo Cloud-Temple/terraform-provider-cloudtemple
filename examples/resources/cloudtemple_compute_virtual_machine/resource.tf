@@ -10,6 +10,14 @@ data "cloudtemple_compute_datastore_cluster" "koukou" {
   name = "sdrs001-LIVE_KOUKOU"
 }
 
+data "cloudtemple_backup_sla_policy" "sla001-daily-par7s" {
+  name = "sla001-daily-par7s"
+}
+
+data "cloudtemple_backup_sla_policy" "sla001-weekly-par7s" {
+  name = "sla001-weekly-par7s"
+}
+
 # Deploying a new virtual machine with a given operating system
 resource "cloudtemple_compute_virtual_machine" "scratch" {
   name = "from-scratch"
@@ -29,6 +37,11 @@ resource "cloudtemple_compute_virtual_machine" "scratch" {
   tags = {
     created_by = "Terraform"
   }
+
+  backup_sla_policies = [
+    data.cloudtemple_backup_sla_policy.sla001-daily-par7s.id,
+    data.cloudtemple_backup_sla_policy.sla001-weekly-par7s.id,
+  ]
 }
 
 # Clone an already existing virtual machine
