@@ -9,6 +9,6 @@ data "cloudtemple_compute_datastore" "id" {
 
 # Read a datastore using its name
 data "cloudtemple_compute_datastore" "name" {
-  name = "ds001-bob-svc1-data4-eqx6"
+  name               = "ds001-bob-svc1-data4-eqx6"
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack-001.id
 }

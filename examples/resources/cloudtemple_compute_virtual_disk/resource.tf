@@ -33,4 +33,9 @@ resource "cloudtemple_compute_virtual_disk" "foo" {
   disk_mode            = "persistent"
   capacity             = 8 * 1024 * 1024 * 1024
   datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.koukou.id
+
+  backup_sla_policies = [
+    data.cloudtemple_backup_sla_policy.sla001-daily-par7s.id,
+    data.cloudtemple_backup_sla_policy.sla001-weekly-par7s.id,
+  ]
 }

@@ -9,14 +9,14 @@ import (
 
 func TestCompute_VirtualDiskList(t *testing.T) {
 	ctx := context.Background()
-	virtualDisks, err := client.Compute().VirtualDisk().List(ctx, "de2b8b80-8b90-414a-bc33-e12f61a4c05c")
+	virtualDisks, err := client.Compute().VirtualDisk().List(ctx, "dba8aea7-7718-4ffb-8932-9acf4c8cc629")
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(virtualDisks), 1)
 
 	var found bool
 	for _, vd := range virtualDisks {
-		if vd.ID == "d370b8cd-83eb-4315-a5d9-42157e2e4bb4" {
+		if vd.ID == "c31307d3-bff1-4374-b431-655cbe68ac24" {
 			found = true
 			break
 		}
@@ -26,23 +26,23 @@ func TestCompute_VirtualDiskList(t *testing.T) {
 
 func TestCompute_VirtualDiskRead(t *testing.T) {
 	ctx := context.Background()
-	virtualDatacenter, err := client.Compute().VirtualDisk().Read(ctx, "d370b8cd-83eb-4315-a5d9-42157e2e4bb4")
+	virtualDatacenter, err := client.Compute().VirtualDisk().Read(ctx, "c31307d3-bff1-4374-b431-655cbe68ac24")
 	require.NoError(t, err)
 
 	expected := &VirtualDisk{
-		ID:                  "d370b8cd-83eb-4315-a5d9-42157e2e4bb4",
-		VirtualMachineId:    "de2b8b80-8b90-414a-bc33-e12f61a4c05c",
-		MachineManagerId:    "9dba240e-a605-4103-bac7-5336d3ffd124",
+		ID:                  "c31307d3-bff1-4374-b431-655cbe68ac24",
+		VirtualMachineId:    "dba8aea7-7718-4ffb-8932-9acf4c8cc629",
+		MachineManagerId:    "8afdb4e8-b68d-4bb8-a606-3dc47cc2da0e",
 		Name:                "Hard disk 1",
-		Capacity:            17179869184,
+		Capacity:            5368709120,
 		DiskUnitNumber:      0,
 		ControllerBusNumber: 0,
-		DatastoreId:         "d439d467-943a-49f5-a022-c0c25b737022",
-		DatastoreName:       "ds001-bob-svc1-data4-eqx6",
+		DatastoreId:         "88fb9089-cf33-47f0-938a-fe792f4a9039",
+		DatastoreName:       "ds001-t0001-r-stw1-data13-th3s",
 		InstantAccess:       false,
-		NativeId:            "6000C296-f0b9-c149-21f6-a1877fc8bae8",
-		DiskPath:            "[ds001-bob-svc1-data4-eqx6] virtual_machine_67_bob-clone/virtual_machine_67_bob-clone_2.vmdk",
-		ProvisioningType:    "staticDiffered",
+		NativeId:            "03ab2449-c80e-4597-a389-39d1af6e5f45",
+		DiskPath:            "[ds001-t0001-r-stw1-data13-th3s] tf-do-not-delete/tf-do-not-delete.vmdk",
+		ProvisioningType:    "dynamic",
 		DiskMode:            "persistent",
 		Editable:            true,
 	}
@@ -53,9 +53,9 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 	ctx := context.Background()
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
 		Name:                      "test-client-disk",
-		DatacenterId:              "ac33c033-693b-4fc5-9196-26df77291dbb",
-		HostClusterId:             "083b0ed7-8b0f-4cec-be47-78f48b457e6a",
-		DatastoreClusterId:        "1a996110-2746-4725-958f-f6fceef05b32",
+		DatacenterId:              "7b56f202-83e3-4112-9771-8fb001fbac3e",
+		HostClusterId:             "c80c4667-2f2d-4087-852b-995b0d5f1f2e",
+		DatastoreClusterId:        "0f3c6809-3f15-42c1-a502-69c80bf7ca8f",
 		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
 	})
 	require.NoError(t, err)
@@ -70,7 +70,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		DiskMode:           "persistent",
 		Capacity:           10737418240,
 		VirtualMachineId:   vm.ID,
-		DatastoreClusterId: "1a996110-2746-4725-958f-f6fceef05b32",
+		DatastoreClusterId: "0f3c6809-3f15-42c1-a502-69c80bf7ca8f",
 	})
 	require.NoError(t, err)
 	activity, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
@@ -91,7 +91,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		&VirtualDisk{
 			ID:               diskId,
 			VirtualMachineId: vm.ID,
-			MachineManagerId: "9dba240e-a605-4103-bac7-5336d3ffd124",
+			MachineManagerId: "8afdb4e8-b68d-4bb8-a606-3dc47cc2da0e",
 			Name:             "Hard disk 1",
 			Capacity:         10737418240,
 			NativeId:         diskId,
@@ -124,7 +124,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		&VirtualDisk{
 			ID:               diskId,
 			VirtualMachineId: vm.ID,
-			MachineManagerId: "9dba240e-a605-4103-bac7-5336d3ffd124",
+			MachineManagerId: "8afdb4e8-b68d-4bb8-a606-3dc47cc2da0e",
 			Name:             "Hard disk 1",
 			Capacity:         21474836480,
 			NativeId:         diskId,
@@ -155,9 +155,9 @@ func TestVirtualDiskClient_Unmount(t *testing.T) {
 	ctx := context.Background()
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
 		Name:                      "test-client-disk-unmount",
-		DatacenterId:              "ac33c033-693b-4fc5-9196-26df77291dbb",
-		HostClusterId:             "083b0ed7-8b0f-4cec-be47-78f48b457e6a",
-		DatastoreClusterId:        "1a996110-2746-4725-958f-f6fceef05b32",
+		DatacenterId:              "7b56f202-83e3-4112-9771-8fb001fbac3e",
+		HostClusterId:             "c80c4667-2f2d-4087-852b-995b0d5f1f2e",
+		DatastoreClusterId:        "0f3c6809-3f15-42c1-a502-69c80bf7ca8f",
 		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
 	})
 	require.NoError(t, err)
@@ -172,7 +172,7 @@ func TestVirtualDiskClient_Unmount(t *testing.T) {
 		DiskMode:           "persistent",
 		Capacity:           10737418240,
 		VirtualMachineId:   vm.ID,
-		DatastoreClusterId: "1a996110-2746-4725-958f-f6fceef05b32",
+		DatastoreClusterId: "0f3c6809-3f15-42c1-a502-69c80bf7ca8f",
 	})
 	require.NoError(t, err)
 	activity, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
