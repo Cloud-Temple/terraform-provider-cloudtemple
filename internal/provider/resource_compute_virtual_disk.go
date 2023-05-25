@@ -65,6 +65,15 @@ func resourceVirtualDisk() *schema.Resource {
 				ConflictsWith: []string{"datastore_id"},
 				ValidateFunc:  validation.IsUUID,
 			},
+			"backup_sla_policies": {
+				Type:        schema.TypeSet,
+				Optional:    true,
+				Description: "The IDs of the SLA policies to assign to the virtual machine.",
+				Elem: &schema.Schema{
+					Type:         schema.TypeString,
+					ValidateFunc: validation.IsUUID,
+				},
+			},
 
 			// Out
 			"name": {
@@ -128,12 +137,86 @@ func computeVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta 
 		return diag.Errorf("failed to create virtual disk, %s", err)
 	}
 
+	if len(d.Get("backup_sla_policies").(*schema.Set).List()) > 0 {
+		// First we need to update the catalog
+		jobs, err := c.Backup().Job().List(ctx, &client.BackupJobFilter{
+			Type: "catalog",
+		})
+		if err != nil {
+			return diag.Errorf("failed to find catalog job: %s", err)
+		}
+
+		var job = &client.BackupJob{}
+		for _, currJob := range jobs {
+			if currJob.Name == "Hypervisor Inventory" {
+				job = currJob
+			}
+		}
+
+		activityId, err := c.Backup().Job().Run(ctx, &client.BackupJobRunRequest{
+			JobId: job.ID,
+		})
+		if err != nil {
+			return diag.Errorf("failed to update catalog: %s", err)
+		}
+
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update catalog, %s", err)
+		}
+
+		_, err = c.Backup().Job().WaitForCompletion(ctx, job.ID, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update catalog, %s", err)
+		}
+
+		slaPolicies := []string{}
+		for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
+			slaPolicies = append(slaPolicies, policy.(string))
+		}
+		activityId, err = c.Backup().SLAPolicy().AssignVirtualDisk(ctx, &client.BackupAssignVirtualDiskRequest{
+			VirtualDiskId: d.Id(),
+			SLAPolicies:   slaPolicies,
+		})
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual disk, %s", err)
+		}
+
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual disk, %s", err)
+		}
+	}
+
 	return computeVirtualDiskRead(ctx, d, meta)
 }
 
 func computeVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	reader := readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-		return client.Compute().VirtualDisk().Read(ctx, d.Id())
+	reader := readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+		disk, err := c.Compute().VirtualDisk().Read(ctx, d.Id())
+		if err != nil {
+			return nil, err
+		}
+		if disk == nil {
+			return nil, nil
+		}
+
+		// Normalize the backup_sla_policies
+		slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
+			VirtualDiskId: d.Id(),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		slaPoliciesIds := []string{}
+		for _, slaPolicy := range slaPolicies {
+			slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
+		}
+
+		sw.set("backup_sla_policies", slaPoliciesIds)
+
+		return disk, nil
 	})
 
 	return reader(ctx, d, meta)
@@ -153,6 +236,25 @@ func computeVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta 
 	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to update virtual disk, %s", err)
+	}
+
+	if d.HasChange("backup_sla_policies") {
+		slaPolicies := []string{}
+		for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
+			slaPolicies = append(slaPolicies, policy.(string))
+		}
+		activityId, err = c.Backup().SLAPolicy().AssignVirtualDisk(ctx, &client.BackupAssignVirtualDiskRequest{
+			VirtualDiskId: d.Id(),
+			SLAPolicies:   slaPolicies,
+		})
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual disk, %s", err)
+		}
+
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to assign policies to virtual disk, %s", err)
+		}
 	}
 
 	return computeVirtualDiskRead(ctx, d, meta)

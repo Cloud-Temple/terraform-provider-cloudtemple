@@ -98,3 +98,14 @@ func (c *BackupSLAPolicyClient) AssignVirtualMachine(ctx context.Context, req *B
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
+
+type BackupAssignVirtualDiskRequest struct {
+	VirtualDiskId string   `json:"virtualDiskId"`
+	SLAPolicies   []string `json:"slaPolicies"`
+}
+
+func (c *BackupSLAPolicyClient) AssignVirtualDisk(ctx context.Context, req *BackupAssignVirtualDiskRequest) (string, error) {
+	r := c.c.newRequest("POST", "/api/backup/v1/policies/assign/virtual_disk")
+	r.obj = req
+	return c.c.doRequestAndReturnActivity(ctx, r)
+}
