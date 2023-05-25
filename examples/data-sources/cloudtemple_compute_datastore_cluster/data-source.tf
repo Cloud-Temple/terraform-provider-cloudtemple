@@ -9,6 +9,6 @@ data "cloudtemple_compute_datastore_cluster" "id" {
 
 # Read an datastore cluster using its name
 data "cloudtemple_compute_datastore_cluster" "name" {
-  name = "sdrs001-LIVE_KOUKOU"
+  name               = "sdrs001-LIVE_KOUKOU"
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack-001.id
 }

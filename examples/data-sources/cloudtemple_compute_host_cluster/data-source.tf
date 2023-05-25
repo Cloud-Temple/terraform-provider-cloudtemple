@@ -7,6 +7,6 @@ data "cloudtemple_compute_host_cluster" "id" {
 }
 
 data "cloudtemple_compute_host_cluster" "name" {
-  name = "clu002-ucs01_FLO"
+  name               = "clu002-ucs01_FLO"
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack-001.id
 }

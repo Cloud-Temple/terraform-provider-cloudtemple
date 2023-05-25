@@ -7,6 +7,6 @@ data "cloudtemple_compute_virtual_datacenter" "id" {
 }
 
 data "cloudtemple_compute_virtual_datacenter" "name" {
-  name = "DC-EQX6"
+  name               = "DC-EQX6"
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack-001.id
 }

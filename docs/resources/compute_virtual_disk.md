@@ -58,6 +58,11 @@ resource "cloudtemple_compute_virtual_disk" "foo" {
   disk_mode            = "persistent"
   capacity             = 8 * 1024 * 1024 * 1024
   datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.koukou.id
+
+  backup_sla_policies = [
+    data.cloudtemple_backup_sla_policy.sla001-daily-par7s.id,
+    data.cloudtemple_backup_sla_policy.sla001-weekly-par7s.id,
+  ]
 }
 ```
 
@@ -73,6 +78,7 @@ resource "cloudtemple_compute_virtual_disk" "foo" {
 
 ### Optional
 
+- `backup_sla_policies` (Set of String) The IDs of the SLA policies to assign to the virtual machine.
 - `controller_id` (String)
 - `datastore_cluster_id` (String) The ID of the datastore cluster. Conflict with `datastore_id`.
 - `datastore_id` (String) The ID of the datastore. Conflict with `datastore_cluster_id`.
