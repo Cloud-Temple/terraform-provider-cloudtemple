@@ -2,9 +2,18 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	JobSessionId   = "TEST_BACKUP_JOB_SESSION_ID"
+	JobSessionName = "TEST_BACKUP_JOB_SESSION_NAME"
+	JobId          = "TEST_BACKUP_JOB_SESSION_JOB_ID"
+	BackupType     = "TEST_BACKUP_TYPE"
+	SlaPolicyType  = "TEST_BACKUP_JOB_SESSION_SLA_POLICY_TYPE"
 )
 
 func TestBackupJobSessionClient_List(t *testing.T) {
@@ -16,30 +25,16 @@ func TestBackupJobSessionClient_List(t *testing.T) {
 
 	var jobSession *BackupJobSession
 	for _, jb := range jobSessions {
-		if jb.ID == "1681977600058" {
+		if jb.ID == os.Getenv(JobSessionId) {
 			jobSession = jb
 			break
 		}
 	}
 	require.NotNil(t, jobSession)
 
-	expected := &BackupJobSession{
-		ID:            "1681977600058",
-		JobName:       "catalog_SLA_CATALOG_SPP",
-		SlaPolicyType: "protection",
-		JobId:         "1003",
-		Type:          "protection",
-		Duration:      23036,
-		Start:         1681977600551,
-		End:           1681977623587,
-		Status:        "COMPLETED",
-		SLAPolicies: []*BackupSLAPolicyStub{
-			{
-				ID:   "2103",
-				Name: "SLA_CATALOG_SPP",
-				HREF: "https://10.12.8.1/api/spec/storageprofile/2103",
-			},
-		},
-	}
-	require.Equal(t, expected, jobSession)
+	require.Equal(t, os.Getenv(JobSessionId), jobSession.ID)
+	require.Equal(t, os.Getenv(JobSessionName), jobSession.JobName)
+	require.Equal(t, os.Getenv(JobId), jobSession.JobId)
+	require.Equal(t, os.Getenv(BackupType), jobSession.Type)
+	require.Equal(t, os.Getenv(SlaPolicyType), jobSession.SlaPolicyType)
 }

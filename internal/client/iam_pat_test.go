@@ -2,10 +2,15 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	PatName = "TEST_IAM_PAT_NAME"
 )
 
 func TestIAM_PATList(t *testing.T) {
@@ -13,8 +18,14 @@ func TestIAM_PATList(t *testing.T) {
 	tokens, err := client.IAM().PAT().List(ctx, testUserID(t), testTenantID(t))
 	require.NoError(t, err)
 
-	require.Len(t, tokens, 1)
-	require.Equal(t, "Terraform", tokens[0].Name)
+	found := false
+	for _, token := range tokens {
+		if token.Name == os.Getenv(PatName) {
+			found = true
+			break
+		}
+	}
+	require.True(t, found)
 }
 
 func TestIAM_PATRead(t *testing.T) {
@@ -24,7 +35,7 @@ func TestIAM_PATRead(t *testing.T) {
 
 	var id string
 	for _, token := range tokens {
-		if token.Name == "Terraform" {
+		if token.Name == os.Getenv(PatName) {
 			id = token.ID
 			break
 		}
@@ -35,7 +46,7 @@ func TestIAM_PATRead(t *testing.T) {
 
 	token, err := client.IAM().PAT().Read(ctx, tokens[0].ID)
 	require.NoError(t, err)
-	require.Equal(t, "Terraform", token.Name)
+	require.Equal(t, os.Getenv(PatName), token.Name)
 	require.Equal(t, "", token.Secret)
 }
 

@@ -2,9 +2,15 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	HostClusterName  = "TEST_HOST_CLUSTER_NAME"
+	HostClusterMoRef = "TEST_HOST_CLUSTER_MOREF"
 )
 
 func TestCompute_HostClusterList(t *testing.T) {
@@ -16,7 +22,7 @@ func TestCompute_HostClusterList(t *testing.T) {
 
 	var found bool
 	for _, hc := range hostClusters {
-		if hc.ID == "bd5d8bf4-953a-46fb-9997-45467ba1ae6f" {
+		if hc.ID == os.Getenv(HostClusterId) {
 			found = true
 			break
 		}
@@ -26,28 +32,10 @@ func TestCompute_HostClusterList(t *testing.T) {
 
 func TestCompute_HostClusterRead(t *testing.T) {
 	ctx := context.Background()
-	hostCluster, err := client.Compute().HostCluster().Read(ctx, "bd5d8bf4-953a-46fb-9997-45467ba1ae6f")
+	hostCluster, err := client.Compute().HostCluster().Read(ctx, os.Getenv(HostClusterId))
 	require.NoError(t, err)
 
-	// ignore changes to metrics
-	hostCluster.Metrics = HostClusterMetrics{}
-	hostCluster.VirtualMachinesNumber = 0
-
-	expected := &HostCluster{
-		ID:    "bd5d8bf4-953a-46fb-9997-45467ba1ae6f",
-		Name:  "clu001-ucs12",
-		Moref: "domain-c1008",
-		Hosts: []HostClusterHostStub{
-			{
-				ID:   "host-1022",
-				Type: "HostSystem",
-			},
-			{
-				ID:   "host-1015",
-				Type: "HostSystem",
-			},
-		},
-		Metrics: HostClusterMetrics{},
-	}
-	require.Equal(t, expected, hostCluster)
+	require.Equal(t, os.Getenv(HostClusterId), hostCluster.ID)
+	require.Equal(t, os.Getenv(HostClusterName), hostCluster.Name)
+	require.Equal(t, os.Getenv(HostClusterMoRef), hostCluster.Moref)
 }

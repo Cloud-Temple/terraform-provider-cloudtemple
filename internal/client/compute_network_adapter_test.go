@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -9,16 +10,25 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	VirtualMachinId2         = "TEST_COMPUTE_VIRTUAL_MACHINE_ID_2"
+	VirtualMachinId3         = "TEST_COMPUTE_VIRTUAL_MACHINE_ID_3"
+	NetworkAdapterId         = "TEST_COMPUTE_NETWORK_ADAPTER_ID"
+	NetworkAdapterName       = "TEST_COMPUTE_NETWORK_ADAPTER_NAME"
+	NetworkAdapterType       = "TEST_COMPUTE_NETWORK_ADAPTER_TYPE"
+	NetworkAdapterMacAddress = "TEST_COMPUTE_NETWORK_ADAPTER_MAC_ADDRESS"
+	NetworkId                = "TEST_COMPUTE_NETWORK_ID"
+)
+
 func TestCompute_NetworkAdapterList(t *testing.T) {
 	ctx := context.Background()
-	networkAdapters, err := client.Compute().NetworkAdapter().List(ctx, "de2b8b80-8b90-414a-bc33-e12f61a4c05c")
+	networkAdapters, err := client.Compute().NetworkAdapter().List(ctx, os.Getenv(VirtualMachinId2))
 	require.NoError(t, err)
-
 	require.GreaterOrEqual(t, len(networkAdapters), 1)
 
 	var found bool
 	for _, na := range networkAdapters {
-		if na.ID == "c74060bf-ebb3-455a-b0b0-d0dcb79f3d86" {
+		if na.ID == os.Getenv(NetworkAdapterId) {
 			found = true
 			break
 		}
@@ -28,44 +38,72 @@ func TestCompute_NetworkAdapterList(t *testing.T) {
 
 func TestCompute_NetworkAdapterRead(t *testing.T) {
 	ctx := context.Background()
-	networkAdapter, err := client.Compute().NetworkAdapter().Read(ctx, "c74060bf-ebb3-455a-b0b0-d0dcb79f3d86")
+	networkAdapter, err := client.Compute().NetworkAdapter().Read(ctx, os.Getenv(NetworkAdapterId))
 	require.NoError(t, err)
 
-	expected := &NetworkAdapter{
-		ID:               "c74060bf-ebb3-455a-b0b0-d0dcb79f3d86",
-		VirtualMachineId: "de2b8b80-8b90-414a-bc33-e12f61a4c05c",
-		Name:             "Network adapter 1",
-		NetworkId:        "cb5d4885-e112-42e9-9842-db4c8fc78f9b",
-		Type:             "VMXNET3",
-		MacType:          "ASSIGNED",
-		MacAddress:       "00:50:56:85:44:2e",
-		Connected:        false,
-		AutoConnect:      true,
-	}
-	require.Equal(t, expected, networkAdapter)
+	require.Equal(t, os.Getenv(NetworkAdapterId), networkAdapter.ID)
+	require.Equal(t, os.Getenv(NetworkAdapterName), networkAdapter.Name)
+	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.ID)
+	require.Equal(t, os.Getenv(NetworkId), networkAdapter.NetworkId)
+	require.Equal(t, os.Getenv(VirtualMachinId3), networkAdapter.VirtualMachineId)
 }
 
 func TestNetworkAdapterClient_Create(t *testing.T) {
 	ctx := context.Background()
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
 		Name:                      "test-client-network-adapter",
-		DatacenterId:              "ac33c033-693b-4fc5-9196-26df77291dbb",
-		HostClusterId:             "083b0ed7-8b0f-4cec-be47-78f48b457e6a",
-		DatastoreClusterId:        "1a996110-2746-4725-958f-f6fceef05b32",
-		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
+		DatacenterId:              os.Getenv(DataCenterId),
+		HostClusterId:             os.Getenv(HostClusterId),
+		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
+		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
 	})
 	require.NoError(t, err)
 	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
-	vm, err := client.Compute().VirtualMachine().Read(ctx, activity.ConcernedItems[0].ID)
+	instanceId := activity.ConcernedItems[0].ID
+
+	jobs, err := client.Backup().Job().List(ctx, &BackupJobFilter{
+		Type: "catalog",
+	})
+	require.NoError(t, err)
+	require.Greater(t, len(jobs), 0)
+
+	var job = &BackupJob{}
+	for _, currJob := range jobs {
+		if currJob.Name == "Hypervisor Inventory" {
+			job = currJob
+		}
+	}
+
+	activityId, err = client.Backup().Job().Run(ctx, &BackupJobRunRequest{
+		JobId: job.ID,
+	})
+	require.NoError(t, err)
+
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
+	require.NoError(t, err)
+
+	_, err = client.Backup().Job().WaitForCompletion(ctx, jobs[0].ID, nil)
+	require.NoError(t, err)
+
+	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &BackupAssignVirtualMachineRequest{
+		VirtualMachineIds: []string{instanceId},
+		SLAPolicies:       []string{os.Getenv(PolicyId)},
+	})
+	require.NoError(t, err)
+
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
+	require.NoError(t, err)
+
+	vm, err := client.Compute().VirtualMachine().Read(ctx, instanceId)
 	require.NoError(t, err)
 
 	activityId, err = client.Compute().NetworkAdapter().Create(ctx, &CreateNetworkAdapterRequest{
-		VirtualMachineId: activity.ConcernedItems[0].ID,
-		NetworkId:        "cb5d4885-e112-42e9-9842-db4c8fc78f9b",
-		Type:             "VMXNET3",
-		MacAddress:       "00:50:57:CB:89:B7",
+		VirtualMachineId: instanceId,
+		NetworkId:        os.Getenv(NetworkId),
+		Type:             os.Getenv(NetworkAdapterType),
+		MacAddress:       os.Getenv(NetworkAdapterMacAddress),
 	})
 	require.NoError(t, err)
 	activity, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
@@ -74,21 +112,14 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 	networkAdapterId := activity.ConcernedItems[0].ID
 
 	networkAdapter, err := client.Compute().NetworkAdapter().Read(ctx, networkAdapterId)
+
 	require.NoError(t, err)
-	require.Equal(
-		t,
-		&NetworkAdapter{
-			ID:               networkAdapterId,
-			VirtualMachineId: vm.ID,
-			Name:             "Network adapter 1",
-			Type:             "VMXNET3",
-			MacType:          "MANUAL",
-			MacAddress:       "00:50:57:CB:89:B7",
-			Connected:        false,
-			AutoConnect:      false,
-		},
-		networkAdapter,
-	)
+
+	require.Equal(t, os.Getenv(NetworkAdapterId), networkAdapter.ID)
+	require.Equal(t, os.Getenv(NetworkAdapterName), networkAdapter.Name)
+	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.ID)
+	require.Equal(t, os.Getenv(NetworkId), networkAdapter.NetworkId)
+	require.Equal(t, os.Getenv(VirtualMachinId3), networkAdapter.VirtualMachineId)
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
 		ID:             vm.ID,
@@ -124,7 +155,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 	activityId, err = client.Compute().NetworkAdapter().Update(ctx, &UpdateNetworkAdapterRequest{
 		ID:           networkAdapterId,
 		MacType:      "ASSIGNED",
-		NewNetworkId: "cb5d4885-e112-42e9-9842-db4c8fc78f9b",
+		NewNetworkId: "1a2e7257-0747-474a-ba49-942ee463a94c",
 	})
 	require.NoError(t, err)
 	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)

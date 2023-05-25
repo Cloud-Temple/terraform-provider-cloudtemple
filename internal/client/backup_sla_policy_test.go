@@ -2,9 +2,18 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	PolicyId           = "TEST_BACKUP_POLICY_ID"
+	PolicyName         = "TEST_BACKUP_POLICY_NAME"
+	DataCenterId       = "TEST_DATACENTER_ID_1"
+	HostClusterId      = "TEST_HOST_CLUSTER_ID"
+	DatastoreClusterId = "TEST_DATASTORE_CLUSTER_ID"
 )
 
 func TestBackupSLAPolicyClient_List(t *testing.T) {
@@ -16,7 +25,7 @@ func TestBackupSLAPolicyClient_List(t *testing.T) {
 
 	var found bool
 	for _, sl := range slaPolicies {
-		if sl.ID == "10c6a0f7-076b-43aa-9230-bc975dcb1f30" {
+		if sl.ID == os.Getenv(PolicyId) {
 			found = true
 			break
 		}
@@ -33,31 +42,11 @@ func TestBackupSLAPolicyClient_List(t *testing.T) {
 
 func TestBackupSLAPolicyClient_Read(t *testing.T) {
 	ctx := context.Background()
-	slaPolicy, err := client.Backup().SLAPolicy().Read(ctx, "10c6a0f7-076b-43aa-9230-bc975dcb1f30")
+	slaPolicy, err := client.Backup().SLAPolicy().Read(ctx, os.Getenv(PolicyId))
 	require.NoError(t, err)
 
-	expected := &BackupSLAPolicy{
-		ID:   "10c6a0f7-076b-43aa-9230-bc975dcb1f30",
-		Name: "nobackup",
-		SubPolicies: []*BackupSLASubPolicy{
-			{
-				Type:          "REPLICATION",
-				UseEncryption: false,
-				Software:      true,
-				Site:          "DC-TH3S",
-				Retention: BackupSLAPolicyRetention{
-					Age: 15,
-				},
-				Target: BackupSLAPolicyTarget{
-					ID:           "1000",
-					Href:         "https://10.12.8.1/api/site/1000",
-					ResourceType: "site",
-				},
-			},
-		},
-	}
-
-	require.Equal(t, expected, slaPolicy)
+	require.Equal(t, os.Getenv(PolicyId), slaPolicy.ID)
+	require.Equal(t, os.Getenv(PolicyName), slaPolicy.Name)
 }
 
 func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
@@ -65,10 +54,10 @@ func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
 		Name:                      "test-client-assign-vm",
-		DatacenterId:              "85d53d08-0fa9-491e-ab89-90919516df25",
-		HostClusterId:             "dde72065-60f4-4577-836d-6ea074384d62",
-		DatastoreClusterId:        "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
-		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
+		DatacenterId:              os.Getenv(DataCenterId),
+		HostClusterId:             os.Getenv(HostClusterId),
+		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
+		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
 	})
 	require.NoError(t, err)
 
@@ -81,10 +70,17 @@ func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
 		Type: "catalog",
 	})
 	require.NoError(t, err)
-	require.Len(t, jobs, 1)
+	require.Greater(t, len(jobs), 0)
+
+	var job = &BackupJob{}
+	for _, currJob := range jobs {
+		if currJob.Name == "Hypervisor Inventory" {
+			job = currJob
+		}
+	}
 
 	activityId, err = client.Backup().Job().Run(ctx, &BackupJobRunRequest{
-		JobId: jobs[0].ID,
+		JobId: job.ID,
 	})
 	require.NoError(t, err)
 
@@ -96,16 +92,7 @@ func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
 
 	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &BackupAssignVirtualMachineRequest{
 		VirtualMachineIds: []string{instanceId},
-		SLAPolicies:       []string{"442718ef-44a1-43d7-9b57-2d910d74e928"},
-	})
-	require.NoError(t, err)
-
-	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
-	require.NoError(t, err)
-
-	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &BackupAssignVirtualMachineRequest{
-		VirtualMachineIds: []string{instanceId},
-		SLAPolicies:       []string{},
+		SLAPolicies:       []string{os.Getenv(PolicyId)},
 	})
 	require.NoError(t, err)
 

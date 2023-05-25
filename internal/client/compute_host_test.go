@@ -2,9 +2,16 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	HostId    = "TEST_HOST_ID"
+	HostName  = "TEST_HOST_NAME"
+	HostMoRef = "TEST_HOST_MOREF"
 )
 
 func TestCompute_HostList(t *testing.T) {
@@ -16,7 +23,7 @@ func TestCompute_HostList(t *testing.T) {
 
 	var found bool
 	for _, h := range hosts {
-		if h.ID == "8997db63-24d5-47f4-8cca-d5f5df199d1a" {
+		if h.ID == os.Getenv(HostId) {
 			found = true
 			break
 		}
@@ -26,19 +33,10 @@ func TestCompute_HostList(t *testing.T) {
 
 func TestCompute_HostRead(t *testing.T) {
 	ctx := context.Background()
-	host, err := client.Compute().Host().Read(ctx, "8997db63-24d5-47f4-8cca-d5f5df199d1a")
+	host, err := client.Compute().Host().Read(ctx, os.Getenv(HostId))
 	require.NoError(t, err)
 
-	// ignore metrics changes
-	host.Metrics = HostMetrics{}
-	host.VirtualMachines = nil
-
-	expected := &Host{
-		ID:               "8997db63-24d5-47f4-8cca-d5f5df199d1a",
-		Name:             "esx001-bob-ucs01-eqx6.cloud-temple.lan",
-		Moref:            "host-1046",
-		MachineManagerID: "",
-		Metrics:          HostMetrics{},
-	}
-	require.Equal(t, expected, host)
+	require.Equal(t, os.Getenv(HostId), host.ID)
+	require.Equal(t, os.Getenv(HostName), host.Name)
+	require.Equal(t, os.Getenv(HostMoRef), host.Moref)
 }

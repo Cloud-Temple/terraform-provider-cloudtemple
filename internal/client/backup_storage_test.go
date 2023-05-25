@@ -2,9 +2,14 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	StorageId = "TEST_BACKUP_STORAGE_ID"
 )
 
 func TestBackupStorageClient_List(t *testing.T) {
@@ -16,7 +21,7 @@ func TestBackupStorageClient_List(t *testing.T) {
 
 	var found bool
 	for _, st := range storages {
-		if st.ID == "2101" {
+		if st.ID == os.Getenv(StorageId) {
 			found = true
 			break
 		}

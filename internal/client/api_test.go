@@ -3,11 +3,13 @@ package client
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,6 +22,12 @@ const (
 var client *Client = nil
 
 func TestMain(m *testing.M) {
+
+	err := godotenv.Load("../../.env")
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	envNames := []string{
 		testClientIDEnvName,
 		testSecretIDEnvName,

@@ -2,21 +2,28 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	OperationSystemMoref    = "TEST_COMPUTE_OPERATION_SYSTEM_MOREF"
+	OperationSystemFamily   = "TEST_COMPUTE_OPERATION_SYSTEM_FAMILY"
+	OperationSystemFullName = "TEST_COMPUTE_OPERATION_SYSTEM_FULLNAME"
+)
+
 func TestCompute_GuestOperatingSystemList(t *testing.T) {
 	ctx := context.Background()
-	folders, err := client.Compute().GuestOperatingSystem().List(ctx, "9dba240e-a605-4103-bac7-5336d3ffd124", "", "", "")
+	folders, err := client.Compute().GuestOperatingSystem().List(ctx, os.Getenv(MachineManagerId), "", "", "")
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(folders), 1)
 
 	var found bool
 	for _, f := range folders {
-		if f.Moref == "amazonlinux2_64Guest" {
+		if f.Moref == os.Getenv(OperationSystemMoref) {
 			found = true
 			break
 		}
@@ -26,13 +33,13 @@ func TestCompute_GuestOperatingSystemList(t *testing.T) {
 
 func TestCompute_GuestOperatingSystemRead(t *testing.T) {
 	ctx := context.Background()
-	folder, err := client.Compute().GuestOperatingSystem().Read(ctx, "9dba240e-a605-4103-bac7-5336d3ffd124", "amazonlinux2_64Guest")
+	folder, err := client.Compute().GuestOperatingSystem().Read(ctx, os.Getenv(MachineManagerId), os.Getenv(OperationSystemMoref))
 	require.NoError(t, err)
 
 	expected := &GuestOperatingSystem{
-		Moref:    "amazonlinux2_64Guest",
-		Family:   "linuxGuest",
-		FullName: "Amazon Linux 2 (64-bit)",
+		Moref:    os.Getenv(OperationSystemMoref),
+		Family:   os.Getenv(OperationSystemFamily),
+		FullName: os.Getenv(OperationSystemFullName),
 	}
 	require.Equal(t, expected, folder)
 }
