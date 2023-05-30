@@ -235,6 +235,11 @@ resource "cloudtemple_compute_virtual_machine" "content-library-deployed" {
 
   guest_operating_system_moref = "centos8_64Guest"
 
+  os_disk {
+    capacity = 25 * 1024 * 1024 * 1024
+    disk_mode = "independent_persistent"
+  }
+
   tags = {
 	"environment" = "cloned-from-content-library"
   }

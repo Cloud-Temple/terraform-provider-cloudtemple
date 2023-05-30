@@ -84,6 +84,10 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
   datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.koukou.id
   datastore_id         = data.cloudtemple_compute_datastore.ds.id
 
+  os_disk {
+    capacity = 25 * 1024 * 1024 * 1024
+  }
+
   tags = {
     created_by = "Terraform"
   }

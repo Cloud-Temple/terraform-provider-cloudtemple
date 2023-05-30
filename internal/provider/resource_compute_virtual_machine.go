@@ -162,6 +162,77 @@ Virtual machines can be created using three different methods:
 					ValidateFunc: validation.IsUUID,
 				},
 			},
+			"os_disk": {
+				Type:        schema.TypeList,
+				Description: "OS disks created from content lib item deployment or virtual machine clone.",
+				Optional:    true,
+				Computed:    true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						// In
+						"capacity": {
+							Type:     schema.TypeInt,
+							Optional: true,
+							Computed: true,
+						},
+						"disk_mode": {
+							Type:     schema.TypeString,
+							Optional: true,
+							Computed: true,
+						},
+
+						// Out
+						"id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"name": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"machine_manager_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"disk_unit_number": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"controller_bus_number": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"datastore_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"datastore_name": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"instant_access": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+						"native_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"disk_path": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"provisioning_type": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"editable": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+					},
+				},
+			},
 
 			// Out
 			"moref": {
@@ -468,6 +539,28 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 	}
 
+	disks, err := c.Compute().VirtualDisk().List(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to retrieve OS disks: %s", err)
+	}
+
+	osDisks := flattenOSDisksData(disks)
+
+	// Overwrite with the desired config
+	for i, osDisk := range osDisks {
+		if v, ok := d.GetOk(fmt.Sprintf("os_disk.%d", i)); ok {
+			vDisk := v.(map[string]interface{})
+			disk := osDisk.(map[string]interface{})
+
+			disk["capacity"] = vDisk["capacity"].(int)
+			disk["disk_mode"] = vDisk["disk_mode"].(string)
+		}
+	}
+
+	if err := d.Set("os_disk", osDisks); err != nil {
+		return diag.FromErr(err)
+	}
+
 	if len(d.Get("backup_sla_policies").(*schema.Set).List()) > 0 {
 		// First we need to update the catalog
 		jobs, err := c.Backup().Job().List(ctx, &client.BackupJobFilter{
@@ -557,6 +650,20 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 		}
 
 		sw.set("backup_sla_policies", slaPoliciesIds)
+
+		osDisks := []interface{}{}
+		for _, osDisk := range d.Get("os_disk").([]interface{}) {
+			osDiskId := osDisk.(map[string]interface{})["id"].(string)
+			if osDiskId != "" {
+				disk, err := c.Compute().VirtualDisk().Read(ctx, osDiskId)
+				if err != nil {
+					return nil, err
+				}
+				osDisks = append(osDisks, flattenOSDiskData(disk))
+			}
+		}
+
+		sw.set("os_disk", osDisks)
 
 		readTags(ctx, sw, c, d.Id())
 
@@ -663,6 +770,26 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 	}
 
+	if d.HasChange("os_disk") {
+		for i, osDisk := range d.Get("os_disk").([]interface{}) {
+			disk := osDisk.(map[string]interface{})
+			if disk["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_disk.%d", i)) {
+				activityId, err := c.Compute().VirtualDisk().Update(ctx, &client.UpdateVirtualDiskRequest{
+					ID:          disk["id"].(string),
+					NewCapacity: disk["capacity"].(int),
+					DiskMode:    disk["disk_mode"].(string),
+				})
+				if err != nil {
+					return diag.Errorf("failed to update virtual disk: %s", err)
+				}
+				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+				if err != nil {
+					return diag.Errorf("failed to update virtual disk, %s", err)
+				}
+			}
+		}
+	}
+
 	if updatePower {
 		powerState := d.Get("power_state").(string)
 
@@ -742,4 +869,39 @@ func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, me
 		return diag.Errorf("failed to delete virtual machine, %s", err)
 	}
 	return nil
+}
+
+func flattenOSDisksData(osDisks []*client.VirtualDisk) []interface{} {
+	if osDisks != nil {
+		disks := make([]interface{}, len(osDisks))
+
+		for i, osDisk := range osDisks {
+			disks[i] = flattenOSDiskData(osDisk)
+		}
+
+		return disks
+	}
+
+	return make([]interface{}, 0)
+}
+
+func flattenOSDiskData(osDisk *client.VirtualDisk) interface{} {
+	disk := make(map[string]interface{})
+
+	disk["id"] = osDisk.ID
+	disk["machine_manager_id"] = osDisk.MachineManagerId
+	disk["name"] = osDisk.Name
+	disk["capacity"] = osDisk.Capacity
+	disk["disk_unit_number"] = osDisk.DiskUnitNumber
+	disk["controller_bus_number"] = osDisk.ControllerBusNumber
+	disk["datastore_id"] = osDisk.DatastoreId
+	disk["datastore_name"] = osDisk.DatastoreName
+	disk["instant_access"] = osDisk.InstantAccess
+	disk["native_id"] = osDisk.NativeId
+	disk["disk_path"] = osDisk.DiskPath
+	disk["provisioning_type"] = osDisk.ProvisioningType
+	disk["disk_mode"] = osDisk.DiskMode
+	disk["editable"] = osDisk.Editable
+
+	return disk
 }
