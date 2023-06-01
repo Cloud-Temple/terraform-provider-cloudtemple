@@ -73,6 +73,10 @@ data "cloudtemple_compute_datastore" "ds" {
   name = "ds001-bob-svc1-data4-eqx6"
 }
 
+data "cloudtemple_compute_network" "vlan" {
+  name = "VLAN_201"
+}
+
 resource "cloudtemple_compute_virtual_machine" "content-library" {
   name = "from-content-library-item"
 
@@ -86,6 +90,10 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 
   os_disk {
     capacity = 25 * 1024 * 1024 * 1024
+  }
+
+  os_network_adapter {
+    network_id = data.cloudtemple_compute_network.vlan.id
   }
 
   tags = {

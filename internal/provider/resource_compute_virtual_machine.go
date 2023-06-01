@@ -3,11 +3,13 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
+	"github.com/sethvargo/go-retry"
 )
 
 func resourceVirtualMachine() *schema.Resource {
@@ -233,7 +235,57 @@ Virtual machines can be created using three different methods:
 					},
 				},
 			},
+			"os_network_adapter": {
+				Type:        schema.TypeList,
+				Description: "OS network adapters created from content lib item deployment or virtual machine clone.",
+				Optional:    true,
+				Computed:    true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						// In
+						"network_id": {
+							Type:     schema.TypeString,
+							Optional: true,
+							Computed: true,
+						},
+						"mac_address": {
+							Type:         schema.TypeString,
+							Optional:     true,
+							Computed:     true,
+							ComputedWhen: []string{"mac_type"},
+						},
+						"mac_type": {
+							Type:     schema.TypeString,
+							Optional: true,
+							Computed: true,
+						},
+						"auto_connect": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Computed: true,
+						},
+						"connected": {
+							Type:     schema.TypeBool,
+							Optional: true,
+							Computed: true,
+						},
 
+						// Out
+						"id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"name": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"type": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+					},
+				},
+			},
 			// Out
 			"moref": {
 				Type:     schema.TypeString,
@@ -561,6 +613,18 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		return diag.FromErr(err)
 	}
 
+	networkAdapters, err := c.Compute().NetworkAdapter().List(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to retrieve OS network adapters: %s", err)
+	}
+
+	// Overwrite with the desired config
+	osNetworkAdapters := updateNestedMapItems(d, flattenOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
+
+	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
+		return diag.FromErr(err)
+	}
+
 	if len(d.Get("backup_sla_policies").(*schema.Set).List()) > 0 {
 		// First we need to update the catalog
 		jobs, err := c.Backup().Job().List(ctx, &client.BackupJobFilter{
@@ -664,6 +728,20 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 		}
 
 		sw.set("os_disk", osDisks)
+
+		osNetworkAdapters := []interface{}{}
+		for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+			osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
+			if osNetworkAdapterId != "" {
+				networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, osNetworkAdapterId)
+				if err != nil {
+					return nil, err
+				}
+				osNetworkAdapters = append(osNetworkAdapters, flattenOSNetworkAdapterData(networkAdapter))
+			}
+		}
+
+		sw.set("os_network_adapter", osNetworkAdapters)
 
 		readTags(ctx, sw, c, d.Id())
 
@@ -790,6 +868,63 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 	}
 
+	if d.HasChange("os_network_adapter") {
+		for i, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+			networkAdapter := osNetworkAdapter.(map[string]interface{})
+			if networkAdapter["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_network_adapter.%d", i)) {
+				macType := networkAdapter["mac_type"].(string)
+				macAddress := networkAdapter["mac_address"].(string)
+				if macType == "ASSIGNED" {
+					macAddress = ""
+				}
+
+				activityId, err := c.Compute().NetworkAdapter().Update(ctx, &client.UpdateNetworkAdapterRequest{
+					ID:           networkAdapter["id"].(string),
+					NewNetworkId: networkAdapter["network_id"].(string),
+					AutoConnect:  networkAdapter["auto_connect"].(bool),
+					MacAddress:   macAddress,
+					MacType:      macType,
+				})
+				if err != nil {
+					return diag.Errorf("failed to update network adapter, %s", err)
+				}
+				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+				if err != nil {
+					return diag.Errorf("failed to update network adapter, %s", err)
+				}
+
+				if d.HasChange(fmt.Sprintf("os_network_adapter.%d.connected", i)) {
+					var msg string
+					var action func(context.Context, string) (string, error)
+					if networkAdapter["connected"].(bool) {
+						msg = "connect"
+						action = c.Compute().NetworkAdapter().Connect
+					} else {
+						msg = "disconnect"
+						action = c.Compute().NetworkAdapter().Disconnect
+					}
+
+					// Connecting a network adapter can fail right after the VM has been powered
+					// on so we retry here until we reach the timeout
+					b := retry.NewFibonacci(1 * time.Second)
+					b = retry.WithCappedDuration(20*time.Second, b)
+
+					err = retry.Do(ctx, b, func(ctx context.Context) error {
+						activityId, err = action(ctx, networkAdapter["id"].(string))
+						if err != nil {
+							return err
+						}
+						_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+						return err
+					})
+					if err != nil {
+						return diag.Errorf("failed to %s network adapter, %s", msg, err)
+					}
+				}
+			}
+		}
+	}
+
 	if updatePower {
 		powerState := d.Get("power_state").(string)
 
@@ -871,6 +1006,30 @@ func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, me
 	return nil
 }
 
+func updateNestedMapItems(d *schema.ResourceData, nestedMapItems []interface{}, key string) []interface{} {
+	nestedMaps := make([]interface{}, len(nestedMapItems))
+
+	for i, mapItems := range nestedMapItems {
+		nestedMaps[i] = updateMapItems(d, mapItems, key, i)
+	}
+
+	return nestedMaps
+}
+
+func updateMapItems(d *schema.ResourceData, mapItems interface{}, key string, index int) interface{} {
+	m := mapItems.(map[string]interface{})
+
+	if value, ok := d.GetOk(fmt.Sprintf("%s.%d", key, index)); ok {
+
+		for k, v := range value.(map[string]interface{}) {
+			if _, ok := d.GetOk(fmt.Sprintf("%s.%d.%s", key, index, k)); ok {
+				m[k] = v
+			}
+		}
+	}
+	return m
+}
+
 func flattenOSDisksData(osDisks []*client.VirtualDisk) []interface{} {
 	if osDisks != nil {
 		disks := make([]interface{}, len(osDisks))
@@ -904,4 +1063,33 @@ func flattenOSDiskData(osDisk *client.VirtualDisk) interface{} {
 	disk["editable"] = osDisk.Editable
 
 	return disk
+}
+
+func flattenOSNetworkAdaptersData(osNetworkAdapters []*client.NetworkAdapter) []interface{} {
+	if osNetworkAdapters != nil {
+		networkAdapters := make([]interface{}, len(osNetworkAdapters))
+
+		for i, osNetworkAdapter := range osNetworkAdapters {
+			networkAdapters[i] = flattenOSNetworkAdapterData(osNetworkAdapter)
+		}
+
+		return networkAdapters
+	}
+
+	return make([]interface{}, 0)
+}
+
+func flattenOSNetworkAdapterData(osNetworkAdapter *client.NetworkAdapter) interface{} {
+	networkAdapter := make(map[string]interface{})
+
+	networkAdapter["id"] = osNetworkAdapter.ID
+	networkAdapter["name"] = osNetworkAdapter.Name
+	networkAdapter["network_id"] = osNetworkAdapter.NetworkId
+	networkAdapter["type"] = osNetworkAdapter.Type
+	networkAdapter["mac_type"] = osNetworkAdapter.MacType
+	networkAdapter["mac_address"] = osNetworkAdapter.MacAddress
+	networkAdapter["connected"] = osNetworkAdapter.Connected
+	networkAdapter["auto_connect"] = osNetworkAdapter.AutoConnect
+
+	return networkAdapter
 }

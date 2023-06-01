@@ -109,6 +109,10 @@ data "cloudtemple_compute_datastore" "ds" {
   name = "ds001-bob-svc1-data4-eqx6"
 }
 
+data "cloudtemple_compute_network" "vlan" {
+  name = "VLAN_201"
+}
+
 resource "cloudtemple_compute_virtual_machine" "content-library" {
   name = "from-content-library-item"
 
@@ -122,6 +126,10 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 
   os_disk {
     capacity = 25 * 1024 * 1024 * 1024
+  }
+
+  os_network_adapter {
+    network_id = data.cloudtemple_compute_network.vlan.id
   }
 
   tags = {
@@ -157,6 +165,7 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 - `memory_hot_add_enabled` (Boolean)
 - `num_cores_per_socket` (Number)
 - `os_disk` (Block List) OS disks created from content lib item deployment or virtual machine clone. (see [below for nested schema](#nestedblock--os_disk))
+- `os_network_adapter` (Block List) OS network adapters created from content lib item deployment or virtual machine clone. (see [below for nested schema](#nestedblock--os_network_adapter))
 - `power_state` (String) Whether to start the virtual machine.
 - `tags` (Map of String) The tags to attach to the virtual machine.
 
@@ -207,6 +216,24 @@ Read-Only:
 - `name` (String)
 - `native_id` (String)
 - `provisioning_type` (String)
+
+
+<a id="nestedblock--os_network_adapter"></a>
+### Nested Schema for `os_network_adapter`
+
+Optional:
+
+- `auto_connect` (Boolean)
+- `connected` (Boolean)
+- `mac_address` (String)
+- `mac_type` (String)
+- `network_id` (String)
+
+Read-Only:
+
+- `id` (String) The ID of this resource.
+- `name` (String)
+- `type` (String)
 
 
 <a id="nestedatt--boot_options"></a>

@@ -223,6 +223,10 @@ data "cloudtemple_compute_content_library_item" "foo" {
   name               = "20211115132417_master_linux-centos-8"
 }
 
+data "cloudtemple_compute_network" "foo" {
+  name = "VLAN_201"
+}
+
 resource "cloudtemple_compute_virtual_machine" "content-library-deployed" {
   name = "test-terraform-content-library-deployed"
 
@@ -238,6 +242,13 @@ resource "cloudtemple_compute_virtual_machine" "content-library-deployed" {
   os_disk {
     capacity = 25 * 1024 * 1024 * 1024
     disk_mode = "independent_persistent"
+  }
+
+  os_network_adapter {
+    network_id   = data.cloudtemple_compute_network.foo.id
+    mac_type     = "MANUAL"
+    mac_address  = "00:50:56:83:84:61"
+	auto_connect = true
   }
 
   tags = {
