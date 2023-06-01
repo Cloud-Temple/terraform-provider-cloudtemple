@@ -596,18 +596,8 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		return diag.Errorf("failed to retrieve OS disks: %s", err)
 	}
 
-	osDisks := flattenOSDisksData(disks)
-
 	// Overwrite with the desired config
-	for i, osDisk := range osDisks {
-		if v, ok := d.GetOk(fmt.Sprintf("os_disk.%d", i)); ok {
-			vDisk := v.(map[string]interface{})
-			disk := osDisk.(map[string]interface{})
-
-			disk["capacity"] = vDisk["capacity"].(int)
-			disk["disk_mode"] = vDisk["disk_mode"].(string)
-		}
-	}
+	osDisks := updateNestedMapItems(d, flattenOSDisksData(disks), "os_disk")
 
 	if err := d.Set("os_disk", osDisks); err != nil {
 		return diag.FromErr(err)
