@@ -7,6 +7,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/sethvargo/go-retry"
@@ -498,6 +499,24 @@ Virtual machines can be created using three different methods:
 				},
 			},
 		},
+		CustomizeDiff: customdiff.All(
+			customdiff.ValidateChange("os_disk", func(ctx context.Context, old, new, meta any) error {
+				o := len(old.([]interface{}))
+				n := len(new.([]interface{}))
+				if n > o && o > 0 {
+					return fmt.Errorf("new os_disk blocks are not allowed if that exceeds the number of existing OS disks (%d > %d)", n, o)
+				}
+				return nil
+			}),
+			customdiff.ValidateChange("os_network_adapter", func(ctx context.Context, old, new, meta any) error {
+				o := len(old.([]interface{}))
+				n := len(new.([]interface{}))
+				if n > o && o > 0 {
+					return fmt.Errorf("new os_network_adapter blocks are not allowed if that exceeds the number of existing OS network adapters (%d > %d)", n, o)
+				}
+				return nil
+			}),
+		),
 	}
 }
 
