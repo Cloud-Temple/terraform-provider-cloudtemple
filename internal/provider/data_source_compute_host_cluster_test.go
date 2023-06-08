@@ -1,10 +1,18 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	HostClusterId     = "COMPUTE_HOST_CLUSTER_ID"
+	HostClusterName   = "COMPUTE_HOST_CLUSTER_NAME"
+	MachineManagerId2 = "COMPUTE_VCENTER_ID_2"
 )
 
 func TestAccDataSourceHostCluster(t *testing.T) {
@@ -13,17 +21,17 @@ func TestAccDataSourceHostCluster(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceHostCluster,
+				Config: fmt.Sprintf(testAccDataSourceHostCluster, os.Getenv(HostClusterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", "c80c4667-2f2d-4087-852b-995b0d5f1f2e"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", "clu001-ucs12"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", os.Getenv(HostClusterId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", os.Getenv(HostClusterName)),
 				),
 			},
 			{
-				Config: testAccDataSourceHostClusterName,
+				Config: fmt.Sprintf(testAccDataSourceHostClusterName, os.Getenv(HostClusterName), os.Getenv(MachineManagerId2)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", "c80c4667-2f2d-4087-852b-995b0d5f1f2e"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", "clu001-ucs12"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", os.Getenv(HostClusterId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", os.Getenv(HostClusterName)),
 				),
 			},
 			{
@@ -36,14 +44,14 @@ func TestAccDataSourceHostCluster(t *testing.T) {
 
 const testAccDataSourceHostCluster = `
 data "cloudtemple_compute_host_cluster" "foo" {
-  id = "c80c4667-2f2d-4087-852b-995b0d5f1f2e"
+  id = "%s"
 }
 `
 
 const testAccDataSourceHostClusterName = `
 data "cloudtemple_compute_host_cluster" "foo" {
-  name               = "clu001-ucs12"
-	machine_manager_id = "8afdb4e8-b68d-4bb8-a606-3dc47cc2da0e"
+  name               = "%s"
+	machine_manager_id = "%s"
 }
 `
 

@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -12,7 +14,7 @@ func TestAccDataSourceGuestOperatingSystems(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceGuestOperatingSystems,
+				Config: fmt.Sprintf(testAccDataSourceGuestOperatingSystems, os.Getenv(MachineManagerId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_guest_operating_systems.foo", "guest_operating_systems.#"),
 				),
@@ -29,7 +31,7 @@ func TestAccDataSourceGuestOperatingSystems(t *testing.T) {
 
 const testAccDataSourceGuestOperatingSystems = `
 data "cloudtemple_compute_guest_operating_systems" "foo" {
-  machine_manager_id = "9dba240e-a605-4103-bac7-5336d3ffd124"
+  machine_manager_id = "%s"
 }
 `
 

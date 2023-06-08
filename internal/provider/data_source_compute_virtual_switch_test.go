@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	VirtualSwitchId   = "COMPUTE_VIRTUAL_SWITCH_ID"
+	VirtualSwitchName = "COMPUTE_VIRTUAL_SWITCH_NAME"
 )
 
 func TestAccDataSourceVirtualSwitch(t *testing.T) {
@@ -13,17 +20,17 @@ func TestAccDataSourceVirtualSwitch(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceVirtualSwitch,
+				Config: fmt.Sprintf(testAccDataSourceVirtualSwitch, os.Getenv(VirtualSwitchId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "id", "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "name", "dvs002-ucs01_FLO-DC-EQX6"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "id", os.Getenv(VirtualSwitchId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "name", os.Getenv(VirtualSwitchName)),
 				),
 			},
 			{
-				Config: testAccDataSourceVirtualSwitchName,
+				Config: fmt.Sprintf(testAccDataSourceVirtualSwitchName, os.Getenv(VirtualSwitchName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "id", "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "name", "dvs002-ucs01_FLO-DC-EQX6"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "id", os.Getenv(VirtualSwitchId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "name", os.Getenv(VirtualSwitchName)),
 				),
 			},
 			{
@@ -36,13 +43,13 @@ func TestAccDataSourceVirtualSwitch(t *testing.T) {
 
 const testAccDataSourceVirtualSwitch = `
 data "cloudtemple_compute_virtual_switch" "foo" {
-  id = "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4"
+  id = "%s"
 }
 `
 
 const testAccDataSourceVirtualSwitchName = `
 data "cloudtemple_compute_virtual_switch" "foo" {
-  name = "dvs002-ucs01_FLO-DC-EQX6"
+  name = "%s"
 }
 `
 

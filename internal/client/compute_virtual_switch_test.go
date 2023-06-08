@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	ComputeVirtualSwitchId    = "TEST_COMPUTE_VIRTUAL_SWITCH_ID"
-	ComputeVirtualSwitchName  = "TEST_COMPUTE_VIRTUAL_SWITCH_NAME"
-	ComputeVirtualSwitchMoref = "TEST_COMPUTE_VIRTUAL_SWITCH_MOREF"
+	VirtualSwitchId    = "COMPUTE_VIRTUAL_SWITCH_ID"
+	VirtualSwitchName  = "COMPUTE_VIRTUAL_SWITCH_NAME"
+	VirtualSwitchMoref = "COMPUTE_VIRTUAL_SWITCH_MOREF"
 )
 
 func TestCompute_VirtualSwitchList(t *testing.T) {
@@ -23,7 +23,7 @@ func TestCompute_VirtualSwitchList(t *testing.T) {
 
 	var found bool
 	for _, vs := range virtualSwitchs {
-		if vs.ID == os.Getenv(ComputeVirtualSwitchId) {
+		if vs.ID == os.Getenv(VirtualSwitchId) {
 			found = true
 			break
 		}
@@ -33,13 +33,13 @@ func TestCompute_VirtualSwitchList(t *testing.T) {
 
 func TestCompute_VirtualSwitchRead(t *testing.T) {
 	ctx := context.Background()
-	virtualSwitch, err := client.Compute().VirtualSwitch().Read(ctx, os.Getenv(ComputeVirtualSwitchId))
+	virtualSwitch, err := client.Compute().VirtualSwitch().Read(ctx, os.Getenv(VirtualSwitchId))
 	require.NoError(t, err)
 
 	expected := &VirtualSwitch{
-		ID:    os.Getenv(ComputeVirtualSwitchId),
-		Name:  os.Getenv(ComputeVirtualSwitchName),
-		Moref: os.Getenv(ComputeVirtualSwitchMoref),
+		ID:    os.Getenv(VirtualSwitchId),
+		Name:  os.Getenv(VirtualSwitchName),
+		Moref: os.Getenv(VirtualSwitchMoref),
 	}
 	require.Equal(t, expected, virtualSwitch)
 }

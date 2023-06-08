@@ -1,9 +1,15 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	VistualDisksQty = "COMPUTE_VIRTUAL_DISK_QTY"
 )
 
 func TestAccDataSourceVirtualDisks(t *testing.T) {
@@ -12,9 +18,9 @@ func TestAccDataSourceVirtualDisks(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceVirtualDisks,
+				Config: fmt.Sprintf(testAccDataSourceVirtualDisks, os.Getenv(VirtualMachineId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disks.foo", "virtual_disks.#", "1"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disks.foo", "virtual_disks.#", os.Getenv(VistualDisksQty)),
 				),
 			},
 			{
@@ -29,7 +35,7 @@ func TestAccDataSourceVirtualDisks(t *testing.T) {
 
 const testAccDataSourceVirtualDisks = `
 data "cloudtemple_compute_virtual_disks" "foo" {
-  virtual_machine_id = "de2b8b80-8b90-414a-bc33-e12f61a4c05c"
+  virtual_machine_id = "%s"
 }
 `
 

@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	DatastoreClusterName  = "TEST_DATASTORE_CLUSTER_NAME"
-	DatastoreClusterMoRef = "TEST_DATASTORE_CLUSTER_MOREF"
-	MachineManagerId2     = "TEST_VIRTUAL_CENTER_ID_2"
+	DatastoreClusterId    = "COMPUTE_DATASTORE_CLUSTER_ID"
+	DatastoreClusterName  = "COMPUTE_DATASTORE_CLUSTER_NAME"
+	DatastoreClusterMoRef = "COMPUTE_DATASTORE_CLUSTER_MOREF"
+	MachineManagerId2     = "COMPUTE_VCENTER_ID_2"
 )
 
 func TestCompute_DatastoreClusterList(t *testing.T) {

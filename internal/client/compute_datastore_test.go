@@ -9,16 +9,17 @@ import (
 )
 
 const (
-	DataStoreMoRef      = "TEST_COMPUTE_DATASTORE_MOREF"
-	DataStoreUniqueId   = "TEST_COMPUTE_DATASTORE_UNIQUE_ID"
-	DataStoreType       = "TEST_COMPUTE_DATASTORE_TYPE"
-	DataStoreHostMoRefs = "TEST_COMPUTE_DATASTORE_HOST_MOREFS"
+	DataStoreDataCenterId = "COMPUTE_DATASTORE_DATACENTER_ID"
+	DataStoreMoRef        = "COMPUTE_DATASTORE_MOREF"
+	DataStoreUniqueId     = "COMPUTE_DATASTORE_UNIQUE_ID"
+	DataStoreType         = "COMPUTE_DATASTORE_TYPE"
+	DataStoreHostMoRefs   = "COMPUTE_DATASTORE_HOST_MOREFS"
 )
 
 func TestCompute_DatastoreList(t *testing.T) {
 	ctx := context.Background()
 	datastores, err := client.Compute().Datastore().List(ctx, &DatastoreFilter{
-		DatacenterId: os.Getenv(DataCenterId2),
+		DatacenterId: os.Getenv(DataStoreDataCenterId),
 	})
 	require.NoError(t, err)
 

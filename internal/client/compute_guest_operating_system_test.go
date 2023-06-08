@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	OperationSystemMoref    = "TEST_COMPUTE_OPERATION_SYSTEM_MOREF"
-	OperationSystemFamily   = "TEST_COMPUTE_OPERATION_SYSTEM_FAMILY"
-	OperationSystemFullName = "TEST_COMPUTE_OPERATION_SYSTEM_FULLNAME"
+	OperationSystemMoref    = "COMPUTE_OPERATION_SYSTEM_MOREF"
+	OperationSystemFamily   = "COMPUTE_OPERATION_SYSTEM_FAMILY"
+	OperationSystemFullName = "COMPUTE_OPERATION_SYSTEM_FULLNAME"
 )
 
 func TestCompute_GuestOperatingSystemList(t *testing.T) {

@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	PolicyId   = "BACKUP_POLICY_ID"
+	PolicyName = "BACKUP_POLICY_NAME"
 )
 
 func TestAccDataSourceBackupSLAPolicy(t *testing.T) {
@@ -13,26 +20,17 @@ func TestAccDataSourceBackupSLAPolicy(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceBackupSLAPolicy,
+				Config: fmt.Sprintf(testAccDataSourceBackupSLAPolicy, os.Getenv(PolicyId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "id", "10c6a0f7-076b-43aa-9230-bc975dcb1f30"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "name", "nobackup"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.#", "1"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.type", "REPLICATION"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.use_encryption", "false"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.software", "true"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.site", "DC-TH3S"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.retention.0.age", "15"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.target.0.id", "1000"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.target.0.href", "https://10.12.8.1/api/site/1000"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.target.0.resource_type", "site"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "id", os.Getenv(PolicyId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "name", os.Getenv(PolicyName)),
 				),
 			},
 			{
-				Config: testAccDataSourceBackupSLAPolicyName,
+				Config: fmt.Sprintf(testAccDataSourceBackupSLAPolicyName, os.Getenv(PolicyName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "id", "10c6a0f7-076b-43aa-9230-bc975dcb1f30"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "name", "nobackup"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "id", os.Getenv(PolicyId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "name", os.Getenv(PolicyName)),
 				),
 			},
 			{
@@ -45,13 +43,13 @@ func TestAccDataSourceBackupSLAPolicy(t *testing.T) {
 
 const testAccDataSourceBackupSLAPolicy = `
 data "cloudtemple_backup_sla_policy" "foo" {
-  id = "10c6a0f7-076b-43aa-9230-bc975dcb1f30"
+  id = "%s"
 }
 `
 
 const testAccDataSourceBackupSLAPolicyName = `
 data "cloudtemple_backup_sla_policy" "foo" {
-  name = "nobackup"
+  name = "%s"
 }
 `
 

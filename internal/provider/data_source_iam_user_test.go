@@ -1,10 +1,21 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	UserEmail         = "IAM_USER_EMAIL"
+	UserEmailVerified = "IAM_USER_EMAIL_VERIFIED"
+	UserId            = "IAM_USER_ID"
+	UserInternalId    = "IAM_USER_INTERNAL_ID"
+	UserName          = "IAM_USER_NAME"
+	UserType          = "IAM_USER_TYPE"
 )
 
 func TestAccDataSourceUser(t *testing.T) {
@@ -13,51 +24,47 @@ func TestAccDataSourceUser(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceUser,
+				Config: fmt.Sprintf(testAccDataSourceUser, os.Getenv(UserId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", "37105598-4889-43da-82ea-cf60f2a36aee"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", "7b8ba092-52e3-4c21-a2f5-adca40a80d34"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", "Rémi Lapeyre"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "type", "LocalAccount"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "source.#", "0"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email_verified", "true"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email", "remi.lapeyre@lenstra.fr"),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", os.Getenv(UserId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", os.Getenv(UserInternalId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", os.Getenv(UserName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "type", os.Getenv(UserType)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email", os.Getenv(UserEmail)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email_verified", os.Getenv(UserEmailVerified)),
 				),
 			},
 			{
-				Config: testAccDataSourceUserName,
+				Config: fmt.Sprintf(testAccDataSourceUserName, os.Getenv(UserName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", "37105598-4889-43da-82ea-cf60f2a36aee"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", "7b8ba092-52e3-4c21-a2f5-adca40a80d34"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", "Rémi Lapeyre"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "type", "LocalAccount"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "source.#", "0"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email_verified", "true"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email", "remi.lapeyre@lenstra.fr"),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", os.Getenv(UserId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", os.Getenv(UserInternalId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", os.Getenv(UserName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "type", os.Getenv(UserType)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email", os.Getenv(UserEmail)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email_verified", os.Getenv(UserEmailVerified)),
 				),
 			},
 			{
-				Config: testAccDataSourceUserInternalId,
+				Config: fmt.Sprintf(testAccDataSourceUserInternalId, os.Getenv(UserInternalId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", "37105598-4889-43da-82ea-cf60f2a36aee"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", "7b8ba092-52e3-4c21-a2f5-adca40a80d34"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", "Rémi Lapeyre"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "type", "LocalAccount"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "source.#", "0"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email_verified", "true"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email", "remi.lapeyre@lenstra.fr"),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", os.Getenv(UserId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", os.Getenv(UserInternalId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", os.Getenv(UserName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "type", os.Getenv(UserType)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email", os.Getenv(UserEmail)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email_verified", os.Getenv(UserEmailVerified)),
 				),
 			},
 			{
-				Config: testAccDataSourceUserEmail,
+				Config: fmt.Sprintf(testAccDataSourceUserEmail, os.Getenv(UserEmail)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", "37105598-4889-43da-82ea-cf60f2a36aee"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", "7b8ba092-52e3-4c21-a2f5-adca40a80d34"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", "Rémi Lapeyre"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "type", "LocalAccount"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "source.#", "0"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email_verified", "true"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email", "remi.lapeyre@lenstra.fr"),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "id", os.Getenv(UserId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "internal_id", os.Getenv(UserInternalId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "name", os.Getenv(UserName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "type", os.Getenv(UserType)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email", os.Getenv(UserEmail)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_user.foo", "email_verified", os.Getenv(UserEmailVerified)),
 				),
 			},
 			{
@@ -70,25 +77,25 @@ func TestAccDataSourceUser(t *testing.T) {
 
 const testAccDataSourceUser = `
 data "cloudtemple_iam_user" "foo" {
-  id = "37105598-4889-43da-82ea-cf60f2a36aee"
+  id = "%s"
 }
 `
 
 const testAccDataSourceUserName = `
 data "cloudtemple_iam_user" "foo" {
-  name = "Rémi Lapeyre"
+  name = "%s"
 }
 `
 
 const testAccDataSourceUserInternalId = `
 data "cloudtemple_iam_user" "foo" {
-  internal_id = "7b8ba092-52e3-4c21-a2f5-adca40a80d34"
+  internal_id = "%s"
 }
 `
 
 const testAccDataSourceUserEmail = `
 data "cloudtemple_iam_user" "foo" {
-  email = "remi.lapeyre@lenstra.fr"
+  email = "%s"
 }
 `
 

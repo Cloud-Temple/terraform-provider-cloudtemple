@@ -11,18 +11,16 @@ import (
 )
 
 const (
-	VirtualMachinId2         = "TEST_COMPUTE_VIRTUAL_MACHINE_ID_2"
-	VirtualMachinId3         = "TEST_COMPUTE_VIRTUAL_MACHINE_ID_3"
-	NetworkAdapterId         = "TEST_COMPUTE_NETWORK_ADAPTER_ID"
-	NetworkAdapterName       = "TEST_COMPUTE_NETWORK_ADAPTER_NAME"
-	NetworkAdapterType       = "TEST_COMPUTE_NETWORK_ADAPTER_TYPE"
-	NetworkAdapterMacAddress = "TEST_COMPUTE_NETWORK_ADAPTER_MAC_ADDRESS"
-	NetworkId                = "TEST_COMPUTE_NETWORK_ID"
+	NetworkAdapterId               = "COMPUTE_NETWORK_ADAPTER_ID"
+	NetworkAdapterName             = "COMPUTE_NETWORK_ADAPTER_NAME"
+	NetworkAdapterType             = "COMPUTE_NETWORK_ADAPTER_TYPE"
+	NetworkAdapterMacAddress       = "COMPUTE_NETWORK_ADAPTER_MAC_ADDRESS"
+	NetworkAdapterVirtualMachineId = "COMPUTE_NETWORK_ADAPTER_VIRTUAL_MACHINE"
 )
 
 func TestCompute_NetworkAdapterList(t *testing.T) {
 	ctx := context.Background()
-	networkAdapters, err := client.Compute().NetworkAdapter().List(ctx, os.Getenv(VirtualMachinId2))
+	networkAdapters, err := client.Compute().NetworkAdapter().List(ctx, os.Getenv(VirtualMachineIdAlternative))
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(networkAdapters), 1)
 
@@ -43,9 +41,9 @@ func TestCompute_NetworkAdapterRead(t *testing.T) {
 
 	require.Equal(t, os.Getenv(NetworkAdapterId), networkAdapter.ID)
 	require.Equal(t, os.Getenv(NetworkAdapterName), networkAdapter.Name)
-	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.ID)
-	require.Equal(t, os.Getenv(NetworkId), networkAdapter.NetworkId)
-	require.Equal(t, os.Getenv(VirtualMachinId3), networkAdapter.VirtualMachineId)
+	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.Type)
+	require.Equal(t, "", networkAdapter.NetworkId)
+	require.Equal(t, os.Getenv(VirtualMachineIdAlternative), networkAdapter.VirtualMachineId)
 }
 
 func TestNetworkAdapterClient_Create(t *testing.T) {
@@ -115,11 +113,10 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 
 	require.NoError(t, err)
 
-	require.Equal(t, os.Getenv(NetworkAdapterId), networkAdapter.ID)
+	require.Equal(t, networkAdapterId, networkAdapter.ID)
 	require.Equal(t, os.Getenv(NetworkAdapterName), networkAdapter.Name)
-	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.ID)
+	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.Type)
 	require.Equal(t, os.Getenv(NetworkId), networkAdapter.NetworkId)
-	require.Equal(t, os.Getenv(VirtualMachinId3), networkAdapter.VirtualMachineId)
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
 		ID:             vm.ID,

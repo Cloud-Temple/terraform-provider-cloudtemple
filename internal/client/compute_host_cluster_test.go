@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	HostClusterName  = "TEST_HOST_CLUSTER_NAME"
-	HostClusterMoRef = "TEST_HOST_CLUSTER_MOREF"
+	HostClusterId    = "COMPUTE_HOST_CLUSTER_ID"
+	HostClusterName  = "COMPUTE_HOST_CLUSTER_NAME"
+	HostClusterMoRef = "COMPUTE_HOST_CLUSTER_MOREF"
 )
 
 func TestCompute_HostClusterList(t *testing.T) {

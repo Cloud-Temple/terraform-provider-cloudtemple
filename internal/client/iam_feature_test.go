@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	FeatureId   = "TEST_IAM_FEATURE_ID"
-	FeatureName = "TEST_IAM_FEATURE_NAME"
+	FeatureId   = "IAM_FEATURE_ID"
+	FeatureName = "IAM_FEATURE_NAME"
 )
 
 func TestIAM_Features(t *testing.T) {

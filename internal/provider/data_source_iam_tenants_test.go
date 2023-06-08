@@ -1,9 +1,17 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	TenantId   = "TENANT_ID"
+	TenantName = "TENANT_NAME"
+	TenantSNC  = "TENANT_SNC"
+	TenantQty  = "TENANT_QTY"
 )
 
 func TestAccDataSourceTenants(t *testing.T) {
@@ -14,11 +22,14 @@ func TestAccDataSourceTenants(t *testing.T) {
 			{
 				Config: testAccDataSourceTenants,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_tenants.foo", "tenants.#", "1"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_tenants.foo", "tenants.0.id"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_tenants.foo", "tenants.0.name", "BOB"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_tenants.foo", "tenants.0.snc", "false"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_tenants.foo", "tenants.0.company_id"),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_tenants.foo", "tenants.#", os.Getenv(TenantQty)),
+					resource.TestCheckTypeSetElemNestedAttrs("data.cloudtemple_iam_tenants.foo", "tenants.*", map[string]string{
+						"id":         os.Getenv(TenantId),
+						"name":       os.Getenv(TenantName),
+						"snc":        os.Getenv(TenantSNC),
+						"company_id": os.Getenv(testCompanyIDEnvName),
+					},
+					),
 				),
 			},
 		},

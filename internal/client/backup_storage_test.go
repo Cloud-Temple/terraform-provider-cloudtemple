@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	StorageId = "TEST_BACKUP_STORAGE_ID"
+	StorageId = "BACKUP_STORAGE_ID"
 )
 
 func TestBackupStorageClient_List(t *testing.T) {

@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	VirtualDiskId   = "COMPUTE_VIRTUAL_DISK_ID"
+	VirtualDiskName = "COMPUTE_VIRTUAL_DISK_NAME"
 )
 
 func TestAccDataSourceVirtualDisk(t *testing.T) {
@@ -13,17 +20,17 @@ func TestAccDataSourceVirtualDisk(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceVirtualDisk,
+				Config: fmt.Sprintf(testAccDataSourceVirtualDisk, os.Getenv(VirtualDiskId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "id", "d370b8cd-83eb-4315-a5d9-42157e2e4bb4"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "name", "Hard disk 1"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "virtual_machine_id", "de2b8b80-8b90-414a-bc33-e12f61a4c05c"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "id", os.Getenv(VirtualDiskId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "name", os.Getenv(VirtualDiskName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "virtual_machine_id", os.Getenv(VirtualMachineIdAlternative)),
 				),
 			}, {
-				Config: testAccDataSourceVirtualDiskName,
+				Config: fmt.Sprintf(testAccDataSourceVirtualDiskName, os.Getenv(VirtualDiskName), os.Getenv(VirtualMachineIdAlternative)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "id", "d370b8cd-83eb-4315-a5d9-42157e2e4bb4"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "name", "Hard disk 1"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "id", os.Getenv(VirtualDiskId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "name", os.Getenv(VirtualDiskName)),
 				),
 			},
 			{
@@ -36,14 +43,14 @@ func TestAccDataSourceVirtualDisk(t *testing.T) {
 
 const testAccDataSourceVirtualDisk = `
 data "cloudtemple_compute_virtual_disk" "foo" {
-  id = "d370b8cd-83eb-4315-a5d9-42157e2e4bb4"
+  id = "%s"
 }
 `
 
 const testAccDataSourceVirtualDiskName = `
 data "cloudtemple_compute_virtual_disk" "foo" {
-  name               = "Hard disk 1"
-  virtual_machine_id = "de2b8b80-8b90-414a-bc33-e12f61a4c05c"
+  name               = "%s"
+  virtual_machine_id = "%s"
 }
 `
 

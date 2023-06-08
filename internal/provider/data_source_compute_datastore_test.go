@@ -1,10 +1,18 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	DataStoreId   = "COMPUTE_DATASTORE_ID"
+	DataStoreName = "COMPUTE_DATASTORE_NAME"
+	DataStoresQty = "COMPUTE_DATASTORE_QTY"
 )
 
 func TestAccDataSourceDatastore(t *testing.T) {
@@ -13,17 +21,17 @@ func TestAccDataSourceDatastore(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceDatastore,
+				Config: fmt.Sprintf(testAccDataSourceDatastore, os.Getenv(DataStoreId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "id", "d439d467-943a-49f5-a022-c0c25b737022"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "name", "ds001-bob-svc1-data4-eqx6"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "id", os.Getenv(DataStoreId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "name", os.Getenv(DataStoreName)),
 				),
 			},
 			{
-				Config: testAccDataSourceDatastoreName,
+				Config: fmt.Sprintf(testAccDataSourceDatastoreName, os.Getenv(DataStoreName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "id", "d439d467-943a-49f5-a022-c0c25b737022"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "name", "ds001-bob-svc1-data4-eqx6"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "id", os.Getenv(DataStoreId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "name", os.Getenv(DataStoreName)),
 				),
 			},
 			{
@@ -36,13 +44,13 @@ func TestAccDataSourceDatastore(t *testing.T) {
 
 const testAccDataSourceDatastore = `
 data "cloudtemple_compute_datastore" "foo" {
-  id = "d439d467-943a-49f5-a022-c0c25b737022"
+  id = "%s"
 }
 `
 
 const testAccDataSourceDatastoreName = `
 data "cloudtemple_compute_datastore" "foo" {
-  name = "ds001-bob-svc1-data4-eqx6"
+  name = "%s"
 }
 `
 

@@ -9,11 +9,9 @@ import (
 )
 
 const (
-	PolicyId           = "TEST_BACKUP_POLICY_ID"
-	PolicyName         = "TEST_BACKUP_POLICY_NAME"
-	DataCenterId       = "TEST_DATACENTER_ID_1"
-	HostClusterId      = "TEST_HOST_CLUSTER_ID"
-	DatastoreClusterId = "TEST_DATASTORE_CLUSTER_ID"
+	PolicyId     = "BACKUP_POLICY_ID"
+	PolicyName   = "BACKUP_POLICY_NAME"
+	DataCenterId = "DATACENTER_ID"
 )
 
 func TestBackupSLAPolicyClient_List(t *testing.T) {
@@ -47,6 +45,7 @@ func TestBackupSLAPolicyClient_Read(t *testing.T) {
 
 	require.Equal(t, os.Getenv(PolicyId), slaPolicy.ID)
 	require.Equal(t, os.Getenv(PolicyName), slaPolicy.Name)
+
 }
 
 func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {

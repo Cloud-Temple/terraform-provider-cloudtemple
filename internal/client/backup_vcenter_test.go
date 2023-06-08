@@ -8,20 +8,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	TestSppServerId = "TEST_BACKUP_SPPSERVER_ID"
-)
-
 func TestBackupVCenterClient_List(t *testing.T) {
 	ctx := context.Background()
-	vcenters, err := client.Backup().VCenter().List(ctx, os.Getenv(TestSppServerId))
+	vcenters, err := client.Backup().VCenter().List(ctx, os.Getenv(SppServerId))
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(vcenters), 1)
 
 	var found bool
 	for _, vc := range vcenters {
-		if vc.ID == os.Getenv(VirtualDatacenterId) {
+		if vc.ID == os.Getenv(VCenterId) {
 			found = true
 			break
 		}

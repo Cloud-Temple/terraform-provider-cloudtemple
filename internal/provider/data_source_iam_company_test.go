@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
@@ -13,9 +15,9 @@ func TestAccDataSourceCompany(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceCompany,
+				Config: fmt.Sprintf(testAccDataSourceCompany, os.Getenv(testCompanyIDEnvName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_company.foo", "id", "77a7d0a7-768d-4688-8c32-5fc539c5a859"),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_company.foo", "id", os.Getenv(testCompanyIDEnvName)),
 					resource.TestCheckResourceAttr("data.cloudtemple_iam_company.foo", "name", "Cloud Temple"),
 				),
 			},
@@ -29,7 +31,7 @@ func TestAccDataSourceCompany(t *testing.T) {
 
 const testAccDataSourceCompany = `
 data "cloudtemple_iam_company" "foo" {
-  id = "77a7d0a7-768d-4688-8c32-5fc539c5a859"
+  id = "%s"
 }
 `
 

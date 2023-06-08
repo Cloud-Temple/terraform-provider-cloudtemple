@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 
@@ -9,9 +10,9 @@ import (
 )
 
 const (
-	HostId    = "TEST_HOST_ID"
-	HostName  = "TEST_HOST_NAME"
-	HostMoRef = "TEST_HOST_MOREF"
+	HostId    = "COMPUTE_HOST_ID"
+	HostName  = "COMPUTE_HOST_NAME"
+	HostMoRef = "COMPUTE_HOST_MOREF"
 )
 
 func TestCompute_HostList(t *testing.T) {
@@ -24,16 +25,20 @@ func TestCompute_HostList(t *testing.T) {
 	var found bool
 	for _, h := range hosts {
 		if h.ID == os.Getenv(HostId) {
+			fmt.Println("found")
 			found = true
 			break
 		}
 	}
+
 	require.True(t, found)
 }
 
 func TestCompute_HostRead(t *testing.T) {
 	ctx := context.Background()
+	fmt.Println(os.Getenv(HostId))
 	host, err := client.Compute().Host().Read(ctx, os.Getenv(HostId))
+
 	require.NoError(t, err)
 
 	require.Equal(t, os.Getenv(HostId), host.ID)

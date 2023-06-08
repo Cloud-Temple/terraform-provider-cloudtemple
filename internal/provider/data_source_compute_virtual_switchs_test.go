@@ -1,9 +1,14 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	VirtualSwitchQty = "COMPUTE_VIRTUAL_SWITCH_QTY"
 )
 
 func TestAccDataSourceVirtualSwitchs(t *testing.T) {
@@ -14,7 +19,7 @@ func TestAccDataSourceVirtualSwitchs(t *testing.T) {
 			{
 				Config: testAccDataSourceVirtualSwitchs,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switchs.foo", "virtual_switchs.#", "2"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switchs.foo", "virtual_switchs.#", os.Getenv(VirtualSwitchQty)),
 				),
 			},
 		},

@@ -1,9 +1,15 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	VCentersQty = "COMPUTE_VCENTER_QTY"
 )
 
 func TestAccDataSourceBackupVCenters(t *testing.T) {
@@ -12,9 +18,9 @@ func TestAccDataSourceBackupVCenters(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceBackupVCenters,
+				Config: fmt.Sprintf(testAccDataSourceBackupVCenters, os.Getenv(SppServerId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_vcenters.foo", "vcenters.#", "2"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_vcenters.foo", "vcenters.#", os.Getenv(VCentersQty)),
 				),
 			},
 		},
@@ -23,6 +29,6 @@ func TestAccDataSourceBackupVCenters(t *testing.T) {
 
 const testAccDataSourceBackupVCenters = `
 data "cloudtemple_backup_vcenters" "foo" {
-  spp_server_id = "a34d230c-dd0f-4fa9-a099-bec7d8609bd4"
+  spp_server_id = "%s"
 }
 `

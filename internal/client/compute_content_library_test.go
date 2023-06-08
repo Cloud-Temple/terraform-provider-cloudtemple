@@ -9,15 +9,15 @@ import (
 )
 
 const (
-	ContentLibraryId       = "TEST_COMPUTE_CONTENT_LIBRARY_ID"
-	ContentLibraryName     = "TEST_COMPUTE_CONTENT_LIBRARY_NAME"
-	ContentLibraryType     = "TEST_COMPUTE_CONTENT_LIBRARY_TYPE"
-	ContentLibraryItemId   = "TEST_COMPUTE_CONTENT_LIBRARY_ITEM_ID"
-	ContentLibraryItemName = "TEST_COMPUTE_CONTENT_LIBRARY_ITEM_NAME"
-	ContentLibraryItemType = "TEST_COMPUTE_CONTENT_LIBRARY_ITEM_TYPE"
-	MachineManagerId       = "TEST_VIRTUAL_CENTER_ID_1"
-	DataStoreId            = "TEST_COMPUTE_DATASTORE_ID"
-	DataStoreName          = "TEST_COMPUTE_DATASTORE_NAME"
+	ContentLibraryId       = "COMPUTE_CONTENT_LIBRARY_ID"
+	ContentLibraryName     = "COMPUTE_CONTENT_LIBRARY_NAME"
+	ContentLibraryType     = "COMPUTE_CONTENT_LIBRARY_TYPE"
+	ContentLibraryItemId   = "COMPUTE_CONTENT_LIBRARY_ITEM_ID"
+	ContentLibraryItemName = "COMPUTE_CONTENT_LIBRARY_ITEM_NAME"
+	ContentLibraryItemType = "COMPUTE_CONTENT_LIBRARY_ITEM_TYPE"
+	MachineManagerId       = "COMPUTE_VCENTER_ID"
+	DataStoreId            = "COMPUTE_DATASTORE_ID"
+	DataStoreName          = "COMPUTE_DATASTORE_NAME"
 )
 
 func TestCompute_ContentLibraryList(t *testing.T) {

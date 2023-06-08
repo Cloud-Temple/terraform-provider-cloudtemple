@@ -6,6 +6,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
+const (
+	DataCenterId2 = "DATACENTER_ID_2"
+)
+
 func TestAccResourceVirtualMachine(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },

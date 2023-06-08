@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	NetworkAdapterId   = "COMPUTE_NETWORK_ADAPTER_ID"
+	NetworkAdapterName = "COMPUTE_NETWORK_ADAPTER_NAME"
 )
 
 func TestAccDataSourceNetworkAdapter(t *testing.T) {
@@ -13,18 +20,18 @@ func TestAccDataSourceNetworkAdapter(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceNetworkAdapter,
+				Config: fmt.Sprintf(testAccDataSourceNetworkAdapter, os.Getenv(NetworkAdapterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "id", "c74060bf-ebb3-455a-b0b0-d0dcb79f3d86"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "name", "Network adapter 1"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "virtual_machine_id", "de2b8b80-8b90-414a-bc33-e12f61a4c05c"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "id", os.Getenv(NetworkAdapterId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "virtual_machine_id", os.Getenv(VirtualMachineIdAlternative)),
 				),
 			},
 			{
-				Config: testAccDataSourceNetworkAdapterName,
+				Config: fmt.Sprintf(testAccDataSourceNetworkAdapterName, os.Getenv(NetworkAdapterName), os.Getenv(VirtualMachineIdAlternative)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "id", "c74060bf-ebb3-455a-b0b0-d0dcb79f3d86"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "name", "Network adapter 1"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "id", os.Getenv(NetworkAdapterId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
 				),
 			},
 			{
@@ -37,14 +44,14 @@ func TestAccDataSourceNetworkAdapter(t *testing.T) {
 
 const testAccDataSourceNetworkAdapter = `
 data "cloudtemple_compute_network_adapter" "foo" {
-  id = "c74060bf-ebb3-455a-b0b0-d0dcb79f3d86"
+  id = "%s"
 }
 `
 
 const testAccDataSourceNetworkAdapterName = `
 data "cloudtemple_compute_network_adapter" "foo" {
-  name               = "Network adapter 1"
-  virtual_machine_id = "de2b8b80-8b90-414a-bc33-e12f61a4c05c"
+  name               = "%s"
+  virtual_machine_id = "%s"
 }
 `
 

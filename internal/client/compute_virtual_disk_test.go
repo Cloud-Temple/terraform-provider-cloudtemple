@@ -10,14 +10,14 @@ import (
 )
 
 const (
-	VirtualDiskId          = "TEST_COMPUTE_VIRTUAL_DISK_ID"
-	VirtualDiskName        = "TEST_COMPUTE_VIRTUAL_DISK_NAME"
-	VirtualMachineCapacity = "TEST_COMPUTE_VIRTUAL_DISK_CAPACITY"
+	VirtualDiskId          = "COMPUTE_VIRTUAL_DISK_ID"
+	VirtualDiskName        = "COMPUTE_VIRTUAL_DISK_NAME"
+	VirtualMachineCapacity = "COMPUTE_VIRTUAL_DISK_CAPACITY"
 )
 
 func TestCompute_VirtualDiskList(t *testing.T) {
 	ctx := context.Background()
-	virtualDisks, err := client.Compute().VirtualDisk().List(ctx, os.Getenv(VirtualMachineId))
+	virtualDisks, err := client.Compute().VirtualDisk().List(ctx, os.Getenv(VirtualMachineIdAlternative))
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(virtualDisks), 1)
@@ -39,8 +39,7 @@ func TestCompute_VirtualDiskRead(t *testing.T) {
 
 	capacity, _ := strconv.Atoi(os.Getenv(VirtualMachineCapacity))
 	require.Equal(t, os.Getenv(VirtualDiskId), virtualDisk.ID)
-	require.Equal(t, os.Getenv(VirtualDiskId), virtualDisk.ID)
-	require.Equal(t, os.Getenv(VirtualMachineId), virtualDisk.VirtualMachineId)
+	require.Equal(t, os.Getenv(VirtualMachineIdAlternative), virtualDisk.VirtualMachineId)
 	require.Equal(t, os.Getenv(MachineManagerId2), virtualDisk.MachineManagerId)
 	require.Equal(t, capacity, virtualDisk.Capacity)
 }
@@ -81,11 +80,6 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 	disk.DatastoreId = ""
 	disk.DatastoreName = ""
 	disk.DiskPath = ""
-
-	// require.Equal(t, diskId, disk.ID)
-	// require.Equal(t, vm.ID, disk.VirtualMachineId)
-	// require.Equal(t, os.Getenv(MachineManagerId2), disk.MachineManagerId)
-	// require.Equal(t, diskId, disk.ID)
 
 	require.Equal(
 		t,

@@ -1,10 +1,21 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	JobId         = "BACKUP_JOB_ID"
+	JobName       = "BACKUP_JOB_NAME"
+	JobDislayName = "BACKUP_JOB_DISPLAY_NAME"
+	JobType       = "BACKUP_JOB_TYPE"
+	JobStatus     = "BACKUP_JOB_STATUS"
+	JobPolicyId   = "BACKUP_JOB_POLICY_ID"
 )
 
 func TestAccDataSourceBackupJob(t *testing.T) {
@@ -13,25 +24,25 @@ func TestAccDataSourceBackupJob(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceBackupJob,
+				Config: fmt.Sprintf(testAccDataSourceBackupJob, os.Getenv(JobId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "id", "1004"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "name", "Hypervisor Inventory"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "display_name", "Hypervisor Inventory"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "type", "catalog"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "status", "IDLE"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "policy_id", "1004"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "id", os.Getenv(JobId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "name", os.Getenv(JobName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "display_name", os.Getenv(JobDislayName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "type", os.Getenv(JobType)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "status", os.Getenv(JobStatus)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "policy_id", os.Getenv(JobPolicyId)),
 				),
 			},
 			{
-				Config: testAccDataSourceBackupJobName,
+				Config: fmt.Sprintf(testAccDataSourceBackupJobName, os.Getenv(JobName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "id", "1004"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "name", "Hypervisor Inventory"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "display_name", "Hypervisor Inventory"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "type", "catalog"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "status", "IDLE"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "policy_id", "1004"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "id", os.Getenv(JobId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "name", os.Getenv(JobName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "display_name", os.Getenv(JobDislayName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "type", os.Getenv(JobType)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "status", os.Getenv(JobStatus)),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "policy_id", os.Getenv(JobPolicyId)),
 				),
 			},
 			{
@@ -44,13 +55,13 @@ func TestAccDataSourceBackupJob(t *testing.T) {
 
 const testAccDataSourceBackupJob = `
 data "cloudtemple_backup_job" "foo" {
-  id = "1004"
+  id = "%s"
 }
 `
 
 const testAccDataSourceBackupJobName = `
 data "cloudtemple_backup_job" "foo" {
-  name = "Hypervisor Inventory"
+  name = "%s"
 }
 `
 

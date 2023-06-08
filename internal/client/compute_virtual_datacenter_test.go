@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	VirtualDatacenterId   = "TEST_COMPUTE_VIRTUAL_DATACENTER_ID"
-	VirtualDatacenterName = "TEST_COMPUTE_VIRTUAL_DATACENTER_NAME"
+	VirtualDatacenterId   = "COMPUTE_VIRTUAL_DATACENTER_ID"
+	VirtualDatacenterName = "COMPUTE_VIRTUAL_DATACENTER_NAME"
 )
 
 func TestCompute_VirtualDatacenterList(t *testing.T) {

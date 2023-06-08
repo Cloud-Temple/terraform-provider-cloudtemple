@@ -9,11 +9,8 @@ import (
 )
 
 const (
-	JobSessionId   = "TEST_BACKUP_JOB_SESSION_ID"
-	JobSessionName = "TEST_BACKUP_JOB_SESSION_NAME"
-	JobId          = "TEST_BACKUP_JOB_SESSION_JOB_ID"
-	BackupType     = "TEST_BACKUP_TYPE"
-	SlaPolicyType  = "TEST_BACKUP_JOB_SESSION_SLA_POLICY_TYPE"
+	JobSessionId   = "BACKUP_JOB_SESSION_ID"
+	JobSessionName = "BACKUP_JOB_SESSION_NAME"
 )
 
 func TestBackupJobSessionClient_List(t *testing.T) {
@@ -35,6 +32,6 @@ func TestBackupJobSessionClient_List(t *testing.T) {
 	require.Equal(t, os.Getenv(JobSessionId), jobSession.ID)
 	require.Equal(t, os.Getenv(JobSessionName), jobSession.JobName)
 	require.Equal(t, os.Getenv(JobId), jobSession.JobId)
-	require.Equal(t, os.Getenv(BackupType), jobSession.Type)
-	require.Equal(t, os.Getenv(SlaPolicyType), jobSession.SlaPolicyType)
+	require.Equal(t, os.Getenv(JobType), jobSession.Type)
+
 }

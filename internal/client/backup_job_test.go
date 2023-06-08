@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	JobName     = "TEST_BACKUP_JOB_NAME"
-	JobType     = "TEST_BACKUP_JOB_TYPE"
-	JobPolicyId = "TEST_BACKUP_JOB_POLICY_ID"
+	JobId       = "BACKUP_JOB_ID"
+	JobName     = "BACKUP_JOB_NAME"
+	JobType     = "BACKUP_JOB_TYPE"
+	JobPolicyId = "BACKUP_JOB_POLICY_ID"
 )
 
 func TestBackupJobClient_List(t *testing.T) {

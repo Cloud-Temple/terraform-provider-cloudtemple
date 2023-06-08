@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	HostId   = "COMPUTE_HOST_ID"
+	HostName = "COMPUTE_HOST_NAME"
 )
 
 func TestAccDataSourceHost(t *testing.T) {
@@ -13,17 +20,17 @@ func TestAccDataSourceHost(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceHost,
+				Config: fmt.Sprintf(testAccDataSourceHost, os.Getenv(HostId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "id", "8997db63-24d5-47f4-8cca-d5f5df199d1a"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "name", "esx001-bob-ucs01-eqx6.cloud-temple.lan"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "id", os.Getenv(HostId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "name", os.Getenv(HostName)),
 				),
 			},
 			{
-				Config: testAccDataSourceHostName,
+				Config: fmt.Sprintf(testAccDataSourceHostName, os.Getenv(HostName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "id", "8997db63-24d5-47f4-8cca-d5f5df199d1a"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "name", "esx001-bob-ucs01-eqx6.cloud-temple.lan"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "id", os.Getenv(HostId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "name", os.Getenv(HostName)),
 				),
 			},
 			{
@@ -36,13 +43,13 @@ func TestAccDataSourceHost(t *testing.T) {
 
 const testAccDataSourceHost = `
 data "cloudtemple_compute_host" "foo" {
-  id = "8997db63-24d5-47f4-8cca-d5f5df199d1a"
+  id = "%s"
 }
 `
 
 const testAccDataSourceHostName = `
 data "cloudtemple_compute_host" "foo" {
-  name = "esx001-bob-ucs01-eqx6.cloud-temple.lan"
+  name = "%s"
 }
 `
 

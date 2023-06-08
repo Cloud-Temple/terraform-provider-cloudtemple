@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	NetworkName  = "TEST_COMPUTE_NETWORK_NAME"
-	NetworkMoRef = "TEST_COMPUTE_NETWORK_MOREF"
+	NetworkId    = "COMPUTE_NETWORK_ID"
+	NetworkName  = "COMPUTE_NETWORK_NAME"
+	NetworkMoRef = "COMPUTE_NETWORK_MOREF"
 )
 
 func TestCompute_NetworkList(t *testing.T) {

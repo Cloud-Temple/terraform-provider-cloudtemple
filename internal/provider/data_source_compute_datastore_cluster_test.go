@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	DatastoreClusterId   = "COMPUTE_DATASTORE_CLUSTER_ID"
+	DatastoreClusterName = "COMPUTE_DATASTORE_CLUSTER_NAME"
 )
 
 func TestAccDataSourceDatastoreCluster(t *testing.T) {
@@ -13,17 +20,17 @@ func TestAccDataSourceDatastoreCluster(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceDatastoreCluster,
+				Config: fmt.Sprintf(testAccDataSourceDatastoreCluster, os.Getenv(DatastoreClusterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "id", "6b06b226-ef55-4a0a-92bc-7aa071681b1b"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "name", "sdrs001-LIVE_KOUKOU"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "id", os.Getenv(DatastoreClusterId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "name", os.Getenv(DatastoreClusterName)),
 				),
 			},
 			{
-				Config: testAccDataSourceDatastoreClusterName,
+				Config: fmt.Sprintf(testAccDataSourceDatastoreClusterName, os.Getenv(DatastoreClusterName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "id", "6b06b226-ef55-4a0a-92bc-7aa071681b1b"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "name", "sdrs001-LIVE_KOUKOU"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "id", os.Getenv(DatastoreClusterId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "name", os.Getenv(DatastoreClusterName)),
 				),
 			},
 			{
@@ -36,13 +43,18 @@ func TestAccDataSourceDatastoreCluster(t *testing.T) {
 
 const testAccDataSourceDatastoreCluster = `
 data "cloudtemple_compute_datastore_cluster" "foo" {
-  id = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+  id = "%s"
 }
 `
 
 const testAccDataSourceDatastoreClusterName = `
+data "cloudtemple_compute_machine_manager" "vstack-01" {
+	name = "vc-vstack-001-t0001"
+}
+
 data "cloudtemple_compute_datastore_cluster" "foo" {
-  name = "sdrs001-LIVE_KOUKOU"
+  name = "%s"
+  machine_manager_id = data.cloudtemple_compute_machine_manager.vstack-01.id
 }
 `
 

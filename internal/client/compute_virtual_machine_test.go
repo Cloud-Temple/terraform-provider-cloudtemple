@@ -10,9 +10,11 @@ import (
 )
 
 const (
-	DataCenterId2       = "TEST_DATACENTER_ID_2"
-	VirtualMachineName  = "TEST_COMPUTE_VIRTUEL_MACHINE_NAME"
-	VirtualMachineMoref = "TEST_COMPUTE_VIRTUEL_MACHINE_MOREF"
+	VirtualMachineId                    = "COMPUTE_VIRTUAL_MACHINE_ID"
+	VirtualMachineName                  = "COMPUTE_VIRTUAL_MACHINE_NAME"
+	VirtualMachineMoref                 = "COMPUTE_VIRTUAL_MACHINE_MOREF"
+	VirtualMachineIdAlternative         = "COMPUTE_VIRTUAL_MACHINE_ID_ALTERNATIVE"
+	VirtualMachineHostClusterIdRelocate = "COMPUTE_VIRTUAL_MACHINE_HOST_CLUSTER_RELOCATE"
 )
 
 func TestCompute_VirtualMachineList(t *testing.T) {
@@ -36,14 +38,10 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 	ctx := context.Background()
 	virtualMachine, err := client.Compute().VirtualMachine().Read(ctx, os.Getenv(VirtualMachineId))
 	require.NoError(t, err)
-
-	// Skip checking the storage
-	virtualMachine.Storage = VirtualMachineStorage{}
-
 	require.Equal(t, os.Getenv(VirtualMachineId), virtualMachine.ID)
 	require.Equal(t, os.Getenv(VirtualMachineName), virtualMachine.Name)
 	require.Equal(t, os.Getenv(VirtualMachineMoref), virtualMachine.Moref)
-	require.Equal(t, os.Getenv(MachineManagerId), virtualMachine.MachineManagerId)
+	require.Equal(t, os.Getenv(MachineManagerId2), virtualMachine.MachineManagerId)
 	require.Equal(t, os.Getenv(VirtualMachineMoref), virtualMachine.Moref)
 
 }
@@ -234,7 +232,7 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 	ctx := context.Background()
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
-		Name:                      "test-client-clone",
+		Name:                      "test-client-relocate",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
@@ -249,9 +247,9 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 	activityId, err = client.Compute().VirtualMachine().Relocate(ctx, &RelocateVirtualMachineRequest{
 		VirtualMachines:    []string{instanceId},
 		Priority:           "highPriority",
-		DatacenterId:       os.Getenv(DataCenterId2),
-		HostClusterId:      "bd5d8bf4-953a-46fb-9997-45467ba1ae6f",
-		DatastoreClusterId: "0f3c6809-3f15-42c1-a502-69c80bf7ca8f",
+		DatacenterId:       os.Getenv(DataCenterId),
+		HostClusterId:      os.Getenv(VirtualMachineHostClusterIdRelocate),
+		DatastoreClusterId: os.Getenv(DatastoreClusterId),
 	})
 
 	newInstanceId := activity.ConcernedItems[0].ID
@@ -262,8 +260,8 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 
 	vm, err := client.Compute().VirtualMachine().Read(ctx, newInstanceId)
 	require.NoError(t, err)
-	require.Equal(t, os.Getenv(DataCenterId2), vm.DatacenterId)
-	require.Equal(t, "bd5d8bf4-953a-46fb-9997-45467ba1ae6f", vm.HostClusterId)
+	require.Equal(t, os.Getenv(DataCenterId), vm.DatacenterId)
+	require.Equal(t, os.Getenv(VirtualMachineHostClusterIdRelocate), vm.HostClusterId)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, newInstanceId)
 	require.NoError(t, err)

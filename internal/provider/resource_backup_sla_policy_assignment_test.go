@@ -1,9 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	MachineManagerName = "MACHINE_MANAGER_NAME"
+	PolicyName2        = "BACKUP_METRICS_POLICY_NAME"
+	PolicyId2          = "BACKUP_METRICS_POLICY_Id"
 )
 
 func TestAccResourceSLAPolicyAssignment(t *testing.T) {
@@ -12,12 +20,21 @@ func TestAccResourceSLAPolicyAssignment(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccResourceSLAPolicyAssignment,
+				Config: fmt.Sprintf(
+					testAccResourceSLAPolicyAssignment,
+					os.Getenv(MachineManagerName),
+					os.Getenv(VirtualDatacenterName),
+					os.Getenv(HostClusterName),
+					os.Getenv(DatastoreClusterName),
+					os.Getenv(OperatingSystemMoRef),
+					os.Getenv(PolicyName),
+					os.Getenv(PolicyName2),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("cloudtemple_backup_sla_policy_assignment.foo", "virtual_machine_id"),
 					resource.TestCheckResourceAttr("cloudtemple_backup_sla_policy_assignment.foo", "sla_policy_ids.#", "2"),
-					resource.TestCheckResourceAttr("cloudtemple_backup_sla_policy_assignment.foo", "sla_policy_ids.0", "442718ef-44a1-43d7-9b57-2d910d74e928"),
-					resource.TestCheckResourceAttr("cloudtemple_backup_sla_policy_assignment.foo", "sla_policy_ids.1", "a90e8505-1a82-4878-9410-0912ec63fec3"),
+					resource.TestCheckResourceAttr("cloudtemple_backup_sla_policy_assignment.foo", "sla_policy_ids.0", os.Getenv(PolicyId2)),
+					resource.TestCheckResourceAttr("cloudtemple_backup_sla_policy_assignment.foo", "sla_policy_ids.1", os.Getenv(PolicyId)),
 				),
 			},
 			{
@@ -31,40 +48,47 @@ func TestAccResourceSLAPolicyAssignment(t *testing.T) {
 }
 
 const testAccResourceSLAPolicyAssignment = `
+data "cloudtemple_compute_machine_manager" "vstack" {
+	name = "%s"
+}
+
 data "cloudtemple_compute_virtual_datacenter" "dc" {
-  name = "DC-EQX6"
+  name = "%s"
+  machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
-data "cloudtemple_compute_host_cluster" "flo" {
-  name = "clu002-ucs01_FLO"
+data "cloudtemple_compute_host_cluster" "chc" {
+  name = "%s"
+  machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
-data "cloudtemple_compute_datastore_cluster" "koukou" {
-  name = "sdrs001-LIVE_KOUKOU"
+data "cloudtemple_compute_datastore_cluster" "cdc" {
+  name = "%s"
+  machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform-sla-policy"
 
   datacenter_id                = data.cloudtemple_compute_virtual_datacenter.dc.id
-  host_cluster_id              = data.cloudtemple_compute_host_cluster.flo.id
-  datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.koukou.id
-  guest_operating_system_moref = "amazonlinux2_64Guest"
+  host_cluster_id              = data.cloudtemple_compute_host_cluster.chc.id
+  datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.cdc.id
+  guest_operating_system_moref = "%s"
 }
 
-data "cloudtemple_backup_sla_policy" "admin" {
-  name = "SLA_ADMIN"
+data "cloudtemple_backup_sla_policy" "nobackup" {
+  name = "%s"
 }
 
 data "cloudtemple_backup_sla_policy" "daily" {
-  name = "SLA_DAILY"
+  name = "%s"
 }
 
 resource "cloudtemple_backup_sla_policy_assignment" "foo" {
   virtual_machine_id = cloudtemple_compute_virtual_machine.foo.id
   sla_policy_ids = [
 	data.cloudtemple_backup_sla_policy.daily.id,
-	data.cloudtemple_backup_sla_policy.admin.id,
+	data.cloudtemple_backup_sla_policy.nobackup.id,
   ]
 }
 `

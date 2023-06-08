@@ -9,14 +9,14 @@ import (
 )
 
 const (
-	MetricPolicyName          = "TEST_BACKUP_METRICS_POLICY_NAME"
-	MetricPolicyTriggerType   = "TEST_BACKUP_METRICS_POLICY_TRIGGER_TYPE"
-	MetricsPlatformVersion    = "TEST_BACKUP_METRICS_PLATEFORM_VERSION"
-	MetricsPlatformBuild      = "TEST_BACKUP_METRICS_PLATEFORM_BUILD"
-	MetricsPlatformDate       = "TEST_BACKUP_METRICS_PLATEFORM_DATE"
-	MetricsPlatformProduct    = "TEST_BACKUP_METRICS_PLATEFORM_PRODUCT"
-	MetricsPlatformEpoch      = "TEST_BACKUP_METRICS_PLATEFORM_EPOCH"
-	MetricsPlatformDeployType = "TEST_BACKUP_METRICS_PLATEFORM_DEPLOY_TYPE"
+	MetricPolicyName          = "BACKUP_METRICS_POLICY_NAME"
+	MetricPolicyTriggerType   = "BACKUP_METRICS_POLICY_TRIGGER_TYPE"
+	MetricsPlatformVersion    = "BACKUP_METRICS_PLATEFORM_VERSION"
+	MetricsPlatformBuild      = "BACKUP_METRICS_PLATEFORM_BUILD"
+	MetricsPlatformDate       = "BACKUP_METRICS_PLATEFORM_DATE"
+	MetricsPlatformProduct    = "BACKUP_METRICS_PLATEFORM_PRODUCT"
+	MetricsPlatformEpoch      = "BACKUP_METRICS_PLATEFORM_EPOCH"
+	MetricsPlatformDeployType = "BACKUP_METRICS_PLATEFORM_DEPLOY_TYPE"
 )
 
 func TestBackupMetricsClient_History(t *testing.T) {

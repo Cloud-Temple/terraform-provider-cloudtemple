@@ -9,11 +9,11 @@ import (
 )
 
 const (
-	IamUserEmail      = "TEST_IAM_USER_EMAIL"
-	IamUserId         = "TEST_IAM_USER_ID"
-	IamUserInternalId = "TEST_IAM_USER_INTERNAL_ID"
-	IamUserName       = "TEST_IAM_USER_NAME"
-	IamUserType       = "TEST_IAM_USER_TYPE"
+	IamUserEmail      = "IAM_USER_EMAIL"
+	IamUserId         = "IAM_USER_ID"
+	IamUserInternalId = "IAM_USER_INTERNAL_ID"
+	IamUserName       = "IAM_USER_NAME"
+	IamUserType       = "IAM_USER_TYPE"
 )
 
 func TestIAM_Users(t *testing.T) {

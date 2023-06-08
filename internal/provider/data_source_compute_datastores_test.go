@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -14,7 +15,7 @@ func TestAccDataSourceDatastores(t *testing.T) {
 			{
 				Config: testAccDataSourceDatastores,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastores.foo", "datastores.#", "3"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastores.foo", "datastores.#", os.Getenv(DataStoresQty)),
 				),
 			},
 		},

@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	SiteId   = "TEST_BACKUP_SITE_ID"
-	SiteName = "TEST_BACKUP_SITE_NAME"
+	SiteId   = "BACKUP_SITE_ID"
+	SiteName = "BACKUP_SITE_NAME"
 )
 
 func TestBackupSiteClient_List(t *testing.T) {

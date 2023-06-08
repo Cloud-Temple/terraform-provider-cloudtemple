@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	ResourcePoolId    = "TEST_COMPTE_RESOURCE_POOL_ID"
-	ResourcePoolName  = "TEST_COMPTE_RESOURCE_POOL_NAME"
-	ResourcePoolMoRef = "TEST_COMPTE_RESOURCE_POOL_MOFER"
+	ResourcePoolId    = "COMPTE_RESOURCE_POOL_ID"
+	ResourcePoolName  = "COMPTE_RESOURCE_POOL_NAME"
+	ResourcePoolMoRef = "COMPTE_RESOURCE_POOL_MOFER"
 )
 
 func TestCompute_ResourcePoolList(t *testing.T) {

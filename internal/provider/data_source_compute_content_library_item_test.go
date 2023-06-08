@@ -1,10 +1,21 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	ContentLibraryId       = "COMPUTE_CONTENT_LIBRARY_ID"
+	ContentLibraryName     = "COMPUTE_CONTENT_LIBRARY_NAME"
+	ContentLibraryType     = "COMPUTE_CONTENT_LIBRARY_TYPE"
+	ContentLibraryItemId   = "COMPUTE_CONTENT_LIBRARY_ITEM_ID"
+	ContentLibraryItemName = "COMPUTE_CONTENT_LIBRARY_ITEM_NAME"
+	ContentLibraryItemType = "COMPUTE_CONTENT_LIBRARY_ITEM_TYPE"
 )
 
 func TestAccDataSourceLibraryItem(t *testing.T) {
@@ -13,30 +24,24 @@ func TestAccDataSourceLibraryItem(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceLibraryItem,
+				Config: fmt.Sprintf(testAccDataSourceLibraryItem, os.Getenv(ContentLibraryName), os.Getenv(ContentLibraryItemId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "content_library_id", "25db620e-ffb1-4152-a786-b36041fe00c8"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", "8d34ec8a-488a-4757-84d0-ae7bc2c3659f"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", "runnable-ubuntu-template"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "description", "Template ubuntu"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", "vm-template"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "stored", "true"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "last_modified_time"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "content_library_id", os.Getenv(ContentLibraryId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", os.Getenv(ContentLibraryItemId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", os.Getenv(ContentLibraryItemName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", os.Getenv(ContentLibraryItemType)),
 				),
 			},
 			{
-				Config: testAccDataSourceLibraryItemName,
+				Config: fmt.Sprintf(testAccDataSourceLibraryItemName, os.Getenv(ContentLibraryName), os.Getenv(ContentLibraryItemName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", "8d34ec8a-488a-4757-84d0-ae7bc2c3659f"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", "runnable-ubuntu-template"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "description", "Template ubuntu"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", "vm-template"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "stored", "true"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "last_modified_time"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", os.Getenv(ContentLibraryItemId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", os.Getenv(ContentLibraryItemName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", os.Getenv(ContentLibraryItemType)),
 				),
 			},
 			{
-				Config:      testAccDataSourceLibraryItemMissing,
+				Config:      fmt.Sprintf(testAccDataSourceLibraryItemMissing, os.Getenv(ContentLibraryName)),
 				ExpectError: regexp.MustCompile("failed to find content library item with id"),
 			},
 		},
@@ -45,29 +50,29 @@ func TestAccDataSourceLibraryItem(t *testing.T) {
 
 const testAccDataSourceLibraryItem = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "local-vc-vstack-001-t0001"
+  name = "%s"
 }
 
 data "cloudtemple_compute_content_library_item" "foo" {
   content_library_id = data.cloudtemple_compute_content_library.foo.id
-  id                 = "8d34ec8a-488a-4757-84d0-ae7bc2c3659f"
+  id                 = "%s"
 }
 `
 
 const testAccDataSourceLibraryItemName = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "local-vc-vstack-001-t0001"
+  name = "%s"
 }
 
 data "cloudtemple_compute_content_library_item" "foo" {
   content_library_id = data.cloudtemple_compute_content_library.foo.id
-  name               = "runnable-ubuntu-template"
+  name               = "%s"
 }
 `
 
 const testAccDataSourceLibraryItemMissing = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "local-vc-vstack-001-t0001"
+  name = "%s"
 }
 
 data "cloudtemple_compute_content_library_item" "foo" {

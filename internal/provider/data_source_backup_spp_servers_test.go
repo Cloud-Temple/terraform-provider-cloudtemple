@@ -1,9 +1,14 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	SppServersQty = "BACKUP_SPPSERVER_QTY"
 )
 
 func TestAccDataSourceBackupSPPServers(t *testing.T) {
@@ -14,7 +19,7 @@ func TestAccDataSourceBackupSPPServers(t *testing.T) {
 			{
 				Config: testAccDataSourceBackupSPPServers,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_servers.foo", "spp_servers.#", "1"),
+					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_servers.foo", "spp_servers.#", os.Getenv(SppServersQty)),
 				),
 			},
 		},

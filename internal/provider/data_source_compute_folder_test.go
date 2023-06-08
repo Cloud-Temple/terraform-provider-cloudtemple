@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	FolderId   = "COMPUTE_FOLDER_ID"
+	FolderName = "COMPUTE_FOLDER_NAME"
 )
 
 func TestAccDataSourceFolder(t *testing.T) {
@@ -13,17 +20,17 @@ func TestAccDataSourceFolder(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceFolder,
+				Config: fmt.Sprintf(testAccDataSourceFolder, os.Getenv(FolderId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "id", "b41ea9b1-4cca-44ed-9a76-2b598de03781"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "name", "Datacenters"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "id", os.Getenv(FolderId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "name", os.Getenv(FolderName)),
 				),
 			},
 			{
-				Config: testAccDataSourceFolderName,
+				Config: fmt.Sprintf(testAccDataSourceFolderName, os.Getenv(FolderName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "id", "b41ea9b1-4cca-44ed-9a76-2b598de03781"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "name", "Datacenters"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "id", os.Getenv(FolderId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "name", os.Getenv(FolderName)),
 				),
 			},
 			{
@@ -36,13 +43,13 @@ func TestAccDataSourceFolder(t *testing.T) {
 
 const testAccDataSourceFolder = `
 data "cloudtemple_compute_folder" "foo" {
-  id = "b41ea9b1-4cca-44ed-9a76-2b598de03781"
+  id = "%s"
 }
 `
 
 const testAccDataSourceFolderName = `
 data "cloudtemple_compute_folder" "foo" {
-  name = "Datacenters"
+  name = "%s"
 }
 `
 

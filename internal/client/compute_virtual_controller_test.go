@@ -9,10 +9,9 @@ import (
 )
 
 const (
-	VirtualMachineId       = "TEST_COMPUTE_VIRTUAL_MACHINE_ID"
-	VirtualControllerId    = "TEST_COMPUTE_VIRTUAL_CONTROLLER_ID"
-	VirtualControllerType  = "TEST_COMPUTE_VIRTUAL_CONTROLLER_TYPE"
-	VirtualControllerLabel = "TEST_COMPUTE_VIRTUAL_CONTROLLER_LABEL"
+	VirtualControllerId    = "COMPUTE_VIRTUAL_CONTROLLER_ID"
+	VirtualControllerType  = "COMPUTE_VIRTUAL_CONTROLLER_TYPE"
+	VirtualControllerLabel = "COMPUTE_VIRTUAL_CONTROLLER_LABEL"
 )
 
 func TestCompute_VirtualControllerList(t *testing.T) {

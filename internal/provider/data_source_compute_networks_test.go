@@ -1,9 +1,14 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	NetworksQty = "COMPUTE_NETWORK_QTY"
 )
 
 func TestAccDataSourceNetworks(t *testing.T) {
@@ -14,7 +19,7 @@ func TestAccDataSourceNetworks(t *testing.T) {
 			{
 				Config: testAccDataSourceNetworks,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_networks.foo", "networks.#", "4"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_networks.foo", "networks.#", os.Getenv(NetworksQty)),
 				),
 			},
 		},

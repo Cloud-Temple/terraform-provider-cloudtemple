@@ -1,9 +1,14 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	ResourcePoolQty = "COMPTE_RESOURCE_POOL_QTY"
 )
 
 func TestAccDataSourceResourcePools(t *testing.T) {
@@ -14,7 +19,7 @@ func TestAccDataSourceResourcePools(t *testing.T) {
 			{
 				Config: testAccDataSourceResourcePools,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pools.foo", "resource_pools.#", "7"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pools.foo", "resource_pools.#", os.Getenv(ResourcePoolQty)),
 				),
 			},
 		},

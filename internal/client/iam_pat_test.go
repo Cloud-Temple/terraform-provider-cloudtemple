@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	PatName = "TEST_IAM_PAT_NAME"
+	PatName = "IAM_PAT_NAME"
 )
 
 func TestIAM_PATList(t *testing.T) {

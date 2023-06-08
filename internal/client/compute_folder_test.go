@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	FolderId   = "TEST_COMPUTE_FOLDER_ID"
-	FolderName = "TEST_COMPUTE_FOLDER_NAME"
+	FolderId   = "COMPUTE_FOLDER_ID"
+	FolderName = "COMPUTE_FOLDER_NAME"
 )
 
 func TestCompute_FolderList(t *testing.T) {

@@ -9,15 +9,14 @@ import (
 )
 
 const (
-	TestTenantId     = "TEST_TENANT_ID"
-	SppServerId      = "TEST_BACKUP_SPPSERVER_ID"
-	SppServerame     = "TEST_BACKUP_SPPSERVER_NAME"
-	SppServerAddress = "TEST_BACKUP_SPPSERVER_ADDRESS"
+	SppServerId      = "BACKUP_SPPSERVER_ID"
+	SppServerName    = "BACKUP_SPPSERVER_NAME"
+	SppServerAddress = "BACKUP_SPPSERVER_ADDRESS"
 )
 
 func TestBackupSPPServerClient_List(t *testing.T) {
 	ctx := context.Background()
-	sppServers, err := client.Backup().SPPServer().List(ctx, os.Getenv(TestTenantId))
+	sppServers, err := client.Backup().SPPServer().List(ctx, os.Getenv(TenantId))
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(sppServers), 1)
@@ -39,7 +38,7 @@ func TestBackupSPPServerClient_Read(t *testing.T) {
 
 	expected := &BackupSPPServer{
 		ID:      os.Getenv(SppServerId),
-		Name:    os.Getenv(SppServerame),
+		Name:    os.Getenv(SppServerName),
 		Address: os.Getenv(SppServerAddress),
 	}
 

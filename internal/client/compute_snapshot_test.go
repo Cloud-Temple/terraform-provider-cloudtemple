@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	SnapShotId = "TEST_COMPUTE_SNAPSHOT_ID"
+	SnapShotId = "COMPUTE_SNAPSHOT_ID"
 )
 
 func TestCompute_SnapshotList(t *testing.T) {

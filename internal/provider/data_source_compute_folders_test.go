@@ -1,9 +1,14 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	FolderQty = "COMPUTE_FOLDER_QTY"
 )
 
 func TestAccDataSourceFolders(t *testing.T) {
@@ -14,7 +19,7 @@ func TestAccDataSourceFolders(t *testing.T) {
 			{
 				Config: testAccDataSourceFolders,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_folders.foo", "folders.#", "21"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_folders.foo", "folders.#", os.Getenv(FolderQty)),
 				),
 			},
 		},
