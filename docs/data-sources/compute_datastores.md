@@ -42,5 +42,6 @@ Read-Only:
 - `name` (String)
 - `type` (String)
 - `unique_id` (String)
+- `virtual_machines_number` (Number)
 
 

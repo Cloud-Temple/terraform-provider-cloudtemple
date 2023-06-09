@@ -41,7 +41,9 @@ data "cloudtemple_compute_virtual_machine" "name" {
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
 - `extra_config` (List of Object) (see [below for nested schema](#nestedatt--extra_config))
+- `guest_operating_system_moref` (String)
 - `hardware_version` (String)
+- `host_cluster_id` (String)
 - `id` (String) The ID of this resource.
 - `machine_manager_id` (String)
 - `machine_manager_name` (String)
