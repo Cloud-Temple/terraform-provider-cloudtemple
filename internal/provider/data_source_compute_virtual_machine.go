@@ -64,6 +64,10 @@ func dataSourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"host_cluster_id": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 			"consolidation_needed": {
 				Type:     schema.TypeBool,
 				Computed: true,
@@ -85,6 +89,10 @@ func dataSourceVirtualMachine() *schema.Resource {
 				Computed: true,
 			},
 			"operating_system_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"guest_operating_system_moref": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
