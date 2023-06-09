@@ -15,15 +15,15 @@ func TestAccDataSourceVirtualMachine(t *testing.T) {
 			{
 				Config: testAccDataSourceVirtualMachine,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", "de2b8b80-8b90-414a-bc33-e12f61a4c05c"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", "virtual_machine_67_bob-clone"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", "dba8aea7-7718-4ffb-8932-9acf4c8cc629"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", "tf-do-not-delete"),
 				),
 			},
 			{
 				Config: testAccDataSourceVirtualMachineName,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", "de2b8b80-8b90-414a-bc33-e12f61a4c05c"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", "virtual_machine_67_bob-clone"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", "dba8aea7-7718-4ffb-8932-9acf4c8cc629"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", "tf-do-not-delete"),
 				),
 			},
 			{
@@ -36,13 +36,13 @@ func TestAccDataSourceVirtualMachine(t *testing.T) {
 
 const testAccDataSourceVirtualMachine = `
 data "cloudtemple_compute_virtual_machine" "foo" {
-  id = "de2b8b80-8b90-414a-bc33-e12f61a4c05c"
+  id = "dba8aea7-7718-4ffb-8932-9acf4c8cc629"
 }
 `
 
 const testAccDataSourceVirtualMachineName = `
 data "cloudtemple_compute_virtual_machine" "foo" {
-  name = "virtual_machine_67_bob-clone"
+  name = "tf-do-not-delete"
 }
 `
 
