@@ -121,8 +121,9 @@ func New(version string) func() *schema.Provider {
 			ResourcesMap: map[string]*schema.Resource{
 				"cloudtemple_backup_sla_policy_assignment": documentResource(resourceBackupSLAPolicyAssignment(), "backup_read", "backup_write", "activity_read"),
 				"cloudtemple_compute_network_adapter":      documentResource(resourceNetworkAdapter(), "compute_write", "compute_read", "activity_read"),
-				"cloudtemple_compute_virtual_disk":         documentResource(resourceVirtualDisk(), "compute_write", "compute_read", "compute_management_read", "compute_management_write", "activity_read"),
-				"cloudtemple_compute_virtual_machine":      documentResource(resourceVirtualMachine(), "compute_write", "compute_read", "activity_read", "tag_read", "tag_write"),
+				"cloudtemple_compute_virtual_controller":   documentResource(resourceVirtualController(), "compute_read", "compute_write", "activity_read"),
+				"cloudtemple_compute_virtual_disk":         documentResource(resourceVirtualDisk(), "compute_write", "compute_read", "backup_read", "backup_write", "compute_management_read", "compute_management_write", "activity_read"),
+				"cloudtemple_compute_virtual_machine":      documentResource(resourceVirtualMachine(), "compute_write", "compute_read", "backup_read", "backup_write", "activity_read", "tag_read", "tag_write"),
 				"cloudtemple_iam_personal_access_token":    documentResource(resourcePersonalAccessToken(), "iam_offline_access"),
 			},
 		}
