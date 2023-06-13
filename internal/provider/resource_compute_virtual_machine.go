@@ -526,7 +526,6 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 
 	var activityId string
 	var err error
-	var fromScratch bool
 	cloneVirtualMachineId := d.Get("clone_virtual_machine_id").(string)
 	contentLibraryItemId := d.Get("content_library_item_id").(string)
 
@@ -587,7 +586,6 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 
 	} else {
-		fromScratch = true
 		activityId, err = c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
 			Name:                      name,
 			DatacenterId:              d.Get("datacenter_id").(string),
@@ -685,7 +683,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 	}
 
-	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on" && fromScratch)
+	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on")
 }
 
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
