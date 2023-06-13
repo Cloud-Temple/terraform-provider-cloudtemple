@@ -67,6 +67,10 @@ func dataSourceDatastores() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
+						"virtual_machines_number": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
 						"hosts_number": {
 							Type:     schema.TypeInt,
 							Computed: true,
