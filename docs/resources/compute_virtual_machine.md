@@ -109,6 +109,10 @@ data "cloudtemple_compute_datastore" "ds" {
   name = "ds001-bob-svc1-data4-eqx6"
 }
 
+data "cloudtemple_compute_network" "vlan" {
+  name = "VLAN_201"
+}
+
 resource "cloudtemple_compute_virtual_machine" "content-library" {
   name = "from-content-library-item"
 
@@ -119,6 +123,14 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
   host_cluster_id      = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.koukou.id
   datastore_id         = data.cloudtemple_compute_datastore.ds.id
+
+  os_disk {
+    capacity = 25 * 1024 * 1024 * 1024
+  }
+
+  os_network_adapter {
+    network_id = data.cloudtemple_compute_network.vlan.id
+  }
 
   tags = {
     created_by = "Terraform"
@@ -152,6 +164,8 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 - `memory` (Number) The quantity of memory to start the virtual machine with.
 - `memory_hot_add_enabled` (Boolean)
 - `num_cores_per_socket` (Number)
+- `os_disk` (Block List) OS disks created from content lib item deployment or virtual machine clone. (see [below for nested schema](#nestedblock--os_disk))
+- `os_network_adapter` (Block List) OS network adapters created from content lib item deployment or virtual machine clone. (see [below for nested schema](#nestedblock--os_network_adapter))
 - `power_state` (String) Whether to start the virtual machine.
 - `tags` (Map of String) The tags to attach to the virtual machine.
 
@@ -179,6 +193,48 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 - `tools` (String)
 - `tools_version` (Number)
 - `triggered_alarms` (List of Object) (see [below for nested schema](#nestedatt--triggered_alarms))
+
+<a id="nestedblock--os_disk"></a>
+### Nested Schema for `os_disk`
+
+Optional:
+
+- `capacity` (Number)
+- `disk_mode` (String)
+
+Read-Only:
+
+- `controller_bus_number` (Number)
+- `datastore_id` (String)
+- `datastore_name` (String)
+- `disk_path` (String)
+- `disk_unit_number` (Number)
+- `editable` (Boolean)
+- `id` (String) The ID of this resource.
+- `instant_access` (Boolean)
+- `machine_manager_id` (String)
+- `name` (String)
+- `native_id` (String)
+- `provisioning_type` (String)
+
+
+<a id="nestedblock--os_network_adapter"></a>
+### Nested Schema for `os_network_adapter`
+
+Optional:
+
+- `auto_connect` (Boolean)
+- `connected` (Boolean)
+- `mac_address` (String)
+- `mac_type` (String)
+- `network_id` (String)
+
+Read-Only:
+
+- `id` (String) The ID of this resource.
+- `name` (String)
+- `type` (String)
+
 
 <a id="nestedatt--boot_options"></a>
 ### Nested Schema for `boot_options`

@@ -73,6 +73,10 @@ data "cloudtemple_compute_datastore" "ds" {
   name = "ds001-bob-svc1-data4-eqx6"
 }
 
+data "cloudtemple_compute_network" "vlan" {
+  name = "VLAN_201"
+}
+
 resource "cloudtemple_compute_virtual_machine" "content-library" {
   name = "from-content-library-item"
 
@@ -83,6 +87,14 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
   host_cluster_id      = data.cloudtemple_compute_host_cluster.flo.id
   datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.koukou.id
   datastore_id         = data.cloudtemple_compute_datastore.ds.id
+
+  os_disk {
+    capacity = 25 * 1024 * 1024 * 1024
+  }
+
+  os_network_adapter {
+    network_id = data.cloudtemple_compute_network.vlan.id
+  }
 
   tags = {
     created_by = "Terraform"
