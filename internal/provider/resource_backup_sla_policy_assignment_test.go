@@ -81,8 +81,8 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   guest_operating_system_moref = "%s"
 }
 
-data "cloudtemple_backup_sla_policy" "test" {
-  name = "test-fsn"
+data "cloudtemple_backup_sla_policy" "daily" {
+  name = "sla001-daily-th3s"
 }
 
 data "cloudtemple_backup_sla_policy" "weekly" {
@@ -94,7 +94,7 @@ resource "cloudtemple_backup_sla_policy_assignment" "foo" {
   virtual_machine_id = cloudtemple_compute_virtual_machine.foo.id
   sla_policy_ids = [
 	data.cloudtemple_backup_sla_policy.weekly.id,
-	data.cloudtemple_backup_sla_policy.test.id,
+	data.cloudtemple_backup_sla_policy.daily.id,
   ]
 }
 `

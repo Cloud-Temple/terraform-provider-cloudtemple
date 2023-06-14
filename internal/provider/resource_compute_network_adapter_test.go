@@ -26,6 +26,8 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
+					os.Getenv(VmPolicyDaily),
+					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
 					os.Getenv(NetworkAdapterType),
@@ -72,6 +74,8 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
+					os.Getenv(VmPolicyDaily),
+					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
 					os.Getenv(NetworkAdapterType),
@@ -84,7 +88,7 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "mac_address"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "mac_type", os.Getenv(NetworkAdapterMacAddressType)),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "auto_connect", "false"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "connected", "false"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "connected", "true"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
 				),
 			},
@@ -95,6 +99,8 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
+					os.Getenv(VmPolicyDaily),
+					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
 					os.Getenv(NetworkAdapterType),
@@ -118,6 +124,8 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
+					os.Getenv(VmPolicyDaily),
+					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
 					os.Getenv(NetworkAdapterType),
@@ -141,6 +149,8 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
+					os.Getenv(VmPolicyDaily),
+					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
 					os.Getenv(NetworkAdapterType),
@@ -174,6 +184,14 @@ data "cloudtemple_compute_datastore_cluster" "cdc" {
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
+data "cloudtemple_backup_sla_policy" "daily" {
+	name = "%s"
+}
+
+data "cloudtemple_backup_sla_policy" "weekly" {
+	name = "%s"
+}
+
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform-network-adapter"
 
@@ -181,15 +199,17 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   host_cluster_id              = data.cloudtemple_compute_host_cluster.chc.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.cdc.id
   guest_operating_system_moref = "%s"
+
+  backup_sla_policies = [
+	data.cloudtemple_backup_sla_policy.weekly.id,
+	data.cloudtemple_backup_sla_policy.daily.id,
+  ]
 }
 
 data "cloudtemple_compute_network" "foo" {
   name = "%s"
 }
 
-resource "cloudtemple_backup_sla_policy_assignment" "policy" {
-
-}
 
 resource "cloudtemple_compute_network_adapter" "foo" {
   virtual_machine_id = cloudtemple_compute_virtual_machine.foo.id
@@ -260,6 +280,14 @@ data "cloudtemple_compute_datastore_cluster" "cdc" {
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
+data "cloudtemple_backup_sla_policy" "daily" {
+	name = "%s"
+}
+
+data "cloudtemple_backup_sla_policy" "weekly" {
+	name = "%s"
+}
+
 resource "cloudtemple_compute_virtual_machine" "bar" {
   name        = "test-terraform-network-adapter-connected"
   power_state = "on"
@@ -268,6 +296,12 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
   host_cluster_id              = data.cloudtemple_compute_host_cluster.chc.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.cdc.id
   guest_operating_system_moref = "%s"
+
+  backup_sla_policies = [
+	data.cloudtemple_backup_sla_policy.weekly.id,
+	data.cloudtemple_backup_sla_policy.daily.id,
+  ]
+
 }
 
 data "cloudtemple_compute_network" "foo" {
@@ -303,6 +337,14 @@ data "cloudtemple_compute_datastore_cluster" "cdc" {
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
+data "cloudtemple_backup_sla_policy" "daily" {
+	name = "%s"
+}
+
+data "cloudtemple_backup_sla_policy" "weekly" {
+	name = "%s"
+}
+
 resource "cloudtemple_compute_virtual_machine" "bar" {
   name        = "test-terraform-network-adapter-connected"
   power_state = "on"
@@ -311,6 +353,11 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
   host_cluster_id              = data.cloudtemple_compute_host_cluster.chc.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.cdc.id
   guest_operating_system_moref = "%s"
+
+  backup_sla_policies = [
+	data.cloudtemple_backup_sla_policy.weekly.id,
+	data.cloudtemple_backup_sla_policy.daily.id,
+  ]
 }
 
 data "cloudtemple_compute_network" "foo" {
@@ -340,9 +387,17 @@ data "cloudtemple_compute_host_cluster" "chc" {
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
-data "cloudtemple_compute_datastore_cluster" "koukcdcou" {
+data "cloudtemple_compute_datastore_cluster" "cdc" {
   name = "%s"
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
+}
+
+data "cloudtemple_backup_sla_policy" "daily" {
+	name = "%s"
+}
+
+data "cloudtemple_backup_sla_policy" "weekly" {
+	name = "%s"
 }
 
 resource "cloudtemple_compute_virtual_machine" "bar" {
@@ -352,6 +407,11 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
   host_cluster_id              = data.cloudtemple_compute_host_cluster.chc.id
   datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.cdc.id
   guest_operating_system_moref = "%s"
+
+  backup_sla_policies = [
+	data.cloudtemple_backup_sla_policy.weekly.id,
+	data.cloudtemple_backup_sla_policy.daily.id,
+  ]
 }
 
 data "cloudtemple_compute_network" "foo" {
