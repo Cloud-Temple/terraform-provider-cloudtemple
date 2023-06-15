@@ -42,13 +42,15 @@ func resourceVirtualController() *schema.Resource {
 				ValidateFunc: validation.StringInSlice([]string{"BusLogic", "LSILogic", "LSILogicSAS", "ParaVirtual"}, false),
 			},
 			"iso_path": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"content_library_item_id"},
 			},
 			"content_library_item_id": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				ValidateFunc: validation.IsUUID,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"iso_path"},
 			},
 			"connected": {
 				Type:     schema.TypeBool,
@@ -98,6 +100,39 @@ func computeVirtualControllerCreate(ctx context.Context, d *schema.ResourceData,
 	if err != nil {
 		return diag.Errorf("failed to create virtual controller, %s", err)
 	}
+
+	// if d.Get("connected").(bool) {
+	// 	activityId, err = c.Compute().VirtualController().Connect(ctx, d.Id())
+	// 	if err != nil {
+	// 		return diag.Errorf("failed to connect virtual controller: %s", err)
+	// 	}
+	// 	_, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	// 	if err != nil {
+	// 		return diag.Errorf("failed to connect virtual controller, %s", err)
+	// 	}
+	// }
+	// if err != nil {
+	// 	return diag.Errorf("the virtual controller could not be connected: %s", err)
+	// }
+
+	if d.Get("mounted").(bool) {
+		activityId, err = c.Compute().VirtualController().Mount(ctx, &client.MountVirtualControllerRequest{
+			ID:                   d.Id(),
+			IsoPath:              d.Get("iso_path").(string),
+			ContentLibraryItemId: d.Get("content_library_item_id").(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to mount virtual controller: %s", err)
+		}
+		_, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to mount virtual controller, %s", err)
+		}
+	}
+	if err != nil {
+		return diag.Errorf("the virtual controller could not be mounted: %s", err)
+	}
+
 	return computeVirtualControllerUpdate(ctx, d, meta)
 }
 
