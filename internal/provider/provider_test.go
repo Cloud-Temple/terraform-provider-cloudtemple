@@ -3,7 +3,6 @@ package provider
 import (
 	"context"
 	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -13,7 +12,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
-	"github.com/joho/godotenv"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,10 +23,10 @@ const (
 
 func TestMain(m *testing.M) {
 
-	err := godotenv.Load("../../.env.test")
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	// err := godotenv.Load("../../.env.test")
+	// if err != nil {
+	// 	log.Fatal("Error loading .env file")
+	// }
 
 	envNames := []string{
 		testClientIDEnvName,

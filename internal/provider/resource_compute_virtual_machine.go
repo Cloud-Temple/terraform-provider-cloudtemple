@@ -837,6 +837,43 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 	}
 
 	if d.HasChange("backup_sla_policies") {
+		backupVm, err := c.Backup().VirtualMachine().Read(ctx, d.Id())
+		if err != nil {
+			return diag.Errorf("failed to get sla policies of virtual machine %s, %s", d.Id(), err)
+		}
+		if backupVm == nil {
+			jobs, err := c.Backup().Job().List(ctx, &client.BackupJobFilter{
+				Type: "catalog",
+			})
+			if err != nil {
+				return diag.Errorf("failed to find catalog job: %s", err)
+			}
+
+			var job = &client.BackupJob{}
+			for _, currJob := range jobs {
+				if currJob.Name == "Hypervisor Inventory" {
+					job = currJob
+				}
+			}
+
+			activityId, err := c.Backup().Job().Run(ctx, &client.BackupJobRunRequest{
+				JobId: job.ID,
+			})
+			if err != nil {
+				return diag.Errorf("failed to update catalog: %s", err)
+			}
+
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to update catalog, %s", err)
+			}
+
+			_, err = c.Backup().Job().WaitForCompletion(ctx, job.ID, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to update catalog, %s", err)
+			}
+		}
+
 		slaPolicies := []string{}
 		for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
 			slaPolicies = append(slaPolicies, policy.(string))

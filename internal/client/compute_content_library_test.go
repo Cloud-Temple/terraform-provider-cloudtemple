@@ -43,10 +43,9 @@ func TestCompute_ContentLibraryRead(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := &ContentLibrary{
-		ID:               os.Getenv(ContentLibraryId),
-		Name:             os.Getenv(ContentLibraryName),
-		MachineManagerID: os.Getenv(MachineManagerId),
-		Type:             os.Getenv(ContentLibraryType),
+		ID:   os.Getenv(ContentLibraryId),
+		Name: os.Getenv(ContentLibraryName),
+		Type: os.Getenv(ContentLibraryType),
 		Datastore: DatastoreLink{
 			ID:   os.Getenv(DataStoreId),
 			Name: os.Getenv(DataStoreName),

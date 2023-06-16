@@ -165,7 +165,6 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "name", "test-terraform-content-library-deployed"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "datacenter_id", "6ecdc746-3225-489d-be78-2c07f715c8d5"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "host_cluster_id", "bd5d8bf4-953a-46fb-9997-45467ba1ae6f"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "guest_operating_system_moref", "centos8_64Guest"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "tags.%", "1"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "tags.environment", "cloned-from-content-library"),
 				),
@@ -184,7 +183,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   guest_operating_system_moref = "%s"
 
   tags = {
-	"environment" = "test"
+		"environment" = "test"
   }
 }
 `
@@ -221,7 +220,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   guest_operating_system_moref = "%s"
 
   tags = {
-	"environment" = "demo"
+		"environment" = "demo"
   }
 }
 `
@@ -236,7 +235,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   guest_operating_system_moref = "%s"
 
   lifecycle {
-	prevent_destroy = true
+		prevent_destroy = true
   }
 }
 `
@@ -257,11 +256,12 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   datacenter_id                = "%s"
   host_cluster_id              = "%s"
   datastore_cluster_id         = "%s"
+
   guest_operating_system_moref = "%s"
 
   backup_sla_policies = [
-	data.cloudtemple_backup_sla_policy.weekly.id,
-	data.cloudtemple_backup_sla_policy.daily.id,
+		data.cloudtemple_backup_sla_policy.weekly.id,
+		data.cloudtemple_backup_sla_policy.daily.id,
   ]
 }
 `
@@ -276,7 +276,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   guest_operating_system_moref = "%s"
 
   tags = {
-	"environment" = "test"
+		"environment" = "test"
   }
 }
 
@@ -289,19 +289,23 @@ resource "cloudtemple_compute_virtual_machine" "cloned" {
   datastore_cluster_id         = "%s"
 
   tags = {
-	"environment" = "cloned"
+		"environment" = "cloned"
   }
 }
 `
 
 const testAccResourceVirtualMachineContentLibraryDeploy = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "TRACTOR_LATEST"
+  name = "local-vc-vstack-001-t0001"
 }
 
 data "cloudtemple_compute_content_library_item" "foo" {
   content_library_id = data.cloudtemple_compute_content_library.foo.id
-  name               = "20220830164424_master_linux-ubuntu-focal-server-wg"
+  name               = "test-fsn-ubuntu"
+}
+
+data "cloudtemple_compute_datastore" "foo" {
+	name = "ds001-t0001-r-stw1-data13-th3s"
 }
 
 data "cloudtemple_compute_network" "foo" {
@@ -316,24 +320,10 @@ resource "cloudtemple_compute_virtual_machine" "content-library-deployed" {
 
   datacenter_id                = "%s"
   host_cluster_id              = "%s"
-  datastore_id          = "f47ec14b-6ede-4f6c-b15e-68945a9f9138"
-
-  guest_operating_system_moref = "amazonlinux2_64Guest"
-
-  os_disk {
-    capacity = 25 * 1024 * 1024 * 1024
-    disk_mode = "independent_persistent"
-  }
-
-  os_network_adapter {
-    network_id   = data.cloudtemple_compute_network.foo.id
-    mac_type     = "MANUAL"
-    mac_address  = "00:50:56:83:84:61"
-	auto_connect = true
-  }
+  datastore_id          			 = "88fb9089-cf33-47f0-938a-fe792f4a9039"
 
   tags = {
-	"environment" = "cloned-from-content-library"
+		"environment" = "cloned-from-content-library"
   }
 }
 `

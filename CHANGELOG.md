@@ -1,3 +1,16 @@
+## 0.6.0 (June 16, 2023)
+
+BUG FIXES:
+
+  * Fixed a bug preventing resource `cloudtemple_virtual_machine` to power on when created from the CL or a Clone.
+  * Fixed a bug causing preventing resource `cloudtemple_virtual_machine` to be inventoried when property `backup_sla_policies` is set after creation.
+
+IMPROVEMENTS:
+
+  * Implemented importation of os_disk and os_network_adapter in the resource `cloudtemple_virtual_machine`.
+  * Improved filtering of data_sources `datastores`, `datastore_clusters`, `host_clusters` and `virtual_machines`.
+  * Added property `backup_sla_policies` on resource `cloudtemple_virtual_disk`.
+
 ## 0.6.0-rc.2 (May 24, 2023)
 
 BUG FIXES:
