@@ -724,6 +724,9 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 
 		osDisks := []interface{}{}
 		for _, osDisk := range d.Get("os_disk").([]interface{}) {
+			if osDisk == nil {
+				continue
+			}
 			osDiskId := osDisk.(map[string]interface{})["id"].(string)
 			if osDiskId != "" {
 				disk, err := c.Compute().VirtualDisk().Read(ctx, osDiskId)
@@ -738,6 +741,9 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 
 		osNetworkAdapters := []interface{}{}
 		for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+			if osNetworkAdapter == nil {
+				continue
+			}
 			osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
 			if osNetworkAdapterId != "" {
 				networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, osNetworkAdapterId)
@@ -857,6 +863,9 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 
 	if d.HasChange("os_disk") {
 		for i, osDisk := range d.Get("os_disk").([]interface{}) {
+			if osDisk == nil {
+				continue
+			}
 			disk := osDisk.(map[string]interface{})
 			if disk["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_disk.%d", i)) {
 				activityId, err := c.Compute().VirtualDisk().Update(ctx, &client.UpdateVirtualDiskRequest{
@@ -877,6 +886,9 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 
 	if d.HasChange("os_network_adapter") {
 		for i, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+			if osNetworkAdapter == nil {
+				continue
+			}
 			networkAdapter := osNetworkAdapter.(map[string]interface{})
 			if networkAdapter["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_network_adapter.%d", i)) {
 				macType := networkAdapter["mac_type"].(string)
