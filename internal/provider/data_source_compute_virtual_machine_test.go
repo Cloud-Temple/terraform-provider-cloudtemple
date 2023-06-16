@@ -1,10 +1,18 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	VirtualMachineId            = "COMPUTE_VIRTUAL_MACHINE_ID"
+	VirtalMachineName           = "COMPUTE_VIRTUAL_MACHINE_NAME"
+	VirtualMachineIdAlternative = "COMPUTE_VIRTUAL_MACHINE_ID_ALTERNATIVE"
 )
 
 func TestAccDataSourceVirtualMachine(t *testing.T) {
@@ -13,17 +21,17 @@ func TestAccDataSourceVirtualMachine(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceVirtualMachine,
+				Config: fmt.Sprintf(testAccDataSourceVirtualMachine, os.Getenv(VirtualMachineId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", "dba8aea7-7718-4ffb-8932-9acf4c8cc629"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", "tf-do-not-delete"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", os.Getenv(VirtualMachineId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", os.Getenv(VirtalMachineName)),
 				),
 			},
 			{
-				Config: testAccDataSourceVirtualMachineName,
+				Config: fmt.Sprintf(testAccDataSourceVirtualMachineName, os.Getenv(VirtalMachineName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", "dba8aea7-7718-4ffb-8932-9acf4c8cc629"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", "tf-do-not-delete"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", os.Getenv(VirtualMachineId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", os.Getenv(VirtalMachineName)),
 				),
 			},
 			{
@@ -36,13 +44,13 @@ func TestAccDataSourceVirtualMachine(t *testing.T) {
 
 const testAccDataSourceVirtualMachine = `
 data "cloudtemple_compute_virtual_machine" "foo" {
-  id = "dba8aea7-7718-4ffb-8932-9acf4c8cc629"
+  id = "%s"
 }
 `
 
 const testAccDataSourceVirtualMachineName = `
 data "cloudtemple_compute_virtual_machine" "foo" {
-  name = "tf-do-not-delete"
+  name = "%s"
 }
 `
 

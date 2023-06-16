@@ -2,9 +2,20 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	TenantId        = "TENANT_ID"
+	TenantName      = "TENANT_NAME"
+	VCenterId       = "COMPUTE_VCENTER_ID"
+	VCenterName     = "COMPUTE_VCENTER_NAME"
+	VCenterFullName = "COMPUTE_VCENTER_FULLNAME"
+	VCenterVendor   = "COMPUTE_VCENTER_VENDOR"
+	VCenterVersion  = "COMPUTE_VCENTER_VERSION"
 )
 
 func TestCompute_VCenterWorkerList(t *testing.T) {
@@ -16,7 +27,7 @@ func TestCompute_VCenterWorkerList(t *testing.T) {
 
 	var found bool
 	for _, h := range vcenters {
-		if h.ID == "9dba240e-a605-4103-bac7-5336d3ffd124" {
+		if h.ID == os.Getenv(VCenterId) {
 			found = true
 			break
 		}
@@ -26,27 +37,13 @@ func TestCompute_VCenterWorkerList(t *testing.T) {
 
 func TestCompute_VCenterWorkerRead(t *testing.T) {
 	ctx := context.Background()
-	vcenter, err := client.Compute().Worker().Read(ctx, "9dba240e-a605-4103-bac7-5336d3ffd124")
+	vcenter, err := client.Compute().Worker().Read(ctx, os.Getenv(VCenterId))
 	require.NoError(t, err)
 
-	expected := &Worker{
-		ID:                    "9dba240e-a605-4103-bac7-5336d3ffd124",
-		Name:                  "vc-vstack-080-bob",
-		FullName:              "VMware vCenter Server 7.0.3 build-20150588",
-		Vendor:                "VMware, Inc.",
-		Version:               "7.0.3",
-		Build:                 20150588,
-		LocaleVersion:         "INTL",
-		LocaleBuild:           0,
-		OsType:                "linux-x64",
-		ProductLineID:         "vpx",
-		ApiType:               "VirtualCenter",
-		ApiVersion:            "7.0.3.0",
-		InstanceUuid:          "e919d66b-cac9-4ea5-839e-74668f49958c",
-		LicenseProductName:    "VMware VirtualCenter Server",
-		LicenseProductVersion: 7,
-		TenantID:              "e225dbf8-e7c5-4664-a595-08edf3526080",
-		TenantName:            "BOB",
-	}
-	require.Equal(t, expected, vcenter)
+	require.Equal(t, os.Getenv(VCenterId), vcenter.ID)
+	require.Equal(t, os.Getenv(VCenterName), vcenter.Name)
+	require.Equal(t, os.Getenv(VCenterFullName), vcenter.FullName)
+	require.Equal(t, os.Getenv(VCenterVendor), vcenter.Vendor)
+	require.Equal(t, os.Getenv(VCenterVersion), vcenter.Version)
+	require.Equal(t, os.Getenv(TenantId), vcenter.TenantID)
 }

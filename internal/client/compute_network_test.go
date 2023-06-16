@@ -2,9 +2,16 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	NetworkId    = "COMPUTE_NETWORK_ID"
+	NetworkName  = "COMPUTE_NETWORK_NAME"
+	NetworkMoRef = "COMPUTE_NETWORK_MOREF"
 )
 
 func TestCompute_NetworkList(t *testing.T) {
@@ -16,7 +23,7 @@ func TestCompute_NetworkList(t *testing.T) {
 
 	var found bool
 	for _, h := range networks {
-		if h.ID == "5e029210-b433-4c45-93be-092cef684edc" {
+		if h.ID == os.Getenv(NetworkId) {
 			found = true
 			break
 		}
@@ -26,13 +33,11 @@ func TestCompute_NetworkList(t *testing.T) {
 
 func TestCompute_NetworkRead(t *testing.T) {
 	ctx := context.Background()
-	network, err := client.Compute().Network().Read(ctx, "5e029210-b433-4c45-93be-092cef684edc")
+	network, err := client.Compute().Network().Read(ctx, os.Getenv(NetworkId))
 	require.NoError(t, err)
 
-	expected := &Network{
-		ID:    "5e029210-b433-4c45-93be-092cef684edc",
-		Name:  "VLAN_201",
-		Moref: "dvportgroup-1054",
-	}
-	require.Equal(t, expected, network)
+	require.Equal(t, os.Getenv(NetworkId), network.ID)
+	require.Equal(t, os.Getenv(NetworkName), network.Name)
+	require.Equal(t, os.Getenv(NetworkMoRef), network.Moref)
+	require.Equal(t, os.Getenv(MachineManagerId2), network.MachineManagerId)
 }

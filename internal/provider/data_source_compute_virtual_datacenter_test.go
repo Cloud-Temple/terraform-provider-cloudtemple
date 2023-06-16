@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	VirtualDatacenterId   = "COMPUTE_VIRTUAL_DATACENTER_ID"
+	VirtualDatacenterName = "COMPUTE_VIRTUAL_DATACENTER_NAME"
 )
 
 func TestAccDataSourceVirtualDatacenter(t *testing.T) {
@@ -13,14 +20,14 @@ func TestAccDataSourceVirtualDatacenter(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceVirtualDatacenter,
+				Config: fmt.Sprintf(testAccDataSourceVirtualDatacenter, os.Getenv(VirtualDatacenterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_datacenter.foo", "id", "ac33c033-693b-4fc5-9196-26df77291dbb"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_datacenter.foo", "name", "DC-TH3"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_datacenter.foo", "id", os.Getenv(VirtualDatacenterId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_datacenter.foo", "name", os.Getenv(VirtualDatacenterName)),
 				),
 			},
 			{
-				Config: testAccDataSourceVirtualDatacenterName,
+				Config: fmt.Sprintf(testAccDataSourceVirtualDatacenterName, os.Getenv(VirtualDatacenterName)),
 			},
 			{
 				Config:      testAccDataSourceVirtualDatacenterMissing,
@@ -32,13 +39,13 @@ func TestAccDataSourceVirtualDatacenter(t *testing.T) {
 
 const testAccDataSourceVirtualDatacenter = `
 data "cloudtemple_compute_virtual_datacenter" "foo" {
-  id = "ac33c033-693b-4fc5-9196-26df77291dbb"
+  id = "%s"
 }
 `
 
 const testAccDataSourceVirtualDatacenterName = `
 data "cloudtemple_compute_virtual_datacenter" "foo" {
-  name = "DC-EQX6"
+  name = "%s"
 }
 `
 

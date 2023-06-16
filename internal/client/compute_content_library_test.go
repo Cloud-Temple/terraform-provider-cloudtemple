@@ -2,10 +2,22 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	ContentLibraryId       = "COMPUTE_CONTENT_LIBRARY_ID"
+	ContentLibraryName     = "COMPUTE_CONTENT_LIBRARY_NAME"
+	ContentLibraryType     = "COMPUTE_CONTENT_LIBRARY_TYPE"
+	ContentLibraryItemId   = "COMPUTE_CONTENT_LIBRARY_ITEM_ID"
+	ContentLibraryItemName = "COMPUTE_CONTENT_LIBRARY_ITEM_NAME"
+	ContentLibraryItemType = "COMPUTE_CONTENT_LIBRARY_ITEM_TYPE"
+	MachineManagerId       = "COMPUTE_VCENTER_ID"
+	DataStoreId            = "COMPUTE_DATASTORE_ID"
+	DataStoreName          = "COMPUTE_DATASTORE_NAME"
 )
 
 func TestCompute_ContentLibraryList(t *testing.T) {
@@ -17,7 +29,7 @@ func TestCompute_ContentLibraryList(t *testing.T) {
 
 	var found bool
 	for _, cl := range contentLibraries {
-		if cl.ID == "355b654d-6ea2-4773-80ee-246d3f56964f" {
+		if cl.ID == os.Getenv(ContentLibraryId) {
 			found = true
 			break
 		}
@@ -27,17 +39,16 @@ func TestCompute_ContentLibraryList(t *testing.T) {
 
 func TestCompute_ContentLibraryRead(t *testing.T) {
 	ctx := context.Background()
-	contentLibrary, err := client.Compute().ContentLibrary().Read(ctx, "355b654d-6ea2-4773-80ee-246d3f56964f")
+	contentLibrary, err := client.Compute().ContentLibrary().Read(ctx, os.Getenv(ContentLibraryId))
 	require.NoError(t, err)
 
 	expected := &ContentLibrary{
-		ID:               "355b654d-6ea2-4773-80ee-246d3f56964f",
-		Name:             "PUBLIC",
-		MachineManagerID: "9dba240e-a605-4103-bac7-5336d3ffd124",
-		Type:             "SUBSCRIBED",
+		ID:   os.Getenv(ContentLibraryId),
+		Name: os.Getenv(ContentLibraryName),
+		Type: os.Getenv(ContentLibraryType),
 		Datastore: DatastoreLink{
-			ID:   "24371f16-b480-40d3-9587-82f97933abca",
-			Name: "ds002-bob-svc1-stor4-th3",
+			ID:   os.Getenv(DataStoreId),
+			Name: os.Getenv(DataStoreName),
 		},
 	}
 	require.Equal(t, expected, contentLibrary)
@@ -45,74 +56,44 @@ func TestCompute_ContentLibraryRead(t *testing.T) {
 
 func TestContentLibraryClient_ListItems(t *testing.T) {
 	ctx := context.Background()
-	items, err := client.Compute().ContentLibrary().ListItems(ctx, "355b654d-6ea2-4773-80ee-246d3f56964f")
+	items, err := client.Compute().ContentLibrary().ListItems(ctx, os.Getenv(ContentLibraryId))
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(items), 1)
 
 	var clItem *ContentLibraryItem
 	for _, item := range items {
-		if item.ID == "8faded09-9f8b-4e27-a978-768f72f8e5f8" {
+		if item.ID == os.Getenv(ContentLibraryItemId) {
 			clItem = item
 			break
 		}
 	}
 	require.NotNil(t, clItem)
 
-	// ignore some fields for the test
-	clItem.LastModifiedTime = ""
-
-	require.Equal(
-		t,
-		&ContentLibraryItem{
-			ID:               "8faded09-9f8b-4e27-a978-768f72f8e5f8",
-			ContentLibraryId: "",
-			Name:             "20211115132417_master_linux-centos-8",
-			Description:      "Centos 8",
-			Type:             "ovf",
-			CreationTime:     time.Date(1, time.January, 1, 0, 0, 0, 0, time.UTC),
-			Size:             0,
-			Stored:           true,
-			OvfProperties:    []string(nil),
-		},
-		clItem,
-	)
+	require.Equal(t, os.Getenv(ContentLibraryItemId), clItem.ID)
+	require.Equal(t, os.Getenv(ContentLibraryItemName), clItem.Name)
 }
 
 func TestContentLibraryClient_ReadItem(t *testing.T) {
 	ctx := context.Background()
-	item, err := client.Compute().ContentLibrary().ReadItem(ctx, "355b654d-6ea2-4773-80ee-246d3f56964f", "8faded09-9f8b-4e27-a978-768f72f8e5f8")
+	item, err := client.Compute().ContentLibrary().ReadItem(ctx, os.Getenv(ContentLibraryId), os.Getenv(ContentLibraryItemId))
 	require.NoError(t, err)
 
-	// ignore some fields for the test
-	item.LastModifiedTime = ""
-
-	require.Equal(
-		t,
-		&ContentLibraryItem{
-			ID:               "8faded09-9f8b-4e27-a978-768f72f8e5f8",
-			ContentLibraryId: "355b654d-6ea2-4773-80ee-246d3f56964f",
-			Name:             "20211115132417_master_linux-centos-8",
-			Description:      "Centos 8",
-			Type:             "ovf",
-			CreationTime:     time.Date(2021, time.December, 2, 3, 26, 39, 156000000, time.UTC),
-			Size:             1706045044,
-			Stored:           true,
-			OvfProperties:    []string{},
-		},
-		item,
-	)
+	require.Equal(t, os.Getenv(ContentLibraryItemId), item.ID)
+	require.Equal(t, os.Getenv(ContentLibraryItemName), item.Name)
+	require.Equal(t, os.Getenv(ContentLibraryId), item.ContentLibraryId)
+	require.Equal(t, os.Getenv(ContentLibraryItemType), item.Type)
 }
 
 func TestContentLibraryClient_Clone(t *testing.T) {
 	ctx := context.Background()
 	activityId, err := client.Compute().ContentLibrary().Deploy(ctx, &ComputeContentLibraryItemDeployRequest{
-		ContentLibraryId:     "355b654d-6ea2-4773-80ee-246d3f56964f",
-		ContentLibraryItemId: "8faded09-9f8b-4e27-a978-768f72f8e5f8",
+		ContentLibraryId:     os.Getenv(ContentLibraryId),
+		ContentLibraryItemId: os.Getenv(ContentLibraryItemId),
 		Name:                 "test-client-content-library-deploy",
-		HostClusterId:        "dde72065-60f4-4577-836d-6ea074384d62",
-		DatacenterId:         "85d53d08-0fa9-491e-ab89-90919516df25",
-		DatastoreId:          "d439d467-943a-49f5-a022-c0c25b737022",
+		HostClusterId:        os.Getenv(HostClusterId),
+		DatacenterId:         os.Getenv(DataCenterId),
+		DatastoreId:          os.Getenv(DataStoreId),
 	})
 	require.NoError(t, err)
 

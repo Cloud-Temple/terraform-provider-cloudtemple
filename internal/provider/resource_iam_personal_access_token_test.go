@@ -1,18 +1,24 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
 func TestAccResourcePersonalAccessToken(t *testing.T) {
+	// current date + 1 day
+	t1 := time.Now().AddDate(0, 0, 1)
+	expirationDate := t1.Format(time.RFC3339)
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccResourcePersonalAccessToken,
+				Config: fmt.Sprintf(testAccResourcePersonalAccessToken, expirationDate, os.Getenv(RoleId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_iam_personal_access_token.foo", "name", "test-terraform"),
 					resource.TestCheckResourceAttrSet("cloudtemple_iam_personal_access_token.foo", "client_id"),
@@ -26,10 +32,10 @@ func TestAccResourcePersonalAccessToken(t *testing.T) {
 const testAccResourcePersonalAccessToken = `
 resource "cloudtemple_iam_personal_access_token" "foo" {
   name            = "test-terraform"
-  expiration_date = "2023-01-02T15:04:05Z"
+  expiration_date = "%s"
 
   roles = [
-	"c83a22e9-70bb-485e-a463-78a99484e5bb"
+	"%s"
   ]
 }
 `

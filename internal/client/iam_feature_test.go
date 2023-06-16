@@ -2,9 +2,15 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	FeatureId   = "IAM_FEATURE_ID"
+	FeatureName = "IAM_FEATURE_NAME"
 )
 
 func TestIAM_Features(t *testing.T) {
@@ -19,8 +25,8 @@ func TestIAM_Features(t *testing.T) {
 		}
 	}
 	require.NotNil(t, rtms, "rtms has not been found")
-	require.Equal(t, "rtms", rtms.Name)
-	require.Equal(t, "f39df526-66c5-465b-a52f-29180e241e09", rtms.ID)
+	require.Equal(t, os.Getenv(FeatureName), rtms.Name)
+	require.Equal(t, os.Getenv(FeatureId), rtms.ID)
 	require.Len(t, rtms.SubFeatures, 2)
 }
 
@@ -28,7 +34,7 @@ func TestIAM_FeatureAssignments(t *testing.T) {
 	ctx := context.Background()
 	tenants, err := client.IAM().Tenant().List(ctx)
 	require.NoError(t, err)
-	require.Len(t, tenants, 1)
+	require.Len(t, tenants, 2)
 
 	tenant := tenants[0]
 	fa, err := client.IAM().Feature().ListAssignments(ctx, tenant.ID)

@@ -2,13 +2,18 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	SnapShotId = "COMPUTE_SNAPSHOT_ID"
+)
+
 func TestCompute_SnapshotList(t *testing.T) {
 	ctx := context.Background()
-	_, err := client.Compute().Snapshot().List(ctx, "de2b8b80-8b90-414a-bc33-e12f61a4c05c")
+	_, err := client.Compute().Snapshot().List(ctx, os.Getenv(SnapShotId))
 	require.NoError(t, err)
 }

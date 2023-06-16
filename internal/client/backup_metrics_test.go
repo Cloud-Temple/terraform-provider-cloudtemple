@@ -2,9 +2,21 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	MetricPolicyName          = "BACKUP_METRICS_POLICY_NAME"
+	MetricPolicyTriggerType   = "BACKUP_METRICS_POLICY_TRIGGER_TYPE"
+	MetricsPlatformVersion    = "BACKUP_METRICS_PLATEFORM_VERSION"
+	MetricsPlatformBuild      = "BACKUP_METRICS_PLATEFORM_BUILD"
+	MetricsPlatformDate       = "BACKUP_METRICS_PLATEFORM_DATE"
+	MetricsPlatformProduct    = "BACKUP_METRICS_PLATEFORM_PRODUCT"
+	MetricsPlatformEpoch      = "BACKUP_METRICS_PLATEFORM_EPOCH"
+	MetricsPlatformDeployType = "BACKUP_METRICS_PLATEFORM_DEPLOY_TYPE"
 )
 
 func TestBackupMetricsClient_History(t *testing.T) {
@@ -33,13 +45,13 @@ func TestBackupMetricsClient_Policies(t *testing.T) {
 	require.GreaterOrEqual(t, len(policiesMetrics), 1)
 
 	expected := &BackupMetricsPolicies{
-		Name:        "sla001-daily-th3s",
-		TriggerType: "DAILY",
+		Name:        os.Getenv(MetricPolicyName),
+		TriggerType: os.Getenv(MetricPolicyTriggerType),
 	}
 
 	var found bool
 	for _, pm := range policiesMetrics {
-		if pm.Name == "sla001-daily-th3s" {
+		if pm.Name == os.Getenv(MetricPolicyName) {
 			// Ignore some fields
 			pm.NumberOfProtectedVM = 0
 
@@ -57,16 +69,8 @@ func TestBackupMetricsClient_Platform(t *testing.T) {
 	platformMetrics, err := client.Backup().Metrics().Platform(ctx)
 	require.NoError(t, err)
 
-	expected := &BackupMetricsPlatform{
-		Version:        "10.1.14",
-		Build:          "158",
-		Date:           "Thu Mar  2 12:22:05 EST 2023",
-		Product:        "Spectrum Protect Plus",
-		Epoch:          1677777725000,
-		DeploymentType: "standard",
-	}
-
-	require.Equal(t, expected, platformMetrics)
+	require.Equal(t, os.Getenv(MetricsPlatformVersion), platformMetrics.Version)
+	require.Equal(t, os.Getenv(MetricsPlatformDeployType), platformMetrics.DeploymentType)
 }
 
 func TestBackupMetricsClient_PlatformCPU(t *testing.T) {

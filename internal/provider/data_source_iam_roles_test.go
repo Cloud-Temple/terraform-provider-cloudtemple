@@ -1,6 +1,7 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -14,8 +15,10 @@ func TestAccDataSourceRoles(t *testing.T) {
 			{
 				Config: testAccDataSourceRoles,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_roles.foo", "roles.0.id"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_roles.foo", "roles.0.name"),
+					resource.TestCheckTypeSetElemNestedAttrs("data.cloudtemple_iam_roles.foo", "roles.*", map[string]string{
+						"id":   os.Getenv(RoleId),
+						"name": os.Getenv(RoleName),
+					}),
 				),
 			},
 		},

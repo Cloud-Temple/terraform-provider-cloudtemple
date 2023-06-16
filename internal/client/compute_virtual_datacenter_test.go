@@ -2,9 +2,15 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	VirtualDatacenterId   = "COMPUTE_VIRTUAL_DATACENTER_ID"
+	VirtualDatacenterName = "COMPUTE_VIRTUAL_DATACENTER_NAME"
 )
 
 func TestCompute_VirtualDatacenterList(t *testing.T) {
@@ -16,7 +22,7 @@ func TestCompute_VirtualDatacenterList(t *testing.T) {
 
 	var found bool
 	for _, vd := range virtualDatacenters {
-		if vd.ID == "ac33c033-693b-4fc5-9196-26df77291dbb" {
+		if vd.ID == os.Getenv(VirtualDatacenterId) {
 			found = true
 			break
 		}
@@ -26,14 +32,14 @@ func TestCompute_VirtualDatacenterList(t *testing.T) {
 
 func TestCompute_VirtualDatacenterRead(t *testing.T) {
 	ctx := context.Background()
-	virtualDatacenter, err := client.Compute().VirtualDatacenter().Read(ctx, "ac33c033-693b-4fc5-9196-26df77291dbb")
+	virtualDatacenter, err := client.Compute().VirtualDatacenter().Read(ctx, os.Getenv(VirtualDatacenterId))
 	require.NoError(t, err)
 
 	expected := &VirtualDatacenter{
-		ID:               "ac33c033-693b-4fc5-9196-26df77291dbb",
-		Name:             "DC-TH3",
-		MachineManagerID: "9dba240e-a605-4103-bac7-5336d3ffd124",
-		TenantID:         "e225dbf8-e7c5-4664-a595-08edf3526080",
+		ID:               os.Getenv(VirtualDatacenterId),
+		Name:             os.Getenv(VirtualDatacenterName),
+		MachineManagerID: os.Getenv(MachineManagerId),
+		TenantID:         os.Getenv(TenantId),
 	}
 	require.Equal(t, expected, virtualDatacenter)
 }

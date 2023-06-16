@@ -2,9 +2,15 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	SiteId   = "BACKUP_SITE_ID"
+	SiteName = "BACKUP_SITE_NAME"
 )
 
 func TestBackupSiteClient_List(t *testing.T) {
@@ -16,7 +22,7 @@ func TestBackupSiteClient_List(t *testing.T) {
 
 	var backupSite *BackupSite
 	for _, bs := range backupSites {
-		if bs.ID == "98e75cf9-6b3c-4422-8d4e-826a032c2bf1" {
+		if bs.ID == os.Getenv(SiteId) {
 			backupSite = bs
 			break
 		}
@@ -24,8 +30,8 @@ func TestBackupSiteClient_List(t *testing.T) {
 	require.NotNil(t, backupSite)
 
 	expected := &BackupSite{
-		ID:   "98e75cf9-6b3c-4422-8d4e-826a032c2bf1",
-		Name: "DC-TH3S",
+		ID:   os.Getenv(SiteId),
+		Name: os.Getenv(SiteName),
 	}
 	require.Equal(t, expected, backupSite)
 }

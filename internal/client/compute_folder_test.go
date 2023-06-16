@@ -2,9 +2,15 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	FolderId   = "COMPUTE_FOLDER_ID"
+	FolderName = "COMPUTE_FOLDER_NAME"
 )
 
 func TestCompute_FolderList(t *testing.T) {
@@ -16,7 +22,7 @@ func TestCompute_FolderList(t *testing.T) {
 
 	var found bool
 	for _, f := range folders {
-		if f.ID == "b41ea9b1-4cca-44ed-9a76-2b598de03781" {
+		if f.ID == os.Getenv(FolderId) {
 			found = true
 			break
 		}
@@ -26,13 +32,13 @@ func TestCompute_FolderList(t *testing.T) {
 
 func TestCompute_FolderRead(t *testing.T) {
 	ctx := context.Background()
-	folder, err := client.Compute().Folder().Read(ctx, "b41ea9b1-4cca-44ed-9a76-2b598de03781")
+	folder, err := client.Compute().Folder().Read(ctx, os.Getenv(FolderId))
 	require.NoError(t, err)
 
 	expected := &Folder{
-		ID:               "b41ea9b1-4cca-44ed-9a76-2b598de03781",
-		Name:             "Datacenters",
-		MachineManagerId: "9dba240e-a605-4103-bac7-5336d3ffd124",
+		ID:               os.Getenv(FolderId),
+		Name:             os.Getenv(FolderName),
+		MachineManagerId: os.Getenv(MachineManagerId),
 	}
 	require.Equal(t, expected, folder)
 }

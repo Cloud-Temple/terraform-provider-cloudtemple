@@ -1,3 +1,39 @@
+## 0.6.0 (June 16, 2023)
+
+BUG FIXES:
+
+  * Fixed a bug causing crashes when trying to start a `cloudtemple_compute_virtual_machine` because it has pending recommendation(s) on VMWare side.
+  * Fixed wrong backup job running after `cloudtemple_compute_virtual_machine` create or update.
+  * Fixed a bug causing fails when trying to create a resource `cloudtemple_compute_virtual_machine`.
+  * Fixed tfstate incorrectly refreshing when updating property `backup_sla_policies` of `cloudtemple_compute_virtual_machine` from outside the provider.
+  * Fixed empty recommendations causing `cloudtemple_compute_virtual_machine` not starting up.
+  * Virtual machines are now inventoried by the backup server when they are created from clone or content library.
+  * Fixed a bug preventing resource `cloudtemple_compute_virtual_machine` to power on when created from the CL or a Clone.
+  * Fixed a bug causing preventing resource `cloudtemple_compute_virtual_machine` to be inventoried when property `backup_sla_policies` is set after creation.
+
+IMPROVEMENTS:
+
+  * Added property `backup_sla_policies` to resource `cloudtemple_compute_virtual_machine`, so that it can be created and started in an SNC environment.
+  * `datastore_cluster_id` and `datastore_id` now conflicts each other on resource `cloudtemple_compute_virtual_disk` and at least one of them is now required.
+  * Resource `cloudtemple_compute_network_adapter` is now importable.
+  * Property `guest_operating_system_moref` on resource `cloudtemple_compute_virtual_machine` can now be updated.
+  * Resource `cloudtemple_compute_virtual_machine` is now powered off before delete.
+  * Added missing documentation on import of resource `cloudtemple_compute_virtual_machine`.
+  * Implemented filters on following data_sources :
+    - `cloudtemple_compute_datastore`
+    - `cloudtemple_compute_datastore_cluster`
+    - `cloudtemple_compute_host_cluster`
+    - `cloudtemple_compute_datacenter`
+    - `datastores`
+    - `datastore_clusters`
+    - `host_clusters`
+    - `virtual_machines`
+  * Implemented importation of os_disk and os_network_adapter in the resource `cloudtemple_compute_virtual_machine` when deployed from a Content Library or a Clone.
+  * Added property `backup_sla_policies` on resource `cloudtemple_compute_virtual_disk`.
+  * Property `guest_operating_system_moref` on resource `cloudtemple_compute_virtual_machine` can now be computed.
+  * Property `backup_sla_policies` of `cloudtemple_compute_virtual_machine` is now optional.
+  * Renamed data source `cloudtemple_compute_worker` to `cloudtemple_compute_machine_manager`.
+
 ## 0.6.0-rc.2 (May 24, 2023)
 
 BUG FIXES:

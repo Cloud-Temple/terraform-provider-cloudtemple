@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	VCenterId   = "COMPUTE_VCENTER_ID"
+	VCenterName = "COMPUTE_VCENTER_NAME"
 )
 
 func TestAccDataSourceWorker(t *testing.T) {
@@ -13,22 +20,22 @@ func TestAccDataSourceWorker(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceWorker,
+				Config: fmt.Sprintf(testAccDataSourceWorker, os.Getenv(VCenterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "name", "vc-vstack-080-bob"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "id", os.Getenv(VCenterId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "name", os.Getenv(VCenterName)),
 				),
 			},
 			{
-				Config: testAccDataSourceWorkerName,
+				Config: fmt.Sprintf(testAccDataSourceWorkerName, os.Getenv(VCenterName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "name", "vc-vstack-080-bob"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "id", os.Getenv(VCenterId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "name", os.Getenv(VCenterName)),
 				),
 			},
 			{
 				Config:      testAccDataSourceWorkerMissing,
-				ExpectError: regexp.MustCompile("failed to find machine_manager with id"),
+				ExpectError: regexp.MustCompile("failed to find worker with id"),
 			},
 		},
 	})
@@ -36,13 +43,13 @@ func TestAccDataSourceWorker(t *testing.T) {
 
 const testAccDataSourceWorker = `
 data "cloudtemple_compute_machine_manager" "foo" {
-  id = "9dba240e-a605-4103-bac7-5336d3ffd124"
+  id = "%s"
 }
 `
 
 const testAccDataSourceWorkerName = `
 data "cloudtemple_compute_machine_manager" "foo" {
-  name = "vc-vstack-080-bob"
+  name = "%s"
 }
 `
 

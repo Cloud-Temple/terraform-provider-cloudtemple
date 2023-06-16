@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,14 +10,14 @@ import (
 
 func TestBackupVCenterClient_List(t *testing.T) {
 	ctx := context.Background()
-	vcenters, err := client.Backup().VCenter().List(ctx, "a3d46fb5-29af-4b98-a665-1e82a62fd6d3")
+	vcenters, err := client.Backup().VCenter().List(ctx, os.Getenv(SppServerId))
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(vcenters), 1)
 
 	var found bool
 	for _, vc := range vcenters {
-		if vc.ID == "9dba240e-a605-4103-bac7-5336d3ffd124" {
+		if vc.ID == os.Getenv(VCenterId) {
 			found = true
 			break
 		}

@@ -2,9 +2,16 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	VirtualSwitchId    = "COMPUTE_VIRTUAL_SWITCH_ID"
+	VirtualSwitchName  = "COMPUTE_VIRTUAL_SWITCH_NAME"
+	VirtualSwitchMoref = "COMPUTE_VIRTUAL_SWITCH_MOREF"
 )
 
 func TestCompute_VirtualSwitchList(t *testing.T) {
@@ -16,7 +23,7 @@ func TestCompute_VirtualSwitchList(t *testing.T) {
 
 	var found bool
 	for _, vs := range virtualSwitchs {
-		if vs.ID == "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4" {
+		if vs.ID == os.Getenv(VirtualSwitchId) {
 			found = true
 			break
 		}
@@ -26,13 +33,13 @@ func TestCompute_VirtualSwitchList(t *testing.T) {
 
 func TestCompute_VirtualSwitchRead(t *testing.T) {
 	ctx := context.Background()
-	virtualSwitch, err := client.Compute().VirtualSwitch().Read(ctx, "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4")
+	virtualSwitch, err := client.Compute().VirtualSwitch().Read(ctx, os.Getenv(VirtualSwitchId))
 	require.NoError(t, err)
 
 	expected := &VirtualSwitch{
-		ID:    "6e7b457c-bdb1-4272-8abf-5fd6e9adb8a4",
-		Name:  "dvs002-ucs01_FLO-DC-EQX6",
-		Moref: "dvs-1044",
+		ID:    os.Getenv(VirtualSwitchId),
+		Name:  os.Getenv(VirtualSwitchName),
+		Moref: os.Getenv(VirtualSwitchMoref),
 	}
 	require.Equal(t, expected, virtualSwitch)
 }

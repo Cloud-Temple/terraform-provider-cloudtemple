@@ -32,10 +32,28 @@ To compile the provider, run `go install`. This will build the provider and put 
 
 To generate or update documentation, run `go generate`.
 
-In order to run the full suite of Acceptance tests, run `make testacc`.
+## Acceptance tests
 
-*Note:* Acceptance tests create real resources, and often cost money to run.
+In order to run the tests suite, rename .env.test.dist to .env.test in root directory. Fill the ENV vars with existing correct data from the Shiva instance you whant to work. Use the shiva interface or the api to get the data or contact a project administrator for information.
+
+
+To run client tests
+
+```sh
+$ make testclient
+```
+
+To run provider tests
+
+```sh
+$ make testprovider
+```
+
+To run full acceptance testes
 
 ```sh
 $ make testacc
 ```
+See GNUmakefile in root directory to more test cases.
+
+*Note:* Acceptance tests create real resources, and often cost money to run according on the shiva instance where you lunch them.

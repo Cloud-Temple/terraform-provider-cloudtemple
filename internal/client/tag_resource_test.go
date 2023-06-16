@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -12,10 +13,10 @@ func TestTagClient(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
 		Name:                      "test-client-tags",
-		DatacenterId:              "85d53d08-0fa9-491e-ab89-90919516df25",
-		HostClusterId:             "dde72065-60f4-4577-836d-6ea074384d62",
-		DatastoreClusterId:        "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
-		GuestOperatingSystemMoref: "amazonlinux2_64Guest",
+		DatacenterId:              os.Getenv(DataCenterId),
+		HostClusterId:             os.Getenv(HostClusterId),
+		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
+		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
 	})
 	require.NoError(t, err)
 

@@ -1,9 +1,15 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	SnapShotQty = "COMPUTE_SNAPSHOT_QTY"
 )
 
 func TestAccDataSourceSnapshots(t *testing.T) {
@@ -12,9 +18,9 @@ func TestAccDataSourceSnapshots(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceSnapshots,
+				Config: fmt.Sprintf(testAccDataSourceSnapshots, os.Getenv(VirtualMachineId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_snapshots.foo", "snapshots.#", "0"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_snapshots.foo", "snapshots.#", os.Getenv(SnapShotQty)),
 				),
 			},
 			{
@@ -29,7 +35,7 @@ func TestAccDataSourceSnapshots(t *testing.T) {
 
 const testAccDataSourceSnapshots = `
 data "cloudtemple_compute_snapshots" "foo" {
-  virtual_machine_id = "de2b8b80-8b90-414a-bc33-e12f61a4c05c"
+  virtual_machine_id = "%s"
 }
 `
 

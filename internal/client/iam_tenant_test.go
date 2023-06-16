@@ -12,14 +12,22 @@ func TestIAM_Tenants(t *testing.T) {
 	tenants, err := client.IAM().Tenant().List(context.Background())
 	require.NoError(t, err)
 
-	require.Len(t, tenants, 1)
+	require.Len(t, tenants, 2)
 
 	companyID := os.Getenv(testCompanyIDEnvName)
 	expected := &Tenant{
-		ID:        "e225dbf8-e7c5-4664-a595-08edf3526080",
-		Name:      "BOB",
-		SNC:       false,
+		ID:        os.Getenv(TenantId),
+		Name:      os.Getenv(TenantName),
+		SNC:       true,
 		CompanyID: companyID,
 	}
-	require.Equal(t, expected, tenants[0])
+
+	var rightTenant = &Tenant{}
+	for _, tenant := range tenants {
+		if tenant.ID == expected.ID {
+			rightTenant = tenant
+		}
+	}
+
+	require.Equal(t, expected, rightTenant)
 }

@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	ResourcePoolId   = "COMPTE_RESOURCE_POOL_ID"
+	ResourcePoolName = "COMPTE_RESOURCE_POOL_NAME"
 )
 
 func TestAccDataSourceResourcePool(t *testing.T) {
@@ -13,17 +20,17 @@ func TestAccDataSourceResourcePool(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceResourcePool,
+				Config: fmt.Sprintf(testAccDataSourceResourcePool, os.Getenv(ResourcePoolId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "id", "d21f84fd-5063-4383-b2b0-65b9f25eac27"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "name", "Resources"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "id", os.Getenv(ResourcePoolId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "name", os.Getenv(ResourcePoolName)),
 				),
 			},
 			{
-				Config: testAccDataSourceResourcePoolName,
+				Config: fmt.Sprintf(testAccDataSourceResourcePoolName, os.Getenv(ResourcePoolName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "id", "d21f84fd-5063-4383-b2b0-65b9f25eac27"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "name", "Resources"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "id", os.Getenv(ResourcePoolId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "name", os.Getenv(ResourcePoolName)),
 				),
 			},
 			{
@@ -36,13 +43,13 @@ func TestAccDataSourceResourcePool(t *testing.T) {
 
 const testAccDataSourceResourcePool = `
 data "cloudtemple_compute_resource_pool" "foo" {
-  id = "d21f84fd-5063-4383-b2b0-65b9f25eac27"
+  id = "%s"
 }
 `
 
 const testAccDataSourceResourcePoolName = `
 data "cloudtemple_compute_resource_pool" "foo" {
-  name = "Resources"
+  name = "%s"
 }
 `
 

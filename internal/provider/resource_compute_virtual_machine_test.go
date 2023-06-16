@@ -1,9 +1,18 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	DataCenterId                        = "DATACENTER_ID"
+	VirtualMachineHostClusterIdRelocate = "COMPUTE_VIRTUAL_MACHINE_HOST_CLUSTER_RELOCATE"
+	VmPolicyDaily                       = "COMPUTE_VIRTUAL_MACHINE_POLICY_1"
+	VmPolicyWeekly                      = "COMPUTE_VIRTUAL_MACHINE_POLICY_2"
 )
 
 func TestAccResourceVirtualMachine(t *testing.T) {
@@ -12,33 +21,51 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccResourceVirtualMachine,
+				Config: fmt.Sprintf(
+					testAccResourceVirtualMachine,
+					os.Getenv(DataCenterId),
+					os.Getenv(HostClusterId),
+					os.Getenv(DatastoreClusterId),
+					os.Getenv(OperatingSystemMoRef),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "datacenter_id", "85d53d08-0fa9-491e-ab89-90919516df25"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "host_cluster_id", "dde72065-60f4-4577-836d-6ea074384d62"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "datastore_cluster_id", "6b06b226-ef55-4a0a-92bc-7aa071681b1b"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "guest_operating_system_moref", "amazonlinux2_64Guest"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "datacenter_id", os.Getenv(DataCenterId)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "host_cluster_id", os.Getenv(HostClusterId)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "datastore_cluster_id", os.Getenv(DatastoreClusterId)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "guest_operating_system_moref", os.Getenv(OperatingSystemMoRef)),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "tags.%", "1"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "tags.environment", "test"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "triggered_alarms.#", "0"),
 				),
 			},
 			{
-				Config: testAccResourceVirtualMachineRelocate,
+				Config: fmt.Sprintf(
+					testAccResourceVirtualMachineRelocate,
+					os.Getenv(DataCenterId),
+					os.Getenv(VirtualMachineHostClusterIdRelocate),
+					os.Getenv(DatastoreClusterId),
+					os.Getenv(OperatingSystemMoRef),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "datacenter_id", "ac33c033-693b-4fc5-9196-26df77291dbb"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "host_cluster_id", "083b0ed7-8b0f-4cec-be47-78f48b457e6a"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "datastore_cluster_id", "1a996110-2746-4725-958f-f6fceef05b32"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "guest_operating_system_moref", "amazonlinux2_64Guest"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "datacenter_id", os.Getenv(DataCenterId)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "host_cluster_id", os.Getenv(VirtualMachineHostClusterIdRelocate)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "datastore_cluster_id", os.Getenv(DatastoreClusterId)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "guest_operating_system_moref", os.Getenv(OperatingSystemMoRef)),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "tags.%", "1"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "tags.environment", "test"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "triggered_alarms.#", "0"),
 				),
 			},
 			{
-				Config:            testAccResourceVirtualMachine,
+				Config: fmt.Sprintf(
+					testAccResourceVirtualMachine,
+					os.Getenv(DataCenterId),
+					os.Getenv(HostClusterId),
+					os.Getenv(DatastoreClusterId),
+					os.Getenv(OperatingSystemMoRef),
+				),
 				ResourceName:      "cloudtemple_compute_virtual_machine.foo",
 				ImportState:       true,
 				ImportStateVerify: true,
@@ -50,7 +77,13 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 				},
 			},
 			{
-				Config: testAccResourceVirtualMachineUpdate,
+				Config: fmt.Sprintf(
+					testAccResourceVirtualMachineUpdate,
+					os.Getenv(DataCenterId),
+					os.Getenv(HostClusterId),
+					os.Getenv(DatastoreClusterId),
+					os.Getenv(OperatingSystemMoRef),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "memory", "67108864"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "cpu", "2"),
@@ -63,14 +96,28 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 				),
 			},
 			{
-				Config: testAccResourceVirtualMachineRename,
+				Config: fmt.Sprintf(
+					testAccResourceVirtualMachineRename,
+					os.Getenv(DataCenterId),
+					os.Getenv(HostClusterId),
+					os.Getenv(DatastoreClusterId),
+					os.Getenv(OperatingSystemMoRef),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform-rename"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "tags.%", "0"),
 				),
 			},
 			{
-				Config: testAccResourceVirtualMachinePowerOn,
+				Config: fmt.Sprintf(
+					testAccResourceVirtualMachinePowerOn,
+					os.Getenv(VmPolicyDaily),
+					os.Getenv(VmPolicyWeekly),
+					os.Getenv(DataCenterId),
+					os.Getenv(HostClusterId),
+					os.Getenv(DatastoreClusterId),
+					os.Getenv(OperatingSystemMoRef),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "name", "test-terraform-rename"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.foo", "power_state", "on"),
@@ -78,26 +125,46 @@ func TestAccResourceVirtualMachine(t *testing.T) {
 			},
 			{
 				Destroy: true,
-				Config:  testAccResourceVirtualMachinePowerOn,
+				Config: fmt.Sprintf(
+					testAccResourceVirtualMachinePowerOn,
+					os.Getenv(VmPolicyDaily),
+					os.Getenv(VmPolicyWeekly),
+					os.Getenv(DataCenterId),
+					os.Getenv(HostClusterId),
+					os.Getenv(DatastoreClusterId),
+					os.Getenv(OperatingSystemMoRef),
+				),
 			},
 			{
-				Config: testAccResourceVirtualMachineClone,
+				Config: fmt.Sprintf(
+					testAccResourceVirtualMachineClone,
+					os.Getenv(DataCenterId),
+					os.Getenv(HostClusterId),
+					os.Getenv(DatastoreClusterId),
+					os.Getenv(OperatingSystemMoRef),
+					os.Getenv(DataCenterId),
+					os.Getenv(VirtualMachineHostClusterIdRelocate),
+					os.Getenv(DatastoreClusterId),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "name", "test-terraform-cloned"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "datacenter_id", "85d53d08-0fa9-491e-ab89-90919516df25"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "host_cluster_id", "dde72065-60f4-4577-836d-6ea074384d62"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "datastore_cluster_id", "6b06b226-ef55-4a0a-92bc-7aa071681b1b"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "datacenter_id", os.Getenv(DataCenterId)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "host_cluster_id", os.Getenv(VirtualMachineHostClusterIdRelocate)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "datastore_cluster_id", os.Getenv(DatastoreClusterId)),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "tags.%", "1"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.cloned", "tags.environment", "cloned"),
 				),
 			},
 			{
-				Config: testAccResourceVirtualMachineContentLibraryDeploy,
+				Config: fmt.Sprintf(
+					testAccResourceVirtualMachineContentLibraryDeploy,
+					os.Getenv(DataCenterId),
+					os.Getenv(HostClusterId),
+				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "name", "test-terraform-content-library-deployed"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "datacenter_id", "85d53d08-0fa9-491e-ab89-90919516df25"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "host_cluster_id", "dde72065-60f4-4577-836d-6ea074384d62"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "guest_operating_system_moref", "centos8_64Guest"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "datacenter_id", "6ecdc746-3225-489d-be78-2c07f715c8d5"),
+					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "host_cluster_id", "bd5d8bf4-953a-46fb-9997-45467ba1ae6f"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "tags.%", "1"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_virtual_machine.content-library-deployed", "tags.environment", "cloned-from-content-library"),
 				),
@@ -110,13 +177,13 @@ const testAccResourceVirtualMachine = `
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform"
 
-  datacenter_id                = "85d53d08-0fa9-491e-ab89-90919516df25"
-  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
-  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
-  guest_operating_system_moref = "amazonlinux2_64Guest"
+  datacenter_id                = "%s"
+  host_cluster_id              = "%s"
+  datastore_cluster_id         = "%s"
+  guest_operating_system_moref = "%s"
 
   tags = {
-	"environment" = "test"
+		"environment" = "test"
   }
 }
 `
@@ -125,10 +192,10 @@ const testAccResourceVirtualMachineRelocate = `
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform"
 
-  datacenter_id                = "ac33c033-693b-4fc5-9196-26df77291dbb"
-  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
-  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
-  guest_operating_system_moref = "amazonlinux2_64Guest"
+  datacenter_id                = "%s"
+  host_cluster_id              = "%s"
+  datastore_cluster_id         = "%s"
+  guest_operating_system_moref = "%s"
 
   tags = {
     "environment" = "test"
@@ -147,13 +214,13 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   cpu_hot_remove_enabled = true
   memory_hot_add_enabled = true
 
-  datacenter_id                = "ac33c033-693b-4fc5-9196-26df77291dbb"
-  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
-  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
-  guest_operating_system_moref = "amazonlinux2_64Guest"
+  datacenter_id                = "%s"
+  host_cluster_id              = "%s"
+  datastore_cluster_id         = "%s"
+  guest_operating_system_moref = "%s"
 
   tags = {
-	"environment" = "demo"
+		"environment" = "demo"
   }
 }
 `
@@ -162,26 +229,40 @@ const testAccResourceVirtualMachineRename = `
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform-rename"
 
-  datacenter_id                = "ac33c033-693b-4fc5-9196-26df77291dbb"
-  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
-  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
-  guest_operating_system_moref = "amazonlinux2_64Guest"
+  datacenter_id                = "%s"
+  host_cluster_id              = "%s"
+  datastore_cluster_id         = "%s"
+  guest_operating_system_moref = "%s"
 
   lifecycle {
-	prevent_destroy = true
+		prevent_destroy = true
   }
 }
 `
 
 const testAccResourceVirtualMachinePowerOn = `
+data "cloudtemple_backup_sla_policy" "daily" {
+	name = "%s"
+}
+
+data "cloudtemple_backup_sla_policy" "weekly" {
+	name = "%s"
+}
+
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name        = "test-terraform-rename"
   power_state = "on"
 
-  datacenter_id                = "ac33c033-693b-4fc5-9196-26df77291dbb"
-  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
-  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
-  guest_operating_system_moref = "amazonlinux2_64Guest"
+  datacenter_id                = "%s"
+  host_cluster_id              = "%s"
+  datastore_cluster_id         = "%s"
+
+  guest_operating_system_moref = "%s"
+
+  backup_sla_policies = [
+		data.cloudtemple_backup_sla_policy.weekly.id,
+		data.cloudtemple_backup_sla_policy.daily.id,
+  ]
 }
 `
 
@@ -189,13 +270,13 @@ const testAccResourceVirtualMachineClone = `
 resource "cloudtemple_compute_virtual_machine" "foo" {
   name = "test-terraform"
 
-  datacenter_id                = "ac33c033-693b-4fc5-9196-26df77291dbb"
-  host_cluster_id              = "083b0ed7-8b0f-4cec-be47-78f48b457e6a"
-  datastore_cluster_id         = "1a996110-2746-4725-958f-f6fceef05b32"
-  guest_operating_system_moref = "amazonlinux2_64Guest"
+  datacenter_id                = "%s"
+  host_cluster_id              = "%s"
+  datastore_cluster_id         = "%s"
+  guest_operating_system_moref = "%s"
 
   tags = {
-	"environment" = "test"
+		"environment" = "test"
   }
 }
 
@@ -203,28 +284,32 @@ resource "cloudtemple_compute_virtual_machine" "cloned" {
   name = "test-terraform-cloned"
 
   clone_virtual_machine_id     = cloudtemple_compute_virtual_machine.foo.id
-  datacenter_id                = "85d53d08-0fa9-491e-ab89-90919516df25"
-  host_cluster_id              = "dde72065-60f4-4577-836d-6ea074384d62"
-  datastore_cluster_id         = "6b06b226-ef55-4a0a-92bc-7aa071681b1b"
+  datacenter_id                = "%s"
+  host_cluster_id              = "%s"
+  datastore_cluster_id         = "%s"
 
   tags = {
-	"environment" = "cloned"
+		"environment" = "cloned"
   }
 }
 `
 
 const testAccResourceVirtualMachineContentLibraryDeploy = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "PUBLIC"
+  name = "local-vc-vstack-001-t0001"
 }
 
 data "cloudtemple_compute_content_library_item" "foo" {
   content_library_id = data.cloudtemple_compute_content_library.foo.id
-  name               = "20211115132417_master_linux-centos-8"
+  name               = "test-fsn-ubuntu"
+}
+
+data "cloudtemple_compute_datastore" "foo" {
+	name = "ds001-t0001-r-stw1-data13-th3s"
 }
 
 data "cloudtemple_compute_network" "foo" {
-  name = "VLAN_201"
+  name = "LAN-dvs-001"
 }
 
 resource "cloudtemple_compute_virtual_machine" "content-library-deployed" {
@@ -233,26 +318,12 @@ resource "cloudtemple_compute_virtual_machine" "content-library-deployed" {
   content_library_id      = data.cloudtemple_compute_content_library.foo.id
   content_library_item_id = data.cloudtemple_compute_content_library_item.foo.id
 
-  datacenter_id         = "85d53d08-0fa9-491e-ab89-90919516df25"
-  host_cluster_id       = "dde72065-60f4-4577-836d-6ea074384d62"
-  datastore_id          = "d439d467-943a-49f5-a022-c0c25b737022"
-
-  guest_operating_system_moref = "centos8_64Guest"
-
-  os_disk {
-    capacity = 25 * 1024 * 1024 * 1024
-    disk_mode = "independent_persistent"
-  }
-
-  os_network_adapter {
-    network_id   = data.cloudtemple_compute_network.foo.id
-    mac_type     = "MANUAL"
-    mac_address  = "00:50:56:83:84:61"
-	auto_connect = true
-  }
+  datacenter_id                = "%s"
+  host_cluster_id              = "%s"
+  datastore_id          			 = "88fb9089-cf33-47f0-938a-fe792f4a9039"
 
   tags = {
-	"environment" = "cloned-from-content-library"
+		"environment" = "cloned-from-content-library"
   }
 }
 `

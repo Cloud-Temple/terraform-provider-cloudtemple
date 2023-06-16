@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	MachineManagerId           = "COMPUTE_VCENTER_ID"
+	ContentLibraryDatastoreQty = "COMPUTE_CONTENT_LIBRARY_DATASTORE_QTY"
 )
 
 func TestAccDataSourceLibrary(t *testing.T) {
@@ -13,22 +20,24 @@ func TestAccDataSourceLibrary(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceLibrary,
+				Config: fmt.Sprintf(testAccDataSourceLibrary, os.Getenv(ContentLibraryId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "id", "355b654d-6ea2-4773-80ee-246d3f56964f"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "name", "PUBLIC"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "machine_manager_id", "9dba240e-a605-4103-bac7-5336d3ffd124"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "type", "SUBSCRIBED"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "datastore.#", "1"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "datastore.0.id", "24371f16-b480-40d3-9587-82f97933abca"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "datastore.0.name", "ds002-bob-svc1-stor4-th3"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "id", os.Getenv(ContentLibraryId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "name", os.Getenv(ContentLibraryName)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "machine_manager_id", os.Getenv(MachineManagerId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "type", os.Getenv(ContentLibraryType)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "datastore.#", os.Getenv(ContentLibraryDatastoreQty)),
+					resource.TestCheckTypeSetElemNestedAttrs("data.cloudtemple_compute_content_library.foo", "datastore.*", map[string]string{
+						"id":   os.Getenv(DataStoreId),
+						"name": os.Getenv(DataStoreName),
+					}),
 				),
 			},
 			{
-				Config: testAccDataSourceLibraryName,
+				Config: fmt.Sprintf(testAccDataSourceLibraryName, os.Getenv(ContentLibraryName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "id", "355b654d-6ea2-4773-80ee-246d3f56964f"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "name", "PUBLIC"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "id", os.Getenv(ContentLibraryId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "name", os.Getenv(ContentLibraryName)),
 				),
 			},
 			{
@@ -41,13 +50,13 @@ func TestAccDataSourceLibrary(t *testing.T) {
 
 const testAccDataSourceLibrary = `
 data "cloudtemple_compute_content_library" "foo" {
-  id = "355b654d-6ea2-4773-80ee-246d3f56964f"
+  id = "%s"
 }
 `
 
 const testAccDataSourceLibraryName = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "PUBLIC"
+  name = "%s"
 }
 `
 

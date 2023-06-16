@@ -2,15 +2,24 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	DataStoreDataCenterId = "COMPUTE_DATASTORE_DATACENTER_ID"
+	DataStoreMoRef        = "COMPUTE_DATASTORE_MOREF"
+	DataStoreUniqueId     = "COMPUTE_DATASTORE_UNIQUE_ID"
+	DataStoreType         = "COMPUTE_DATASTORE_TYPE"
+	DataStoreHostMoRefs   = "COMPUTE_DATASTORE_HOST_MOREFS"
+)
+
 func TestCompute_DatastoreList(t *testing.T) {
 	ctx := context.Background()
 	datastores, err := client.Compute().Datastore().List(ctx, &DatastoreFilter{
-		DatacenterId: "7b56f202-83e3-4112-9771-8fb001fbac3e",
+		DatacenterId: os.Getenv(DataStoreDataCenterId),
 	})
 	require.NoError(t, err)
 
@@ -18,7 +27,7 @@ func TestCompute_DatastoreList(t *testing.T) {
 
 	var found bool
 	for _, dc := range datastores {
-		if dc.ID == "88fb9089-cf33-47f0-938a-fe792f4a9039" {
+		if dc.ID == os.Getenv(DataStoreId) {
 			found = true
 			break
 		}
@@ -28,26 +37,13 @@ func TestCompute_DatastoreList(t *testing.T) {
 
 func TestCompute_DatastoreRead(t *testing.T) {
 	ctx := context.Background()
-	datastore, err := client.Compute().Datastore().Read(ctx, "88fb9089-cf33-47f0-938a-fe792f4a9039")
+	datastore, err := client.Compute().Datastore().Read(ctx, os.Getenv(DataStoreId))
 	require.NoError(t, err)
 
-	// Skip checking changes on metrics
-	datastore.FreeCapacity = 0
-	datastore.VirtualMachinesNumber = 0
-
-	expected := &Datastore{
-		ID:                "d439d467-943a-49f5-a022-c0c25b737022",
-		Name:              "ds001-bob-svc1-data4-eqx6",
-		Moref:             "datastore-1056",
-		MaxCapacity:       536602476544,
-		Accessible:        1,
-		MaintenanceStatus: "normal",
-		UniqueId:          "601d9902-28268458-ac1a-0025b553004c",
-		MachineManagerId:  "9dba240e-a605-4103-bac7-5336d3ffd124",
-		Type:              "VMFS",
-		HostsNumber:       1,
-		HostsNames:        nil,
-		AssociatedFolder:  "",
-	}
-	require.Equal(t, expected, datastore)
+	require.Equal(t, os.Getenv(DataStoreId), datastore.ID)
+	require.Equal(t, os.Getenv(DataStoreName), datastore.Name)
+	require.Equal(t, os.Getenv(DataStoreMoRef), datastore.Moref)
+	require.Equal(t, os.Getenv(DataStoreType), datastore.Type)
+	require.Equal(t, os.Getenv(DataStoreUniqueId), datastore.UniqueId)
+	require.Equal(t, os.Getenv(MachineManagerId), datastore.MachineManagerId)
 }

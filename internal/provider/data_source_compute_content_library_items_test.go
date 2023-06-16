@@ -1,6 +1,8 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -12,9 +14,9 @@ func TestAccDataSourceLibraryItems(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceLibraryItems,
+				Config: fmt.Sprintf(testAccDataSourceLibraryItems, os.Getenv(ContentLibraryName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_items.foo", "content_library_id", "355b654d-6ea2-4773-80ee-246d3f56964f"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_items.foo", "content_library_id", os.Getenv(ContentLibraryId)),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_items.foo", "content_library_items.#"),
 				),
 			},
@@ -24,7 +26,7 @@ func TestAccDataSourceLibraryItems(t *testing.T) {
 
 const testAccDataSourceLibraryItems = `
 data "cloudtemple_compute_content_library" "foo" {
-  name = "PUBLIC"
+  name = "%s"
 }
 
 data "cloudtemple_compute_content_library_items" "foo" {

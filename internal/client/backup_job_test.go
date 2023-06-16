@@ -2,9 +2,17 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	JobId       = "BACKUP_JOB_ID"
+	JobName     = "BACKUP_JOB_NAME"
+	JobType     = "BACKUP_JOB_TYPE"
+	JobPolicyId = "BACKUP_JOB_POLICY_ID"
 )
 
 func TestBackupJobClient_List(t *testing.T) {
@@ -16,7 +24,7 @@ func TestBackupJobClient_List(t *testing.T) {
 
 	var found bool
 	for _, cl := range jobs {
-		if cl.ID == "1004" {
+		if cl.ID == os.Getenv(JobId) {
 			found = true
 			break
 		}
@@ -24,7 +32,7 @@ func TestBackupJobClient_List(t *testing.T) {
 	require.True(t, found)
 
 	jobs, err = client.Backup().Job().List(ctx, &BackupJobFilter{
-		Type: "catalog",
+		Type: os.Getenv(JobType),
 	})
 	require.NoError(t, err)
 
@@ -33,33 +41,26 @@ func TestBackupJobClient_List(t *testing.T) {
 
 func TestBackupJobClient_Read(t *testing.T) {
 	ctx := context.Background()
-	job, err := client.Backup().Job().Read(ctx, "1004")
+	job, err := client.Backup().Job().Read(ctx, os.Getenv(JobId))
 	require.NoError(t, err)
 
-	// ignore some fields
-	job.Status = ""
-
-	expected := &BackupJob{
-		ID:          "1004",
-		Name:        "Hypervisor Inventory",
-		DisplayName: "Hypervisor Inventory",
-		Type:        "catalog",
-		PolicyId:    "1004",
-	}
-	require.Equal(t, expected, job)
+	require.Equal(t, os.Getenv(JobId), job.ID)
+	require.Equal(t, os.Getenv(JobName), job.Name)
+	require.Equal(t, os.Getenv(JobType), job.Type)
+	require.Equal(t, os.Getenv(JobPolicyId), job.PolicyId)
 }
 
 func TestBackupJobClient_Run(t *testing.T) {
 	ctx := context.Background()
 
 	activityId, err := client.Backup().Job().Run(ctx, &BackupJobRunRequest{
-		JobId: "1004",
+		JobId: os.Getenv(JobId),
 	})
 	require.NoError(t, err)
 
 	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
-	_, err = client.Backup().Job().WaitForCompletion(ctx, "1004", nil)
+	_, err = client.Backup().Job().WaitForCompletion(ctx, os.Getenv(JobId), nil)
 	require.NoError(t, err)
 }

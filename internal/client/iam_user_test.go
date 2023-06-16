@@ -8,6 +8,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const (
+	IamUserEmail      = "IAM_USER_EMAIL"
+	IamUserId         = "IAM_USER_ID"
+	IamUserInternalId = "IAM_USER_INTERNAL_ID"
+	IamUserName       = "IAM_USER_NAME"
+	IamUserType       = "IAM_USER_TYPE"
+)
+
 func TestIAM_Users(t *testing.T) {
 	companyID := os.Getenv(testCompanyIDEnvName)
 	users, err := client.IAM().User().List(context.Background(), companyID)
@@ -17,18 +25,13 @@ func TestIAM_Users(t *testing.T) {
 
 	var found bool
 	for _, user := range users {
-		if user.Email == "remi.lapeyre@lenstra.fr" {
+
+		if user.Email == os.Getenv(IamUserEmail) {
 			found = true
-			expected := &User{
-				ID:            "37105598-4889-43da-82ea-cf60f2a36aee",
-				InternalID:    "7b8ba092-52e3-4c21-a2f5-adca40a80d34",
-				Name:          "Rémi Lapeyre",
-				Type:          "LocalAccount",
-				Source:        nil,
-				SourceID:      "",
-				EmailVerified: true, Email: "remi.lapeyre@lenstra.fr",
-			}
-			require.Equal(t, expected, user)
+			require.Equal(t, os.Getenv(IamUserId), user.ID)
+			require.Equal(t, os.Getenv(IamUserName), user.Name)
+			require.Equal(t, os.Getenv(IamUserType), user.Type)
+			require.Equal(t, os.Getenv(IamUserInternalId), user.InternalID)
 			break
 		}
 	}
@@ -36,17 +39,11 @@ func TestIAM_Users(t *testing.T) {
 }
 
 func TestIAM_User(t *testing.T) {
-	user, err := client.IAM().User().Read(context.Background(), "37105598-4889-43da-82ea-cf60f2a36aee")
+	user, err := client.IAM().User().Read(context.Background(), os.Getenv(IamUserId))
 	require.NoError(t, err)
 
-	expected := &User{
-		ID:            "37105598-4889-43da-82ea-cf60f2a36aee",
-		InternalID:    "7b8ba092-52e3-4c21-a2f5-adca40a80d34",
-		Name:          "Rémi Lapeyre",
-		Type:          "LocalAccount",
-		Source:        nil,
-		SourceID:      "",
-		EmailVerified: true, Email: "remi.lapeyre@lenstra.fr",
-	}
-	require.Equal(t, expected, user)
+	require.Equal(t, os.Getenv(IamUserId), user.ID)
+	require.Equal(t, os.Getenv(IamUserName), user.Name)
+	require.Equal(t, os.Getenv(IamUserType), user.Type)
+	require.Equal(t, os.Getenv(IamUserInternalId), user.InternalID)
 }

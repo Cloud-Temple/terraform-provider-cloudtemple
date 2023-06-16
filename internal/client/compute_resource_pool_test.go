@@ -2,9 +2,16 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	ResourcePoolId    = "COMPTE_RESOURCE_POOL_ID"
+	ResourcePoolName  = "COMPTE_RESOURCE_POOL_NAME"
+	ResourcePoolMoRef = "COMPTE_RESOURCE_POOL_MOFER"
 )
 
 func TestCompute_ResourcePoolList(t *testing.T) {
@@ -16,7 +23,7 @@ func TestCompute_ResourcePoolList(t *testing.T) {
 
 	var found bool
 	for _, h := range resourcePools {
-		if h.ID == "d21f84fd-5063-4383-b2b0-65b9f25eac27" {
+		if h.ID == os.Getenv(ResourcePoolId) {
 			found = true
 			break
 		}
@@ -26,21 +33,11 @@ func TestCompute_ResourcePoolList(t *testing.T) {
 
 func TestCompute_ResourcePoolRead(t *testing.T) {
 	ctx := context.Background()
-	resourcePool, err := client.Compute().ResourcePool().Read(ctx, "d21f84fd-5063-4383-b2b0-65b9f25eac27")
+	resourcePool, err := client.Compute().ResourcePool().Read(ctx, os.Getenv(ResourcePoolId))
 	require.NoError(t, err)
 
-	// ignore metrics changes
-	resourcePool.Metrics = ResourcePoolMetrics{}
-
-	expected := &ResourcePool{
-		ID:               "d21f84fd-5063-4383-b2b0-65b9f25eac27",
-		Name:             "Resources",
-		MachineManagerID: "9dba240e-a605-4103-bac7-5336d3ffd124",
-		Moref:            "resgroup-1042",
-		Parent: ResourcePoolParent{
-			ID:   "domain-c1041",
-			Type: "ClusterComputeResource",
-		},
-	}
-	require.Equal(t, expected, resourcePool)
+	require.Equal(t, os.Getenv(ResourcePoolId), resourcePool.ID)
+	require.Equal(t, os.Getenv(ResourcePoolName), resourcePool.Name)
+	require.Equal(t, os.Getenv(ResourcePoolMoRef), resourcePool.Moref)
+	require.Equal(t, os.Getenv(MachineManagerId), resourcePool.MachineManagerID)
 }

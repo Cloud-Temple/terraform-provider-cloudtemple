@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	RoleId   = "IAM_ROLE_ID"
+	RoleName = "IAM_ROLE_NAME"
 )
 
 func TestAccDataSourceRole(t *testing.T) {
@@ -13,17 +20,17 @@ func TestAccDataSourceRole(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceRole,
+				Config: fmt.Sprintf(testAccDataSourceRole, os.Getenv(RoleId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_role.foo", "id", "c83a22e9-70bb-485e-a463-78a99484e5bb"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_role.foo", "name", "compute_read"),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_role.foo", "id", os.Getenv(RoleId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_iam_role.foo", "name", os.Getenv(RoleName)),
 				),
 			},
 			{
-				Config: testAccDataSourceRoleName,
+				Config: fmt.Sprintf(testAccDataSourceRoleName, os.Getenv(RoleName)),
 			},
 			{
-				Config:      testAccDataSourceRoleConflict,
+				Config:      fmt.Sprintf(testAccDataSourceRoleConflict, os.Getenv(RoleId), os.Getenv(RoleName)),
 				ExpectError: regexp.MustCompile(`"id": conflicts with name`),
 			},
 			{
@@ -36,20 +43,20 @@ func TestAccDataSourceRole(t *testing.T) {
 
 const testAccDataSourceRole = `
 data "cloudtemple_iam_role" "foo" {
-  id = "c83a22e9-70bb-485e-a463-78a99484e5bb"
+  id = "%s"
 }
 `
 
 const testAccDataSourceRoleName = `
 data "cloudtemple_iam_role" "foo" {
-  name = "compute_read"
+  name = "%s"
 }
 `
 
 const testAccDataSourceRoleConflict = `
 data "cloudtemple_iam_role" "foo" {
-  id   = "c83a22e9-70bb-485e-a463-78a99484e5bb"
-  name = "compute_read"
+  id   = "%s"
+  name = "%s"
 }
 `
 

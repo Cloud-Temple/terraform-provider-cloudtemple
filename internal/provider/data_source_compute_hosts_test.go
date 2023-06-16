@@ -1,9 +1,14 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	HostsQty = "COMPUTE_HOST_QTY"
 )
 
 func TestAccDataSourceHosts(t *testing.T) {
@@ -14,7 +19,7 @@ func TestAccDataSourceHosts(t *testing.T) {
 			{
 				Config: testAccDataSourceHosts,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_hosts.foo", "hosts.#", "3"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_hosts.foo", "hosts.#", os.Getenv(HostsQty)),
 				),
 			},
 		},

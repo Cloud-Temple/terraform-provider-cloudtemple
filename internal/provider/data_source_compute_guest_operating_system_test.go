@@ -1,10 +1,16 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	OperatingSystemMoRef = "COMPUTE_OPERATION_SYSTEM_MOREF"
 )
 
 func TestAccDataSourceGuestOperatingSystem(t *testing.T) {
@@ -13,14 +19,14 @@ func TestAccDataSourceGuestOperatingSystem(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceGuestOperatingSystem,
+				Config: fmt.Sprintf(testAccDataSourceGuestOperatingSystem, os.Getenv(OperatingSystemMoRef), os.Getenv(MachineManagerId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_guest_operating_system.foo", "id", "amazonlinux2_64Guest"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_guest_operating_system.foo", "id", os.Getenv(OperatingSystemMoRef)),
 				),
 			},
 			{
-				Config:      testAccDataSourceGuestOperatingSystemMissing,
-				ExpectError: regexp.MustCompile("failed to find guest operating system"),
+				Config:      fmt.Sprintf(testAccDataSourceGuestOperatingSystemMissing, os.Getenv(MachineManagerId)),
+				ExpectError: regexp.MustCompile("Forbidden."),
 			},
 		},
 	})
@@ -28,14 +34,14 @@ func TestAccDataSourceGuestOperatingSystem(t *testing.T) {
 
 const testAccDataSourceGuestOperatingSystem = `
 data "cloudtemple_compute_guest_operating_system" "foo" {
-  moref              = "amazonlinux2_64Guest"
-  machine_manager_id = "9dba240e-a605-4103-bac7-5336d3ffd124"
+  moref              = "%s"
+  machine_manager_id = "%s"
 }
 `
 
 const testAccDataSourceGuestOperatingSystemMissing = `
 data "cloudtemple_compute_guest_operating_system" "foo" {
-  moref              = "amazonlinux2_64Guest"
+  moref              = "%s"
   machine_manager_id = "12345678-1234-5678-1234-567812345678"
 }
 `

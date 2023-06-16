@@ -1,9 +1,14 @@
 package provider
 
 import (
+	"os"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	VirtualDatacenterQty = "COMPUTE_VIRTUAL_DATACENTER_QTY"
 )
 
 func TestAccDataSourceVirtualDatacenters(t *testing.T) {
@@ -14,7 +19,7 @@ func TestAccDataSourceVirtualDatacenters(t *testing.T) {
 			{
 				Config: testAccDataSourceVirtualDatacenters,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_datacenters.foo", "virtual_datacenters.#", "2"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_datacenters.foo", "virtual_datacenters.#", os.Getenv(VirtualDatacenterQty)),
 				),
 			},
 		},

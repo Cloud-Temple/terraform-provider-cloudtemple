@@ -2,9 +2,17 @@ package client
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	DatastoreClusterId    = "COMPUTE_DATASTORE_CLUSTER_ID"
+	DatastoreClusterName  = "COMPUTE_DATASTORE_CLUSTER_NAME"
+	DatastoreClusterMoRef = "COMPUTE_DATASTORE_CLUSTER_MOREF"
+	MachineManagerId2     = "COMPUTE_VCENTER_ID_2"
 )
 
 func TestCompute_DatastoreClusterList(t *testing.T) {
@@ -16,7 +24,7 @@ func TestCompute_DatastoreClusterList(t *testing.T) {
 
 	var found bool
 	for _, dc := range datastoreClusters {
-		if dc.ID == "6b06b226-ef55-4a0a-92bc-7aa071681b1b" {
+		if dc.ID == os.Getenv(DatastoreClusterId) {
 			found = true
 			break
 		}
@@ -26,19 +34,11 @@ func TestCompute_DatastoreClusterList(t *testing.T) {
 
 func TestCompute_DatastoreClusterRead(t *testing.T) {
 	ctx := context.Background()
-	datastoreCluster, err := client.Compute().DatastoreCluster().Read(ctx, "6b06b226-ef55-4a0a-92bc-7aa071681b1b")
+	datastoreCluster, err := client.Compute().DatastoreCluster().Read(ctx, os.Getenv(DatastoreClusterId))
 	require.NoError(t, err)
 
-	// Skip checking changes on metrics
-	datastoreCluster.Metrics = DatastoreClusterMetrics{}
-
-	expected := &DatastoreCluster{
-		ID:               "6b06b226-ef55-4a0a-92bc-7aa071681b1b",
-		Name:             "sdrs001-LIVE_KOUKOU",
-		Moref:            "group-p1055",
-		MachineManagerId: "9dba240e-a605-4103-bac7-5336d3ffd124",
-		Datastores:       []string{"d439d467-943a-49f5-a022-c0c25b737022"},
-		Metrics:          DatastoreClusterMetrics{},
-	}
-	require.Equal(t, expected, datastoreCluster)
+	require.Equal(t, os.Getenv(DatastoreClusterId), datastoreCluster.ID)
+	require.Equal(t, os.Getenv(DatastoreClusterName), datastoreCluster.Name)
+	require.Equal(t, os.Getenv(DatastoreClusterMoRef), datastoreCluster.Moref)
+	require.Equal(t, os.Getenv(MachineManagerId2), datastoreCluster.MachineManagerId)
 }

@@ -1,10 +1,17 @@
 package provider
 
 import (
+	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
+)
+
+const (
+	NetworkId   = "COMPUTE_NETWORK_ID"
+	NetworkName = "COMPUTE_NETWORK_NAME"
 )
 
 func TestAccDataSourceNetwork(t *testing.T) {
@@ -13,17 +20,17 @@ func TestAccDataSourceNetwork(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: testAccDataSourceNetwork,
+				Config: fmt.Sprintf(testAccDataSourceNetwork, os.Getenv(NetworkId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "id", "5e029210-b433-4c45-93be-092cef684edc"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "name", "VLAN_201"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "id", os.Getenv(NetworkId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "name", os.Getenv(NetworkName)),
 				),
 			},
 			{
-				Config: testAccDataSourceNetworkName,
+				Config: fmt.Sprintf(testAccDataSourceNetworkName, os.Getenv(NetworkName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "id", "5e029210-b433-4c45-93be-092cef684edc"),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "name", "VLAN_201"),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "id", os.Getenv(NetworkId)),
+					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "name", os.Getenv(NetworkName)),
 				),
 			},
 			{
@@ -36,13 +43,13 @@ func TestAccDataSourceNetwork(t *testing.T) {
 
 const testAccDataSourceNetwork = `
 data "cloudtemple_compute_network" "foo" {
-  id = "5e029210-b433-4c45-93be-092cef684edc"
+  id = "%s"
 }
 `
 
 const testAccDataSourceNetworkName = `
 data "cloudtemple_compute_network" "foo" {
-  name = "VLAN_201"
+  name = "%s"
 }
 `
 
