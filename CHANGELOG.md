@@ -1,3 +1,9 @@
+## 0.6.1 (June 19, 2023)
+
+BUG FIXES:
+
+  * Fixed mistyped property on newly added 'backup_virtual_machine' controller causes virtual machines struggling to power on.
+
 ## 0.6.0 (June 16, 2023)
 
 BUG FIXES:
