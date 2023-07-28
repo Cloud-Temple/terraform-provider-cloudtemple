@@ -1,0 +1,10 @@
+#cloud-config
+users:
+  - default
+  - name: terraform
+    primary_group: users
+    shell: /bin/bash
+    sudo: ['ALL=(ALL) NOPASSWD:ALL']
+    groups: sudo
+    lock_passwd: false  
+    plain_text_passwd: password
