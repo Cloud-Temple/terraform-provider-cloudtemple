@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -66,6 +68,39 @@ Virtual machines can be created using three different methods:
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
+			},
+			"cloud_init": {
+				Type:     schema.TypeMap,
+				ForceNew: true,
+				Optional: true,
+				Description: `A set of cloud-init compatible key/value used to configure the virtual machine.
+					
+	List of cloud-init compatible keys :
+	- ` + "`user-data` (This value should be base64 encoded)" + `
+	- ` + "`network-config` (This value should be base64 encoded)" + `
+	- ` + "`public-keys` Indicates that the instance should populate the default user's 'authorized_keys' with this value" + `
+	- ` + "`instance-id`" + `
+	- ` + "`password` If set, the default user's password will be set to this value to allow password based login.  The password will be good for only a single login.  If set to the string 'RANDOM' then a random password will be generated, and written to the console." + `
+	- ` + "`hostname` Specifies the hostname for the appliance" + `
+	- ` + "`seedfrom`" + `
+	
+	If you need more informations, please refer to the cloud-init documentation about the OVF datasource.
+
+	NB : The cloud-init configuration is only triggered at virtual machine first startup and requires a cloud-init compatible OVF.
+	For exemple, you can use this [Ubuntu Cloud Image](https://cloud-images.ubuntu.com/) and convert it to an OVF.
+				`,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				ValidateDiagFunc: validation.MapKeyMatch(regexp.MustCompile(strings.Join([]string{
+					"^user-data$",
+					"^network-config$",
+					"^public-keys$",
+					"^instance-id$",
+					"^password$",
+					"^hostname$",
+					"^seedfrom$"},
+					"|")), `The following key is not allowed for cloud-init`),
 			},
 			"clone_virtual_machine_id": {
 				Type:          schema.TypeString,
@@ -562,6 +597,17 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 				ID:    k,
 				Value: v.(string),
 			})
+		}
+
+		for k, v := range d.Get("cloud_init").(map[string]interface{}) {
+			if !exists(deployOptions, func(i *client.DeployOption) bool {
+				return i.ID == k
+			}) {
+				deployOptions = append(deployOptions, &client.DeployOption{
+					ID:    k,
+					Value: v.(string),
+				})
+			}
 		}
 
 		activityId, err = c.Compute().ContentLibrary().Deploy(ctx, &client.ComputeContentLibraryItemDeployRequest{

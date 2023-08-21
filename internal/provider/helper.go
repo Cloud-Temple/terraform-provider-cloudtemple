@@ -76,3 +76,13 @@ func readFullResource(read func(ctx context.Context, client *client.Client, d *s
 		return resource, nil, err
 	})
 }
+
+func exists[T any](data []T, f func(T) bool) bool {
+	for _, v := range data {
+		if f(v) {
+			return true
+		}
+	}
+
+	return false
+}
