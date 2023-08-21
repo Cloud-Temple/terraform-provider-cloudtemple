@@ -221,8 +221,8 @@ resource "cloudtemple_compute_virtual_machine" "ubuntu-cloud-init" {
 - `cloud_init` (Map of String) A set of cloud-init compatible key/value used to configure the virtual machine.
 					
 	List of cloud-init compatible keys :
-	- `user-data` (This value value should be base64 encoded)
-	- `network-config` (This value value should be base64 encoded)
+	- `user-data` (This value should be base64 encoded)
+	- `network-config` (This value should be base64 encoded)
 	- `public-keys` Indicates that the instance should populate the default user's 'authorized_keys' with this value
 	- `instance-id`
 	- `password` If set, the default user's password will be set to this value to allow password based login.  The password will be good for only a single login.  If set to the string 'RANDOM' then a random password will be generated, and written to the console.

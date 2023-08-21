@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -74,8 +76,8 @@ Virtual machines can be created using three different methods:
 				Description: `A set of cloud-init compatible key/value used to configure the virtual machine.
 					
 	List of cloud-init compatible keys :
-	- ` + "`user-data` (This value value should be base64 encoded)" + `
-	- ` + "`network-config` (This value value should be base64 encoded)" + `
+	- ` + "`user-data` (This value should be base64 encoded)" + `
+	- ` + "`network-config` (This value should be base64 encoded)" + `
 	- ` + "`public-keys` Indicates that the instance should populate the default user's 'authorized_keys' with this value" + `
 	- ` + "`instance-id`" + `
 	- ` + "`password` If set, the default user's password will be set to this value to allow password based login.  The password will be good for only a single login.  If set to the string 'RANDOM' then a random password will be generated, and written to the console." + `
@@ -88,9 +90,17 @@ Virtual machines can be created using three different methods:
 	For exemple, you can use this [Ubuntu Cloud Image](https://cloud-images.ubuntu.com/) and convert it to an OVF.
 				`,
 				Elem: &schema.Schema{
-					Type:         schema.TypeString,
-					ValidateFunc: validation.StringInSlice([]string{"user-data", "network-config", "public-keys", "instance-id", "password", "hostname", "seedfrom"}, false),
+					Type: schema.TypeString,
 				},
+				ValidateDiagFunc: validation.MapKeyMatch(regexp.MustCompile(strings.Join([]string{
+					"^user-data$",
+					"^network-config$",
+					"^public-keys$",
+					"^instance-id$",
+					"^password$",
+					"^hostname$",
+					"^seedfrom$"},
+					"|")), `The following key is not allowed for cloud-init`),
 			},
 			"clone_virtual_machine_id": {
 				Type:          schema.TypeString,
