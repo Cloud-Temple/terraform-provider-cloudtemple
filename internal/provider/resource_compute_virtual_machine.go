@@ -706,9 +706,9 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			return diag.Errorf("failed to update catalog, %s", err)
 		}
 
-		_, err = c.Backup().Job().WaitForCompletion(ctx, job.ID, getWaiterOptions(ctx))
+		_, err = c.Backup().VirtualMachine().WaitForInventory(ctx, d.Id(), getWaiterOptions(ctx))
 		if err != nil {
-			return diag.Errorf("failed to update catalog, %s", err)
+			return diag.Errorf("failed to find virtual machine in backup inventory : %s", err)
 		}
 
 		slaPolicies := []string{}
