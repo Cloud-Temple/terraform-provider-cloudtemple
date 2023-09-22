@@ -1,3 +1,9 @@
+## 0.7.0 (September 22, 2023)
+
+NEW FEATURES:
+
+  * Added cloud-init support
+
 ## 0.6.1 (June 19, 2023)
 
 BUG FIXES:
