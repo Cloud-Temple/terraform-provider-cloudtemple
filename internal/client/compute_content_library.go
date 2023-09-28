@@ -120,16 +120,17 @@ func (c *ContentLibraryClient) ReadItem(ctx context.Context, contentLibraryId, c
 }
 
 type ComputeContentLibraryItemDeployRequest struct {
-	ContentLibraryId     string          `json:"-"`
-	ContentLibraryItemId string          `json:"contentLibraryItemId"`
-	Name                 string          `json:"name"`
-	HostClusterId        string          `json:"hostClusterId,omitempty"`
-	HostId               string          `json:"hostId,omitempty"`
-	DatastoreId          string          `json:"datastoreId,"`
-	DatacenterId         string          `json:"datacenterId,omitempty"`
-	PowerOn              bool            `json:"powerOn"`
-	DeployOptions        []*DeployOption `json:"deployOptions,omitempty"`
-	NetworkData          []*NetworkData  `json:"networkData,omitempty"`
+	ContentLibraryId      string          `json:"-"`
+	ContentLibraryItemId  string          `json:"contentLibraryItemId"`
+	Name                  string          `json:"name"`
+	HostClusterId         string          `json:"hostClusterId,omitempty"`
+	HostId                string          `json:"hostId,omitempty"`
+	DatastoreId           string          `json:"datastoreId,"`
+	DatacenterId          string          `json:"datacenterId,omitempty"`
+	PowerOn               bool            `json:"powerOn"`
+	DisksProvisioningType string          `json:"disksProvisioningType,omitempty"`
+	DeployOptions         []*DeployOption `json:"deployOptions,omitempty"`
+	NetworkData           []*NetworkData  `json:"networkData,omitempty"`
 }
 
 type DeployOption struct {

@@ -200,6 +200,12 @@ Virtual machines can be created using three different methods:
 					ValidateFunc: validation.IsUUID,
 				},
 			},
+			"disks_provisioning_type": {
+				Type:         schema.TypeString,
+				Description:  "Overrides the provisioning type for the os_disks of an OVF.",
+				Optional:     true,
+				ValidateFunc: validation.StringInSlice([]string{"dynamic", "staticImmediate", "staticDiffered"}, false),
+			},
 			"os_disk": {
 				Type:        schema.TypeList,
 				Description: "OS disks created from content lib item deployment or virtual machine clone.",
@@ -611,15 +617,16 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 
 		activityId, err = c.Compute().ContentLibrary().Deploy(ctx, &client.ComputeContentLibraryItemDeployRequest{
-			Name:                 name,
-			ContentLibraryId:     d.Get("content_library_id").(string),
-			ContentLibraryItemId: d.Get("content_library_item_id").(string),
-			HostClusterId:        d.Get("host_cluster_id").(string),
-			HostId:               d.Get("host_id").(string),
-			DatastoreId:          d.Get("datastore_id").(string),
-			DatacenterId:         d.Get("datacenter_id").(string),
-			PowerOn:              d.Get("power_state").(string) == "on",
-			DeployOptions:        deployOptions,
+			Name:                  name,
+			ContentLibraryId:      d.Get("content_library_id").(string),
+			ContentLibraryItemId:  d.Get("content_library_item_id").(string),
+			HostClusterId:         d.Get("host_cluster_id").(string),
+			HostId:                d.Get("host_id").(string),
+			DatastoreId:           d.Get("datastore_id").(string),
+			DatacenterId:          d.Get("datacenter_id").(string),
+			PowerOn:               d.Get("power_state").(string) == "on",
+			DisksProvisioningType: d.Get("disks_provisioning_type").(string),
+			DeployOptions:         deployOptions,
 		})
 		if err != nil {
 			return diag.Errorf("failed to deploy content library item: %s", err)
