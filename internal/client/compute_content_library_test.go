@@ -22,7 +22,10 @@ const (
 
 func TestCompute_ContentLibraryList(t *testing.T) {
 	ctx := context.Background()
-	contentLibraries, err := client.Compute().ContentLibrary().List(ctx, "", "", "")
+	contentLibraries, err := client.Compute().ContentLibrary().List(ctx, &ContentLibraryFilter{
+		Name:             os.Getenv(ContentLibraryName),
+		MachineManagerId: os.Getenv(MachineManagerId),
+	})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(contentLibraries), 1)

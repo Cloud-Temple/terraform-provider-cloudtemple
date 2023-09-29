@@ -26,9 +26,14 @@ type DatastoreLink struct {
 	Name string `terraform:"name"`
 }
 
-func (c *ContentLibraryClient) List(ctx context.Context, machineManagerID string, datacenterID string, hostID string) ([]*ContentLibrary, error) {
-	// TODO: filters
+type ContentLibraryFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerId string `filter:"machineManagerId"`
+}
+
+func (c *ContentLibraryClient) List(ctx context.Context, filter *ContentLibraryFilter) ([]*ContentLibrary, error) {
 	r := c.c.newRequest("GET", "/api/compute/v1/vcenters/content_libraries")
+	r.addFilter(filter)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

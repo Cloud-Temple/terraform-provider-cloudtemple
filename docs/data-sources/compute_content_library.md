@@ -29,13 +29,13 @@ data "cloudtemple_compute_content_library" "name" {
 
 ### Optional
 
+- `machine_manager_id` (String)
 - `name` (String)
 
 ### Read-Only
 
 - `datastore` (List of Object) (see [below for nested schema](#nestedatt--datastore))
 - `id` (String) The ID of this resource.
-- `machine_manager_id` (String)
 - `type` (String)
 
 <a id="nestedatt--datastore"></a>
