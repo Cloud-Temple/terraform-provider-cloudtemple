@@ -25,10 +25,10 @@ Virtual machines can be created using three different methods:
   - by cloning an existing virtual machine with ` + "`clone_virtual_machine_id`" + `
   - by deploying a content library item with ` + "`content_library_id` and `content_library_item_id`",
 
-		CreateContext: computeVirtualMachineCreate,
-		ReadContext:   computeVirtualMachineRead,
-		UpdateContext: computeVirtualMachineUpdate,
-		DeleteContext: computeVirtualMachineDelete,
+		CreateWithoutTimeout: computeVirtualMachineCreate,
+		ReadContext:          computeVirtualMachineRead,
+		UpdateContext:        computeVirtualMachineUpdate,
+		DeleteContext:        computeVirtualMachineDelete,
 
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
