@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -12,21 +13,34 @@ func dataSourceContentLibraryItem() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			return getBy(
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+			name := d.Get("name").(string)
+			if name != "" {
+				items, err := c.Compute().ContentLibrary().ListItems(ctx, &client.ContentLibraryItemFilter{
+					Name:             name,
+					ContentLibraryId: d.Get("content_library_id").(string),
+				})
+				if err != nil {
+					return nil, fmt.Errorf("failed to find content library item named %q: %s", name, err)
+				}
+				for _, item := range items {
+					if item.Name == name {
+						return item, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find content library item named %q", name)
+			}
+
+			id := d.Get("id").(string)
+			item, err := c.Compute().ContentLibrary().ReadItem(
 				ctx,
-				d,
-				"content library item",
-				func(id string) (any, error) {
-					contentLibraryId := d.Get("content_library_id").(string)
-					return client.Compute().ContentLibrary().ReadItem(ctx, contentLibraryId, id)
-				},
-				func(d *schema.ResourceData) (any, error) {
-					contentLibraryId := d.Get("content_library_id").(string)
-					return client.Compute().ContentLibrary().ListItems(ctx, contentLibraryId)
-				},
-				[]string{"name"},
+				d.Get("content_library_id").(string),
+				id,
 			)
+			if err == nil && item == nil {
+				return nil, fmt.Errorf("failed to find content library item with id %q", id)
+			}
+			return item, err
 		}),
 
 		Schema: map[string]*schema.Schema{

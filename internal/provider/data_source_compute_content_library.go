@@ -28,13 +28,13 @@ func dataSourceContentLibrary() *schema.Resource {
 						return cl, nil
 					}
 				}
-				return nil, fmt.Errorf("failed to find host cluster named %q", name)
+				return nil, fmt.Errorf("failed to find content library named %q", name)
 			}
 
 			id := d.Get("id").(string)
 			contentLibrary, err := c.Compute().ContentLibrary().Read(ctx, id)
 			if err == nil && contentLibrary == nil {
-				return nil, fmt.Errorf("failed to find host cluster with id %q", id)
+				return nil, fmt.Errorf("failed to find content library with id %q", id)
 			}
 			return contentLibrary, err
 		}),

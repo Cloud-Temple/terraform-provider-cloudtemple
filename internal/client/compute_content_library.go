@@ -84,8 +84,14 @@ type ContentLibraryItem struct {
 	OvfProperties    []string  `terraform:"ovf_properties"`
 }
 
-func (c *ContentLibraryClient) ListItems(ctx context.Context, id string) ([]*ContentLibraryItem, error) {
-	r := c.c.newRequest("GET", "/api/compute/v1/vcenters/content_libraries/%s/items", id)
+type ContentLibraryItemFilter struct {
+	Name             string `filter:"name"`
+	ContentLibraryId string `terraform:"content_library_id"`
+}
+
+func (c *ContentLibraryClient) ListItems(ctx context.Context, filter *ContentLibraryItemFilter) ([]*ContentLibraryItem, error) {
+	r := c.c.newRequest("GET", "/api/compute/v1/vcenters/content_libraries/%s/items", filter.ContentLibraryId)
+	r.addFilter(filter)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
