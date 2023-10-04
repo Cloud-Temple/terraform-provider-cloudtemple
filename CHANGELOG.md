@@ -1,3 +1,16 @@
+## 0.8.0-rc.1 (October 4th, 2023)
+
+IMPROVMENTS:
+
+  * Added a property `disks_provisioning_type` that overrides the provisioning types of disks present on a OVF deployed from content library.
+  * Added `name` and `machine_manager` filters on datasource `cloudtemple_compute_content_library` and `cloudtemple_compute_content_libraries`
+  * Added `name` and `content_library_id` filters on datasource `cloudtemple_compute_content_library_item` and `cloudtemple_compute_content_library_items`
+
+BUG FIXES:
+
+  * Updated the CreateContext of resource cloudtemple_compute_virtual_machine to make it without timeout so it doesn't fails after 20 minutes.
+  * Fixed a bug causing backup module not to find the virtual machine when trying to assign an SLA policy
+
 ## 0.7.0 (September 22, 2023)
 
 NEW FEATURES:
