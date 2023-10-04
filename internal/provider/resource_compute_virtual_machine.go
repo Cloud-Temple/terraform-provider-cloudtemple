@@ -204,6 +204,7 @@ Virtual machines can be created using three different methods:
 				Type:         schema.TypeString,
 				Description:  "Overrides the provisioning type for the os_disks of an OVF.",
 				Optional:     true,
+				ForceNew:     true,
 				ValidateFunc: validation.StringInSlice([]string{"dynamic", "staticImmediate", "staticDiffered"}, false),
 			},
 			"os_disk": {
