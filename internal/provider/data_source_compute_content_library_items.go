@@ -12,9 +12,11 @@ func dataSourceContentLibraryItems() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			contentLibraryItem := d.Get("content_library_id").(string)
-			contentLibraryItems, err := client.Compute().ContentLibrary().ListItems(ctx, contentLibraryItem)
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+			contentLibraryItems, err := c.Compute().ContentLibrary().ListItems(ctx, &client.ContentLibraryItemFilter{
+				Name:             d.Get("name").(string),
+				ContentLibraryId: d.Get("content_library_id").(string),
+			})
 			return map[string]interface{}{
 				"id":                    "content_library_items",
 				"content_library_items": contentLibraryItems,

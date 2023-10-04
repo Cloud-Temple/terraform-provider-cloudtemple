@@ -136,10 +136,6 @@ func dataSourceHostCluster() *schema.Resource {
 				Type:     schema.TypeInt,
 				Computed: true,
 			},
-			// "machine_manager_id": {
-			// 	Type:     schema.TypeString,
-			// 	Computed: true,
-			// },
 		},
 	}
 }
