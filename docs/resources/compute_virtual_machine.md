@@ -241,6 +241,7 @@ resource "cloudtemple_compute_virtual_machine" "ubuntu-cloud-init" {
 - `datastore_cluster_id` (String)
 - `datastore_id` (String)
 - `deploy_options` (Map of String)
+- `disks_provisioning_type` (String) Overrides the provisioning type for the os_disks of an OVF.
 - `guest_operating_system_moref` (String) The operating system to launch the virtual machine with.
 - `host_id` (String) The host to start the virtual machine on.
 - `memory` (Number) The quantity of memory to start the virtual machine with.
