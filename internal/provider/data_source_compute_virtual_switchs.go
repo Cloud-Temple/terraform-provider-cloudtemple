@@ -11,8 +11,13 @@ func dataSourceVirtualSwitchs() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			switches, err := client.Compute().VirtualSwitch().List(ctx, "", "", "")
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+			switches, err := c.Compute().VirtualSwitch().List(ctx, &client.VirtualSwitchFilter{
+				Name:             d.Get("name").(string),
+				MachineManagerId: d.Get("machine_manager_id").(string),
+				DatacenterId:     d.Get("datacenter_id").(string),
+				HostClusterId:    d.Get("host_cluster_id").(string),
+			})
 			return map[string]interface{}{
 				"id":              "virtual_switchs",
 				"virtual_switchs": switches,

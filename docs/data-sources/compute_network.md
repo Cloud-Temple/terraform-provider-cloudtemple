@@ -27,14 +27,21 @@ data "cloudtemple_compute_network" "name" {
 
 ### Optional
 
+- `datacenter_id` (String)
+- `folder_id` (String)
+- `host_cluster_id` (String)
+- `host_id` (String)
+- `machine_manager_id` (String)
 - `name` (String)
+- `type` (String)
+- `virtual_machine_id` (String)
+- `virtual_switch_id` (String)
 
 ### Read-Only
 
 - `host_names` (List of String)
 - `host_number` (Number)
 - `id` (String) The ID of this resource.
-- `machine_manager_id` (String)
 - `moref` (String)
 - `virtual_machines_number` (Number)
 
