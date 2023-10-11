@@ -1,4 +1,12 @@
-## 0.8.0-rc.1 (October 4th, 2023)
+## 0.8.1 (October 11th, 2023)
+
+IMPROVMENTS:
+
+  * Added filters on data source cloudtemple_compute_virtual_switchand cloudtemple_compute_virtual_switchs
+  * Added filters on data source cloudtemple_compute_networkand cloudtemple_compute_networks
+  * Updated datasource cloudtemple_compute_datastore_cluster to make the filter datacenter_id mandatory
+
+## 0.8.0 (October 4th, 2023)
 
 IMPROVMENTS:
 
