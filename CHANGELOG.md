@@ -1,3 +1,9 @@
+## 0.8.2 (October 11th, 2023)
+
+BUG FIXES :
+
+  * Fixed a bug causing datasource `cloudtemple_compute_datastore_cluster` not to work.
+
 ## 0.8.1 (October 11th, 2023)
 
 IMPROVMENTS:
