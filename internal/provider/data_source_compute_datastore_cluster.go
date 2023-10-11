@@ -61,28 +61,24 @@ func dataSourceDatastoreCluster() *schema.Resource {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
-				AtLeastOneOf:  []string{"id", "name"},
 			},
 			"datacenter_id": {
 				Type:          schema.TypeString,
-				Optional:      true,
+				Required:      true,
 				Default:       "",
 				ConflictsWith: []string{"id"},
-				AtLeastOneOf:  []string{"id", "name"},
 			},
 			"host_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				Default:       "",
 				ConflictsWith: []string{"id"},
-				AtLeastOneOf:  []string{"id", "name"},
 			},
 			"host_cluster_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				Default:       "",
 				ConflictsWith: []string{"id"},
-				AtLeastOneOf:  []string{"id", "name"},
 			},
 
 			// Out

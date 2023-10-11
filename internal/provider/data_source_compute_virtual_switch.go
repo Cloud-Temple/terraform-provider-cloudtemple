@@ -57,19 +57,22 @@ func dataSourceVirtualSwitch() *schema.Resource {
 				ConflictsWith: []string{"id"},
 			},
 			"machine_manager_id": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				ValidateFunc: validation.IsUUID,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"id"},
 			},
 			"datacenter_id": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				ValidateFunc: validation.IsUUID,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"id"},
 			},
 			"host_cluster_id": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				ValidateFunc: validation.IsUUID,
+				Type:          schema.TypeString,
+				Optional:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"id"},
 			},
 
 			// Out
