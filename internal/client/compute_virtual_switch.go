@@ -18,14 +18,20 @@ type VirtualSwitch struct {
 	MachineManagerID string `terraform:"machine_manager_id"`
 }
 
+type VirtualSwitchFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerId string `filter:"machineManagerId"`
+	DatacenterId     string `filter:"datacenterId"`
+	HostClusterId    string `filter:"hostClusterId"`
+}
+
 func (v *VirtualSwitchClient) List(
 	ctx context.Context,
-	machineManagerId string,
-	datacenterId string,
-	hostClusterId string) ([]*VirtualSwitch, error) {
+	filter *VirtualSwitchFilter) ([]*VirtualSwitch, error) {
 
 	// TODO: filters
 	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_switchs")
+	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

@@ -11,8 +11,18 @@ func dataSourceNetworks() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			networks, err := client.Compute().Network().List(ctx, "", "", "", "", "", "", "", "", true)
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+			networks, err := c.Compute().Network().List(ctx, &client.NetworkFilter{
+				Name:             d.Get("name").(string),
+				MachineManagerId: d.Get("machine_manager_id").(string),
+				DatacenterId:     d.Get("datacenter_id").(string),
+				VirtualMachineId: d.Get("virtual_machine_id").(string),
+				Type:             d.Get("type").(string),
+				VirtualSwitchId:  d.Get("virtual_switch_id").(string),
+				HostId:           d.Get("host_id").(string),
+				FolderId:         d.Get("folder_id").(string),
+				HostClusterId:    d.Get("host_cluster_id").(string),
+			})
 			return map[string]interface{}{
 				"id":       "networks",
 				"networks": networks,

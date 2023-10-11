@@ -10,6 +10,18 @@ func (c *ComputeClient) Network() *NetworkClient {
 	return &NetworkClient{c.c}
 }
 
+type NetworkFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerId string `filter:"machineManagerId"`
+	DatacenterId     string `filter:"datacenterId"`
+	VirtualMachineId string `filter:"virtualMachineId"`
+	Type             string `filter:"type"`
+	VirtualSwitchId  string `filter:"virtualSwitchId"`
+	HostId           string `filter:"hostId"`
+	HostClusterId    string `filter:"hostClusterId"`
+	FolderId         string `filter:"folderId"`
+}
+
 type Network struct {
 	ID                    string   `terraform:"id"`
 	Name                  string   `terraform:"name"`
@@ -22,18 +34,10 @@ type Network struct {
 
 func (n *NetworkClient) List(
 	ctx context.Context,
-	machineManagerId string,
-	datacenterId string,
-	virtualMachineId string,
-	typ string,
-	virtualSwitchId string,
-	hostId string,
-	hostClusterId string,
-	folderId string,
-	allOptions bool) ([]*Network, error) {
+	filter *NetworkFilter) ([]*Network, error) {
 
-	// TODO: filters
 	r := n.c.newRequest("GET", "/api/compute/v1/vcenters/networks")
+	r.addFilter(filter)
 	resp, err := n.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
