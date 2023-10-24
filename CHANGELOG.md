@@ -1,3 +1,9 @@
+## 0.9.0-rc.1
+
+IMPROVMENTS:
+
+  * Boot options of a virtual machine can now be modified.
+
 ## 0.8.2 (October 11th, 2023)
 
 BUG FIXES :

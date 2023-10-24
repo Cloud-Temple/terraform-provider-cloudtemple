@@ -217,6 +217,7 @@ resource "cloudtemple_compute_virtual_machine" "ubuntu-cloud-init" {
 ### Optional
 
 - `backup_sla_policies` (Set of String) The IDs of the SLA policies to assign to the virtual machine.
+- `boot_options` (Block List, Max: 1) (see [below for nested schema](#nestedblock--boot_options))
 - `clone_virtual_machine_id` (String) The ID of the virtual machine to clone. Conflict with `content_library_item_id`.
 - `cloud_init` (Map of String) A set of cloud-init compatible key/value used to configure the virtual machine.
 					
@@ -254,7 +255,6 @@ resource "cloudtemple_compute_virtual_machine" "ubuntu-cloud-init" {
 
 ### Read-Only
 
-- `boot_options` (List of Object) (see [below for nested schema](#nestedatt--boot_options))
 - `consolidation_needed` (Boolean)
 - `cpu_usage` (Number)
 - `datastore_name` (String)
@@ -276,6 +276,19 @@ resource "cloudtemple_compute_virtual_machine" "ubuntu-cloud-init" {
 - `tools` (String)
 - `tools_version` (Number)
 - `triggered_alarms` (List of Object) (see [below for nested schema](#nestedatt--triggered_alarms))
+
+<a id="nestedblock--boot_options"></a>
+### Nested Schema for `boot_options`
+
+Optional:
+
+- `boot_delay` (Number) Delay in milliseconds before starting the boot sequence. The boot delay specifies a time interval between virtual machine power on or restart and the beginning of the boot sequence.
+- `boot_retry_delay` (Number) Delay in milliseconds before a boot retry. The boot retry delay specifies a time interval between virtual machine boot failure and the subsequent attempt to boot again. The virtual machine uses this value only if bootRetryEnabled is true.
+- `boot_retry_enabled` (Boolean) If set to true, a virtual machine that fails to boot will try again after the bootRetryDelay time period has expired. When false, the virtual machine waits indefinitely for you to initiate boot retry.
+- `efi_secure_boot_enabled` (Boolean) If set to true, the virtual machine's firmware will perform signature checks of any EFI images loaded during startup, and will refuse to start any images which do not pass those signature checks.
+- `enter_bios_setup` (Boolean) If set to true, the virtual machine automatically enters BIOS setup the next time it boots. The virtual machine resets this flag to false so that subsequent boots proceed normally.
+- `firmware` (String) Firmware type. (BIOS or EFI)
+
 
 <a id="nestedblock--os_disk"></a>
 ### Nested Schema for `os_disk`
@@ -317,18 +330,6 @@ Read-Only:
 - `id` (String) The ID of this resource.
 - `name` (String)
 - `type` (String)
-
-
-<a id="nestedatt--boot_options"></a>
-### Nested Schema for `boot_options`
-
-Read-Only:
-
-- `boot_delay` (Number)
-- `boot_retry_delay` (Number)
-- `boot_retry_enabled` (Boolean)
-- `enter_bios_setup` (Boolean)
-- `firmware` (String)
 
 
 <a id="nestedatt--extra_config"></a>
