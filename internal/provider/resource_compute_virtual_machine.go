@@ -329,6 +329,54 @@ Virtual machines can be created using three different methods:
 					},
 				},
 			},
+			"boot_options": {
+				Type:     schema.TypeList,
+				MaxItems: 1,
+				Optional: true,
+				Computed: true,
+
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"firmware": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Computed:    true,
+							Description: "Firmware type. (BIOS or EFI)",
+						},
+						"boot_delay": {
+							Type:        schema.TypeInt,
+							Optional:    true,
+							Computed:    true,
+							Description: "Delay in milliseconds before starting the boot sequence. The boot delay specifies a time interval between virtual machine power on or restart and the beginning of the boot sequence.",
+						},
+						"enter_bios_setup": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Computed:    true,
+							Description: "If set to true, the virtual machine automatically enters BIOS setup the next time it boots. The virtual machine resets this flag to false so that subsequent boots proceed normally.",
+						},
+						"boot_retry_enabled": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Computed:    true,
+							Description: "If set to true, a virtual machine that fails to boot will try again after the bootRetryDelay time period has expired. When false, the virtual machine waits indefinitely for you to initiate boot retry.",
+						},
+						"boot_retry_delay": {
+							Type:        schema.TypeInt,
+							Optional:    true,
+							Computed:    true,
+							Description: "Delay in milliseconds before a boot retry. The boot retry delay specifies a time interval between virtual machine boot failure and the subsequent attempt to boot again. The virtual machine uses this value only if bootRetryEnabled is true.",
+						},
+						"efi_secure_boot_enabled": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Computed:    true,
+							Description: "If set to true, the virtual machine's firmware will perform signature checks of any EFI images loaded during startup, and will refuse to start any images which do not pass those signature checks.",
+						},
+					},
+				},
+			},
+
 			// Out
 			"moref": {
 				Type:     schema.TypeString,
@@ -410,35 +458,6 @@ Virtual machines can be created using three different methods:
 						},
 						"status": {
 							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
-			},
-			"boot_options": {
-				Type:     schema.TypeList,
-				Computed: true,
-
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"firmware": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"boot_delay": {
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-						"enter_bios_setup": {
-							Type:     schema.TypeBool,
-							Computed: true,
-						},
-						"boot_retry_enabled": {
-							Type:     schema.TypeBool,
-							Computed: true,
-						},
-						"boot_retry_delay": {
-							Type:     schema.TypeInt,
 							Computed: true,
 						},
 					},
@@ -825,7 +844,7 @@ func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, me
 func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any, updatePower bool) diag.Diagnostics {
 	c := getClient(meta)
 
-	activityId, err := c.Compute().VirtualMachine().Update(ctx, &client.UpdateVirtualMachineRequest{
+	req := &client.UpdateVirtualMachineRequest{
 		Id:            d.Id(),
 		Ram:           d.Get("memory").(int),
 		Cpu:           d.Get("cpu").(int),
@@ -833,14 +852,21 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		HotCpuAdd:     d.Get("cpu_hot_add_enabled").(bool),
 		HotCpuRemove:  d.Get("cpu_hot_remove_enabled").(bool),
 		HotMemAdd:     d.Get("memory_hot_add_enabled").(bool),
-		BootOptions: &client.BootOptions{
-			BootDelay:        0,
-			BootRetryDelay:   10000,
-			BootRetryEnabled: false,
-			EnterBIOSSetup:   false,
-			Firmware:         "bios",
-		},
-	})
+	}
+
+	if len(d.Get("boot_options").([]interface{})) > 0 {
+		bootOptions := d.Get("boot_options").([]interface{})[0]
+		req.BootOptions = &client.BootOptions{
+			BootDelay:            bootOptions.(map[string]interface{})["boot_delay"].(int),
+			BootRetryDelay:       bootOptions.(map[string]interface{})["boot_retry_delay"].(int),
+			BootRetryEnabled:     bootOptions.(map[string]interface{})["boot_retry_enabled"].(bool),
+			EnterBIOSSetup:       bootOptions.(map[string]interface{})["enter_bios_setup"].(bool),
+			Firmware:             strings.ToLower(bootOptions.(map[string]interface{})["firmware"].(string)),
+			EFISecureBootEnabled: bootOptions.(map[string]interface{})["efi_secure_boot_enabled"].(bool),
+		}
+	}
+
+	activityId, err := c.Compute().VirtualMachine().Update(ctx, req)
 	if err != nil {
 		return diag.Errorf("failed to update virtual machine: %s", err)
 	}

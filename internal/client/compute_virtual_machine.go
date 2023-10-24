@@ -82,19 +82,21 @@ type VirtualMachineStorage struct {
 }
 
 type VirtualMachineBootOptions struct {
-	Firmware         string `terraform:"firmware"`
-	BootDelay        int    `terraform:"boot_delay"`
-	EnterBIOSSetup   bool   `terraform:"enter_bios_setup"`
-	BootRetryEnabled bool   `terraform:"boot_retry_enabled"`
-	BootRetryDelay   int    `terraform:"boot_retry_delay"`
+	Firmware             string `terraform:"firmware"`
+	BootDelay            int    `terraform:"boot_delay"`
+	EnterBIOSSetup       bool   `terraform:"enter_bios_setup"`
+	BootRetryEnabled     bool   `terraform:"boot_retry_enabled"`
+	BootRetryDelay       int    `terraform:"boot_retry_delay"`
+	EFISecureBootEnabled bool   `terraform:"efi_secure_boot_enabled"`
 }
 
 type BootOptions struct {
-	BootDelay        int    `json:"bootDelay"`
-	BootRetryDelay   int    `json:"bootRetryDelay"`
-	BootRetryEnabled bool   `json:"bootRetryEnabled"`
-	EnterBIOSSetup   bool   `json:"enterBIOSSetup"`
-	Firmware         string `json:"firmware"`
+	BootDelay            int    `json:"bootDelay"`
+	BootRetryDelay       int    `json:"bootRetryDelay"`
+	BootRetryEnabled     bool   `json:"bootRetryEnabled"`
+	EnterBIOSSetup       bool   `json:"enterBIOSSetup"`
+	Firmware             string `json:"firmware"`
+	EFISecureBootEnabled bool   `json:"efiSecureBootEnabled"`
 }
 
 type PowerRequest struct {
