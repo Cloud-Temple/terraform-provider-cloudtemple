@@ -115,23 +115,23 @@ func computeVirtualControllerCreate(ctx context.Context, d *schema.ResourceData,
 	// 	return diag.Errorf("the virtual controller could not be connected: %s", err)
 	// }
 
-	if d.Get("mounted").(bool) {
-		activityId, err = c.Compute().VirtualController().Mount(ctx, &client.MountVirtualControllerRequest{
-			ID:                   d.Id(),
-			IsoPath:              d.Get("iso_path").(string),
-			ContentLibraryItemId: d.Get("content_library_item_id").(string),
-		})
-		if err != nil {
-			return diag.Errorf("failed to mount virtual controller: %s", err)
-		}
-		_, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		if err != nil {
-			return diag.Errorf("failed to mount virtual controller, %s", err)
-		}
-	}
-	if err != nil {
-		return diag.Errorf("the virtual controller could not be mounted: %s", err)
-	}
+	// if d.Get("mounted").(bool) {
+	// 	activityId, err = c.Compute().VirtualController().Mount(ctx, &client.MountVirtualControllerRequest{
+	// 		ID:                   d.Id(),
+	// 		IsoPath:              d.Get("iso_path").(string),
+	// 		ContentLibraryItemId: d.Get("content_library_item_id").(string),
+	// 	})
+	// 	if err != nil {
+	// 		return diag.Errorf("failed to mount virtual controller: %s", err)
+	// 	}
+	// 	_, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	// 	if err != nil {
+	// 		return diag.Errorf("failed to mount virtual controller, %s", err)
+	// 	}
+	// }
+	// if err != nil {
+	// 	return diag.Errorf("the virtual controller could not be mounted: %s", err)
+	// }
 
 	return computeVirtualControllerUpdate(ctx, d, meta)
 }
@@ -175,7 +175,7 @@ func computeVirtualControllerUpdate(ctx context.Context, d *schema.ResourceData,
 	if d.HasChange("mounted") {
 		var activityId string
 		var err error
-		if d.Get("mounted") == true {
+		if d.Get("mounted").(bool) {
 			activityId, err = c.Compute().VirtualController().Mount(ctx, &client.MountVirtualControllerRequest{
 				ID:                   d.Id(),
 				IsoPath:              d.Get("iso_path").(string),
