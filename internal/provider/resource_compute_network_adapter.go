@@ -15,10 +15,10 @@ func resourceNetworkAdapter() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		CreateContext: computeNetworkAdapterCreate,
-		ReadContext:   computeNetworkAdapterRead,
-		UpdateContext: computeNetworkAdapterUpdate,
-		DeleteContext: computeNetworkAdapterDelete,
+		CreateWithoutTimeout: computeNetworkAdapterCreate,
+		ReadContext:          computeNetworkAdapterRead,
+		UpdateContext:        computeNetworkAdapterUpdate,
+		DeleteContext:        computeNetworkAdapterDelete,
 
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,

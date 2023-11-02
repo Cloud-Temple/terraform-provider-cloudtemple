@@ -13,10 +13,10 @@ func resourceVirtualDisk() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		CreateContext: computeVirtualDiskCreate,
-		ReadContext:   computeVirtualDiskRead,
-		UpdateContext: computeVirtualDiskUpdate,
-		DeleteContext: computeVirtualDiskDelete,
+		CreateWithoutTimeout: computeVirtualDiskCreate,
+		ReadContext:          computeVirtualDiskRead,
+		UpdateContext:        computeVirtualDiskUpdate,
+		DeleteContext:        computeVirtualDiskDelete,
 
 		Schema: map[string]*schema.Schema{
 			// In
