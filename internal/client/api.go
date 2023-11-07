@@ -320,7 +320,7 @@ func closeResponseBody(resp *http.Response) error {
 
 // requireOK is used to wrap doRequest and check for a 200
 func requireOK(resp *http.Response) error {
-	return requireHttpCodes(resp, 200, 201)
+	return requireHttpCodes(resp, 200, 201, 206)
 }
 
 // requireHttpCodes checks for the "allowable" http codes for a response
@@ -339,7 +339,7 @@ func requireHttpCodes(resp *http.Response, httpCodes ...int) error {
 
 func requireNotFoundOrOK(resp *http.Response, notFoundCode int) (bool, error) {
 	switch resp.StatusCode {
-	case 200:
+	case 200, 206:
 		return true, nil
 	case 404, notFoundCode:
 		return false, nil

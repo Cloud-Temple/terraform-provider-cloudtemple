@@ -11,13 +11,12 @@ import (
 
 func resourceVirtualController() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Create and manage virtual controllers of a virtual machine.",
 
 		CreateContext: computeVirtualControllerCreate,
 		ReadContext:   computeVirtualControllerRead,
 		UpdateContext: computeVirtualControllerUpdate,
 		DeleteContext: computeVirtualControllerDelete,
-
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
@@ -35,35 +34,42 @@ func resourceVirtualController() *schema.Resource {
 				Required:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.StringInSlice([]string{"USB2", "USB3", "SCSI", "CD/DVD"}, false),
+				Description:  "Can be one of : USB2, USB3, SCSI, CD/DVD",
 			},
 			"sub_type": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				ForceNew:     true,
 				ValidateFunc: validation.StringInSlice([]string{"BusLogic", "LSILogic", "LSILogicSAS", "ParaVirtual"}, false),
+				Description:  "Can be one of : BusLogic, LSILogic, LSILogicSAS, ParaVirtual",
 			},
 			"iso_path": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"content_library_item_id"},
+				Description:   "If exists, the datastore ISO path. (Conflicts with `content_library_item_id`)",
 			},
 			"content_library_item_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"iso_path"},
+				Description:   "Content library item identifier. (Conflicts with `iso_path`)",
 			},
 			"connected": {
-				Type:     schema.TypeBool,
-				Optional: true,
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Only compatible with CDROM controllers",
 			},
 			"mounted": {
-				Type:     schema.TypeBool,
-				Optional: true,
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Only compatible with CDROM controllers",
 			},
 
 			//Out
 			"hot_add_remove": {
-				Type:     schema.TypeString,
+				Type:     schema.TypeBool,
 				Computed: true,
 			},
 			"shared_bus": {
@@ -78,6 +84,14 @@ func resourceVirtualController() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"virtual_disks": {
+				Type:     schema.TypeList,
+				Computed: true,
+
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
 		},
 	}
 }
@@ -86,11 +100,9 @@ func computeVirtualControllerCreate(ctx context.Context, d *schema.ResourceData,
 	c := getClient(meta)
 
 	activityId, err := c.Compute().VirtualController().Create(ctx, &client.CreateVirtualControllerRequest{
-		VirtualMachineId:     d.Get("virtual_machine_id").(string),
-		Type:                 d.Get("type").(string),
-		SubType:              d.Get("sub_type").(string),
-		IsoPath:              d.Get("iso_path").(string),
-		ContentLibraryItemId: d.Get("content_library_item_id").(string),
+		VirtualMachineId: d.Get("virtual_machine_id").(string),
+		Type:             d.Get("type").(string),
+		SubType:          d.Get("sub_type").(string),
 	})
 	if err != nil {
 		return diag.Errorf("the virtual controller could not be created: %s", err)
@@ -100,38 +112,6 @@ func computeVirtualControllerCreate(ctx context.Context, d *schema.ResourceData,
 	if err != nil {
 		return diag.Errorf("failed to create virtual controller, %s", err)
 	}
-
-	// if d.Get("connected").(bool) {
-	// 	activityId, err = c.Compute().VirtualController().Connect(ctx, d.Id())
-	// 	if err != nil {
-	// 		return diag.Errorf("failed to connect virtual controller: %s", err)
-	// 	}
-	// 	_, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	// 	if err != nil {
-	// 		return diag.Errorf("failed to connect virtual controller, %s", err)
-	// 	}
-	// }
-	// if err != nil {
-	// 	return diag.Errorf("the virtual controller could not be connected: %s", err)
-	// }
-
-	// if d.Get("mounted").(bool) {
-	// 	activityId, err = c.Compute().VirtualController().Mount(ctx, &client.MountVirtualControllerRequest{
-	// 		ID:                   d.Id(),
-	// 		IsoPath:              d.Get("iso_path").(string),
-	// 		ContentLibraryItemId: d.Get("content_library_item_id").(string),
-	// 	})
-	// 	if err != nil {
-	// 		return diag.Errorf("failed to mount virtual controller: %s", err)
-	// 	}
-	// 	_, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	// 	if err != nil {
-	// 		return diag.Errorf("failed to mount virtual controller, %s", err)
-	// 	}
-	// }
-	// if err != nil {
-	// 	return diag.Errorf("the virtual controller could not be mounted: %s", err)
-	// }
 
 	return computeVirtualControllerUpdate(ctx, d, meta)
 }
@@ -154,24 +134,6 @@ func computeVirtualControllerRead(ctx context.Context, d *schema.ResourceData, m
 func computeVirtualControllerUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
-	if d.HasChange("connected") {
-		var activityId string
-		var err error
-		if d.Get("connected").(bool) {
-			activityId, err = c.Compute().VirtualController().Connect(ctx, d.Id())
-		} else {
-			activityId, err = c.Compute().VirtualController().Disconnect(ctx, d.Id())
-		}
-		if err != nil {
-			return diag.Errorf("the virtual controller could not be connected: %s", err)
-		}
-		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		setIdFromActivityConcernedItems(d, activity)
-		if err != nil {
-			return diag.Errorf("failed to connect virtual controller, %s", err)
-		}
-	}
-
 	if d.HasChange("mounted") {
 		var activityId string
 		var err error
@@ -183,6 +145,24 @@ func computeVirtualControllerUpdate(ctx context.Context, d *schema.ResourceData,
 			})
 		} else {
 			activityId, err = c.Compute().VirtualController().Unmount(ctx, d.Id())
+		}
+		if err != nil {
+			return diag.Errorf("the virtual controller could not be connected: %s", err)
+		}
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		setIdFromActivityConcernedItems(d, activity)
+		if err != nil {
+			return diag.Errorf("failed to connect virtual controller, %s", err)
+		}
+	}
+
+	if d.HasChange("connected") {
+		var activityId string
+		var err error
+		if d.Get("connected").(bool) {
+			activityId, err = c.Compute().VirtualController().Connect(ctx, d.Id())
+		} else {
+			activityId, err = c.Compute().VirtualController().Disconnect(ctx, d.Id())
 		}
 		if err != nil {
 			return diag.Errorf("the virtual controller could not be connected: %s", err)

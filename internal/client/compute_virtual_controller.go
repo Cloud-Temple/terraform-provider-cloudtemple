@@ -47,11 +47,9 @@ func (v *VirtualControllerClient) List(
 }
 
 type CreateVirtualControllerRequest struct {
-	VirtualMachineId     string `json:"virtualMachineId"`
-	Type                 string `json:"type"`
-	SubType              string `json:"subType,omitempty"`
-	IsoPath              string `json:"isoPath,omitempty"`
-	ContentLibraryItemId string `json:"contentLibraryitemId,omitempty"`
+	VirtualMachineId string `json:"virtualMachineId"`
+	Type             string `json:"type"`
+	SubType          string `json:"subType,omitempty"`
 }
 
 func (n *VirtualControllerClient) Create(ctx context.Context, req *CreateVirtualControllerRequest) (string, error) {
@@ -83,7 +81,7 @@ func (v *VirtualControllerClient) Read(ctx context.Context, id string) (*Virtual
 type MountVirtualControllerRequest struct {
 	ID                   string `json:"id"`
 	IsoPath              string `json:"isoPath,omitempty"`
-	ContentLibraryItemId string `json:"contentLibraryitemId,omitempty"`
+	ContentLibraryItemId string `json:"contentLibraryItemId,omitempty"`
 }
 
 func (n *VirtualControllerClient) Mount(ctx context.Context, req *MountVirtualControllerRequest) (string, error) {
