@@ -1,6 +1,12 @@
-## 0.9.0-rc.1
+## 0.10.0-rc.1 (November 7nd, 2023)
 
-IMPROVMENTS:
+IMPROVEMENTS:
+
+  * Added support of creation, management and deletion of virtual controllers through a new `cloudtemple_compute_virtual_controller` resource.
+
+## 0.9.0-rc.1 (November 2nd, 2023)
+
+IMPROVEMENTS:
 
   * Boot options of a virtual machine can now be modified.
 
@@ -12,7 +18,7 @@ BUG FIXES :
 
 ## 0.8.1 (October 11th, 2023)
 
-IMPROVMENTS:
+IMPROVEMENTS:
 
   * Added filters on data source cloudtemple_compute_virtual_switchand cloudtemple_compute_virtual_switchs
   * Added filters on data source cloudtemple_compute_networkand cloudtemple_compute_networks
@@ -20,7 +26,7 @@ IMPROVMENTS:
 
 ## 0.8.0 (October 4th, 2023)
 
-IMPROVMENTS:
+IMPROVEMENTS:
 
   * Added a property `disks_provisioning_type` that overrides the provisioning types of disks present on a OVF deployed from content library.
   * Added `name` and `machine_manager` filters on datasource `cloudtemple_compute_content_library` and `cloudtemple_compute_content_libraries`
