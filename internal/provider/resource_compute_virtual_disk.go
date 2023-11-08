@@ -17,6 +17,9 @@ func resourceVirtualDisk() *schema.Resource {
 		ReadContext:          computeVirtualDiskRead,
 		UpdateContext:        computeVirtualDiskUpdate,
 		DeleteContext:        computeVirtualDiskDelete,
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			// In
