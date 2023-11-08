@@ -1,4 +1,8 @@
-## 0.10.0-rc.1 (November 7nd, 2023)
+## 0.10.0-rc.2 (November 8th, 2023)
+
+  * Resource `cloudtemple_compute_virtual_disk` can now be imported into state.
+
+## 0.10.0-rc.1 (November 7th, 2023)
 
 IMPROVEMENTS:
 
