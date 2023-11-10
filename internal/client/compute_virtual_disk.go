@@ -18,6 +18,7 @@ type VirtualDisk struct {
 	Capacity            int    `terraform:"capacity"`
 	DiskUnitNumber      int    `terraform:"disk_unit_number"`
 	ControllerBusNumber int    `terraform:"controller_bus_number"`
+	ControllerId        string `terraform:"controller_id"`
 	DatastoreId         string `terraform:"datastore_id"`
 	DatastoreName       string `terraform:"datastore_name"`
 	InstantAccess       bool   `terraform:"instant_access"`
