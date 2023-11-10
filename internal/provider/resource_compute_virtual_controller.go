@@ -37,10 +37,9 @@ func resourceVirtualController() *schema.Resource {
 				Description:  "Can be one of : USB2, USB3, SCSI, CD/DVD",
 			},
 			"sub_type": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
-				// ForceNew:     true,
+				Type:         schema.TypeString,
+				Optional:     true,
+				ForceNew:     true,
 				ValidateFunc: validation.StringInSlice([]string{"BusLogic", "LSILogic", "LSILogicSAS", "ParaVirtual"}, false),
 				Description:  "Can be one of : BusLogic, LSILogic, LSILogicSAS, ParaVirtual",
 			},
