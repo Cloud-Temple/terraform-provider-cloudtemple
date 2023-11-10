@@ -16,7 +16,7 @@ type BackupSite struct {
 }
 
 func (c *BackupSiteClient) List(ctx context.Context) ([]*BackupSite, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/sites")
+	r := c.c.newRequest("GET", "/backup/v1/sites")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

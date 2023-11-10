@@ -42,7 +42,7 @@ type ActivityConcernedItem struct {
 }
 
 func (c *ActivityClient) List(ctx context.Context, filter *struct{}) ([]*Activity, error) {
-	r := c.c.newRequest("GET", "/api/activity/v1/activities")
+	r := c.c.newRequest("GET", "/activity/v1/activities")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -61,7 +61,7 @@ func (c *ActivityClient) List(ctx context.Context, filter *struct{}) ([]*Activit
 }
 
 func (c *ActivityClient) Read(ctx context.Context, id string) (*Activity, error) {
-	r := c.c.newRequest("GET", "/api/activity/v1/activities/%s", id)
+	r := c.c.newRequest("GET", "/activity/v1/activities/%s", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

@@ -17,7 +17,7 @@ type TenantAssignment struct {
 }
 
 func (a *AssignmentClient) List(ctx context.Context, userId, tenantId, roleId string) ([]*TenantAssignment, error) {
-	r := a.c.newRequest("GET", "/api/iam/v2/assignments/tenant")
+	r := a.c.newRequest("GET", "/iam/v2/assignments/tenant")
 	r.params.Set("userId", userId)
 	r.params.Set("tenantId", tenantId)
 	if roleId != "" {

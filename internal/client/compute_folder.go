@@ -22,7 +22,7 @@ func (f *FolderClient) List(
 	datacenterId string) ([]*Folder, error) {
 
 	// TODO: filters
-	r := f.c.newRequest("GET", "/api/compute/v1/vcenters/folders")
+	r := f.c.newRequest("GET", "/compute/v1/vcenters/folders")
 	resp, err := f.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func (f *FolderClient) List(
 }
 
 func (f *FolderClient) Read(ctx context.Context, id string) (*Folder, error) {
-	r := f.c.newRequest("GET", "/api/compute/v1/vcenters/folders/%s", id)
+	r := f.c.newRequest("GET", "/compute/v1/vcenters/folders/%s", id)
 	resp, err := f.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

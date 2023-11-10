@@ -23,7 +23,7 @@ type CreateTagRequestResource struct {
 }
 
 func (c *TagResourceClient) Create(ctx context.Context, req *CreateTagRequest) error {
-	r := c.c.newRequest("POST", "/api/tag/v1/tags")
+	r := c.c.newRequest("POST", "/tag/v1/tags")
 	r.obj = req
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
@@ -34,7 +34,7 @@ func (c *TagResourceClient) Create(ctx context.Context, req *CreateTagRequest) e
 }
 
 func (c *TagResourceClient) Read(ctx context.Context, resourceId string) ([]*Tag, error) {
-	r := c.c.newRequest("GET", "/api/tag/v1/tags/resources/%s", resourceId)
+	r := c.c.newRequest("GET", "/tag/v1/tags/resources/%s", resourceId)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (c *TagResourceClient) Read(ctx context.Context, resourceId string) ([]*Tag
 }
 
 func (c *TagResourceClient) Delete(ctx context.Context, resourceId string, key string) error {
-	r := c.c.newRequest("DELETE", "/api/tag/v1/tags/resources/%s/keys/%s", resourceId, key)
+	r := c.c.newRequest("DELETE", "/tag/v1/tags/resources/%s/keys/%s", resourceId, key)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return err

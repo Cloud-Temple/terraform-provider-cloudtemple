@@ -36,7 +36,7 @@ func (n *NetworkClient) List(
 	ctx context.Context,
 	filter *NetworkFilter) ([]*Network, error) {
 
-	r := n.c.newRequest("GET", "/api/compute/v1/vcenters/networks")
+	r := n.c.newRequest("GET", "/compute/v1/vcenters/networks")
 	r.addFilter(filter)
 	resp, err := n.c.doRequest(ctx, r)
 	if err != nil {
@@ -56,7 +56,7 @@ func (n *NetworkClient) List(
 }
 
 func (n *NetworkClient) Read(ctx context.Context, id string) (*Network, error) {
-	r := n.c.newRequest("GET", "/api/compute/v1/vcenters/networks/%s", id)
+	r := n.c.newRequest("GET", "/compute/v1/vcenters/networks/%s", id)
 	resp, err := n.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

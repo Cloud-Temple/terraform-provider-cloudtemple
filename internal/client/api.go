@@ -208,7 +208,7 @@ func (c *Client) token(ctx context.Context) (*jwt.Token, error) {
 		}
 	}
 
-	r := c.newRequest("POST", "/api/iam/v2/auth/personal_access_token")
+	r := c.newRequest("POST", "/iam/v2/auth/personal_access_token")
 	r.obj = map[string]interface{}{
 		"id":     c.config.ClientID,
 		"secret": c.config.SecretID,

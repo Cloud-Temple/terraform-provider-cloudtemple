@@ -24,7 +24,7 @@ type Token struct {
 }
 
 func (p *PATClient) List(ctx context.Context, userId string, tenantId string) ([]*Token, error) {
-	r := p.c.newRequest("GET", "/api/iam/v2/personal_access_tokens")
+	r := p.c.newRequest("GET", "/iam/v2/personal_access_tokens")
 	r.params.Set("userId", userId)
 	r.params.Set("tenantId", tenantId)
 	resp, err := p.c.doRequest(ctx, r)
@@ -45,7 +45,7 @@ func (p *PATClient) List(ctx context.Context, userId string, tenantId string) ([
 }
 
 func (p *PATClient) Read(ctx context.Context, patID string) (*Token, error) {
-	r := p.c.newRequest("GET", "/api/iam/v2/personal_access_tokens/%s", patID)
+	r := p.c.newRequest("GET", "/iam/v2/personal_access_tokens/%s", patID)
 	resp, err := p.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -69,7 +69,7 @@ func (p *PATClient) Create(ctx context.Context, name string, roles []string, exp
 		return nil, fmt.Errorf("roles must not be empty")
 	}
 
-	r := p.c.newRequest("POST", "/api/iam/v2/personal_access_tokens")
+	r := p.c.newRequest("POST", "/iam/v2/personal_access_tokens")
 	r.obj = map[string]interface{}{
 		"name":           name,
 		"roles":          roles,
@@ -103,7 +103,7 @@ func (p *PATClient) Create(ctx context.Context, name string, roles []string, exp
 }
 
 func (p *PATClient) Delete(ctx context.Context, patID string) error {
-	r := p.c.newRequest("DELETE", "/api/iam/v2/personal_access_tokens/%s", patID)
+	r := p.c.newRequest("DELETE", "/iam/v2/personal_access_tokens/%s", patID)
 	resp, err := p.c.doRequest(ctx, r)
 	if err != nil {
 		return err

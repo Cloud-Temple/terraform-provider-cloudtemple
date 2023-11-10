@@ -18,7 +18,7 @@ type Snapshot struct {
 }
 
 func (s *SnapshotClient) List(ctx context.Context, virtualMachineId string) ([]*Snapshot, error) {
-	r := s.c.newRequest("GET", "/api/compute/v1/vcenters/snapshots")
+	r := s.c.newRequest("GET", "/compute/v1/vcenters/snapshots")
 	r.params.Add("virtualMachineId", virtualMachineId)
 	resp, err := s.c.doRequest(ctx, r)
 	if err != nil {

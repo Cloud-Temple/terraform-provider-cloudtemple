@@ -22,7 +22,7 @@ type User struct {
 }
 
 func (t *UserClient) Read(ctx context.Context, userID string) (*User, error) {
-	r := t.c.newRequest("GET", "/api/iam/v2/users/%s", userID)
+	r := t.c.newRequest("GET", "/iam/v2/users/%s", userID)
 	resp, err := t.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ func (t *UserClient) Read(ctx context.Context, userID string) (*User, error) {
 }
 
 func (t *UserClient) List(ctx context.Context, companyID string) ([]*User, error) {
-	r := t.c.newRequest("GET", "/api/iam/v2/users")
+	r := t.c.newRequest("GET", "/iam/v2/users")
 	r.params.Add("companyId", companyID)
 	resp, err := t.c.doRequest(ctx, r)
 	if err != nil {

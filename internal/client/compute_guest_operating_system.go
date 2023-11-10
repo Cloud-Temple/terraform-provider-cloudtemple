@@ -24,7 +24,7 @@ func (g *GuestOperatingSystemClient) List(
 	osFamily string) ([]*GuestOperatingSystem, error) {
 
 	// TODO: filters
-	r := g.c.newRequest("GET", "/api/compute/v1/vcenters/guest_operating_systems")
+	r := g.c.newRequest("GET", "/compute/v1/vcenters/guest_operating_systems")
 	r.params.Add("machineManagerId", machineManagerId)
 	resp, err := g.c.doRequest(ctx, r)
 	if err != nil {
@@ -45,7 +45,7 @@ func (g *GuestOperatingSystemClient) List(
 }
 
 func (g *GuestOperatingSystemClient) Read(ctx context.Context, machineManagerId string, moref string) (*GuestOperatingSystem, error) {
-	r := g.c.newRequest("GET", "/api/compute/v1/vcenters/guest_operating_systems/%s", moref)
+	r := g.c.newRequest("GET", "/compute/v1/vcenters/guest_operating_systems/%s", moref)
 	r.params.Add("machineManagerId", machineManagerId)
 	resp, err := g.c.doRequest(ctx, r)
 	if err != nil {

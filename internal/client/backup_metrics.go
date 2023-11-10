@@ -23,7 +23,7 @@ type BackupMetricsHistory struct {
 }
 
 func (c *BackupMetricsClient) History(ctx context.Context, rang int) (*BackupMetricsHistory, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/metrics/backup/history")
+	r := c.c.newRequest("GET", "/backup/v1/metrics/backup/history")
 	r.params.Add("range", strconv.Itoa(rang))
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
@@ -51,7 +51,7 @@ type BackupMetricsCoverage struct {
 }
 
 func (c *BackupMetricsClient) Coverage(ctx context.Context) (*BackupMetricsCoverage, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/metrics/coverage")
+	r := c.c.newRequest("GET", "/backup/v1/metrics/coverage")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -79,7 +79,7 @@ type BackupMetricsVirtualMachines struct {
 }
 
 func (c *BackupMetricsClient) VirtualMachines(ctx context.Context) (*BackupMetricsVirtualMachines, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/metrics/vm")
+	r := c.c.newRequest("GET", "/backup/v1/metrics/vm")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -104,7 +104,7 @@ type BackupMetricsPolicies struct {
 }
 
 func (c *BackupMetricsClient) Policies(ctx context.Context) ([]*BackupMetricsPolicies, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/metrics/policies")
+	r := c.c.newRequest("GET", "/backup/v1/metrics/policies")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ type BackupMetricsPlatform struct {
 }
 
 func (c *BackupMetricsClient) Platform(ctx context.Context) (*BackupMetricsPlatform, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/metrics/plateform")
+	r := c.c.newRequest("GET", "/backup/v1/metrics/plateform")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ type BackupMetricsPlatformCPU struct {
 }
 
 func (c *BackupMetricsClient) PlatformCPU(ctx context.Context) (*BackupMetricsPlatformCPU, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/metrics/plateform/cpu")
+	r := c.c.newRequest("GET", "/backup/v1/metrics/plateform/cpu")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
