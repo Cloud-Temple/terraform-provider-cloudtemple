@@ -42,6 +42,13 @@ func New(version string) func() *schema.Provider {
 					Optional:    true,
 					DefaultFunc: schema.EnvDefaultFunc(client.HTTPAddrEnvName, "shiva.cloud-temple.com"),
 				},
+				"api_suffix": {
+					Description: "Specify whether it is necessary to use an /api suffix after the address. (Used for development purpose only)",
+					Type:        schema.TypeBool,
+					Optional:    true,
+					Default:     true,
+					DefaultFunc: schema.EnvDefaultFunc(client.HTTPAddrEnvName, "shiva.cloud-temple.com"),
+				},
 				"scheme": {
 					Description: "The URL scheme to used to connect to the API. Default to `https`. Can also be specified with the environment variable `CLOUDTEMPLE_HTTP_SCHEME`.",
 					Type:        schema.TypeString,
@@ -156,6 +163,7 @@ func configure(version string, p *schema.Provider) func(context.Context, *schema
 		config.ClientID = d.Get("client_id").(string)
 		config.SecretID = d.Get("secret_id").(string)
 		config.Address = d.Get("address").(string)
+		config.ApiSuffix = d.Get("api_suffix").(bool)
 		config.Scheme = d.Get("scheme").(string)
 
 		config.Transport = &loggingHttpTransport{

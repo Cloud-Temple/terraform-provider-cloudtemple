@@ -30,6 +30,8 @@ const (
 type Config struct {
 	Address string
 
+	ApiSuffix bool
+
 	Scheme string
 
 	HttpClient *http.Client
@@ -119,6 +121,10 @@ type request struct {
 }
 
 func (c *Client) newRequest(method, path string, args ...interface{}) *request {
+	if c.config.ApiSuffix {
+		path = "/api" + path
+	}
+
 	r := &request{
 		config: &c.config,
 		method: method,
