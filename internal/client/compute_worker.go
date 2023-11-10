@@ -32,7 +32,7 @@ type Worker struct {
 
 func (v *WorkerClient) List(ctx context.Context, name string) ([]*Worker, error) {
 	// TODO: filters
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters")
+	r := v.c.newRequest("GET", "/compute/v1/vcenters")
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -51,7 +51,7 @@ func (v *WorkerClient) List(ctx context.Context, name string) ([]*Worker, error)
 }
 
 func (v *WorkerClient) Read(ctx context.Context, id string) (*Worker, error) {
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/%s", id)
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

@@ -18,7 +18,7 @@ type Feature struct {
 }
 
 func (f *FeatureClient) List(ctx context.Context) ([]*Feature, error) {
-	r := f.c.newRequest("GET", "/api/iam/v2/features")
+	r := f.c.newRequest("GET", "/iam/v2/features")
 	resp, err := f.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -42,7 +42,7 @@ type FeatureAssignment struct {
 }
 
 func (f *FeatureClient) ListAssignments(ctx context.Context, tenantID string) ([]*FeatureAssignment, error) {
-	r := f.c.newRequest("GET", "/api/iam/v2/features/assignments")
+	r := f.c.newRequest("GET", "/iam/v2/features/assignments")
 	r.params.Set("tenantId", tenantID)
 	resp, err := f.c.doRequest(ctx, r)
 	if err != nil {

@@ -46,7 +46,7 @@ func (h *HostClusterClient) List(
 	filter *HostClusterFilter) ([]*HostCluster, error) {
 
 	// TODO: filters
-	r := h.c.newRequest("GET", "/api/compute/v1/vcenters/host_clusters")
+	r := h.c.newRequest("GET", "/compute/v1/vcenters/host_clusters")
 	r.addFilter(filter)
 	resp, err := h.c.doRequest(ctx, r)
 	if err != nil {
@@ -66,7 +66,7 @@ func (h *HostClusterClient) List(
 }
 
 func (h *HostClusterClient) Read(ctx context.Context, id string) (*HostCluster, error) {
-	r := h.c.newRequest("GET", "/api/compute/v1/vcenters/host_clusters/%s", id)
+	r := h.c.newRequest("GET", "/compute/v1/vcenters/host_clusters/%s", id)
 	resp, err := h.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

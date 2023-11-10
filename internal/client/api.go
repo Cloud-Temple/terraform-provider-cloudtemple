@@ -30,6 +30,8 @@ const (
 type Config struct {
 	Address string
 
+	ApiSuffix bool
+
 	Scheme string
 
 	HttpClient *http.Client
@@ -119,6 +121,10 @@ type request struct {
 }
 
 func (c *Client) newRequest(method, path string, args ...interface{}) *request {
+	if c.config.ApiSuffix {
+		path = "/api" + path
+	}
+
 	r := &request{
 		config: &c.config,
 		method: method,
@@ -208,7 +214,7 @@ func (c *Client) token(ctx context.Context) (*jwt.Token, error) {
 		}
 	}
 
-	r := c.newRequest("POST", "/api/iam/v2/auth/personal_access_token")
+	r := c.newRequest("POST", "/iam/v2/auth/personal_access_token")
 	r.obj = map[string]interface{}{
 		"id":     c.config.ClientID,
 		"secret": c.config.SecretID,

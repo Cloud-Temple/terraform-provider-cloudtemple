@@ -16,7 +16,7 @@ type Role struct {
 }
 
 func (r *RoleClient) List(ctx context.Context) ([]*Role, error) {
-	req := r.c.newRequest("GET", "/api/iam/v2/roles")
+	req := r.c.newRequest("GET", "/iam/v2/roles")
 	resp, err := r.c.doRequest(ctx, req)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func (r *RoleClient) List(ctx context.Context) ([]*Role, error) {
 }
 
 func (r *RoleClient) Read(ctx context.Context, roleID string) (*Role, error) {
-	req := r.c.newRequest("GET", "/api/iam/v2/roles/%s", roleID)
+	req := r.c.newRequest("GET", "/iam/v2/roles/%s", roleID)
 	resp, err := r.c.doRequest(ctx, req)
 	if err != nil {
 		return nil, err
