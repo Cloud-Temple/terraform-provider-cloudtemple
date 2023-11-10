@@ -30,7 +30,7 @@ func (v *VirtualSwitchClient) List(
 	filter *VirtualSwitchFilter) ([]*VirtualSwitch, error) {
 
 	// TODO: filters
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_switchs")
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_switchs")
 	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
@@ -50,7 +50,7 @@ func (v *VirtualSwitchClient) List(
 }
 
 func (v *VirtualSwitchClient) Read(ctx context.Context, id string) (*VirtualSwitch, error) {
-	r := v.c.newRequest("GET", "/api/compute/v1/vcenters/virtual_switchs/%s", id)
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_switchs/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

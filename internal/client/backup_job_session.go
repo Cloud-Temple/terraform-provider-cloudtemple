@@ -38,7 +38,7 @@ type BackupSLAPolicyStub struct {
 }
 
 func (c *BackupJobSessionClient) List(ctx context.Context, filter *struct{}) ([]*BackupJobSession, error) {
-	r := c.c.newRequest("GET", "/api/backup/v1/jobs/session")
+	r := c.c.newRequest("GET", "/backup/v1/jobs/session")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

@@ -18,7 +18,7 @@ type Company struct {
 }
 
 func (c *CompanyClient) Read(ctx context.Context, companyID string) (*Company, error) {
-	r := c.c.newRequest("GET", "/api/iam/v2/companies/%s", companyID)
+	r := c.c.newRequest("GET", "/iam/v2/companies/%s", companyID)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
