@@ -46,6 +46,7 @@ type VirtualMachine struct {
 	ExtraConfig                    []VirtualMachineExtraConfig     `terraform:"extra_config"`
 	Storage                        VirtualMachineStorage           `terraform:"storage"`
 	BootOptions                    VirtualMachineBootOptions       `terraform:"boot_options"`
+	ExposeHardwareVirtualization   bool                            `terraform:"expose_hardware_virtualization"`
 }
 
 type VirtualMachineTriggeredAlarm struct {
@@ -177,14 +178,15 @@ func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMac
 }
 
 type UpdateVirtualMachineRequest struct {
-	Id            string       `json:"id"`
-	Ram           int          `json:"ram"`
-	Cpu           int          `json:"cpu"`
-	CorePerSocket int          `json:"corePerSocket"`
-	HotCpuAdd     bool         `json:"hotCpuAdd"`
-	HotCpuRemove  bool         `json:"hotCpuRemove"`
-	HotMemAdd     bool         `json:"hotMemAdd"`
-	BootOptions   *BootOptions `json:"bootOptions,omitempty"`
+	Id                           string       `json:"id"`
+	Ram                          int          `json:"ram"`
+	Cpu                          int          `json:"cpu"`
+	CorePerSocket                int          `json:"corePerSocket"`
+	HotCpuAdd                    bool         `json:"hotCpuAdd"`
+	HotCpuRemove                 bool         `json:"hotCpuRemove"`
+	HotMemAdd                    bool         `json:"hotMemAdd"`
+	BootOptions                  *BootOptions `json:"bootOptions,omitempty"`
+	ExposeHardwareVirtualization bool         `json:"exposeHardwareVirtualization,omitempty"`
 }
 
 func (v *VirtualMachineClient) Update(ctx context.Context, req *UpdateVirtualMachineRequest) (string, error) {

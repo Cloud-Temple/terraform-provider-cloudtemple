@@ -175,6 +175,12 @@ Virtual machines can be created using three different methods:
 				Type:     schema.TypeBool,
 				Optional: true,
 			},
+			"expose_hardware_virtualization": {
+				Type:        schema.TypeBool,
+				Description: "Enable nested hardware virtualization on the virtual machine, facilitating nested virtualization in the guest operating system (Default: false)",
+				Optional:    true,
+				Default:     false,
+			},
 			"power_state": {
 				Type:         schema.TypeString,
 				Description:  "Whether to start the virtual machine.",
@@ -845,13 +851,14 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 	c := getClient(meta)
 
 	req := &client.UpdateVirtualMachineRequest{
-		Id:            d.Id(),
-		Ram:           d.Get("memory").(int),
-		Cpu:           d.Get("cpu").(int),
-		CorePerSocket: d.Get("num_cores_per_socket").(int),
-		HotCpuAdd:     d.Get("cpu_hot_add_enabled").(bool),
-		HotCpuRemove:  d.Get("cpu_hot_remove_enabled").(bool),
-		HotMemAdd:     d.Get("memory_hot_add_enabled").(bool),
+		Id:                           d.Id(),
+		Ram:                          d.Get("memory").(int),
+		Cpu:                          d.Get("cpu").(int),
+		CorePerSocket:                d.Get("num_cores_per_socket").(int),
+		HotCpuAdd:                    d.Get("cpu_hot_add_enabled").(bool),
+		HotCpuRemove:                 d.Get("cpu_hot_remove_enabled").(bool),
+		HotMemAdd:                    d.Get("memory_hot_add_enabled").(bool),
+		ExposeHardwareVirtualization: d.Get("expose_hardware_virtualization").(bool),
 	}
 
 	if len(d.Get("boot_options").([]interface{})) > 0 {
