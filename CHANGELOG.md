@@ -1,16 +1,33 @@
+## 0.11.0 (November 15th, 2023)
+
+NEW FEATURES:
+
+  * Added a new parameter `expose_hardware_virtualization` on resource `cloudtemple_cirtual_machine` that enables nested hardware virtualization on the virtual machine.
+
+MISCELLANEOUS:
+
+  * Changed the way URL are built in the Go Http client.
+
+BUG FIXES:
+
+  * Fixed a bug on resource `cloudtemple_compute_virtual_disk` causing desynchronization between state and real configuration after an import.
+  * Fixed a bug on resource `cloudtemple_compute_virtual_controller` causing desynchronization between state and real configuration after an import.
+
 ## 0.10.0-rc.2 (November 8th, 2023)
+
+NEW FEATURES:
 
   * Resource `cloudtemple_compute_virtual_disk` can now be imported into state.
 
 ## 0.10.0-rc.1 (November 7th, 2023)
 
-IMPROVEMENTS:
+NEW FEATURES:
 
   * Added support of creation, management and deletion of virtual controllers through a new `cloudtemple_compute_virtual_controller` resource.
 
 ## 0.9.0-rc.1 (November 2nd, 2023)
 
-IMPROVEMENTS:
+NEW FEATURES:
 
   * Boot options of a virtual machine can now be modified.
 
@@ -30,9 +47,12 @@ IMPROVEMENTS:
 
 ## 0.8.0 (October 4th, 2023)
 
-IMPROVEMENTS:
+NEW FEATURES:
 
   * Added a property `disks_provisioning_type` that overrides the provisioning types of disks present on a OVF deployed from content library.
+
+IMPROVEMENTS:
+  
   * Added `name` and `machine_manager` filters on datasource `cloudtemple_compute_content_library` and `cloudtemple_compute_content_libraries`
   * Added `name` and `content_library_id` filters on datasource `cloudtemple_compute_content_library_item` and `cloudtemple_compute_content_library_items`
 
