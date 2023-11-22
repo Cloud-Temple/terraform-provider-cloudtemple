@@ -40,6 +40,7 @@ data "cloudtemple_compute_virtual_machine" "name" {
 - `datacenter_id` (String)
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
+- `expose_hardware_virtualization` (Boolean)
 - `extra_config` (List of Object) (see [below for nested schema](#nestedatt--extra_config))
 - `guest_operating_system_moref` (String)
 - `hardware_version` (String)
@@ -72,6 +73,7 @@ Read-Only:
 - `boot_delay` (Number)
 - `boot_retry_delay` (Number)
 - `boot_retry_enabled` (Boolean)
+- `efi_secure_boot_enabled` (Boolean)
 - `enter_bios_setup` (Boolean)
 - `firmware` (String)
 

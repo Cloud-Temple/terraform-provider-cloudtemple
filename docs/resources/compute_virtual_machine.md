@@ -18,7 +18,7 @@ description: |-
 
 Provision a virtual machine. This allows instances to be created, updated, and deleted.
 
-Virtual machines can be created using three different methods:
+ Virtual machines can be created using three different methods:
 
   - by creating a new instance with `guest_operating_system_moref`
   - by cloning an existing virtual machine with `clone_virtual_machine_id`
@@ -239,6 +239,7 @@ resource "cloudtemple_compute_virtual_machine" "ubuntu-cloud-init" {
 - `cpu` (Number) The number of CPUs to start the virtual machine with.
 - `cpu_hot_add_enabled` (Boolean)
 - `cpu_hot_remove_enabled` (Boolean)
+- `customize` (Block List, Max: 1) Customizes a virtual machine's guest operating system. (VMWare Tools has to be installed) (see [below for nested schema](#nestedblock--customize))
 - `datastore_cluster_id` (String)
 - `datastore_id` (String)
 - `deploy_options` (Map of String)
@@ -289,6 +290,75 @@ Optional:
 - `efi_secure_boot_enabled` (Boolean) If set to true, the virtual machine's firmware will perform signature checks of any EFI images loaded during startup, and will refuse to start any images which do not pass those signature checks.
 - `enter_bios_setup` (Boolean) If set to true, the virtual machine automatically enters BIOS setup the next time it boots. The virtual machine resets this flag to false so that subsequent boots proceed normally.
 - `firmware` (String) Firmware type. (BIOS or EFI)
+
+
+<a id="nestedblock--customize"></a>
+### Nested Schema for `customize`
+
+Required:
+
+- `network_config` (Block List, Min: 1) A collection of global network settings. (see [below for nested schema](#nestedblock--customize--network_config))
+
+Optional:
+
+- `windows_config` (Block List, Max: 1) A set of Windows specific configurations. (see [below for nested schema](#nestedblock--customize--windows_config))
+
+<a id="nestedblock--customize--network_config"></a>
+### Nested Schema for `customize.network_config`
+
+Required:
+
+- `domain` (String) The fully qualified domain name.
+- `hostname` (String) The network host name of the virtual machine.
+
+Optional:
+
+- `adapters` (Block List) The IP settings for the associated virtual network adapter. (see [below for nested schema](#nestedblock--customize--network_config--adapters))
+- `dns_server_list` (Set of String) List of DNS servers
+- `dns_suffix_list` (Set of String) List of name resolution suffixes for the virtual network adapter. This list applies to both Windows and Linux guest customization.
+
+<a id="nestedblock--customize--network_config--adapters"></a>
+### Nested Schema for `customize.network_config.adapters`
+
+Required:
+
+- `gateway` (String) Gateway address for this virtual network adapter.
+- `ip_address` (String) Static IP Address for the virtual network adapter.
+- `subnet_mask` (String) Subnet mask for this virtual network adapter.
+
+Optional:
+
+- `mac_address` (String) The MAC address of a network adapter being customized.
+
+
+
+<a id="nestedblock--customize--windows_config"></a>
+### Nested Schema for `customize.windows_config`
+
+Required:
+
+- `auto_logon` (Boolean) Flag to determine whether or not the machine automatically logs on as Administrator. See also the password property.
+										If the AutoLogon flag is set, password must not be blank or the guest customization will fail.
+- `auto_logon_count` (Number) If the AutoLogon flag is set, then the AutoLogonCount property specifies the number of times the machine should automatically log on as Administrator. Generally it should be 1, but if your setup requires a number of reboots, you may want to increase it.
+- `timezone` (Number) The time zone index for the virtual machine. Numbers correspond to time zones listed at [ Microsoft Time Zone Index Values](https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms912391(v=winembedded.11)).
+
+Optional:
+
+- `domain` (Block List, Max: 1) The domain identification informations to provide to the Windows guest os. (see [below for nested schema](#nestedblock--customize--windows_config--domain))
+- `password` (String, Sensitive) The new administrator password for the machine. To specify that the password should be set to blank (that is, no password), set the password value to NULL. Because of encryption, "" is NOT a valid value.
+										If password is set to blank and autoLogon is set, the guest customization will fail.
+- `workgroup` (String) The workgroup that the virtual machine should join. If this value is supplied, then the domain name and authentication fields must be empty.
+
+<a id="nestedblock--customize--windows_config--domain"></a>
+### Nested Schema for `customize.windows_config.domain`
+
+Optional:
+
+- `admin_password` (String, Sensitive) This is the password for the domain user account used for authentication if the virtual machine is joining a domain.
+- `admin_username` (String) This is the domain user account used for authentication if the virtual machine is joining a domain. The user does not need to be a domain administrator, but the account must have the privileges required to add computers to the domain.
+- `name` (String) The domain that the virtual machine should join. If this value is supplied, then admin_username and admin_password must also be supplied, and the workgroup name must be empty.
+
+
 
 
 <a id="nestedblock--os_disk"></a>
