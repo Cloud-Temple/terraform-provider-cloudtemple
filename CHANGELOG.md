@@ -1,3 +1,9 @@
+## 0.12.0 (November 22nd, 2023)
+
+NEW FEATURES:
+
+  * Guest OS of `cloudtemple_compute_virtual_machine` can now be customized using `customize` block.
+
 ## 0.11.0 (November 15th, 2023)
 
 NEW FEATURES:
