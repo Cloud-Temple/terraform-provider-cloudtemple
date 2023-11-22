@@ -19,7 +19,7 @@ func resourceVirtualMachine() *schema.Resource {
 	return &schema.Resource{
 		Description: `Provision a virtual machine. This allows instances to be created, updated, and deleted.
 
-Virtual machines can be created using three different methods:
+ Virtual machines can be created using three different methods:
 
   - by creating a new instance with ` + "`guest_operating_system_moref`" + `
   - by cloning an existing virtual machine with ` + "`clone_virtual_machine_id`" + `
@@ -101,6 +101,165 @@ Virtual machines can be created using three different methods:
 					"^hostname$",
 					"^seedfrom$"},
 					"|")), `The following key is not allowed for cloud-init`),
+			},
+			"customize": {
+				Type:        schema.TypeList,
+				MaxItems:    1,
+				Optional:    true,
+				Description: "Customizes a virtual machine's guest operating system. (VMWare Tools has to be installed)",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"network_config": {
+							Type:        schema.TypeList,
+							Required:    true,
+							Description: "A collection of global network settings.",
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"hostname": {
+										Type:        schema.TypeString,
+										Required:    true,
+										Description: "The network host name of the virtual machine.",
+									},
+									"domain": {
+										Type:        schema.TypeString,
+										Required:    true,
+										Description: "The fully qualified domain name.",
+									},
+									"dns_server_list": {
+										Type:        schema.TypeSet,
+										Optional:    true,
+										Description: "List of DNS servers",
+										Elem: &schema.Schema{
+											Type:         schema.TypeString,
+											ValidateFunc: validation.IsIPAddress,
+										},
+									},
+									"dns_suffix_list": {
+										Type:        schema.TypeSet,
+										Optional:    true,
+										Description: "List of name resolution suffixes for the virtual network adapter. This list applies to both Windows and Linux guest customization.",
+										Elem: &schema.Schema{
+											Type: schema.TypeString,
+										},
+									},
+									"adapters": {
+										Type:        schema.TypeList,
+										Optional:    true,
+										Description: "The IP settings for the associated virtual network adapter.",
+										Elem: &schema.Resource{
+											Schema: map[string]*schema.Schema{
+												"mac_address": {
+													Type:         schema.TypeString,
+													Optional:     true,
+													ValidateFunc: validation.IsMACAddress,
+													Description:  "The MAC address of a network adapter being customized.",
+												},
+												"ip_address": {
+													Type:         schema.TypeString,
+													Required:     true,
+													ValidateFunc: validation.IsIPAddress,
+													Description:  "Static IP Address for the virtual network adapter.",
+												},
+												"subnet_mask": {
+													Type:         schema.TypeString,
+													Required:     true,
+													ValidateFunc: validation.IsIPAddress,
+													Description:  "Subnet mask for this virtual network adapter.",
+												},
+												"gateway": {
+													Type:         schema.TypeString,
+													Required:     true,
+													ValidateFunc: validation.IsIPAddress,
+													Description:  "Gateway address for this virtual network adapter.",
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						"windows_config": {
+							Type:        schema.TypeList,
+							MaxItems:    1,
+							Optional:    true,
+							Description: "A set of Windows specific configurations.",
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"auto_logon": {
+										Type:     schema.TypeBool,
+										Required: true,
+										Description: `
+										Flag to determine whether or not the machine automatically logs on as Administrator. See also the password property.
+										If the AutoLogon flag is set, password must not be blank or the guest customization will fail.`,
+									},
+									"auto_logon_count": {
+										Type:        schema.TypeInt,
+										Required:    true,
+										Description: "If the AutoLogon flag is set, then the AutoLogonCount property specifies the number of times the machine should automatically log on as Administrator. Generally it should be 1, but if your setup requires a number of reboots, you may want to increase it.",
+									},
+									"timezone": {
+										Type:        schema.TypeInt,
+										Required:    true,
+										Description: "The time zone index for the virtual machine. Numbers correspond to time zones listed at [ Microsoft Time Zone Index Values](https://learn.microsoft.com/en-us/previous-versions/windows/embedded/ms912391(v=winembedded.11)).",
+									},
+									"password": {
+										Type:     schema.TypeString,
+										Optional: true,
+										Description: `The new administrator password for the machine. To specify that the password should be set to blank (that is, no password), set the password value to NULL. Because of encryption, "" is NOT a valid value.
+										If password is set to blank and autoLogon is set, the guest customization will fail.`,
+										Sensitive: true,
+									},
+									"domain": {
+										Type:          schema.TypeList,
+										MaxItems:      1,
+										Optional:      true,
+										Description:   "The domain identification informations to provide to the Windows guest os.",
+										ConflictsWith: []string{"customize.0.windows_config.0.workgroup"},
+										Elem: &schema.Resource{
+											Schema: map[string]*schema.Schema{
+												"name": {
+													Type:        schema.TypeString,
+													Optional:    true,
+													Description: "The domain that the virtual machine should join. If this value is supplied, then admin_username and admin_password must also be supplied, and the workgroup name must be empty.",
+													RequiredWith: []string{
+														"customize.0.windows_config.0.domain.0.admin_username",
+														"customize.0.windows_config.0.domain.0.admin_password",
+													},
+												},
+												"admin_username": {
+													Type:        schema.TypeString,
+													Optional:    true,
+													Description: "This is the domain user account used for authentication if the virtual machine is joining a domain. The user does not need to be a domain administrator, but the account must have the privileges required to add computers to the domain.",
+													RequiredWith: []string{
+														"customize.0.windows_config.0.domain.0.name",
+														"customize.0.windows_config.0.domain.0.admin_password",
+													},
+												},
+												"admin_password": {
+													Type:        schema.TypeString,
+													Optional:    true,
+													Description: "This is the password for the domain user account used for authentication if the virtual machine is joining a domain.",
+													Sensitive:   true,
+													RequiredWith: []string{
+														"customize.0.windows_config.0.domain.0.admin_username",
+														"customize.0.windows_config.0.domain.0.name",
+													},
+												},
+											},
+										},
+									},
+									"workgroup": {
+										Type:          schema.TypeString,
+										Optional:      true,
+										Description:   "The workgroup that the virtual machine should join. If this value is supplied, then the domain name and authentication fields must be empty.",
+										ConflictsWith: []string{"customize.0.windows_config.0.domain"},
+										AtLeastOneOf:  []string{"customize.0.windows_config.0.domain", "customize.0.windows_config.0.workgroup"},
+									},
+								},
+							},
+						},
+					},
+				},
 			},
 			"clone_virtual_machine_id": {
 				Type:          schema.TypeString,
@@ -598,9 +757,9 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 
 	if cloneVirtualMachineId != "" {
 		activityId, err = c.Compute().VirtualMachine().Clone(ctx, &client.CloneVirtualMachineRequest{
-			Name:              name,
-			VirtualMachineId:  cloneVirtualMachineId,
-			PowerOn:           d.Get("power_state").(string) == "on",
+			Name:             name,
+			VirtualMachineId: cloneVirtualMachineId,
+			// PowerOn:           d.Get("power_state").(string) == "on",
 			DatacenterId:      d.Get("datacenter_id").(string),
 			HostClusterId:     d.Get("host_cluster_id").(string),
 			HostId:            d.Get("host_id").(string),
@@ -709,6 +868,19 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 
 	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
 		return diag.FromErr(err)
+	}
+
+	if d.Get("customization") != nil {
+		customizationRequest := buildGuestOSCustomizationRequest(ctx, d)
+		activityId, err = c.Compute().VirtualMachine().CustomizeGuestOS(ctx, d.Id(), customizationRequest)
+		if err != nil {
+			return diag.Errorf("failed to customize virtual machine guest os: %s", err)
+		}
+
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("an error has occured while customizing virtual machine guest os, %s", err)
+		}
 	}
 
 	if len(d.Get("backup_sla_policies").(*schema.Set).List()) > 0 {
@@ -929,6 +1101,59 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 	}
 
+	if d.HasChange("customize") {
+		vm, err := c.Compute().VirtualMachine().Read(ctx, d.Id())
+		if err != nil {
+			return diag.Errorf("failed to read virtual machine: %s", err)
+		}
+		if vm.PowerState == "running" {
+			activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
+				ID:           d.Id(),
+				DatacenterId: vm.DatacenterId,
+				PowerAction:  "off",
+			})
+			if err != nil {
+				return diag.Errorf("failed to power off virtual machine: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to power off virtual machine, %s", err)
+			}
+		}
+
+		customizationRequest := buildGuestOSCustomizationRequest(ctx, d)
+		activityId, err = c.Compute().VirtualMachine().CustomizeGuestOS(ctx, d.Id(), customizationRequest)
+		if err != nil {
+			return diag.Errorf("failed to customize virtual machine guest os: %s", err)
+		}
+
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("an error has occured while customizing virtual machine guest os, %s", err)
+		}
+
+		if vm.PowerState == "running" {
+			recommendation, err := getPowerRecommendation(vm, vm.PowerState, ctx, c)
+			if err != nil {
+				return diag.Errorf("failed to get power recommendation for virtual machine: %s", err)
+			}
+
+			activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
+				ID:             d.Id(),
+				DatacenterId:   vm.DatacenterId,
+				PowerAction:    "on",
+				Recommendation: recommendation,
+			})
+			if err != nil {
+				return diag.Errorf("failed to power on virtual machine: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to power on virtual machine, %s", err)
+			}
+		}
+	}
+
 	if d.HasChange("backup_sla_policies") {
 		backupVm, err := c.Backup().VirtualMachine().Read(ctx, d.Id())
 		if err != nil {
@@ -1073,29 +1298,12 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 
 		vm, err := c.Compute().VirtualMachine().Read(ctx, d.Id())
 		if err != nil {
-			return diag.Errorf("failed to read virtual effect: %s", err)
+			return diag.Errorf("failed to read virtual machine: %s", err)
 		}
 
-		var recommendations []*client.VirtualMachinePowerRecommendation
-		if powerState == "on" {
-			recommendations, err = c.Compute().VirtualMachine().Recommendation(ctx, &client.VirtualMachineRecommendationFilter{
-				Id:            d.Id(),
-				DatacenterId:  vm.DatacenterId,
-				HostClusterId: vm.HostClusterId,
-			})
-			if err != nil {
-				return diag.Errorf("failed to find power recommendations: %s", err)
-			}
-		}
-
-		var recommendation *client.VirtualMachinePowerRecommendation
-		if len(recommendations) > 0 {
-			recommendation = &client.VirtualMachinePowerRecommendation{
-				Key:           recommendations[0].Key,
-				HostClusterId: recommendations[0].HostClusterId,
-			}
-		} else {
-			recommendation = nil
+		recommendation, err := getPowerRecommendation(vm, powerState, ctx, c)
+		if err != nil {
+			return diag.Errorf("failed to get power recommendation for virtual machine: %s", err)
 		}
 
 		activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
@@ -1147,92 +1355,4 @@ func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, me
 		return diag.Errorf("failed to delete virtual machine, %s", err)
 	}
 	return nil
-}
-
-func updateNestedMapItems(d *schema.ResourceData, nestedMapItems []interface{}, key string) []interface{} {
-	nestedMaps := make([]interface{}, len(nestedMapItems))
-
-	for i, mapItems := range nestedMapItems {
-		nestedMaps[i] = updateMapItems(d, mapItems, key, i)
-	}
-
-	return nestedMaps
-}
-
-func updateMapItems(d *schema.ResourceData, mapItems interface{}, key string, index int) interface{} {
-	m := mapItems.(map[string]interface{})
-
-	if value, ok := d.GetOk(fmt.Sprintf("%s.%d", key, index)); ok {
-
-		for k, v := range value.(map[string]interface{}) {
-			if _, ok := d.GetOk(fmt.Sprintf("%s.%d.%s", key, index, k)); ok {
-				m[k] = v
-			}
-		}
-	}
-	return m
-}
-
-func flattenOSDisksData(osDisks []*client.VirtualDisk) []interface{} {
-	if osDisks != nil {
-		disks := make([]interface{}, len(osDisks))
-
-		for i, osDisk := range osDisks {
-			disks[i] = flattenOSDiskData(osDisk)
-		}
-
-		return disks
-	}
-
-	return make([]interface{}, 0)
-}
-
-func flattenOSDiskData(osDisk *client.VirtualDisk) interface{} {
-	disk := make(map[string]interface{})
-
-	disk["id"] = osDisk.ID
-	disk["machine_manager_id"] = osDisk.MachineManagerId
-	disk["name"] = osDisk.Name
-	disk["capacity"] = osDisk.Capacity
-	disk["disk_unit_number"] = osDisk.DiskUnitNumber
-	disk["controller_bus_number"] = osDisk.ControllerBusNumber
-	disk["datastore_id"] = osDisk.DatastoreId
-	disk["datastore_name"] = osDisk.DatastoreName
-	disk["instant_access"] = osDisk.InstantAccess
-	disk["native_id"] = osDisk.NativeId
-	disk["disk_path"] = osDisk.DiskPath
-	disk["provisioning_type"] = osDisk.ProvisioningType
-	disk["disk_mode"] = osDisk.DiskMode
-	disk["editable"] = osDisk.Editable
-
-	return disk
-}
-
-func flattenOSNetworkAdaptersData(osNetworkAdapters []*client.NetworkAdapter) []interface{} {
-	if osNetworkAdapters != nil {
-		networkAdapters := make([]interface{}, len(osNetworkAdapters))
-
-		for i, osNetworkAdapter := range osNetworkAdapters {
-			networkAdapters[i] = flattenOSNetworkAdapterData(osNetworkAdapter)
-		}
-
-		return networkAdapters
-	}
-
-	return make([]interface{}, 0)
-}
-
-func flattenOSNetworkAdapterData(osNetworkAdapter *client.NetworkAdapter) interface{} {
-	networkAdapter := make(map[string]interface{})
-
-	networkAdapter["id"] = osNetworkAdapter.ID
-	networkAdapter["name"] = osNetworkAdapter.Name
-	networkAdapter["network_id"] = osNetworkAdapter.NetworkId
-	networkAdapter["type"] = osNetworkAdapter.Type
-	networkAdapter["mac_type"] = osNetworkAdapter.MacType
-	networkAdapter["mac_address"] = osNetworkAdapter.MacAddress
-	networkAdapter["connected"] = osNetworkAdapter.Connected
-	networkAdapter["auto_connect"] = osNetworkAdapter.AutoConnect
-
-	return networkAdapter
 }

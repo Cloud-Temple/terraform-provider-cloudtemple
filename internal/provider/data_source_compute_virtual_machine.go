@@ -112,6 +112,10 @@ func dataSourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeBool,
 				Computed: true,
 			},
+			"expose_hardware_virtualization": {
+				Type:     schema.TypeBool,
+				Computed: true,
+			},
 			"memory": {
 				Type:     schema.TypeInt,
 				Computed: true,
@@ -289,6 +293,10 @@ func dataSourceVirtualMachine() *schema.Resource {
 						},
 						"boot_retry_delay": {
 							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"efi_secure_boot_enabled": {
+							Type:     schema.TypeBool,
 							Computed: true,
 						},
 					},

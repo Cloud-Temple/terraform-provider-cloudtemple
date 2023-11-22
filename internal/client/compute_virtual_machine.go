@@ -108,6 +108,37 @@ type PowerRequest struct {
 	Recommendation *VirtualMachinePowerRecommendation `json:"recommendation,omitempty"`
 }
 
+type CustomAdapterConfig struct {
+	MacAddress string `json:"macAddress,omitempty"`
+	IpAddress  string `json:"ipAddress"`
+	SubnetMask string `json:"subnetMask"`
+	Gateway    string `json:"gateway"`
+}
+
+type CustomGuestNetworkConfig struct {
+	Hostname      string                 `json:"hostname"`
+	Domain        string                 `json:"domain"`
+	DnsServerList []string               `json:"dnsServerList,omitempty"`
+	DnsSuffixList []string               `json:"dnsSuffixList,omitempty"`
+	Adapters      []*CustomAdapterConfig `json:"adapters,omitempty"`
+}
+
+type CustomGuestWindowsConfig struct {
+	AutoLogon           bool   `json:"autoLogon"`
+	AutoLogonCount      int    `json:"autoLogonCount"`
+	TimeZone            int    `json:"timezone"`
+	Password            string `json:"password"`
+	JoinDomain          string `json:"joinDomain,omitempty"`
+	DomainAdmin         string `json:"domainAdmin,omitempty"`
+	DomainAdminPassword string `json:"domainAdminPassword,omitempty"`
+	JoinWorkgroup       string `json:"joinWorkgroup,omitempty"`
+}
+
+type CustomizeGuestOSRequest struct {
+	NetworkConfig *CustomGuestNetworkConfig `json:"networkConfig"`
+	WindowsConfig *CustomGuestWindowsConfig `json:"windowsConfig,omitempty"`
+}
+
 func (v *VirtualMachineClient) List(
 	ctx context.Context,
 	allOptions bool,
@@ -263,6 +294,12 @@ type UpdateGuestRequest struct {
 
 func (v *VirtualMachineClient) Guest(ctx context.Context, id string, req *UpdateGuestRequest) (string, error) {
 	r := v.c.newRequest("PATCH", "/compute/v1/vcenters/virtual_machines/%s/guest", id)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+func (v *VirtualMachineClient) CustomizeGuestOS(ctx context.Context, id string, req *CustomizeGuestOSRequest) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/vcenters/virtual_machines/%s/guest/customize", id)
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
