@@ -1,3 +1,9 @@
+## 0.12.1 (November 23rd, 2023)
+
+BUG FIXES:
+
+  * Fixed a bug on newly released Virtual Machine Guest OS Customization feature.
+
 ## 0.12.0 (November 22nd, 2023)
 
 NEW FEATURES:

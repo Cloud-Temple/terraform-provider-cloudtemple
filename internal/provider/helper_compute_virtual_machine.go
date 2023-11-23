@@ -39,7 +39,7 @@ func buildGuestOSCustomizationRequest(ctx context.Context, d *schema.ResourceDat
 		},
 	}
 
-	if d.Get("customization.0.windows_config") != nil {
+	if len(d.Get("customize.0.windows_config").([]interface{})) > 0 {
 		customizationRequest.WindowsConfig = &client.CustomGuestWindowsConfig{
 			AutoLogon:           d.Get("customize.0.windows_config.0.auto_logon").(bool),
 			AutoLogonCount:      d.Get("customize.0.windows_config.0.auto_logon_count").(int),

@@ -173,14 +173,14 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
   name        = "pbt-customize-tf-04"
   power_state = "on"
 
-  memory                 = 8 * 1024 * 1024 * 1024
-  cpu                    = 4
-  num_cores_per_socket   = 1
+  memory               = 8 * 1024 * 1024 * 1024
+  cpu                  = 4
+  num_cores_per_socket = 1
 
-  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.th3s.id
-  host_cluster_id              = data.cloudtemple_compute_host_cluster.clu001.id
-  datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.sdrs001.id
-  datastore_id                 = data.cloudtemple_compute_datastore.ds001.id
+  datacenter_id        = data.cloudtemple_compute_virtual_datacenter.th3s.id
+  host_cluster_id      = data.cloudtemple_compute_host_cluster.clu001.id
+  datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.sdrs001.id
+  datastore_id         = data.cloudtemple_compute_datastore.ds001.id
 
   content_library_id      = data.cloudtemple_compute_content_library.cl001.id
   content_library_item_id = data.cloudtemple_compute_content_library_item.ubuntu.id
@@ -196,8 +196,8 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
 
   customize {
     network_config {
-      hostname        = "Pimp-My-VM-updated"
-      domain          = "cloud-temple.com"
+      hostname = "Pimp-My-VM-updated"
+      domain   = "cloud-temple.com"
       dns_server_list = [
         "8.8.8.8"
       ]
@@ -215,14 +215,14 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   name        = "pbt-customize-tf-03"
   power_state = "on"
 
-  memory                 = 8 * 1024 * 1024 * 1024
-  cpu                    = 4
-  num_cores_per_socket   = 1
+  memory               = 8 * 1024 * 1024 * 1024
+  cpu                  = 4
+  num_cores_per_socket = 1
 
-  datacenter_id                = data.cloudtemple_compute_virtual_datacenter.th3s.id
-  host_cluster_id              = data.cloudtemple_compute_host_cluster.clu001.id
-  datastore_cluster_id         = data.cloudtemple_compute_datastore_cluster.sdrs001.id
-  datastore_id                 = data.cloudtemple_compute_datastore.ds001.id
+  datacenter_id        = data.cloudtemple_compute_virtual_datacenter.th3s.id
+  host_cluster_id      = data.cloudtemple_compute_host_cluster.clu001.id
+  datastore_cluster_id = data.cloudtemple_compute_datastore_cluster.sdrs001.id
+  datastore_id         = data.cloudtemple_compute_datastore.ds001.id
 
   clone_virtual_machine_id = data.cloudtemple_compute_virtual_machine.windows_server_vm.id
 
@@ -237,8 +237,8 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 
   customize {
     network_config {
-      hostname        = "Pimp-My-VM"
-      domain          = "cloud-temple.com"
+      hostname = "Pimp-My-VM"
+      domain   = "cloud-temple.com"
       dns_server_list = [
         "8.8.8.8"
       ]
@@ -249,11 +249,11 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
       }
     }
     windows_config {
-      auto_logon = true
+      auto_logon       = true
       auto_logon_count = 3
-      timezone = 105
-      password = "azerty"
-      workgroup = "cloudtemple"
+      timezone         = 105
+      password         = "azerty"
+      workgroup        = "cloudtemple"
     }
   }
 }
