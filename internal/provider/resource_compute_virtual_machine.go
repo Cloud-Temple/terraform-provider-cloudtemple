@@ -870,7 +870,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		return diag.FromErr(err)
 	}
 
-	if d.Get("customization") != nil {
+	if len(d.Get("customize").([]interface{})) > 0 {
 		customizationRequest := buildGuestOSCustomizationRequest(ctx, d)
 		activityId, err = c.Compute().VirtualMachine().CustomizeGuestOS(ctx, d.Id(), customizationRequest)
 		if err != nil {
@@ -934,7 +934,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 	}
 
-	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on")
+	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on", true)
 }
 
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
@@ -1016,10 +1016,10 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 }
 
 func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	return updateVirtualMachine(ctx, d, meta, d.HasChange("power_state"))
+	return updateVirtualMachine(ctx, d, meta, d.HasChange("power_state"), false)
 }
 
-func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any, updatePower bool) diag.Diagnostics {
+func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any, updatePower bool, customizing bool) diag.Diagnostics {
 	c := getClient(meta)
 
 	req := &client.UpdateVirtualMachineRequest{
@@ -1101,7 +1101,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 	}
 
-	if d.HasChange("customize") {
+	if d.HasChange("customize") && !customizing {
 		vm, err := c.Compute().VirtualMachine().Read(ctx, d.Id())
 		if err != nil {
 			return diag.Errorf("failed to read virtual machine: %s", err)
