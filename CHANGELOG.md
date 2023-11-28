@@ -1,3 +1,9 @@
+## 0.12.2 (November 28th, 2023)
+
+BUG FIXES:
+
+  * Fixed a bug causing plugin to crash when using the datasource cloudtemple_compute_content_library_items
+
 ## 0.12.1 (November 23rd, 2023)
 
 BUG FIXES:
