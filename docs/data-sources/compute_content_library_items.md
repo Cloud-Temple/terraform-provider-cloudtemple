@@ -29,6 +29,10 @@ data "cloudtemple_compute_content_library_items" "items" {
 
 - `content_library_id` (String)
 
+### Optional
+
+- `name` (String)
+
 ### Read-Only
 
 - `content_library_items` (List of Object) (see [below for nested schema](#nestedatt--content_library_items))

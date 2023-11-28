@@ -25,6 +25,10 @@ func dataSourceContentLibraryItems() *schema.Resource {
 
 		Schema: map[string]*schema.Schema{
 			// In
+			"name": {
+				Type:     schema.TypeString,
+				Optional: true,
+			},
 			"content_library_id": {
 				Type:         schema.TypeString,
 				Required:     true,
