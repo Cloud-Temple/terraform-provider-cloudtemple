@@ -1,3 +1,9 @@
+## 0.12.3 (November 29th, 2023)
+
+BUG FIXES :
+
+  * Fixed a bug causing terraform to taint a healthy virtual_disk due to controller_id desynchronization in state.
+
 ## 0.12.2 (November 28th, 2023)
 
 BUG FIXES:
