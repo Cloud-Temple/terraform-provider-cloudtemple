@@ -32,6 +32,7 @@ func resourceVirtualDisk() *schema.Resource {
 			"controller_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Computed:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
 			},
