@@ -169,9 +169,9 @@ func computeVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta 
 			return diag.Errorf("failed to update catalog, %s", err)
 		}
 
-		_, err = c.Backup().Job().WaitForCompletion(ctx, job.ID, getWaiterOptions(ctx))
+		_, err = c.Backup().VirtualDisk().WaitForInventory(ctx, d.Id(), getWaiterOptions(ctx))
 		if err != nil {
-			return diag.Errorf("failed to update catalog, %s", err)
+			return diag.Errorf("failed to find virtual disk in backup inventory : %s", err)
 		}
 
 		slaPolicies := []string{}
