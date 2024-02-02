@@ -17,7 +17,7 @@ type Datastore struct {
 	MaxCapacity           int      `terraform:"max_capacity"`
 	FreeCapacity          int      `terraform:"free_capacity"`
 	Accessible            int      `terraform:"accessible"`
-	MaintenanceStatus     string   `terraform:"maintenance_status"`
+	MaintenanceStatus     bool     `terraform:"maintenance_status"`
 	UniqueId              string   `terraform:"unique_id"`
 	MachineManagerId      string   `terraform:"machine_manager_id"`
 	Type                  string   `terraform:"type"`
