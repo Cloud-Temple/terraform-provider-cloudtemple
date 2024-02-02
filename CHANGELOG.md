@@ -1,3 +1,9 @@
+## 0.12.4-rc.1 (February 2nd, 2024)
+
+BUG FIXED :
+
+  * Fixed a bug when retreiving datastore information due to API modification.
+
 ## 0.12.3 (November 29th, 2023)
 
 BUG FIXES :
