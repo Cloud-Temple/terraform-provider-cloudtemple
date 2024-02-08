@@ -1,8 +1,14 @@
-## 0.12.4 (January 25th, 2024)
+## 0.12.4-rc.2 (February 8th, 2024)
 
 BUG FIXES :
 
   * Fixed a bug causing backup module not to find the virtual disk after running hypervisor inventory.
+
+## 0.12.4-rc.1 (February 2nd, 2024)
+
+BUG FIXED :
+
+  * Fixed a bug when retreiving datastore information due to API modification.
 
 ## 0.12.3 (November 29th, 2023)
 
