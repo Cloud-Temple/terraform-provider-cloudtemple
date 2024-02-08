@@ -1,9 +1,3 @@
-## 0.12.4-rc.2 (February 8th, 2024)
-
-BUG FIXES :
-
-  * Fixed a bug causing backup module not to find the virtual disk after running hypervisor inventory.
-
 ## 0.12.4-rc.1 (February 2nd, 2024)
 
 BUG FIXED :
