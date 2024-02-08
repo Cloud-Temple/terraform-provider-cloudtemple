@@ -48,7 +48,7 @@ data "cloudtemple_compute_datastore" "name" {
 - `hosts_names` (List of String)
 - `hosts_number` (Number)
 - `id` (String) The ID of this resource.
-- `maintenance_status` (Boolean)
+- `maintenance_status` (String)
 - `max_capacity` (Number)
 - `moref` (String)
 - `type` (String)

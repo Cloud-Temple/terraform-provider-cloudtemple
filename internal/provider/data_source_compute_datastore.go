@@ -94,7 +94,7 @@ func dataSourceDatastore() *schema.Resource {
 				Computed: true,
 			},
 			"maintenance_status": {
-				Type:     schema.TypeBool,
+				Type:     schema.TypeString,
 				Computed: true,
 			},
 			"unique_id": {
