@@ -1,6 +1,6 @@
 module github.com/cloud-temple/terraform-provider-cloudtemple
 
-go 1.18
+go 1.20
 
 require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
