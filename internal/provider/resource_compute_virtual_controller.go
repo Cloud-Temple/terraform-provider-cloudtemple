@@ -108,7 +108,7 @@ func computeVirtualControllerCreate(ctx context.Context, d *schema.ResourceData,
 		return diag.Errorf("the virtual controller could not be created: %s", err)
 	}
 	activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	setIdFromActivityConcernedItems(d, activity)
+	setIdFromActivityConcernedItems(d, activity, "virtual_controller")
 	if err != nil {
 		return diag.Errorf("failed to create virtual controller, %s", err)
 	}
@@ -149,8 +149,7 @@ func computeVirtualControllerUpdate(ctx context.Context, d *schema.ResourceData,
 		if err != nil {
 			return diag.Errorf("the virtual controller could not be connected: %s", err)
 		}
-		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		setIdFromActivityConcernedItems(d, activity)
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
 			return diag.Errorf("failed to connect virtual controller, %s", err)
 		}
@@ -167,8 +166,7 @@ func computeVirtualControllerUpdate(ctx context.Context, d *schema.ResourceData,
 		if err != nil {
 			return diag.Errorf("the virtual controller could not be connected: %s", err)
 		}
-		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		setIdFromActivityConcernedItems(d, activity)
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
 			return diag.Errorf("failed to connect virtual controller, %s", err)
 		}

@@ -59,5 +59,5 @@ func (c *TagResourceClient) Delete(ctx context.Context, resourceId string, key s
 		return err
 	}
 	defer closeResponseBody(resp)
-	return requireHttpCodes(resp, 204)
+	return requireHttpCodes(resp, 204, 201)
 }

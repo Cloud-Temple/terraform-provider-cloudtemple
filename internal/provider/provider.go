@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/logging"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"golang.org/x/exp/slices"
 )
 
 func init() {
@@ -415,12 +416,13 @@ func setIdFromActivityState(d *schema.ResourceData, activity *client.Activity) {
 	}
 }
 
-func setIdFromActivityConcernedItems(d *schema.ResourceData, activity *client.Activity) {
+func setIdFromActivityConcernedItems(d *schema.ResourceData, activity *client.Activity, expectedType string) {
 	if activity == nil || len(activity.ConcernedItems) == 0 {
 		return
 	}
 
-	if activity.ConcernedItems[0].ID != "" {
-		d.SetId(activity.ConcernedItems[0].ID)
+	i := slices.IndexFunc(activity.ConcernedItems, func(concernedItem client.ActivityConcernedItem) bool { return concernedItem.Type == expectedType })
+	if i > -1 {
+		d.SetId(activity.ConcernedItems[i].ID)
 	}
 }
