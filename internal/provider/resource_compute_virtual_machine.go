@@ -840,7 +840,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 
 		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		setIdFromActivityConcernedItems(d, activity)
+		setIdFromActivityConcernedItems(d, activity, "virtual_machine")
 		if err != nil {
 			return diag.Errorf("failed to create virtual machine: %s", err)
 		}

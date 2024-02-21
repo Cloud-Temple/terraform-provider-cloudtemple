@@ -1,3 +1,10 @@
+## 0.12.4-rc.3 (February 13th, 2024)
+
+BUG FIXES :
+
+  * Fixed a bug causing tags deletion to fail the process.
+  * Fixed a bug causing `cloudtemple_compute_virtual_disk` creation to fail.
+
 ## 0.12.4-rc.2 (February 8th, 2024)
 
 BUG FIXES :
