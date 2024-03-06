@@ -4,20 +4,16 @@ page_title: "cloudtemple_compute_virtual_disk Resource - terraform-provider-clou
 subcategory: "Compute"
 description: |-
   To manage this resource you will need the following roles:
-    - compute_write
+    - compute_management
     - compute_read
-    - compute_management_read
-    - compute_management_write
     - activity_read
 ---
 
 # cloudtemple_compute_virtual_disk (Resource)
 
 To manage this resource you will need the following roles:
-  - `compute_write`
+  - `compute_management`
   - `compute_read`
-  - `compute_management_read`
-  - `compute_management_write`
   - `activity_read`
 
 ## Example Usage
@@ -72,7 +68,10 @@ resource "cloudtemple_compute_virtual_disk" "foo" {
 ### Required
 
 - `capacity` (Number)
-- `disk_mode` (String)
+- `disk_mode` (String) disk_mode can have multiple different values :
+					- Persistent: Changes are immediately and permanently written to the virtual disk.
+					- Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots.
+					- Independent persistent: Changes are immediately and permanently written to the virtual disk. Not affected by snapshots.
 - `provisioning_type` (String)
 - `virtual_machine_id` (String)
 

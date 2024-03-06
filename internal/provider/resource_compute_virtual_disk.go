@@ -44,6 +44,10 @@ func resourceVirtualDisk() *schema.Resource {
 			"disk_mode": {
 				Type:     schema.TypeString,
 				Required: true,
+				Description: `disk_mode can have multiple different values :
+					- Persistent: Changes are immediately and permanently written to the virtual disk.
+					- Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots.
+					- Independent persistent: Changes are immediately and permanently written to the virtual disk. Not affected by snapshots.`,
 			},
 			"capacity": {
 				Type:     schema.TypeInt,
