@@ -33,8 +33,8 @@ func resourceVirtualController() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
-				ValidateFunc: validation.StringInSlice([]string{"USB2", "USB3", "SCSI", "CD/DVD"}, false),
-				Description:  "Can be one of : USB2, USB3, SCSI, CD/DVD",
+				ValidateFunc: validation.StringInSlice([]string{"USB2", "USB3", "SCSI", "CD/DVD", "NVME"}, false),
+				Description:  "Can be one of : USB2, USB3, SCSI, CD/DVD, NVME",
 			},
 			"sub_type": {
 				Type:         schema.TypeString,
