@@ -84,7 +84,7 @@ resource "cloudtemple_compute_virtual_controller" "baz" {
 
 ### Required
 
-- `type` (String) Can be one of : USB2, USB3, SCSI, CD/DVD
+- `type` (String) Can be one of : USB2, USB3, SCSI, CD/DVD, NVME
 - `virtual_machine_id` (String)
 
 ### Optional

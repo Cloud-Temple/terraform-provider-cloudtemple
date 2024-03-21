@@ -1,3 +1,7 @@
+## 0.13.0-rc.1 (March 19th, 2024)
+
+  * Added the ability to create NVME controllers.
+
 ## 0.12.4-rc.3 (February 13th, 2024)
 
 BUG FIXES :
@@ -13,7 +17,7 @@ BUG FIXES :
 
 ## 0.12.4-rc.1 (February 2nd, 2024)
 
-BUG FIXED :
+BUG FIXES :
 
   * Fixed a bug when retreiving datastore information due to API modification.
 
