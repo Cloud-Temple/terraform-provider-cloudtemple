@@ -40,6 +40,10 @@ func resourceVirtualDisk() *schema.Resource {
 				Type:     schema.TypeString,
 				Required: true,
 				ForceNew: true,
+				Description: `provisioning_type can take 3 different values :
+					- staticImmediate
+					- dynamic
+					- staticDiffered`,
 			},
 			"disk_mode": {
 				Type:     schema.TypeString,
@@ -50,8 +54,9 @@ func resourceVirtualDisk() *schema.Resource {
 					- Independent persistent: Changes are immediately and permanently written to the virtual disk. Not affected by snapshots.`,
 			},
 			"capacity": {
-				Type:     schema.TypeInt,
-				Required: true,
+				Type:        schema.TypeInt,
+				Description: "Disk size in bytes",
+				Required:    true,
 			},
 			"datastore_id": {
 				Type:          schema.TypeString,

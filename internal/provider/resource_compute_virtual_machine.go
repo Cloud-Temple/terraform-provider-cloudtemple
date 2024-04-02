@@ -365,6 +365,39 @@ func resourceVirtualMachine() *schema.Resource {
 					ValidateFunc: validation.IsUUID,
 				},
 			},
+			"disks": {
+				Type:        schema.TypeList,
+				Description: "Creates virtual disks before the virtual machine is powered on.",
+				Optional:    true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						// In
+						"disk_mode": {
+							Type: schema.TypeString,
+							Description: `disk_mode can have multiple different values :
+								- Persistent: Changes are immediately and permanently written to the virtual disk.
+								- Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots.
+								- Independent persistent: Changes are immediately and permanently written to the virtual disk. Not affected by snapshots.`,
+						},
+						"capacity": {
+							Type:        schema.TypeInt,
+							Description: "Disk size in bytes",
+						},
+						"provisioning_type": {
+							Type: schema.TypeString,
+							Description: `provisioning_type can take 3 different values :
+								- staticImmediate
+								- dynamic
+								- staticDiffered`,
+						},
+						"disk_path": {
+							Type:        schema.TypeString,
+							Description: "Disk path",
+						},
+						// Out
+					},
+				},
+			},
 			"disks_provisioning_type": {
 				Type:         schema.TypeString,
 				Description:  "Overrides the provisioning type for the os_disks of an OVF.",
