@@ -1,6 +1,12 @@
 ## 0.13.0-rc.1 (March 19th, 2024)
 
+NEW FEATURES:
+
   * Added the ability to create NVME controllers.
+
+BUG FIXES:
+
+  * Fixed a bug causing `datastore_id` and `datastore_cluster_id` not to be imported in state when importing a `cloudtemple_compute_virtual_machine`
 
 ## 0.12.4-rc.3 (February 13th, 2024)
 
