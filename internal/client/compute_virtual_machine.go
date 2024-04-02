@@ -38,6 +38,8 @@ type VirtualMachine struct {
 	ToolsVersion                   int                             `terraform:"tools_version"`
 	DatacenterId                   string                          `terraform:"datacenter_id"`
 	HostClusterId                  string                          `terraform:"host_cluster_id"`
+	DatastoreId                    string                          `terraform:"datastore_id"`
+	DatastoreClusterId             string                          `terraform:"datastore_cluster_id"`
 	DistributedVirtualPortGroupIds []string                        `terraform:"distributed_virtual_port_group_ids"`
 	SppMode                        string                          `terraform:"spp_mode"`
 	Snapshoted                     bool                            `terraform:"snapshoted"`
