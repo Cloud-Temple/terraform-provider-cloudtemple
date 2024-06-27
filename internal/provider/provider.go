@@ -426,3 +426,23 @@ func setIdFromActivityConcernedItems(d *schema.ResourceData, activity *client.Ac
 		d.SetId(activity.ConcernedItems[i].ID)
 	}
 }
+
+func getIdFromActivityConcernedItems(activity *client.Activity, expectedType string) string {
+	if activity == nil || len(activity.ConcernedItems) == 0 {
+		return ""
+	}
+
+	i := slices.IndexFunc(activity.ConcernedItems, func(concernedItem client.ActivityConcernedItem) bool { return concernedItem.Type == expectedType })
+	if i > -1 {
+		return activity.ConcernedItems[i].ID
+	}
+	return ""
+}
+
+// Fonction pour générer une clé unique pour chaque disque
+// func diskHash(v interface{}) int {
+// 	var buf bytes.Buffer
+// 	m := v.(map[string]interface{})
+// 	buf.WriteString(fmt.Sprintf("%s-", m["label"].(string))) // Utilise uniquement l'ID pour le hash
+// 	return hashcode.String(buf.String())
+// }

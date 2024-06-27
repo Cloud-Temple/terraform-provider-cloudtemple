@@ -9,7 +9,6 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/sethvargo/go-retry"
@@ -365,15 +364,21 @@ func resourceVirtualMachine() *schema.Resource {
 					ValidateFunc: validation.IsUUID,
 				},
 			},
-			"disks": {
+			"disk": {
 				Type:        schema.TypeList,
 				Description: "Creates virtual disks before the virtual machine is powered on.",
 				Optional:    true,
+				Computed:    true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						// In
+						"label": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
 						"disk_mode": {
-							Type: schema.TypeString,
+							Type:     schema.TypeString,
+							Required: true,
 							Description: `disk_mode can have multiple different values :
 								- Persistent: Changes are immediately and permanently written to the virtual disk.
 								- Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots.
@@ -381,10 +386,12 @@ func resourceVirtualMachine() *schema.Resource {
 						},
 						"capacity": {
 							Type:        schema.TypeInt,
+							Required:    true,
 							Description: "Disk size in bytes",
 						},
 						"provisioning_type": {
-							Type: schema.TypeString,
+							Type:     schema.TypeString,
+							Required: true,
 							Description: `provisioning_type can take 3 different values :
 								- staticImmediate
 								- dynamic
@@ -392,10 +399,34 @@ func resourceVirtualMachine() *schema.Resource {
 						},
 						"disk_path": {
 							Type:        schema.TypeString,
+							Optional:    true,
 							Description: "Disk path",
 						},
+						"datastore_id": {
+							Type:         schema.TypeString,
+							Optional:     true,
+							ValidateFunc: validation.IsUUID,
+						},
+						"datastore_cluster_id": {
+							Type:         schema.TypeString,
+							Optional:     true,
+							ValidateFunc: validation.IsUUID,
+						},
 						// Out
+						"id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
 					},
+					// CustomizeDiff: func(ctx context.Context, diff *schema.ResourceDiff, v interface{}) error {
+					// 	if diff.HasChange("disk.0.capacity") {
+					// 		// Récupère l'ancienne valeur
+					// 		oldValue, _ := diff.GetChange("disk.0.capacity")
+					// 		// Réinitialise la propriété à son ancienne valeur
+					// 		diff.SetNew("disk.0.capacity", oldValue)
+					// 	}
+					// 	return nil
+					// },
 				},
 			},
 			"disks_provisioning_type": {
@@ -758,24 +789,89 @@ func resourceVirtualMachine() *schema.Resource {
 				},
 			},
 		},
-		CustomizeDiff: customdiff.All(
-			customdiff.ValidateChange("os_disk", func(ctx context.Context, old, new, meta any) error {
-				o := len(old.([]interface{}))
-				n := len(new.([]interface{}))
-				if n > o && o > 0 {
-					return fmt.Errorf("new os_disk blocks are not allowed if that exceeds the number of existing OS disks (%d > %d)", n, o)
+		CustomizeDiff: // customdiff.All(
+		func(ctx context.Context, diff *schema.ResourceDiff, v interface{}) error {
+			old, new := diff.GetChange("disk")
+			oldDisks := old.([]interface{})
+			newDisks := new.([]interface{})
+
+			// Créer un tableau pour stocker les disques mis à jour
+			updatedDisks := make([]interface{}, len(oldDisks))
+
+			// Parcourir les anciens disques et marquer ceux qui ont été supprimés
+			for i, oldDisk := range oldDisks {
+				oldDiskMap := oldDisk.(map[string]interface{})
+				label := oldDiskMap["label"].(string)
+
+				// Vérifier si le disque a été supprimé
+				deleted := true
+				for _, newDisk := range newDisks {
+					newDiskMap := newDisk.(map[string]interface{})
+					if newDiskMap["label"].(string) == label {
+						// Le disque n'a pas été supprimé
+						deleted = false
+						newDiskMap["id"] = oldDiskMap["id"]
+						updatedDisks[i] = newDisk
+						break
+					}
 				}
-				return nil
-			}),
-			customdiff.ValidateChange("os_network_adapter", func(ctx context.Context, old, new, meta any) error {
-				o := len(old.([]interface{}))
-				n := len(new.([]interface{}))
-				if n > o && o > 0 {
-					return fmt.Errorf("new os_network_adapter blocks are not allowed if that exceeds the number of existing OS network adapters (%d > %d)", n, o)
+
+				// Si le disque a été supprimé, changer son ID à "DELETED"
+				if deleted {
+					updatedDisks[i] = nil //oldDiskMap
+					oldDiskMap["label"] = "DELETED"
+					updatedDisks[i] = oldDiskMap
+					//updatedDisks = append(updatedDisks[:i], updatedDisks[i+1:]...)
 				}
-				return nil
-			}),
-		),
+			}
+
+			// Ajouter les nouveaux disques au tableau
+			for _, newDisk := range newDisks {
+				newDiskMap := newDisk.(map[string]interface{})
+				id := newDiskMap["label"].(string)
+
+				// Vérifier si le disque est nouveau
+				found := false
+				for _, oldDisk := range oldDisks {
+					oldDiskMap := oldDisk.(map[string]interface{})
+					if oldDiskMap["label"].(string) == id {
+						// Le disque n'est pas nouveau
+						found = true
+						break
+					}
+				}
+
+				// Si le disque est nouveau, l'ajouter au tableau
+				if !found {
+					newDiskMap["id"] = nil
+					updatedDisks = append(updatedDisks, newDisk)
+				}
+			}
+
+			// Mettre à jour l'état avec les disques mis à jour
+			if err := diff.SetNew("disk", updatedDisks); err != nil {
+				return fmt.Errorf("failed to update state: %s", err)
+			}
+
+			return nil
+		},
+		// customdiff.ValidateChange("os_disk", func(ctx context.Context, old, new, meta any) error {
+		// 	o := len(old.([]interface{}))
+		// 	n := len(new.([]interface{}))
+		// 	if n > o && o > 0 {
+		// 		return fmt.Errorf("new os_disk blocks are not allowed if that exceeds the number of existing OS disks (%d > %d)", n, o)
+		// 	}
+		// 	return nil
+		// }),
+		// customdiff.ValidateChange("os_network_adapter", func(ctx context.Context, old, new, meta any) error {
+		// 	o := len(old.([]interface{}))
+		// 	n := len(new.([]interface{}))
+		// 	if n > o && o > 0 {
+		// 		return fmt.Errorf("new os_network_adapter blocks are not allowed if that exceeds the number of existing OS network adapters (%d > %d)", n, o)
+		// 	}
+		// 	return nil
+		// }),
+		// ),
 	}
 }
 
@@ -1241,6 +1337,93 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		if err != nil {
 			return diag.Errorf("failed to assign policies to virtual machine, %s", err)
 		}
+	}
+
+	// // Mise à jour des disques
+	if d.HasChange("disk") {
+		oldDisks, newDisks := d.GetChange("disk")
+
+		// Parcourir tous les disques
+		for i, newDisk := range newDisks.([]interface{}) {
+			diskMap := newDisk.(map[string]interface{})
+
+			// Si le disque existait déjà, le mettre à jour
+			if i < len(oldDisks.([]interface{})) {
+				if diskMap["label"] == "DELETED" {
+					// Suppression du disque
+					_, err := c.Compute().VirtualDisk().Delete(ctx, diskMap["id"].(string))
+					if err != nil {
+						return diag.Errorf("Failed to delete embedded virtual disk, %s", err)
+					}
+
+					_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+					if err != nil {
+						return diag.Errorf("Failed to delete embedded virtual disk, %s", err)
+					}
+
+					continue
+				}
+
+				// Mise à jour du disque
+				activityId, err := c.Compute().VirtualDisk().Update(ctx, &client.UpdateVirtualDiskRequest{
+					ID:          diskMap["id"].(string),
+					NewCapacity: diskMap["capacity"].(int),
+					DiskMode:    diskMap["disk_mode"].(string),
+				})
+				if err != nil {
+					return diag.Errorf("Failed to update embedded virtual disk, %s", err)
+				}
+
+				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+				if err != nil {
+					return diag.Errorf("Failed to update embedded virtual disk, %s", err)
+				}
+			} else {
+				// Sinon, créer un nouveau disque
+				activityId, err := c.Compute().VirtualDisk().Create(ctx, &client.CreateVirtualDiskRequest{
+					VirtualMachineId:   d.Id(),
+					Capacity:           diskMap["capacity"].(int),
+					DiskMode:           diskMap["disk_mode"].(string),
+					ProvisioningType:   diskMap["provisioning_type"].(string),
+					DatastoreId:        diskMap["datastore_id"].(string),
+					DatastoreClusterId: diskMap["datastore_cluster_id"].(string),
+				})
+				if err != nil {
+					return diag.Errorf("Failed to create embedded virtual disk, %s", err)
+				}
+
+				activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+				if err != nil {
+					return diag.Errorf("Failed to create embedded virtual disk, %s", err)
+				}
+
+				disks := d.Get("disk").([]interface{})
+				disk := disks[i].(map[string]interface{})
+				disk["id"] = getIdFromActivityConcernedItems(activity, "virtual_disk")
+
+				if err := d.Set("disk", disks); err != nil {
+					return diag.Errorf("unable to set embedded disk id: %s", err)
+				}
+			}
+		}
+
+		// Supprimer les disques en trop
+		// if len(oldDisks.([]interface{})) > len(newDisks.([]interface{})) {
+		// 	for i := len(newDisks.([]interface{})); i < len(oldDisks.([]interface{})); i++ {
+		// 		diskMap := oldDisks.([]interface{})[i].(map[string]interface{})
+
+		// 		// Suppression du disque
+		// 		_, err := c.Compute().VirtualDisk().Delete(ctx, diskMap["id"].(string))
+		// 		if err != nil {
+		// 			return diag.Errorf("Failed to delete embedded virtual disk, %s", err)
+		// 		}
+
+		// 		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		// 		if err != nil {
+		// 			return diag.Errorf("Failed to delete embedded virtual disk, %s", err)
+		// 		}
+		// 	}
+		// }
 	}
 
 	if d.HasChange("os_disk") {

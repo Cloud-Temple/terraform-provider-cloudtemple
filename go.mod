@@ -21,6 +21,7 @@ require (
 	github.com/bgentry/speakeasy v0.1.0 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
 	github.com/google/uuid v1.4.0 // indirect
+	github.com/hashicorp/terraform-plugin-sdk v1.17.2 // indirect
 	github.com/huandu/xstrings v1.3.2 // indirect
 	github.com/mitchellh/cli v1.1.5 // indirect
 	github.com/posener/complete v1.2.3 // indirect
