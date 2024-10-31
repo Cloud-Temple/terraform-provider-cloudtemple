@@ -12,6 +12,8 @@ description: |-
     - compute_iaas_vmware_management
     - compute_iaas_vmware_read
     - compute_iaas_vmware_virtual_machine_power
+    - backup_iaas_spp_read
+    - backup_iaas_spp_write
     - activity_read
     - tag_read
     - tag_write
@@ -33,6 +35,8 @@ To manage this resource you will need the following roles:
   - `compute_iaas_vmware_management`
   - `compute_iaas_vmware_read`
   - `compute_iaas_vmware_virtual_machine_power`
+  - `backup_iaas_spp_read`
+  - `backup_iaas_spp_write`
   - `activity_read`
   - `tag_read`
   - `tag_write`
