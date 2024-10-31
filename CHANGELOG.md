@@ -4,6 +4,10 @@ BUG FIXES:
 
   * Fixed a bug causing terraform plugin to fail when an alarm is triggered on a `cloudtemple_compute_virtual_machine`.
 
+MISCELLANEOUS:
+
+  * Updated the role names in the documentations.
+
 ## 0.13.0-rc.1 (March 19th, 2024)
 
 NEW FEATURES:
