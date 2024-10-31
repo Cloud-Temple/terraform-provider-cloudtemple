@@ -3,12 +3,12 @@
 page_title: "cloudtemple_compute_resource_pools Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
-  To query this datasource you will need the compute_read role.
+  To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_resource_pools (Data Source)
 
-To query this datasource you will need the `compute_read` role.
+To query this datasource you will need the `compute_iaas_vmware_read` role.
 
 ## Example Usage
 

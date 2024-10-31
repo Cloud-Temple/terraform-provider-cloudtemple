@@ -5,8 +5,8 @@ subcategory: "Compute"
 description: |-
   Create and manage virtual controllers of a virtual machine.
   To manage this resource you will need the following roles:
-    - compute_write
-    - compute_read
+    - compute_iaas_vmware_management
+    - compute_iaas_vmware_read
     - activity_read
 ---
 
@@ -15,8 +15,8 @@ description: |-
 Create and manage virtual controllers of a virtual machine.
 
 To manage this resource you will need the following roles:
-  - `compute_write`
-  - `compute_read`
+  - `compute_iaas_vmware_management`
+  - `compute_iaas_vmware_read`
   - `activity_read`
 
 ## Example Usage

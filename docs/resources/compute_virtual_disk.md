@@ -4,16 +4,16 @@ page_title: "cloudtemple_compute_virtual_disk Resource - terraform-provider-clou
 subcategory: "Compute"
 description: |-
   To manage this resource you will need the following roles:
-    - compute_management
-    - compute_read
+    - compute_iaas_vmware_management
+    - compute_iaas_vmware_read
     - activity_read
 ---
 
 # cloudtemple_compute_virtual_disk (Resource)
 
 To manage this resource you will need the following roles:
-  - `compute_management`
-  - `compute_read`
+  - `compute_iaas_vmware_management`
+  - `compute_iaas_vmware_read`
   - `activity_read`
 
 ## Example Usage

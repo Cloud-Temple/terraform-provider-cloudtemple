@@ -4,16 +4,16 @@ page_title: "cloudtemple_backup_sla_policy_assignment Resource - terraform-provi
 subcategory: "Backup"
 description: |-
   To manage this resource you will need the following roles:
-    - backup_read
-    - backup_write
+    - backup_iaas_spp_read
+    - backup_iaas_spp_write
     - activity_read
 ---
 
 # cloudtemple_backup_sla_policy_assignment (Resource)
 
 To manage this resource you will need the following roles:
-  - `backup_read`
-  - `backup_write`
+  - `backup_iaas_spp_read`
+  - `backup_iaas_spp_write`
   - `activity_read`
 
 ## Example Usage
