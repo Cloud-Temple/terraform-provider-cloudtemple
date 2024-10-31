@@ -7,6 +7,7 @@ BUG FIXES:
 MISCELLANEOUS:
 
   * Updated the role names in the documentations.
+  * Cloud-init now doesn't force recreate when updated.
 
 ## 0.13.0-rc.1 (March 19th, 2024)
 
