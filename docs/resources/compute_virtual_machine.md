@@ -7,11 +7,11 @@ description: |-
   Virtual machines can be created using three different methods:
   by creating a new instance with guest_operating_system_morefby cloning an existing virtual machine with clone_virtual_machine_idby deploying a content library item with content_library_id and content_library_item_id
   To manage this resource you will need the following roles:
-    - compute_infrastructure_read
-    - compute_infrastructure_write
-    - compute_management
-    - copute_read
-    - compute_virtual_machine_power
+    - compute_iaas_vmware_infrastructure_read
+    - compute_iaas_vmware_infrastructure_write
+    - compute_iaas_vmware_management
+    - compute_iaas_vmware_read
+    - compute_iaas_vmware_virtual_machine_power
     - activity_read
     - tag_read
     - tag_write
@@ -28,11 +28,11 @@ Provision a virtual machine. This allows instances to be created, updated, and d
   - by deploying a content library item with `content_library_id` and `content_library_item_id`
 
 To manage this resource you will need the following roles:
-  - `compute_infrastructure_read`
-  - `compute_infrastructure_write`
-  - `compute_management`
-  - `copute_read`
-  - `compute_virtual_machine_power`
+  - `compute_iaas_vmware_infrastructure_read`
+  - `compute_iaas_vmware_infrastructure_write`
+  - `compute_iaas_vmware_management`
+  - `compute_iaas_vmware_read`
+  - `compute_iaas_vmware_virtual_machine_power`
   - `activity_read`
   - `tag_read`
   - `tag_write`

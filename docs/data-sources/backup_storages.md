@@ -3,12 +3,12 @@
 page_title: "cloudtemple_backup_storages Data Source - terraform-provider-cloudtemple"
 subcategory: "Backup"
 description: |-
-  To query this datasource you will need the backup_read role.
+  To query this datasource you will need the backup_iaas_spp_read role.
 ---
 
 # cloudtemple_backup_storages (Data Source)
 
-To query this datasource you will need the `backup_read` role.
+To query this datasource you will need the `backup_iaas_spp_read` role.
 
 ## Example Usage
 

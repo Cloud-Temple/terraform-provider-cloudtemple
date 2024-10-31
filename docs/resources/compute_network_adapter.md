@@ -4,16 +4,16 @@ page_title: "cloudtemple_compute_network_adapter Resource - terraform-provider-c
 subcategory: "Compute"
 description: |-
   To manage this resource you will need the following roles:
-    - compute_write
-    - compute_read
+    - compute_iaas_vmware_management
+    - compute_iaas_vmware_read
     - activity_read
 ---
 
 # cloudtemple_compute_network_adapter (Resource)
 
 To manage this resource you will need the following roles:
-  - `compute_write`
-  - `compute_read`
+  - `compute_iaas_vmware_management`
+  - `compute_iaas_vmware_read`
   - `activity_read`
 
 ## Example Usage

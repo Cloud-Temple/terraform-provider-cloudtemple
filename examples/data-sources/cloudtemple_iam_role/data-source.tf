@@ -5,5 +5,5 @@ data "cloudtemple_iam_role" "id" {
 
 # Read a role using its name
 data "cloudtemple_iam_role" "name" {
-  name = "compute_read"
+  name = "compute_iaas_vmware_read"
 }
