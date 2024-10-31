@@ -1,3 +1,9 @@
+## 0.14.0 (October 31st, 2024)
+
+BUG FIXES:
+
+  * Fixed a bug causing terraform plugin to fail when an alarm is triggered on a `cloudtemple_compute_virtual_machine`.
+
 ## 0.13.0-rc.1 (March 19th, 2024)
 
 NEW FEATURES:

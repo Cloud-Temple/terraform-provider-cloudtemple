@@ -52,8 +52,8 @@ type VirtualMachine struct {
 }
 
 type VirtualMachineTriggeredAlarm struct {
-	ID     string `type:"id"`
-	Status string `type:"status"`
+	ID     string `terraform:"id"`
+	Status string `terraform:"status"`
 }
 
 type VirtualMachineReplicationConfig struct {
