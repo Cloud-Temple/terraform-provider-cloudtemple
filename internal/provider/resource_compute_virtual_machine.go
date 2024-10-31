@@ -71,7 +71,6 @@ func resourceVirtualMachine() *schema.Resource {
 			},
 			"cloud_init": {
 				Type:     schema.TypeMap,
-				ForceNew: true,
 				Optional: true,
 				Description: `A set of cloud-init compatible key/value used to configure the virtual machine.
 					
