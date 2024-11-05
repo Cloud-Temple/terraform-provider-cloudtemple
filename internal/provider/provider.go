@@ -126,6 +126,7 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_compute_iaas_opensource_pool":               documentDatasource(dataSourceOpenIaasPool(), "compute_iaas_opensource_infrastructure_read"),
 				"cloudtemple_compute_iaas_opensource_template":           documentDatasource(dataSourceOpenIaasTemplate(), "compute_iaas_opensource_read"),
 				"cloudtemple_compute_iaas_opensource_network":            documentDatasource(dataSourceOpenIaasNetwork(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_virtual_machine":    documentDatasource(dataSourceOpenIaasVirtualMachine(), "compute_iaas_opensource_read"),
 
 				// IAM
 				"cloudtemple_iam_company":                documentDatasource(dataSourceCompany(), "iam_read"),
