@@ -25,9 +25,14 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 
 			name := d.Get("name").(string)
 			if name != "" {
+				types := d.Get("types").([]interface{})
+				stringTypes := make([]string, 0, len(types))
+				for _, v := range types {
+					stringTypes = append(stringTypes, v.(string))
+				}
 				repositories, err := c.Compute().OpenIaaS().StorageRepository().List(ctx, &client.StorageRepositoryFilter{
 					MachineManagerId: d.Get("machine_manager_id").(string),
-					Types:            d.Get("types").([]string),
+					Types:            stringTypes,
 					Shared:           d.Get("shared").(bool),
 				})
 				if err != nil {

@@ -48,12 +48,12 @@ func dataSourceOpenIaasHost() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
 			},
-			// "name": {
-			// 	Type:          schema.TypeString,
-			// 	Optional:      true,
-			// 	ConflictsWith: []string{"id"},
-			// 	AtLeastOneOf:  []string{"id", "name"},
-			// },
+			"name": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
@@ -82,10 +82,6 @@ func dataSourceOpenIaasHost() *schema.Resource {
 						},
 					},
 				},
-			},
-			"name": {
-				Type:     schema.TypeString,
-				Computed: true,
 			},
 			"uptime": {
 				Type:     schema.TypeInt,
