@@ -21,6 +21,7 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 ### Optional
 
 - `machine_manager_id` (String)
+- `name` (String)
 
 ### Read-Only
 
@@ -28,7 +29,6 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 - `id` (String) The ID of this resource.
 - `internal_id` (String)
 - `memory` (List of Object) (see [below for nested schema](#nestedatt--memory))
-- `name` (String)
 - `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
 - `power_state` (String)
 - `reboot_required` (Boolean)
