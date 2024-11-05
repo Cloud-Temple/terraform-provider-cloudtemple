@@ -16,7 +16,7 @@ func dataSourceOpenIaasHost() *schema.Resource {
 		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 			name := d.Get("name").(string)
 			if name != "" {
-				hosts, err := c.Compute().OpenIaaS().Host().List(ctx, &client.OpenIaaSHostFilter{
+				hosts, err := c.Compute().OpenIaaS().Host().List(ctx, &client.OpenIaasHostFilter{
 					// TODO: Add name filter Name:             name,
 					MachineManagerId: d.Get("machine_manager_id").(string),
 				})
