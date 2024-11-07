@@ -706,6 +706,35 @@ func resourceVirtualMachine() *schema.Resource {
 					},
 				},
 			},
+			"vapp_properties": {
+				Type:     schema.TypeList,
+				Computed: true,
+
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"key": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"label": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"type": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						// "value": {
+						// 	Type:     schema.TypeString,
+						// 	Computed: true,
+						// },
+					},
+				},
+			},
 			"storage": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -1006,6 +1035,19 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 
 		sw.set("os_network_adapter", osNetworkAdapters)
 
+		// Convert VAppProperties to a format that can be set in the state
+		vappProperties := make([]map[string]interface{}, len(vm.VAppProperties))
+		for i, prop := range vm.VAppProperties {
+			vappProperties[i] = map[string]interface{}{
+				"key":   prop.Key,
+				"id":    prop.ID,
+				"label": prop.Label,
+				"type":  prop.Type,
+				// Notez que le champ "value" n'est pas inclus ici
+			}
+		}
+		d.Set("vapp_properties", vappProperties)
+
 		readTags(ctx, sw, c, d.Id())
 
 		return vm, nil
@@ -1291,6 +1333,17 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 			}
 		}
 	}
+
+	// if d.HasChange("cloud_init") {
+	// 	activityId, err := c.Compute().VirtualMachine().UpdateVAppProperties(ctx, d.Id(), d.Get("cloud_init").([]client.VAppProperty))
+	// 	if err != nil {
+	// 		return diag.Errorf("failed to update virtual machine guest os: %s", err)
+	// 	}
+	// 	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	// 	if err != nil {
+	// 		return diag.Errorf("failed to update virtual machine guest os, %s", err)
+	// 	}
+	// }
 
 	if updatePower {
 		powerState := d.Get("power_state").(string)

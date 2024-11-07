@@ -315,7 +315,7 @@ func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string
 
 	k := v.Kind()
 	switch k {
-	case reflect.Bool, reflect.Int, reflect.String, reflect.Float64:
+	case reflect.Bool, reflect.Int, reflect.String, reflect.Float64, reflect.Interface:
 		return v.Interface()
 
 	case reflect.Slice:

@@ -46,9 +46,18 @@ type VirtualMachine struct {
 	TriggeredAlarms                []VirtualMachineTriggeredAlarm  `terraform:"triggered_alarms"`
 	ReplicationConfig              VirtualMachineReplicationConfig `terraform:"replication_config"`
 	ExtraConfig                    []VirtualMachineExtraConfig     `terraform:"extra_config"`
+	VAppProperties                 []VAppProperty                  `terraform:"vapp_properties"`
 	Storage                        VirtualMachineStorage           `terraform:"storage"`
 	BootOptions                    VirtualMachineBootOptions       `terraform:"boot_options"`
 	ExposeHardwareVirtualization   bool                            `terraform:"expose_hardware_virtualization"`
+}
+
+type VAppProperty struct {
+	Key   int         `terraform:"key" json:"key"`
+	ID    string      `terraform:"id" json:"id"`
+	Label string      `terraform:"label" json:"label"`
+	Type  string      `terraform:"type" json:"type"`
+	Value interface{} `json:"value"`
 }
 
 type VirtualMachineTriggeredAlarm struct {
@@ -154,7 +163,7 @@ func (v *VirtualMachineClient) List(
 	vmwareToolsVersions []int) ([]*VirtualMachine, error) {
 
 	// TODO: filters
-	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_machines")
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_machines?allOptions=%s", allOptions)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -340,3 +349,9 @@ func (v *VirtualMachineClient) Recommendation(ctx context.Context, filter *Virtu
 
 	return out, nil
 }
+
+// func (v *VirtualMachineClient) UpdateVAppProperties(ctx context.Context, id string, properties []VAppProperty) (string, error) {
+// 	r := v.c.newRequest("POST", "/compute/v1/vcenters/virtual_machines/%s/vapp_properties", id)
+// 	r.obj = properties
+// 	return v.c.doRequestAndReturnActivity(ctx, r)
+// }
