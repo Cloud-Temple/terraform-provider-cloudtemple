@@ -121,7 +121,9 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_compute_machine_managers":        documentDatasource(dataSourceWorkers(), "compute_iaas_vmware_read"),
 
 				// Backup - Open IaaS
-				"cloudtemple_backup_iaas_opensource_policy": documentDatasource(dataSourceOpenIaasBackupPolicy(), "backup_iaas_opensource_read"),
+				"cloudtemple_backup_iaas_opensource_policy":  documentDatasource(dataSourceOpenIaasBackupPolicy(), "backup_iaas_opensource_read"),
+				"cloudtemple_backup_iaas_opensource_backup":  documentDatasource(dataSourceOpenIaasBackup(), "backup_iaas_opensource_read"),
+				"cloudtemple_backup_iaas_opensource_backups": documentDatasource(dataSourceOpenIaasBackups(), "backup_iaas_opensource_read"),
 
 				// Compute - Open IaaS
 				"cloudtemple_compute_iaas_opensource_host":               documentDatasource(dataSourceOpenIaasHost(), "compute_iaas_opensource_infrastructure_read"),
