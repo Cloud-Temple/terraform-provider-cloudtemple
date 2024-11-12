@@ -23,7 +23,11 @@ type OpenIaaSVirtualMachine struct {
 	CPU                 int      `terraform:"cpu"`
 	NumCoresPerSocket   int      `terraform:"num_cores_per_socket"`
 	Memory              int      `terraform:"memory"`
-	Addresses           struct {
+	Tools               struct {
+		Detected bool   `terraform:"detected"`
+		Version  string `terraform:"version"`
+	} `terraform:"tools"`
+	Addresses struct {
 		IPv6 string `terraform:"ipv6"`
 		IPv4 string `terraform:"ipv4"`
 	} `terraform:"addresses"`
@@ -48,6 +52,19 @@ type DvdDrive struct {
 
 type OpenIaaSVirtualMachineFilter struct {
 	MachineManagerID string `filter:"machineManagerId"`
+}
+
+type CreateOpenIaasVirtualMachineRequest struct {
+	Name       string `json:"name"`
+	TemplateID string `json:"templateId"`
+	CPU        int    `json:"cpu"`
+	Memory     int    `json:"memory"`
+}
+
+func (c *OpenIaaSVirtualMachineClient) Create(ctx context.Context, req *CreateOpenIaasVirtualMachineRequest) (string, error) {
+	r := c.c.newRequest("POST", "/compute/v1/open_iaas/virtual_machines")
+	r.obj = req
+	return c.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (v *OpenIaaSVirtualMachineClient) List(
@@ -91,4 +108,46 @@ func (v *OpenIaaSVirtualMachineClient) Read(ctx context.Context, id string) (*Op
 	}
 
 	return &out, nil
+}
+
+type UpdateOpenIaasVirtualMachineRequest struct {
+	Name              string `json:"name"`
+	CPU               int    `json:"cpu"`
+	NumCoresPerSocket int    `json:"numCoresPerSocket"`
+	Memory            int    `json:"memory"`
+	SecureBoot        bool   `json:"secureBoot"`
+	AutoPowerOn       bool   `json:"autoPowerOn"`
+	HighAvailability  string `json:"highAvailability"`
+}
+
+func (v *OpenIaaSVirtualMachineClient) Update(ctx context.Context, id string, req *UpdateOpenIaasVirtualMachineRequest) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_machines/%s", id)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+func (v *OpenIaaSVirtualMachineClient) Delete(ctx context.Context, id string) (string, error) {
+	r := v.c.newRequest("DELETE", "/compute/v1/open_iaas/virtual_machines/%s", id)
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+type UpdateOpenIaasVirtualMachinePowerRequest struct {
+	PowerState              string `json:"powerState"`
+	HostId                  string `json:"hostId,omitempty"`
+	Force                   bool   `json:"force,omitempty"`
+	BypassMacAddressesCheck bool   `json:"bypassMacAddressesCheck,omitempty"`
+	ForceShutdownDelay      int    `json:"forceShutdownDelay,omitempty"`
+	BypassBlockedOperation  bool   `json:"bypassBlockedOperation,omitempty"`
+}
+
+func (v *OpenIaaSVirtualMachineClient) Power(ctx context.Context, id string, req *UpdateOpenIaasVirtualMachinePowerRequest) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_machines/%s/power", id)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+func (v *OpenIaaSVirtualMachineClient) UpdateBootOrder(ctx context.Context, id string, bootOrder []string) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_machines/%s/boot_order", id)
+	r.obj = map[string][]string{"order": bootOrder}
+	return v.c.doRequestAndReturnActivity(ctx, r)
 }

@@ -40,6 +40,7 @@ To query this datasource you will need the `compute_iaas_opensource_read` role.
 - `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
 - `power_state` (String)
 - `secure_boot` (Boolean)
+- `tools` (List of Object) (see [below for nested schema](#nestedatt--tools))
 
 <a id="nestedatt--addresses"></a>
 ### Nested Schema for `addresses`
@@ -84,5 +85,14 @@ Read-Only:
 
 - `id` (String)
 - `name` (String)
+
+
+<a id="nestedatt--tools"></a>
+### Nested Schema for `tools`
+
+Read-Only:
+
+- `detected` (Boolean)
+- `version` (String)
 
 

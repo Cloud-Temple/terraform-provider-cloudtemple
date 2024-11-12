@@ -67,3 +67,14 @@ func (v *BackupOpenIaasPolicyClient) List(ctx context.Context) ([]*BackupOpenIaa
 
 	return out, nil
 }
+
+type BackupOpenIaasAssignPolicyRequest struct {
+	VirtualMachineId string   `json:"virtualMachineId"`
+	PolicyIds        []string `json:"policyIds"`
+}
+
+func (v *BackupOpenIaasPolicyClient) Assign(ctx context.Context, req *BackupOpenIaasAssignPolicyRequest) (string, error) {
+	r := v.c.newRequest("POST", "/backup/v1/open_iaas/policies/assign")
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}

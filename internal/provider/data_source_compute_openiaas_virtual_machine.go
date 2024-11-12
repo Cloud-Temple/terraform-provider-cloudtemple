@@ -109,6 +109,22 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 					},
 				},
 			},
+			"tools": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"detected": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+						"version": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+					},
+				},
+			},
 			"boot_order": {
 				Type:     schema.TypeList,
 				Computed: true,
