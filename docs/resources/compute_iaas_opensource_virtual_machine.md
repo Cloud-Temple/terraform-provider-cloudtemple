@@ -5,8 +5,6 @@ subcategory: "Compute"
 description: |-
   Create and manage virtual machines over an Open IaaS infrastructure.
   To manage this resource you will need the following roles:
-    - compute_iaas_opensource_infrastructure_read
-    - compute_iaas_opensource_infrastructure_write
     - compute_iaas_opensource_management
     - compute_iaas_opensource_read
     - compute_iaas_opensource_virtual_machine_power
@@ -22,8 +20,6 @@ description: |-
 Create and manage virtual machines over an Open IaaS infrastructure.
 
 To manage this resource you will need the following roles:
-  - `compute_iaas_opensource_infrastructure_read`
-  - `compute_iaas_opensource_infrastructure_write`
   - `compute_iaas_opensource_management`
   - `compute_iaas_opensource_read`
   - `compute_iaas_opensource_virtual_machine_power`
