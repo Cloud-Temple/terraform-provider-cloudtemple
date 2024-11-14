@@ -306,28 +306,6 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		return diag.Errorf("failed to update virtual machine, %s", err)
 	}
 
-	// TODO: Implement the mount/unmount methods and get files from the storage repository
-
-	// if d.HasChange("mounted") {
-	// 	var activityId string
-	// 	var err error
-	// 	if d.Get("mounted").(bool) {
-	// 		activityId, err = c.Compute().OpenIaaS().VirtualMachine().Mount(ctx, &client.MountISORequest{
-	// 			ID:                   d.Id(),
-	// 			IsoPath:              d.Get("iso_path").(string),
-	// 			ContentLibraryItemId: d.Get("content_library_item_id").(string),
-	// 		})
-	// 	} else {
-	// 		activityId, err = c.Compute().VirtualMachine().Unmount(ctx, d.Id())
-	// 	}
-	// 	if err != nil {
-	// 		return diag.Errorf("the virtual machine could not be connected: %s", err)
-	// 	}
-	// 	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	// 	if err != nil {
-	// 		return diag.Errorf("failed to connect virtual machine, %s", err)
-	// 	}
-	// }
 	if d.HasChange("boot_order") {
 		bootOrder := d.Get("boot_order").([]interface{})
 		bootOrderStr := make([]string, len(bootOrder))
@@ -349,7 +327,7 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
 			HostId:                  d.Get("host_id").(string),
 			PowerState:              powerState,
-			Force:                   true,
+			Force:                   false,
 			BypassMacAddressesCheck: false,
 			BypassBlockedOperation:  false,
 			ForceShutdownDelay:      0,

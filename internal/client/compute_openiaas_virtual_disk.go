@@ -28,6 +28,21 @@ type OpenIaaSVirtualDisk struct {
 	} `terraform:"virtual_machines"`
 }
 
+type OpenIaaSVirtualDiskCreateRequest struct {
+	Name                string `json:"name"`
+	Size                int    `json:"size"`
+	Mode                string `json:"mode"`
+	StorageRepositoryID string `json:"storageRepositoryId"`
+	VirtualMachineID    string `json:"virtualMachineId"`
+	Bootable            bool   `json:"bootable"`
+}
+
+func (v *OpenIaaSVirtualDiskClient) Create(ctx context.Context, req *OpenIaaSVirtualDiskCreateRequest) (string, error) {
+	r := v.c.newRequest("POST", "/compute/v1/open_iaas/virtual_disks")
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
 func (v *OpenIaaSVirtualDiskClient) Read(ctx context.Context, id string) (*OpenIaaSVirtualDisk, error) {
 	r := v.c.newRequest("GET", "/compute/v1/open_iaas/virtual_disks/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
@@ -67,4 +82,22 @@ func (v *OpenIaaSVirtualDiskClient) List(ctx context.Context, virtualMachineId s
 	}
 
 	return out, nil
+}
+
+type OpenIaaSVirtualDiskAttachRequest struct {
+	VirtualMachineID string `json:"virtualMachineId"`
+	Bootable         bool   `json:"bootable,omitempty"`
+	Mode             string `json:"mode"`
+	Position         string `json:"position,omitempty"`
+}
+
+func (v *OpenIaaSVirtualDiskClient) Attach(ctx context.Context, id string, req *OpenIaaSVirtualDiskAttachRequest) (string, error) {
+	r := v.c.newRequest("POST", "/compute/v1/open_iaas/virtual_disks/%s/attach", id)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+func (v *OpenIaaSVirtualDiskClient) Delete(ctx context.Context, id string) (string, error) {
+	r := v.c.newRequest("DELETE", "/compute/v1/open_iaas/virtual_disks/%s", id)
+	return v.c.doRequestAndReturnActivity(ctx, r)
 }
