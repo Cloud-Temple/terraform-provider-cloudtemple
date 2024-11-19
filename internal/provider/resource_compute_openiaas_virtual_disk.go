@@ -13,7 +13,7 @@ func resourceOpenIaasVirtualDisk() *schema.Resource {
 	return &schema.Resource{
 		CreateContext: openIaasVirtualDiskCreate,
 		ReadContext:   openIaasVirtualDiskRead,
-		UpdateContext: openIaasVirtualDiskUpdate,
+		//UpdateContext: openIaasVirtualDiskUpdate,
 		DeleteContext: openIaasVirtualDiskDelete,
 
 		Schema: map[string]*schema.Schema{
@@ -66,7 +66,7 @@ func resourceOpenIaasVirtualDisk() *schema.Resource {
 				Description: "The ID of the virtual disk.",
 			},
 			"usage": {
-				Type:        schema.TypeString,
+				Type:        schema.TypeInt,
 				Computed:    true,
 				Description: "The usage of the virtual disk.",
 			},
@@ -94,7 +94,7 @@ func openIaasVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta
 		return diag.Errorf("the virtual disk could not be created: %s", err)
 	}
 
-	return openIaasVirtualDiskUpdate(ctx, d, meta)
+	return openIaasVirtualDiskRead(ctx, d, meta) // DevNote : Call update instead when it will be implemented
 }
 
 func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -108,12 +108,13 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 	}
 
 	// Set the retrieved data to the schema
-	d.Set("name", virtualDisk.Name)
-	d.Set("size", virtualDisk.Size)
-	d.Set("usage", virtualDisk.Usage)
-	d.Set("storage_repository_id", virtualDisk.StorageRepository.ID)
+	sw := newStateWriter(d)
+	sw.set("name", virtualDisk.Name)
+	sw.set("size", virtualDisk.Size)
+	sw.set("usage", virtualDisk.Usage)
+	sw.set("storage_repository_id", virtualDisk.StorageRepository.ID)
 
-	return nil
+	return sw.diags
 }
 
 func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {

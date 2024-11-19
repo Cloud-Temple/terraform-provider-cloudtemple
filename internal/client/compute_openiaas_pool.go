@@ -11,8 +11,12 @@ func (c *ComputeOpenIaaSClient) Pool() *OpenIaasPoolClient {
 }
 
 type OpenIaasPool struct {
-	ID                      string   `terraform:"id"`
-	MachineManager          string   `terraform:"machine_manager_id"`
+	ID             string `terraform:"id"`
+	MachineManager struct {
+		ID   string `terraform:"id"`
+		Name string `terraform:"name"`
+		Type string `terraform:"type"`
+	} `terraform:"machine_manager"`
 	InternalID              string   `terraform:"internal_id"`
 	Name                    string   `terraform:"name"`
 	HighAvailabilityEnabled bool     `terraform:"high_availability_enabled"`

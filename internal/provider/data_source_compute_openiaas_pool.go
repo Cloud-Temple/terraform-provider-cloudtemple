@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,30 +13,50 @@ func dataSourceOpenIaasPool() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific pool from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+		ReadContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+			c := getClient(meta)
+			var pool *client.OpenIaasPool
 			name := d.Get("name").(string)
 			if name != "" {
 				pools, err := c.Compute().OpenIaaS().Pool().List(ctx, &client.OpenIaasPoolFilter{
 					MachineManagerId: d.Get("machine_manager_id").(string),
 				})
 				if err != nil {
-					return nil, fmt.Errorf("failed to find pool named %q: %s", name, err)
+					diag.Errorf("failed to find pool named %q: %s", name, err)
 				}
-				for _, pool := range pools {
-					if pool.Name == name {
-						return pool, nil
+				for _, currPool := range pools {
+					if currPool.Name == name {
+						pool = currPool
 					}
 				}
-				return nil, fmt.Errorf("failed to find pool named %q", name)
+				diag.Errorf("failed to find pool named %q", name)
+			} else {
+				id := d.Get("id").(string)
+				pool, err := c.Compute().OpenIaaS().Pool().Read(ctx, id)
+				if err == nil && pool == nil {
+					diag.Errorf("failed to find pool with id %q", id)
+				}
 			}
 
-			id := d.Get("id").(string)
-			pool, err := c.Compute().OpenIaaS().Pool().Read(ctx, id)
-			if err == nil && pool == nil {
-				return nil, fmt.Errorf("failed to find pool with id %q", id)
-			}
-			return pool, err
-		}),
+			sw := newStateWriter(d)
+
+			d.SetId(pool.ID)
+
+			d.Set("name", pool.Name)
+			d.Set("machine_manager_id", pool.MachineManager.ID)
+			d.Set("internal_id", pool.InternalID)
+			d.Set("high_availability_enabled", pool.HighAvailabilityEnabled)
+			d.Set("cpu", []interface{}{
+				map[string]interface{}{
+					"cores":   pool.Cpu.Cores,
+					"sockets": pool.Cpu.Sockets,
+				},
+			})
+			d.Set("master", pool.Master)
+			d.Set("hosts", pool.Hosts)
+
+			return sw.diags
+		},
 
 		Schema: map[string]*schema.Schema{
 			// In

@@ -162,6 +162,7 @@ func New(version string) func() *schema.Provider {
 				// Compute - Open IaaS
 				"cloudtemple_compute_iaas_opensource_virtual_machine": documentResource(resourceOpenIaasVirtualMachine(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "compute_iaas_opensource_virtual_machine_power", "backup_iaas_opensource_read", "backup_iaas_opensource_write", "activity_read", "tag_read", "tag_write"),
 				"cloudtemple_compute_iaas_opensource_virtual_disk":    documentResource(resourceOpenIaasVirtualDisk(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
+				"cloudtemple_compute_iaas_opensource_network_adapter": documentResource(resourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
 			},
 		}
 

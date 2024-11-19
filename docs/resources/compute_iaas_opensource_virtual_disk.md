@@ -36,6 +36,6 @@ To manage this resource you will need the following roles:
 ### Read-Only
 
 - `id` (String) The ID of the virtual disk.
-- `usage` (String) The usage of the virtual disk.
+- `usage` (Number) The usage of the virtual disk.
 
 
