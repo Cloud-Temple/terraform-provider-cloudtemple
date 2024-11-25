@@ -29,8 +29,6 @@ To query this datasource you will need the `compute_iaas_opensource_read` role.
 - `disks` (List of Object) (see [below for nested schema](#nestedatt--disks))
 - `id` (String) The ID of this resource.
 - `internal_id` (String)
-- `machine_manager_name` (String)
-- `machine_manager_type` (String)
 - `memory` (Number)
 - `num_cores_per_socket` (Number)
 - `power_state` (String)

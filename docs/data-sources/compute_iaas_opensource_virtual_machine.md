@@ -33,7 +33,6 @@ To query this datasource you will need the `compute_iaas_opensource_read` role.
 - `host` (List of Object) (see [below for nested schema](#nestedatt--host))
 - `id` (String) The ID of this resource.
 - `internal_id` (String)
-- `machine_manager` (List of Object) (see [below for nested schema](#nestedatt--machine_manager))
 - `memory` (Number)
 - `num_cores_per_socket` (Number)
 - `operating_system_name` (String)
@@ -62,15 +61,6 @@ Read-Only:
 
 <a id="nestedatt--host"></a>
 ### Nested Schema for `host`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
-
-
-<a id="nestedatt--machine_manager"></a>
-### Nested Schema for `machine_manager`
 
 Read-Only:
 

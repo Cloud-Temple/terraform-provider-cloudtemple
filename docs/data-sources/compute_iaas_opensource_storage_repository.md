@@ -33,7 +33,6 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 - `host` (List of Object) (see [below for nested schema](#nestedatt--host))
 - `id` (String) The ID of this resource.
 - `internal_id` (String)
-- `machine_manager` (List of Object) (see [below for nested schema](#nestedatt--machine_manager))
 - `maintenance_status` (Boolean)
 - `max_capacity` (Number)
 - `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
@@ -42,15 +41,6 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 
 <a id="nestedatt--host"></a>
 ### Nested Schema for `host`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
-
-
-<a id="nestedatt--machine_manager"></a>
-### Nested Schema for `machine_manager`
 
 Read-Only:
 
