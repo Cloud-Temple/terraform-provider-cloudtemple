@@ -11,8 +11,11 @@ func (c *ComputeOpenIaaSClient) Network() *OpenIaaSNetworkClient {
 }
 
 type OpenIaaSNetwork struct {
-	ID                         string   `terraform:"id"`
-	MachineManagerID           string   `terraform:"machine_manager_id"`
+	ID             string `terraform:"id"`
+	MachineManager struct {
+		ID   string `terraform:"id"`
+		Name string `terraform:"name"`
+	} `terraform:"machine_manager"`
 	InternalID                 string   `terraform:"internal_id"`
 	Name                       string   `terraform:"name"`
 	Pool                       Pool     `terraform:"pool"`

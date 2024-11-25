@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,30 +13,79 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific virtual machine from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+		ReadContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+			c := getClient(meta)
+			var virtualMachine *client.OpenIaaSVirtualMachine
+
 			name := d.Get("name").(string)
 			if name != "" {
 				virtualMachines, err := c.Compute().OpenIaaS().VirtualMachine().List(ctx, &client.OpenIaaSVirtualMachineFilter{
 					MachineManagerID: d.Get("machine_manager_id").(string),
 				})
 				if err != nil {
-					return nil, fmt.Errorf("failed to find virtual machine named %q: %s", name, err)
+					diag.Errorf("failed to find virtual machine named %q: %s", name, err)
 				}
-				for _, virtualMachine := range virtualMachines {
-					if virtualMachine.Name == name {
-						return virtualMachine, nil
+				for _, currVirtualMachine := range virtualMachines {
+					if currVirtualMachine.Name == name {
+						virtualMachine = currVirtualMachine
 					}
 				}
-				return nil, fmt.Errorf("failed to find virtual machine named %q", name)
+				diag.Errorf("failed to find virtual machine named %q", name)
+			} else {
+				id := d.Get("id").(string)
+				virtualMachine, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, id)
+				if err == nil && virtualMachine == nil {
+					diag.Errorf("failed to find virtual machine with id %q", id)
+				}
 			}
 
-			id := d.Get("id").(string)
-			virtualMachine, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, id)
-			if err == nil && virtualMachine == nil {
-				return nil, fmt.Errorf("failed to find virtual machine with id %q", id)
-			}
-			return virtualMachine, err
-		}),
+			sw := newStateWriter(d)
+
+			d.SetId(virtualMachine.ID)
+			d.Set("name", virtualMachine.Name)
+			d.Set("machine_manager_id", virtualMachine.MachineManager.ID)
+			d.Set("internal_id", virtualMachine.InternalID)
+			d.Set("power_state", virtualMachine.PowerState)
+			d.Set("secure_boot", virtualMachine.SecureBoot)
+			d.Set("auto_power_on", virtualMachine.AutoPowerOn)
+			d.Set("dvd_drive", []interface{}{
+				map[string]interface{}{
+					"name":     virtualMachine.DvdDrive.Name,
+					"attached": virtualMachine.DvdDrive.Attached,
+				},
+			})
+			d.Set("tools", []interface{}{
+				map[string]interface{}{
+					"detected": virtualMachine.Tools.Detected,
+					"version":  virtualMachine.Tools.Version,
+				},
+			})
+			d.Set("boot_order", virtualMachine.BootOrder)
+			d.Set("operating_system_name", virtualMachine.OperatingSystemName)
+			d.Set("cpu", virtualMachine.CPU)
+			d.Set("num_cores_per_socket", virtualMachine.NumCoresPerSocket)
+			d.Set("memory", virtualMachine.Memory)
+			d.Set("addresses", []interface{}{
+				map[string]interface{}{
+					"ipv6": virtualMachine.Addresses.IPv6,
+					"ipv4": virtualMachine.Addresses.IPv4,
+				},
+			})
+			d.Set("pool", []interface{}{
+				map[string]interface{}{
+					"id":   virtualMachine.Pool.ID,
+					"name": virtualMachine.Pool.Name,
+				},
+			})
+			d.Set("host", []interface{}{
+				map[string]interface{}{
+					"id":   virtualMachine.Host.ID,
+					"name": virtualMachine.Host.Name,
+				},
+			})
+
+			return sw.diags
+		},
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -61,22 +110,6 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 			},
 
 			// Out
-			"machine_manager": {
-				Type:     schema.TypeList,
-				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
-			},
 			"internal_id": {
 				Type:     schema.TypeString,
 				Computed: true,

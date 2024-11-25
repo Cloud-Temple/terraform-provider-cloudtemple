@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,15 +13,9 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific storage repository from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			id := d.Get("id").(string)
-			if id != "" {
-				repository, err := c.Compute().OpenIaaS().StorageRepository().Read(ctx, id)
-				if err != nil {
-					return nil, fmt.Errorf("failed to find storage repository with id %q: %s", id, err)
-				}
-				return repository, nil
-			}
+		ReadContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+			c := getClient(meta)
+			var sr *client.OpenIaaSStorageRepository
 
 			name := d.Get("name").(string)
 			if name != "" {
@@ -36,18 +30,50 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 					Shared:           d.Get("shared").(bool),
 				})
 				if err != nil {
-					return nil, fmt.Errorf("failed to find storage repository named %q: %s", name, err)
+					diag.Errorf("failed to find storage repository named %q: %s", name, err)
 				}
-				for _, repository := range repositories {
-					if repository.Name == name {
-						return repository, nil
+				for _, currSr := range repositories {
+					if currSr.Name == name {
+						sr = currSr
 					}
 				}
-				return nil, fmt.Errorf("failed to find storage repository named %q", name)
+				diag.Errorf("failed to find storage repository named %q", name)
+			} else {
+				id := d.Get("id").(string)
+				sr, err := c.Compute().OpenIaaS().StorageRepository().Read(ctx, id)
+				if err != nil && sr == nil {
+					diag.Errorf("failed to find storage repository with id %q: %s", id, err)
+				}
 			}
 
-			return nil, fmt.Errorf("id and name are required to find a storage repository")
-		}),
+			sw := newStateWriter(d)
+
+			d.SetId(sr.ID)
+			d.Set("name", sr.Name)
+			d.Set("machine_manager_id", sr.MachineManager.ID)
+			d.Set("internal_id", sr.InternalId)
+			d.Set("description", sr.Description)
+			d.Set("maintenance_status", sr.MaintenanceStatus)
+			d.Set("accessible", sr.Accessible)
+			d.Set("type", sr.Type)
+			d.Set("free_capacity", sr.FreeCapacity)
+			d.Set("max_capacity", sr.MaxCapacity)
+			d.Set("virtual_disks", sr.VirtualDisks)
+			d.Set("pool", []interface{}{
+				map[string]interface{}{
+					"id":   sr.Pool.ID,
+					"name": sr.Pool.Name,
+				},
+			})
+			d.Set("host", []interface{}{
+				map[string]interface{}{
+					"id":   sr.Host.ID,
+					"name": sr.Host.Name,
+				},
+			})
+
+			return sw.diags
+		},
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -97,23 +123,6 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 			"internal_id": {
 				Type:     schema.TypeString,
 				Computed: true,
-			},
-			"machine_manager": {
-				Type:     schema.TypeList,
-				Computed: true,
-
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
 			},
 			"description": {
 				Type:     schema.TypeString,

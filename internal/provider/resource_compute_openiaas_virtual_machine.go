@@ -324,20 +324,28 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 
 	if d.HasChange("power_state") {
 		powerState := d.Get("power_state").(string)
-		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
-			HostId:                  d.Get("host_id").(string),
-			PowerState:              powerState,
-			Force:                   false,
-			BypassMacAddressesCheck: false,
-			BypassBlockedOperation:  false,
-			ForceShutdownDelay:      0,
-		})
-		if err != nil {
-			return diag.Errorf("failed to power %s virtual machine: %s", powerState, err)
-		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		if err != nil {
-			return diag.Errorf("failed to power %s virtual machine, %s", powerState, err)
+		// Avoid trying to power off a halted VM
+		if powerState == "on" || !d.IsNewResource() {
+			activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
+				HostId:                  d.Get("host_id").(string),
+				PowerState:              powerState,
+				Force:                   false,
+				BypassMacAddressesCheck: false,
+				BypassBlockedOperation:  false,
+				ForceShutdownDelay:      0,
+			})
+			if err != nil {
+				return diag.Errorf("failed to power %s virtual machine: %s", powerState, err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to power %s virtual machine, %s", powerState, err)
+			}
+			// We have to wait for the tools to be mounted, otherwise, operations like creating new network adapters will fail
+			_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForTools(ctx, d.Id(), getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to get tools on virtual machine, %s", err)
+			}
 		}
 	}
 

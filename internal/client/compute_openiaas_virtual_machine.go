@@ -1,6 +1,12 @@
 package client
 
-import "context"
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/sethvargo/go-retry"
+)
 
 type OpenIaaSVirtualMachineClient struct {
 	c *Client
@@ -150,4 +156,46 @@ func (v *OpenIaaSVirtualMachineClient) UpdateBootOrder(ctx context.Context, id s
 	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_machines/%s/boot_order", id)
 	r.obj = map[string][]string{"order": bootOrder}
 	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+func (c *OpenIaaSVirtualMachineClient) WaitForTools(ctx context.Context, id string, options *WaiterOptions) (*OpenIaaSVirtualMachine, error) {
+	b := retry.NewFibonacci(1 * time.Second)
+	b = retry.WithCappedDuration(30*time.Second, b)
+
+	var res *OpenIaaSVirtualMachine
+	var count int
+
+	err := retry.Do(ctx, b, func(ctx context.Context) error {
+		count++
+		vm, err := c.Read(ctx, id)
+		if err != nil {
+			return options.retryableError(&StatusError{
+				Code: 500,
+				Body: "an error occured while getting the status of the virtual machine"})
+		}
+		if vm == nil {
+			err := &StatusError{
+				Code: 404,
+				Body: fmt.Sprintf("the virtual machine %q could not be found", id),
+			}
+			if count == 1 {
+				return options.retryableError(err)
+			}
+			return options.error(err)
+		}
+		res = vm
+		switch vm.Tools.Detected {
+		case true:
+			options.log(fmt.Sprintf("the virtual machine %q has the tools installed", id))
+			return nil
+		case false:
+			return options.retryableError(&StatusError{
+				Code: 500,
+				Body: fmt.Sprintf("the tools are not detected for the virtual machine %q", id),
+			})
+		}
+		return nil
+	})
+
+	return res, err
 }

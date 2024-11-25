@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,30 +13,50 @@ func dataSourceOpenIaasNetwork() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific network from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+		ReadContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
+			c := getClient(meta)
+			var network *client.OpenIaaSNetwork
 			name := d.Get("name").(string)
 			if name != "" {
 				networks, err := c.Compute().OpenIaaS().Network().List(ctx, &client.OpenIaaSNetworkFilter{
 					MachineManagerID: d.Get("machine_manager_id").(string),
 				})
 				if err != nil {
-					return nil, fmt.Errorf("failed to find network named %q: %s", name, err)
+					diag.Errorf("failed to find network named %q: %s", name, err)
 				}
-				for _, network := range networks {
-					if network.Name == name {
-						return network, nil
+				for _, currNetwork := range networks {
+					if currNetwork.Name == name {
+						network = currNetwork
 					}
 				}
-				return nil, fmt.Errorf("failed to find network named %q", name)
+				diag.Errorf("failed to find network named %q", name)
+			} else {
+				id := d.Get("id").(string)
+				network, err := c.Compute().OpenIaaS().Network().Read(ctx, id)
+				if err == nil && network == nil {
+					diag.Errorf("failed to find network with id %q", id)
+				}
 			}
 
-			id := d.Get("id").(string)
-			network, err := c.Compute().OpenIaaS().Network().Read(ctx, id)
-			if err == nil && network == nil {
-				return nil, fmt.Errorf("failed to find network with id %q", id)
-			}
-			return network, err
-		}),
+			sw := newStateWriter(d)
+
+			d.SetId(network.ID)
+			d.Set("name", network.Name)
+			d.Set("machine_manager_id", network.MachineManager.ID)
+			d.Set("internal_id", network.InternalID)
+			d.Set("pool", []interface{}{
+				map[string]interface{}{
+					"id":   network.Pool.ID,
+					"name": network.Pool.Name,
+				},
+			})
+			d.Set("maximum_transmission_unit", network.MaximumTransmissionUnit)
+			d.Set("network_adapters", network.NetworkAdapters)
+			d.Set("network_block_device", network.NetworkBlockDevice)
+			d.Set("insecure_network_block_device", network.InsecureNetworkBlockDevice)
+
+			return sw.diags
+		},
 
 		Schema: map[string]*schema.Schema{
 			// In

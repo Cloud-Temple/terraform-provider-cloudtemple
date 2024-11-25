@@ -11,18 +11,20 @@ func (c *ComputeOpenIaaSClient) Template() *OpenIaasTemplateClient {
 }
 
 type OpenIaasTemplate struct {
-	ID                 string   `terraform:"id"`
-	MachineManagerID   string   `terraform:"machine_manager_id"`
-	InternalID         string   `terraform:"internal_id"`
-	Name               string   `terraform:"name"`
-	MachineManagerType string   `terraform:"machine_manager_type"`
-	MachineManagerName string   `terraform:"machine_manager_name"`
-	CPU                int      `terraform:"cpu"`
-	NumCoresPerSocket  int      `terraform:"num_cores_per_socket"`
-	Memory             int      `terraform:"memory"`
-	PowerState         string   `terraform:"power_state"`
-	Snapshots          []string `terraform:"snapshots"`
-	Disks              []struct {
+	ID             string `terraform:"id"`
+	MachineManager struct {
+		ID   string `terraform:"id"`
+		Name string `terraform:"name"`
+		Type string `terraform:"type"`
+	} `terraform:"machine_manager"`
+	InternalID        string   `terraform:"internal_id"`
+	Name              string   `terraform:"name"`
+	CPU               int      `terraform:"cpu"`
+	NumCoresPerSocket int      `terraform:"num_cores_per_socket"`
+	Memory            int      `terraform:"memory"`
+	PowerState        string   `terraform:"power_state"`
+	Snapshots         []string `terraform:"snapshots"`
+	Disks             []struct {
 		Bootable bool   `terraform:"bootable"`
 		Size     int    `terraform:"size"`
 		Type     string `terraform:"type"`

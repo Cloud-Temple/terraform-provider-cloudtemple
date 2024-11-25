@@ -11,10 +11,14 @@ func (c *ComputeOpenIaaSClient) Host() *OpenIaaSHostClient {
 }
 
 type OpenIaaSHost struct {
-	ID               string `terraform:"id"`
-	MachineManagerId string `terraform:"machine_manager_id"`
-	InternalId       string `terraform:"internal_id"`
-	Pool             struct {
+	ID             string `terraform:"id"`
+	MachineManager struct {
+		ID   string `terraform:"id"`
+		Name string `terraform:"name"`
+		Type string `terraform:"type"`
+	} `terraform:"machine_manager_id"`
+	InternalId string `terraform:"internal_id"`
+	Pool       struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
 	} `terraform:"pool"`
