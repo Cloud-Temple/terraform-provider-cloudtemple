@@ -18,6 +18,9 @@ NEW FEATURES :
     - `cloudtemple_compute_iaas_opensource_virtual_disk`
     - `cloudtemple_compute_iaas_opensource_snapshot`
     - `cloudtemple_compute_iaas_opensource_network_adapter`
+    - `cloudtemple_backup_iaas_opensource_backup`
+    - `cloudtemple_backup_iaas_opensource_policy`
+    
 
 ## 0.14.0 (October 31st, 2024)
 
