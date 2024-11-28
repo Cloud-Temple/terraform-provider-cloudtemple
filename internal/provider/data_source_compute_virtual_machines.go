@@ -59,7 +59,19 @@ func dataSourceVirtualMachines() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
+						"datastore_cluster_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"datastore_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
 						"consolidation_needed": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+						"expose_hardware_virtualization": {
 							Type:     schema.TypeBool,
 							Computed: true,
 						},
@@ -280,6 +292,10 @@ func dataSourceVirtualMachines() *schema.Resource {
 									},
 									"boot_retry_delay": {
 										Type:     schema.TypeInt,
+										Computed: true,
+									},
+									"efi_secure_boot_enabled": {
+										Type:     schema.TypeBool,
 										Computed: true,
 									},
 								},
