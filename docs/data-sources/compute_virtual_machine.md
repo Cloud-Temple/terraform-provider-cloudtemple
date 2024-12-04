@@ -38,6 +38,8 @@ data "cloudtemple_compute_virtual_machine" "name" {
 - `cpu_hot_remove_enabled` (Boolean)
 - `cpu_usage` (Number)
 - `datacenter_id` (String)
+- `datastore_cluster_id` (String)
+- `datastore_id` (String)
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
 - `expose_hardware_virtualization` (Boolean)

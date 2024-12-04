@@ -21,6 +21,11 @@ NEW FEATURES :
     - `cloudtemple_backup_iaas_opensource_backup`
     - `cloudtemple_backup_iaas_opensource_policy`
     
+## 0.14.1 (November 28th, 2024)
+
+BUG FIXES:
+
+  * Fixed `cloudtemple_virtual_machines` and `cloudtemple_compute_networks` datasources that were not working properly.
 
 ## 0.14.0 (October 31st, 2024)
 

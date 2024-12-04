@@ -68,6 +68,14 @@ func dataSourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"datastore_cluster_id": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"datastore_id": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 			"consolidation_needed": {
 				Type:     schema.TypeBool,
 				Computed: true,
