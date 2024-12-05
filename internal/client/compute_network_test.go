@@ -16,7 +16,7 @@ const (
 
 func TestCompute_NetworkList(t *testing.T) {
 	ctx := context.Background()
-	networks, err := client.Compute().Network().List(ctx, "", "", "", "", "", "", "", "", true)
+	networks, err := client.Compute().Network().List(ctx, &NetworkFilter{})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(networks), 1)

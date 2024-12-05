@@ -71,6 +71,11 @@ func DefaultConfig() *Config {
 	return config
 }
 
+type BaseObject struct {
+	ID   string `terraform:"id"`
+	Name string `terraform:"name"`
+}
+
 type Client struct {
 	lock       sync.Mutex
 	savedToken *jwt.Token
@@ -159,6 +164,11 @@ func (r *request) addFilter(filter any) {
 			r.params.Add(name, field.Interface().(string))
 		case "*bool":
 			r.params.Add(name, strconv.FormatBool(*field.Interface().(*bool)))
+		case "[]string":
+			stringSlice := field.Interface().([]string)
+			for _, s := range stringSlice {
+				r.params.Add(name, s)
+			}
 		default:
 			panic(fmt.Sprintf("unknown type: %q", typ))
 		}

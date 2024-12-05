@@ -16,7 +16,7 @@ const (
 
 func TestCompute_VirtualSwitchList(t *testing.T) {
 	ctx := context.Background()
-	virtualSwitchs, err := client.Compute().VirtualSwitch().List(ctx, "", "", "")
+	virtualSwitchs, err := client.Compute().VirtualSwitch().List(ctx, &VirtualSwitchFilter{})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(virtualSwitchs), 1)
