@@ -20,12 +20,15 @@ type OpenIaasPool struct {
 	InternalID              string   `terraform:"internal_id"`
 	Name                    string   `terraform:"name"`
 	HighAvailabilityEnabled bool     `terraform:"high_availability_enabled"`
-	Master                  string   `terraform:"master"`
 	Hosts                   []string `terraform:"hosts"`
 	Cpu                     struct {
 		Cores   int `terraform:"cores"`
 		Sockets int `terraform:"sockets"`
 	} `terraform:"cpu"`
+	Type struct {
+		Key         string `terraform:"key"`
+		Description string `terraform:"description"`
+	} `terraform:"type"`
 }
 
 type OpenIaasPoolFilter struct {

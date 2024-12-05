@@ -30,7 +30,7 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 - `hosts` (List of String)
 - `id` (String) The ID of this resource.
 - `internal_id` (String)
-- `master` (String)
+- `type` (List of Object) (see [below for nested schema](#nestedatt--type))
 
 <a id="nestedatt--cpu"></a>
 ### Nested Schema for `cpu`
@@ -39,5 +39,14 @@ Read-Only:
 
 - `cores` (Number)
 - `sockets` (Number)
+
+
+<a id="nestedatt--type"></a>
+### Nested Schema for `type`
+
+Read-Only:
+
+- `description` (String)
+- `key` (String)
 
 

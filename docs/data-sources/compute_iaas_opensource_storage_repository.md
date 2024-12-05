@@ -23,7 +23,7 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 - `machine_manager_id` (String)
 - `name` (String)
 - `shared` (Boolean)
-- `types` (List of String)
+- `type` (String)
 
 ### Read-Only
 
@@ -36,7 +36,6 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 - `maintenance_status` (Boolean)
 - `max_capacity` (Number)
 - `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
-- `type` (String)
 - `virtual_disks` (List of String)
 
 <a id="nestedatt--host"></a>

@@ -10,6 +10,21 @@ func (c *ComputeOpenIaaSClient) Template() *OpenIaasTemplateClient {
 	return &OpenIaasTemplateClient{c.c.c}
 }
 
+type TemplateDisk struct {
+	Name              string     `terraform:"name"`
+	Description       string     `terraform:"description"`
+	Size              int        `terraform:"size"`
+	StorageRepository BaseObject `terraform:"storage_repository"`
+}
+
+type TemplateNetworkAdapter struct {
+	Name       string     `terraform:"name"`
+	MacAddress string     `terraform:"mac_address"`
+	MTU        int        `terraform:"mtu"`
+	Attached   bool       `terraform:"attached"`
+	Network    BaseObject `terraform:"network"`
+}
+
 type OpenIaasTemplate struct {
 	ID             string `terraform:"id"`
 	MachineManager struct {
@@ -17,23 +32,22 @@ type OpenIaasTemplate struct {
 		Name string `terraform:"name"`
 		Type string `terraform:"type"`
 	} `terraform:"machine_manager"`
-	InternalID        string   `terraform:"internal_id"`
-	Name              string   `terraform:"name"`
-	CPU               int      `terraform:"cpu"`
-	NumCoresPerSocket int      `terraform:"num_cores_per_socket"`
-	Memory            int      `terraform:"memory"`
-	PowerState        string   `terraform:"power_state"`
-	Snapshots         []string `terraform:"snapshots"`
-	Disks             []struct {
-		Bootable bool   `terraform:"bootable"`
-		Size     int    `terraform:"size"`
-		Type     string `terraform:"type"`
-	} `terraform:"disks"`
+	InternalID        string                   `terraform:"internal_id"`
+	Name              string                   `terraform:"name"`
+	CPU               int                      `terraform:"cpu"`
+	NumCoresPerSocket int                      `terraform:"num_cores_per_socket"`
+	Memory            int                      `terraform:"memory"`
+	PowerState        string                   `terraform:"power_state"`
+	Snapshots         []string                 `terraform:"snapshots"`
+	SLAPolicies       []string                 `terraform:"sla_policies"`
+	Disks             []TemplateDisk           `terraform:"disks"`
+	NetworkAdapters   []TemplateNetworkAdapter `terraform:"network_adapters"`
 }
 
 type OpenIaaSTemplateFilter struct {
 	// TODO : Add filter by name
 	MachineManagerId string `filter:"machineManagerId"`
+	PoolId           string `filter:"poolId,omitempty"`
 }
 
 func (p *OpenIaasTemplateClient) List(

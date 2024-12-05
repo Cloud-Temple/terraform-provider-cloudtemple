@@ -52,8 +52,13 @@ func dataSourceOpenIaasPool() *schema.Resource {
 					"sockets": pool.Cpu.Sockets,
 				},
 			})
-			d.Set("master", pool.Master)
 			d.Set("hosts", pool.Hosts)
+			d.Set("type", []interface{}{
+				map[string]interface{}{
+					"key":         pool.Type.Key,
+					"description": pool.Type.Description,
+				},
+			})
 
 			return sw.diags
 		},
@@ -106,16 +111,29 @@ func dataSourceOpenIaasPool() *schema.Resource {
 					},
 				},
 			},
-			"master": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"hosts": {
 				Type:     schema.TypeList,
 				Computed: true,
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
+				},
+			},
+			"type": {
+				Type:     schema.TypeList,
+				Computed: true,
+
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"key": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"description": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+					},
 				},
 			},
 		},

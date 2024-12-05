@@ -19,14 +19,16 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 
 			name := d.Get("name").(string)
 			if name != "" {
-				types := d.Get("types").([]interface{})
-				stringTypes := make([]string, 0, len(types))
-				for _, v := range types {
-					stringTypes = append(stringTypes, v.(string))
-				}
+				// types := d.Get("types").([]interface{})
+				// stringTypes := make([]string, 0, len(types))
+				// for _, v := range types {
+				// 	stringTypes = append(stringTypes, v.(string))
+				// }
+				stringTypes := make([]string, 0, 1)
+				stringTypes = append(stringTypes, d.Get("type").(string))
 				repositories, err := c.Compute().OpenIaaS().StorageRepository().List(ctx, &client.StorageRepositoryFilter{
 					MachineManagerId: d.Get("machine_manager_id").(string),
-					Types:            stringTypes,
+					StorageTypes:     stringTypes,
 					Shared:           d.Get("shared").(bool),
 				})
 				if err != nil {
@@ -55,7 +57,8 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 			d.Set("description", sr.Description)
 			d.Set("maintenance_status", sr.MaintenanceStatus)
 			d.Set("accessible", sr.Accessible)
-			d.Set("type", sr.Type)
+			d.Set("storage_type", sr.StorageType)
+			d.Set("shared", sr.Shared)
 			d.Set("free_capacity", sr.FreeCapacity)
 			d.Set("max_capacity", sr.MaxCapacity)
 			d.Set("virtual_disks", sr.VirtualDisks)
@@ -96,23 +99,21 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
 			},
-			"types": {
-				Type:     schema.TypeList,
+			"type": {
+				Type:     schema.TypeString,
 				Optional: true,
-				Elem: &schema.Schema{
-					Type: schema.TypeString,
-					ValidateFunc: validation.StringInSlice([]string{
-						"ext",
-						"lvm",
-						"lvmoiscsi",
-						"lvmohba",
-						"nfs",
-						"smb",
-						"iso",
-						"nfs_iso",
-						"cifs",
-					}, true),
-				},
+				Computed: true,
+				ValidateFunc: validation.StringInSlice([]string{
+					"ext",
+					"lvm",
+					"lvmoiscsi",
+					"lvmohba",
+					"nfs",
+					"smb",
+					"iso",
+					"nfs_iso",
+					"cifs",
+				}, true),
 			},
 			"shared": {
 				Type:     schema.TypeBool,
@@ -136,10 +137,10 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 				Type:     schema.TypeInt,
 				Computed: true,
 			},
-			"type": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
+			// "type": {
+			// 	Type:     schema.TypeString,
+			// 	Computed: true,
+			// },
 			"free_capacity": {
 				Type:     schema.TypeInt,
 				Computed: true,

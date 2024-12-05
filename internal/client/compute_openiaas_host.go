@@ -21,24 +21,38 @@ type OpenIaaSHost struct {
 	Pool       struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
+		Type struct {
+			Key         string `terraform:"key"`
+			Description string `terraform:"description"`
+		} `terraform:"type"`
 	} `terraform:"pool"`
 	Name       string `terraform:"name"`
+	Master     bool   `terraform:"master"`
 	Uptime     int    `terraform:"uptime"`
 	PowerState string `terraform:"power_state"`
 	UpdateData struct {
 		MaintenanceMode bool   `terraform:"maintenance_mode"`
 		Status          string `terraform:"status"`
 	} `terraform:"update_data"`
-	Memory struct {
-		Usage int `terraform:"usage"`
-		Size  int `terraform:"size"`
-	} `terraform:"memory"`
-	Cpu struct {
-		Cores   int `terraform:"cores"`
-		Sockets int `terraform:"sockets"`
-	} `terraform:"cpu"`
 	RebootRequired  bool     `terraform:"reboot_required"`
 	VirtualMachines []string `terraform:"virtual_machines"`
+	Metrics         struct {
+		XOA struct {
+			Version  string `terraform:"version"`
+			FullName string `terraform:"full_name"`
+			Build    string `terraform:"build"`
+		} `terraform:"xoa"`
+		Memory struct {
+			Usage int `terraform:"usage"`
+			Size  int `terraform:"size"`
+		} `terraform:"memory"`
+		Cpu struct {
+			Sockets   int    `terraform:"sockets"`
+			Cores     int    `terraform:"cores"`
+			Model     string `terraform:"model"`
+			ModelName string `terraform:"model_name"`
+		} `terraform:"cpu"`
+	} `terraform:"metrics"`
 }
 
 type OpenIaasHostFilter struct {

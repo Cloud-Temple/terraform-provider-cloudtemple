@@ -86,3 +86,12 @@ func exists[T any](data []T, f func(T) bool) bool {
 
 	return false
 }
+
+func flattenBaseObject(obj client.BaseObject) []interface{} {
+	return []interface{}{
+		map[string]interface{}{
+			"id":   obj.ID,
+			"name": obj.Name,
+		},
+	}
+}

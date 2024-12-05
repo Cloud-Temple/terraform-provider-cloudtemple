@@ -21,6 +21,7 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 			if name != "" {
 				templates, err := c.Compute().OpenIaaS().Template().List(ctx, &client.OpenIaaSTemplateFilter{
 					MachineManagerId: d.Get("machine_manager_id").(string),
+					PoolId:           d.Get("pool_id").(string),
 				})
 				if err != nil {
 					diag.Errorf("failed to find template named %q: %s", name, err)
@@ -51,7 +52,11 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 			d.Set("memory", template.Memory)
 			d.Set("power_state", template.PowerState)
 			d.Set("snapshots", template.Snapshots)
-			d.Set("disks", template.Disks)
+			d.Set("sla_policies", template.SLAPolicies)
+			d.Set("disks", flattenDisks(template.Disks))
+			d.Set("network_adapters", flattenNetworkAdapters(template.NetworkAdapters))
+
+			diag.Errorf("network_adapters: %v", template.NetworkAdapters)
 
 			return sw.diags
 		},
@@ -76,6 +81,11 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+			},
+			"pool_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
 			},
 
 			// Out
@@ -106,26 +116,123 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 					Type: schema.TypeString,
 				},
 			},
+			"sla_policies": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
 			"disks": {
 				Type:     schema.TypeList,
 				Computed: true,
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"bootable": {
-							Type:     schema.TypeBool,
+						"name": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"description": {
+							Type:     schema.TypeString,
 							Computed: true,
 						},
 						"size": {
 							Type:     schema.TypeInt,
 							Computed: true,
 						},
-						"type": {
+						"storage_repository": {
+							Type:     schema.TypeList,
+							Computed: true,
+
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"id": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+									"name": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			"network_adapters": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"name": {
 							Type:     schema.TypeString,
 							Computed: true,
+						},
+						"mac_address": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"mtu": {
+							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"attached": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+						"network": {
+							Type:     schema.TypeList,
+							Computed: true,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"id": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+									"name": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+								},
+							},
 						},
 					},
 				},
 			},
 		},
 	}
+}
+
+func flattenDisks(disks []client.TemplateDisk) []interface{} {
+	if disks != nil {
+		result := make([]interface{}, len(disks))
+		for i, disk := range disks {
+			result[i] = map[string]interface{}{
+				"name":               disk.Name,
+				"description":        disk.Description,
+				"size":               disk.Size,
+				"storage_repository": flattenBaseObject(disk.StorageRepository),
+			}
+		}
+		return result
+	}
+	return make([]interface{}, 0)
+}
+
+func flattenNetworkAdapters(adapters []client.TemplateNetworkAdapter) []interface{} {
+	if adapters != nil {
+		result := make([]interface{}, len(adapters))
+		for i, adapter := range adapters {
+			result[i] = map[string]interface{}{
+				"name":        adapter.Name,
+				"mac_address": adapter.MacAddress,
+				"mtu":         adapter.MTU,
+				"attached":    adapter.Attached,
+				"network":     flattenBaseObject(adapter.Network),
+			}
+		}
+		return result
+	}
+	return make([]interface{}, 0)
 }

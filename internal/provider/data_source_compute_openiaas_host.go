@@ -48,6 +48,12 @@ func dataSourceOpenIaasHost() *schema.Resource {
 				map[string]interface{}{
 					"id":   host.Pool.ID,
 					"name": host.Pool.Name,
+					"type": []interface{}{
+						map[string]interface{}{
+							"key":         host.Pool.Type.Key,
+							"description": host.Pool.Type.Description,
+						},
+					},
 				},
 			})
 			d.Set("uptime", host.Uptime)
@@ -58,16 +64,29 @@ func dataSourceOpenIaasHost() *schema.Resource {
 					"status":           host.UpdateData.Status,
 				},
 			})
-			d.Set("memory", []interface{}{
+			d.Set("metrics", []interface{}{
 				map[string]interface{}{
-					"usage": host.Memory.Usage,
-					"size":  host.Memory.Size,
-				},
-			})
-			d.Set("cpu", []interface{}{
-				map[string]interface{}{
-					"cores":   host.Cpu.Cores,
-					"sockets": host.Cpu.Sockets,
+					"xoa": []interface{}{
+						map[string]interface{}{
+							"version":   host.Metrics.XOA.Version,
+							"full_name": host.Metrics.XOA.FullName,
+							"build":     host.Metrics.XOA.Build,
+						},
+					},
+					"memory": []interface{}{
+						map[string]interface{}{
+							"usage": host.Metrics.Memory.Usage,
+							"size":  host.Metrics.Memory.Size,
+						},
+					},
+					"cpu": []interface{}{
+						map[string]interface{}{
+							"cores":      host.Metrics.Cpu.Cores,
+							"sockets":    host.Metrics.Cpu.Sockets,
+							"model":      host.Metrics.Cpu.Model,
+							"model_name": host.Metrics.Cpu.ModelName,
+						},
+					},
 				},
 			})
 			d.Set("reboot_required", host.RebootRequired)
@@ -117,6 +136,23 @@ func dataSourceOpenIaasHost() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
+						"type": {
+							Type:     schema.TypeList,
+							Computed: true,
+
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"key": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+									"description": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+								},
+							},
+						},
 					},
 				},
 			},
@@ -145,40 +181,6 @@ func dataSourceOpenIaasHost() *schema.Resource {
 					},
 				},
 			},
-			"memory": {
-				Type:     schema.TypeList,
-				Computed: true,
-
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"usage": {
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-						"size": {
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-					},
-				},
-			},
-			"cpu": {
-				Type:     schema.TypeList,
-				Computed: true,
-
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"cores": {
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-						"sockets": {
-							Type:     schema.TypeInt,
-							Computed: true,
-						},
-					},
-				},
-			},
 			"reboot_required": {
 				Type:     schema.TypeBool,
 				Computed: true,
@@ -189,6 +191,78 @@ func dataSourceOpenIaasHost() *schema.Resource {
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
+				},
+			},
+			"metrics": {
+				Type:     schema.TypeList,
+				Computed: true,
+
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"xoa": {
+							Type:     schema.TypeList,
+							Computed: true,
+
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"version": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+									"full_name": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+									"build": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+								},
+							},
+						},
+						"memory": {
+							Type:     schema.TypeList,
+							Computed: true,
+
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"usage": {
+										Type:     schema.TypeInt,
+										Computed: true,
+									},
+									"size": {
+										Type:     schema.TypeInt,
+										Computed: true,
+									},
+								},
+							},
+						},
+						"cpu": {
+							Type:     schema.TypeList,
+							Computed: true,
+
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"sockets": {
+										Type:     schema.TypeInt,
+										Computed: true,
+									},
+									"cores": {
+										Type:     schema.TypeInt,
+										Computed: true,
+									},
+									"model": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+									"model_name": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+								},
+							},
+						},
+					},
 				},
 			},
 		},

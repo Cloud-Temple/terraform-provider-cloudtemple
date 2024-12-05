@@ -22,6 +22,7 @@ To query this datasource you will need the `compute_iaas_opensource_read` role.
 
 - `machine_manager_id` (String)
 - `name` (String)
+- `pool_id` (String)
 
 ### Read-Only
 
@@ -30,8 +31,10 @@ To query this datasource you will need the `compute_iaas_opensource_read` role.
 - `id` (String) The ID of this resource.
 - `internal_id` (String)
 - `memory` (Number)
+- `network_adapters` (List of Object) (see [below for nested schema](#nestedatt--network_adapters))
 - `num_cores_per_socket` (Number)
 - `power_state` (String)
+- `sla_policies` (List of String)
 - `snapshots` (List of String)
 
 <a id="nestedatt--disks"></a>
@@ -39,8 +42,38 @@ To query this datasource you will need the `compute_iaas_opensource_read` role.
 
 Read-Only:
 
-- `bootable` (Boolean)
+- `description` (String)
+- `name` (String)
 - `size` (Number)
-- `type` (String)
+- `storage_repository` (List of Object) (see [below for nested schema](#nestedobjatt--disks--storage_repository))
+
+<a id="nestedobjatt--disks--storage_repository"></a>
+### Nested Schema for `disks.storage_repository`
+
+Read-Only:
+
+- `id` (String)
+- `name` (String)
+
+
+
+<a id="nestedatt--network_adapters"></a>
+### Nested Schema for `network_adapters`
+
+Read-Only:
+
+- `attached` (Boolean)
+- `mac_address` (String)
+- `mtu` (Number)
+- `name` (String)
+- `network` (List of Object) (see [below for nested schema](#nestedobjatt--network_adapters--network))
+
+<a id="nestedobjatt--network_adapters--network"></a>
+### Nested Schema for `network_adapters.network`
+
+Read-Only:
+
+- `id` (String)
+- `name` (String)
 
 

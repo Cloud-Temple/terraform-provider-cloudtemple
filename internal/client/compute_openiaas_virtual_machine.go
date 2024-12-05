@@ -40,15 +40,10 @@ type OpenIaaSVirtualMachine struct {
 	MachineManager struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
+		Type string `terraform:"type"`
 	} `terraform:"machine_manager"`
-	Host struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform:"host"`
-	Pool struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform:"pool"`
+	Host BaseObject `terraform:"host"`
+	Pool BaseObject `terraform:"pool"`
 }
 
 type DvdDrive struct {

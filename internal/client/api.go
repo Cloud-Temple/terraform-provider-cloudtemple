@@ -71,6 +71,11 @@ func DefaultConfig() *Config {
 	return config
 }
 
+type BaseObject struct {
+	ID   string `terraform:"id"`
+	Name string `terraform:"name"`
+}
+
 type Client struct {
 	lock       sync.Mutex
 	savedToken *jwt.Token

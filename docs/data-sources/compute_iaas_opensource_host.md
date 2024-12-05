@@ -25,10 +25,9 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 
 ### Read-Only
 
-- `cpu` (List of Object) (see [below for nested schema](#nestedatt--cpu))
 - `id` (String) The ID of this resource.
 - `internal_id` (String)
-- `memory` (List of Object) (see [below for nested schema](#nestedatt--memory))
+- `metrics` (List of Object) (see [below for nested schema](#nestedatt--metrics))
 - `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
 - `power_state` (String)
 - `reboot_required` (Boolean)
@@ -36,22 +35,44 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 - `uptime` (Number)
 - `virtual_machines` (List of String)
 
-<a id="nestedatt--cpu"></a>
-### Nested Schema for `cpu`
+<a id="nestedatt--metrics"></a>
+### Nested Schema for `metrics`
+
+Read-Only:
+
+- `cpu` (List of Object) (see [below for nested schema](#nestedobjatt--metrics--cpu))
+- `memory` (List of Object) (see [below for nested schema](#nestedobjatt--metrics--memory))
+- `xoa` (List of Object) (see [below for nested schema](#nestedobjatt--metrics--xoa))
+
+<a id="nestedobjatt--metrics--cpu"></a>
+### Nested Schema for `metrics.cpu`
 
 Read-Only:
 
 - `cores` (Number)
+- `model` (String)
+- `model_name` (String)
 - `sockets` (Number)
 
 
-<a id="nestedatt--memory"></a>
-### Nested Schema for `memory`
+<a id="nestedobjatt--metrics--memory"></a>
+### Nested Schema for `metrics.memory`
 
 Read-Only:
 
 - `size` (Number)
 - `usage` (Number)
+
+
+<a id="nestedobjatt--metrics--xoa"></a>
+### Nested Schema for `metrics.xoa`
+
+Read-Only:
+
+- `build` (String)
+- `full_name` (String)
+- `version` (String)
+
 
 
 <a id="nestedatt--pool"></a>
@@ -61,6 +82,16 @@ Read-Only:
 
 - `id` (String)
 - `name` (String)
+- `type` (List of Object) (see [below for nested schema](#nestedobjatt--pool--type))
+
+<a id="nestedobjatt--pool--type"></a>
+### Nested Schema for `pool.type`
+
+Read-Only:
+
+- `description` (String)
+- `key` (String)
+
 
 
 <a id="nestedatt--update_data"></a>

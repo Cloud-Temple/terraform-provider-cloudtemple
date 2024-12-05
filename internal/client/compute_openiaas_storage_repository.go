@@ -18,7 +18,7 @@ type OpenIaaSStorageRepository struct {
 	MaintenanceStatus bool     `terraform:"maintenance_status"`
 	MaxCapacity       int      `terraform:"max_capacity"`
 	FreeCapacity      int      `terraform:"free_capacity"`
-	Type              string   `terraform:"type"`
+	StorageType       string   `terraform:"storage_type"`
 	VirtualDisks      []string `terraform:"virtual_disks"`
 	Shared            bool     `terraform:"shared"`
 	Accessible        int      `terraform:"accessible"`
@@ -42,7 +42,7 @@ type OpenIaaSStorageRepository struct {
 type StorageRepositoryFilter struct {
 	// TODO : Add filter by name
 	MachineManagerId string   `filter:"machineManagerId"`
-	Types            []string `filter:"types"`
+	StorageTypes     []string `filter:"types,omitempty"`
 	Shared           bool     `filter:"shared"`
 }
 

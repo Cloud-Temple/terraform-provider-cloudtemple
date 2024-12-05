@@ -71,18 +71,8 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 					"ipv4": virtualMachine.Addresses.IPv4,
 				},
 			})
-			d.Set("pool", []interface{}{
-				map[string]interface{}{
-					"id":   virtualMachine.Pool.ID,
-					"name": virtualMachine.Pool.Name,
-				},
-			})
-			d.Set("host", []interface{}{
-				map[string]interface{}{
-					"id":   virtualMachine.Host.ID,
-					"name": virtualMachine.Host.Name,
-				},
-			})
+			d.Set("pool", flattenBaseObject(virtualMachine.Pool))
+			d.Set("host", flattenBaseObject(virtualMachine.Host))
 
 			return sw.diags
 		},
