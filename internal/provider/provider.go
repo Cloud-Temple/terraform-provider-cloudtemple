@@ -71,17 +71,20 @@ func New(version string) func() *schema.Provider {
 				},
 			},
 			DataSourcesMap: map[string]*schema.Resource{
-				"cloudtemple_backup_job_sessions":             documentDatasource(dataSourceBackupJobSessions(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_job":                      documentDatasource(dataSourceBackupJob(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_jobs":                     documentDatasource(dataSourceBackupJobs(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_metrics":                  documentDatasource(dataSourceBackupMetrics(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_sites":                    documentDatasource(dataSourceBackupSites(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_sla_policies":             documentDatasource(dataSourceBackupSLAPolicies(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_sla_policy":               documentDatasource(dataSourceBackupSLAPolicy(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_spp_server":               documentDatasource(dataSourceBackupSPPServer(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_spp_servers":              documentDatasource(dataSourceBackupSPPServers(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_storages":                 documentDatasource(dataSourceBackupStorages(), "backup_iaas_spp_read"),
-				"cloudtemple_backup_vcenters":                 documentDatasource(dataSourceBackupVCenters(), "backup_iaas_spp_read"),
+				// Backup - IaaS VMWare
+				"cloudtemple_backup_job_sessions": documentDatasource(dataSourceBackupJobSessions(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_job":          documentDatasource(dataSourceBackupJob(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_jobs":         documentDatasource(dataSourceBackupJobs(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_metrics":      documentDatasource(dataSourceBackupMetrics(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_sites":        documentDatasource(dataSourceBackupSites(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_sla_policies": documentDatasource(dataSourceBackupSLAPolicies(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_sla_policy":   documentDatasource(dataSourceBackupSLAPolicy(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_spp_server":   documentDatasource(dataSourceBackupSPPServer(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_spp_servers":  documentDatasource(dataSourceBackupSPPServers(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_storages":     documentDatasource(dataSourceBackupStorages(), "backup_iaas_spp_read"),
+				"cloudtemple_backup_vcenters":     documentDatasource(dataSourceBackupVCenters(), "backup_iaas_spp_read"),
+
+				// Compute - IaaS VMWare
 				"cloudtemple_compute_content_libraries":       documentDatasource(dataSourceContentLibraries(), "compute_iaas_vmware_read"),
 				"cloudtemple_compute_content_library_item":    documentDatasource(dataSourceContentLibraryItem(), "compute_iaas_vmware_read"),
 				"cloudtemple_compute_content_library_items":   documentDatasource(dataSourceContentLibraryItems(), "compute_iaas_vmware_read"),
@@ -116,23 +119,50 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_compute_virtual_switchs":         documentDatasource(dataSourceVirtualSwitchs(), "compute_iaas_vmware_read"),
 				"cloudtemple_compute_machine_manager":         documentDatasource(dataSourceWorker(), "compute_iaas_vmware_read"),
 				"cloudtemple_compute_machine_managers":        documentDatasource(dataSourceWorkers(), "compute_iaas_vmware_read"),
-				"cloudtemple_iam_company":                     documentDatasource(dataSourceCompany(), "iam_read"),
-				"cloudtemple_iam_features":                    documentDatasource(dataSourceFeatures(), "iam_read"),
-				"cloudtemple_iam_personal_access_token":       documentDatasource(dataSourcePersonalAccessToken(), "iam_read"),
-				"cloudtemple_iam_personal_access_tokens":      documentDatasource(dataSourcePersonalAccessTokens(), "iam_read"),
-				"cloudtemple_iam_role":                        documentDatasource(dataSourceRole(), "iam_read"),
-				"cloudtemple_iam_roles":                       documentDatasource(dataSourceRoles(), "iam_read"),
-				"cloudtemple_iam_tenants":                     documentDatasource(dataSourceTenants(), "iam_read"),
-				"cloudtemple_iam_user":                        documentDatasource(dataSourceUser(), "iam_read"),
-				"cloudtemple_iam_users":                       documentDatasource(dataSourceUsers(), "iam_read"),
+
+				// Backup - Open IaaS
+				"cloudtemple_backup_iaas_opensource_policy":  documentDatasource(dataSourceOpenIaasBackupPolicy(), "backup_iaas_opensource_read"),
+				"cloudtemple_backup_iaas_opensource_backup":  documentDatasource(dataSourceOpenIaasBackup(), "backup_iaas_opensource_read"),
+				"cloudtemple_backup_iaas_opensource_backups": documentDatasource(dataSourceOpenIaasBackups(), "backup_iaas_opensource_read"),
+
+				// Compute - Open IaaS
+				"cloudtemple_compute_iaas_opensource_host":               documentDatasource(dataSourceOpenIaasHost(), "compute_iaas_opensource_infrastructure_read"),
+				"cloudtemple_compute_iaas_opensource_storage_repository": documentDatasource(dataSourceOpenIaasStorageRepository(), "compute_iaas_opensource_infrastructure_read"),
+				"cloudtemple_compute_iaas_opensource_pool":               documentDatasource(dataSourceOpenIaasPool(), "compute_iaas_opensource_infrastructure_read"),
+				"cloudtemple_compute_iaas_opensource_template":           documentDatasource(dataSourceOpenIaasTemplate(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_network":            documentDatasource(dataSourceOpenIaasNetwork(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_virtual_machine":    documentDatasource(dataSourceOpenIaasVirtualMachine(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_virtual_disk":       documentDatasource(dataSourceOpenIaasVirtualDisk(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_network_adapter":    documentDatasource(dataSourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_snapshot":           documentDatasource(dataSourceOpenIaasSnapshot(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_availability_zone":  documentDatasource(dataSourceOpenIaasMachineManager(), "compute_iaas_opensource_read"),
+
+				// IAM
+				"cloudtemple_iam_company":                documentDatasource(dataSourceCompany(), "iam_read"),
+				"cloudtemple_iam_features":               documentDatasource(dataSourceFeatures(), "iam_read"),
+				"cloudtemple_iam_personal_access_token":  documentDatasource(dataSourcePersonalAccessToken(), "iam_read"),
+				"cloudtemple_iam_personal_access_tokens": documentDatasource(dataSourcePersonalAccessTokens(), "iam_read"),
+				"cloudtemple_iam_role":                   documentDatasource(dataSourceRole(), "iam_read"),
+				"cloudtemple_iam_roles":                  documentDatasource(dataSourceRoles(), "iam_read"),
+				"cloudtemple_iam_tenants":                documentDatasource(dataSourceTenants(), "iam_read"),
+				"cloudtemple_iam_user":                   documentDatasource(dataSourceUser(), "iam_read"),
+				"cloudtemple_iam_users":                  documentDatasource(dataSourceUsers(), "iam_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
+				// Backup - IaaS VMWare
 				"cloudtemple_backup_sla_policy_assignment": documentResource(resourceBackupSLAPolicyAssignment(), "backup_iaas_spp_read", "backup_iaas_spp_write", "activity_read"),
-				"cloudtemple_compute_network_adapter":      documentResource(resourceNetworkAdapter(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
-				"cloudtemple_compute_virtual_controller":   documentResource(resourceVirtualController(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
-				"cloudtemple_compute_virtual_disk":         documentResource(resourceVirtualDisk(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
-				"cloudtemple_compute_virtual_machine":      documentResource(resourceVirtualMachine(), "compute_iaas_vmware_infrastructure_read", "compute_iaas_vmware_infrastructure_write", "compute_iaas_vmware_management", "compute_iaas_vmware_read", "compute_iaas_vmware_virtual_machine_power", "backup_iaas_spp_read", "backup_iaas_spp_write", "activity_read", "tag_read", "tag_write"),
-				"cloudtemple_iam_personal_access_token":    documentResource(resourcePersonalAccessToken(), "iam_offline_access"),
+
+				// Compute - IaaS VMWare
+				"cloudtemple_compute_network_adapter":    documentResource(resourceNetworkAdapter(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
+				"cloudtemple_compute_virtual_controller": documentResource(resourceVirtualController(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
+				"cloudtemple_compute_virtual_disk":       documentResource(resourceVirtualDisk(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
+				"cloudtemple_compute_virtual_machine":    documentResource(resourceVirtualMachine(), "compute_iaas_vmware_infrastructure_read", "compute_iaas_vmware_infrastructure_write", "compute_iaas_vmware_management", "compute_iaas_vmware_read", "compute_iaas_vmware_virtual_machine_power", "backup_iaas_spp_read", "backup_iaas_spp_write", "activity_read", "tag_read", "tag_write"),
+				"cloudtemple_iam_personal_access_token":  documentResource(resourcePersonalAccessToken(), "iam_offline_access"),
+
+				// Compute - Open IaaS
+				"cloudtemple_compute_iaas_opensource_virtual_machine": documentResource(resourceOpenIaasVirtualMachine(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "compute_iaas_opensource_virtual_machine_power", "backup_iaas_opensource_read", "backup_iaas_opensource_write", "activity_read", "tag_read", "tag_write"),
+				"cloudtemple_compute_iaas_opensource_virtual_disk":    documentResource(resourceOpenIaasVirtualDisk(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
+				"cloudtemple_compute_iaas_opensource_network_adapter": documentResource(resourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
 			},
 		}
 

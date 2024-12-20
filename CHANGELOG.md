@@ -1,3 +1,26 @@
+## 0.15.0 (No release date yet.)
+
+NEW FEATURES :
+
+  * The following resources are now available :
+    - `cloudtemple_compute_iaas_opensource_virtual_machine`
+    - `cloudtemple_compute_iaas_opensource_virtual_disk`
+    - `cloudtemple_compute_iaas_opensource_network_adapter`
+
+  * The following datasource are now available :
+    - `cloudtemple_compute_iaas_opensource_machine_manager`
+    - `cloudtemple_compute_iaas_opensource_pool`
+    - `cloudtemple_compute_iaas_opensource_host`
+    - `cloudtemple_compute_iaas_opensource_network`
+    - `cloudtemple_compute_iaas_opensource_storage_repository`
+    - `cloudtemple_compute_iaas_opensource_template`
+    - `cloudtemple_compute_iaas_opensource_virtual_machine`
+    - `cloudtemple_compute_iaas_opensource_virtual_disk`
+    - `cloudtemple_compute_iaas_opensource_snapshot`
+    - `cloudtemple_compute_iaas_opensource_network_adapter`
+    - `cloudtemple_backup_iaas_opensource_backup`
+    - `cloudtemple_backup_iaas_opensource_policy`
+    
 ## 0.14.1 (November 28th, 2024)
 
 BUG FIXES:

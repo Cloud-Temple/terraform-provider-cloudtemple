@@ -59,7 +59,9 @@ func TestCompute_ContentLibraryRead(t *testing.T) {
 
 func TestContentLibraryClient_ListItems(t *testing.T) {
 	ctx := context.Background()
-	items, err := client.Compute().ContentLibrary().ListItems(ctx, os.Getenv(ContentLibraryId))
+	items, err := client.Compute().ContentLibrary().ListItems(ctx, &ContentLibraryItemFilter{
+		ContentLibraryId: os.Getenv(ContentLibraryId),
+	})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(items), 1)
