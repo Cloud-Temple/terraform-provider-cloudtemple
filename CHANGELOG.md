@@ -1,4 +1,4 @@
-## 0.15.0 (No release date yet.)
+## 0.15.0 (December 20th, 2024)
 
 NEW FEATURES :
 
