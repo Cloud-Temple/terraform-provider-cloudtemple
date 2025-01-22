@@ -15,8 +15,10 @@ func dataSourceOpenIaasSnapshot() *schema.Resource {
 
 		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 			id := d.Get("id").(string)
+			var snapshot *client.OpenIaaSSnapshot
+			var err error
 			if id != "" {
-				snapshot, err := c.Compute().OpenIaaS().Snapshot().Read(ctx, id)
+				snapshot, err = c.Compute().OpenIaaS().Snapshot().Read(ctx, id)
 				if err == nil && snapshot == nil {
 					return nil, fmt.Errorf("failed to find snapshot with id %q", id)
 				}
