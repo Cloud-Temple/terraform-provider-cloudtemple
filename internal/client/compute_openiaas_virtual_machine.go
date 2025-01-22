@@ -147,6 +147,12 @@ func (v *OpenIaaSVirtualMachineClient) Power(ctx context.Context, id string, req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
+func (v *OpenIaaSVirtualMachineClient) MountISO(ctx context.Context, id string, virtualDiskId string) (string, error) {
+	r := v.c.newRequest("POST", "/compute/v1/open_iaas/virtual_machines/%s/mount", id)
+	r.obj = map[string]string{"virtualDiskId": virtualDiskId}
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
 func (v *OpenIaaSVirtualMachineClient) UpdateBootOrder(ctx context.Context, id string, bootOrder []string) (string, error) {
 	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_machines/%s/boot_order", id)
 	r.obj = map[string][]string{"order": bootOrder}

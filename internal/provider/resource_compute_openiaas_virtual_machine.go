@@ -72,6 +72,12 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 					ValidateFunc: validation.StringInSlice([]string{"Hard-Drive", "DVD-Drive", "Network"}, false),
 				},
 			},
+			"dvd_drive": {
+				Type:         schema.TypeString,
+				Description:  "An ISO disk to mount to on the virtual machine.",
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
+			},
 			"secure_boot": {
 				Type:        schema.TypeBool,
 				Description: "Whether to enable secure boot.",
@@ -121,6 +127,10 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
+						"type": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
 					},
 				},
 			},
@@ -128,22 +138,22 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			"dvd_drive": {
-				Type:     schema.TypeList,
-				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"attached": {
-							Type:     schema.TypeBool,
-							Computed: true,
-						},
-					},
-				},
-			},
+			// "dvd_drive": {
+			// 	Type:     schema.TypeList,
+			// 	Computed: true,
+			// 	Elem: &schema.Resource{
+			// 		Schema: map[string]*schema.Schema{
+			// 			"name": {
+			// 				Type:     schema.TypeString,
+			// 				Computed: true,
+			// 			},
+			// 			"attached": {
+			// 				Type:     schema.TypeBool,
+			// 				Computed: true,
+			// 			},
+			// 		},
+			// 	},
+			// },
 			"tools": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -304,6 +314,18 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to update virtual machine, %s", err)
+	}
+
+	if d.HasChange("dvd_drive") {
+		dvdDrive := d.Get("dvd_drive").(string)
+		activityId, err := c.Compute().OpenIaaS().VirtualMachine().MountISO(ctx, d.Id(), dvdDrive)
+		if err != nil {
+			return diag.Errorf("failed to mount DVD drive: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to mount DVD drive, %s", err)
+		}
 	}
 
 	if d.HasChange("boot_order") {

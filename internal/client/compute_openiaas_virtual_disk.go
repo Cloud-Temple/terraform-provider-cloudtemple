@@ -65,7 +65,9 @@ func (v *OpenIaaSVirtualDiskClient) Read(ctx context.Context, id string) (*OpenI
 
 func (v *OpenIaaSVirtualDiskClient) List(ctx context.Context, virtualMachineId string) ([]*OpenIaaSVirtualDisk, error) {
 	r := v.c.newRequest("GET", "/compute/v1/open_iaas/virtual_disks")
-	r.params.Add("virtualMachineId", virtualMachineId)
+	if virtualMachineId != "" {
+		r.params.Add("virtualMachineId", virtualMachineId)
+	}
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
