@@ -49,6 +49,10 @@ jobs:
         with:
           go-version-file: 'go.mod'
           cache: true
+      - name: Install Terraform
+        uses: hashicorp/terraform-github-actions@v1.6.0
+        with:
+          terraform_version: 'latest' # ou spécifiez une version spécifique si nécessaire
       - run: go generate ./...
       - name: git diff
         run: |
