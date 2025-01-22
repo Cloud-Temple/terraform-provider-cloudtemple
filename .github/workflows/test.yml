@@ -46,7 +46,7 @@ jobs:
     steps:
       - uses: hashicorp/setup-terraform@v2
         with:
-          terraform_version: 'latest'
+          terraform_version: 'v1.5.7'
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
