@@ -48,6 +48,7 @@ To manage this resource you will need the following roles:
 - `boot_order` (List of String) The boot order of the virtual machine.
 - `high_availability` (String) HA mode to enable on the virtual machine.
 - `host_id` (String) The host identifier.
+- `mount_iso` (String) An ISO disk to mount to on the virtual machine DVD Drive.
 - `num_cores_per_socket` (Number) The number of cores per socket.
 - `power_state` (String) The desired power state of the virtual machine.
 - `secure_boot` (Boolean) Whether to enable secure boot.
