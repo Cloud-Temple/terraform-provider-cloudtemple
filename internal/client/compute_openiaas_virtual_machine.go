@@ -154,19 +154,33 @@ func (v *OpenIaaSVirtualMachineClient) UpdateBootOrder(ctx context.Context, id s
 }
 
 func (c *OpenIaaSVirtualMachineClient) WaitForTools(ctx context.Context, id string, options *WaiterOptions) (*OpenIaaSVirtualMachine, error) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	b := retry.NewFibonacci(1 * time.Second)
-	b = retry.WithCappedDuration(30*time.Second, b)
+	b = retry.WithMaxRetries(30, b)
 
 	var res *OpenIaaSVirtualMachine
 	var count int
 
 	err := retry.Do(ctx, b, func(ctx context.Context) error {
 		count++
+
+		if ctx.Err() != nil {
+			vm, err := c.Read(ctx, id)
+			if err != nil {
+				return err
+			}
+			res = vm
+			options.log(fmt.Sprintf("timeout reached, continuing without tools for virtual machine %q", id))
+			return nil
+		}
+
 		vm, err := c.Read(ctx, id)
 		if err != nil {
 			return options.retryableError(&StatusError{
 				Code: 500,
-				Body: "an error occured while getting the status of the virtual machine"})
+				Body: "an error occurred while getting the status of the virtual machine"})
 		}
 		if vm == nil {
 			err := &StatusError{
@@ -178,19 +192,23 @@ func (c *OpenIaaSVirtualMachineClient) WaitForTools(ctx context.Context, id stri
 			}
 			return options.error(err)
 		}
+
 		res = vm
-		switch vm.Tools.Detected {
-		case true:
+		if vm.Tools.Detected {
 			options.log(fmt.Sprintf("the virtual machine %q has the tools installed", id))
 			return nil
-		case false:
-			return options.retryableError(&StatusError{
-				Code: 500,
-				Body: fmt.Sprintf("the tools are not detected for the virtual machine %q", id),
-			})
 		}
-		return nil
+
+		return options.retryableError(&StatusError{
+			Code: 500,
+			Body: fmt.Sprintf("the tools are not detected for the virtual machine %q", id),
+		})
 	})
+
+	// Si c'est une erreur de timeout, on l'ignore
+	if err != nil && ctx.Err() != nil {
+		return res, nil
+	}
 
 	return res, err
 }

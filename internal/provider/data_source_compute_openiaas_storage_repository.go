@@ -19,11 +19,6 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 
 			name := d.Get("name").(string)
 			if name != "" {
-				// types := d.Get("types").([]interface{})
-				// stringTypes := make([]string, 0, len(types))
-				// for _, v := range types {
-				// 	stringTypes = append(stringTypes, v.(string))
-				// }
 				stringTypes := make([]string, 0, 1)
 				stringTypes = append(stringTypes, d.Get("type").(string))
 				repositories, err := c.Compute().OpenIaaS().StorageRepository().List(ctx, &client.StorageRepositoryFilter{
@@ -42,7 +37,8 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 				diag.Errorf("failed to find storage repository named %q", name)
 			} else {
 				id := d.Get("id").(string)
-				sr, err := c.Compute().OpenIaaS().StorageRepository().Read(ctx, id)
+				var err error
+				sr, err = c.Compute().OpenIaaS().StorageRepository().Read(ctx, id)
 				if err != nil && sr == nil {
 					diag.Errorf("failed to find storage repository with id %q: %s", id, err)
 				}

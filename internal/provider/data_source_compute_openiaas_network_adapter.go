@@ -14,6 +14,7 @@ func dataSourceOpenIaasNetworkAdapter() *schema.Resource {
 		Description: "Used to retrieve a specific network adapter from an Open IaaS infrastructure.",
 
 		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+			var adapter *client.OpenIaaSNetworkAdapter
 			name := d.Get("name").(string)
 			if name != "" {
 				adapters, err := c.Compute().OpenIaaS().NetworkAdapter().List(ctx, d.Get("virtual_machine_id").(string))
@@ -29,7 +30,8 @@ func dataSourceOpenIaasNetworkAdapter() *schema.Resource {
 			}
 
 			id := d.Get("id").(string)
-			adapter, err := c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, id)
+			var err error
+			adapter, err = c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, id)
 			if err == nil && adapter == nil {
 				return nil, fmt.Errorf("failed to find network adapter with id %q", id)
 			}

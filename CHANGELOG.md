@@ -1,3 +1,9 @@
+## 0.15.1 (January 22nd, 2025)
+
+BUG FIXES:
+
+  * Fixed a bug causing provider plugin to crash when using a datasource from iaas opensource with an ID.
+
 ## 0.15.0 (December 20th, 2024)
 
 NEW FEATURES :

@@ -32,7 +32,8 @@ func dataSourceOpenIaasNetwork() *schema.Resource {
 				diag.Errorf("failed to find network named %q", name)
 			} else {
 				id := d.Get("id").(string)
-				network, err := c.Compute().OpenIaaS().Network().Read(ctx, id)
+				var err error
+				network, err = c.Compute().OpenIaaS().Network().Read(ctx, id)
 				if err == nil && network == nil {
 					diag.Errorf("failed to find network with id %q", id)
 				}

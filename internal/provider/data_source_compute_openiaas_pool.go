@@ -32,7 +32,8 @@ func dataSourceOpenIaasPool() *schema.Resource {
 				diag.Errorf("failed to find pool named %q", name)
 			} else {
 				id := d.Get("id").(string)
-				pool, err := c.Compute().OpenIaaS().Pool().Read(ctx, id)
+				var err error
+				pool, err = c.Compute().OpenIaaS().Pool().Read(ctx, id)
 				if err == nil && pool == nil {
 					diag.Errorf("failed to find pool with id %q", id)
 				}

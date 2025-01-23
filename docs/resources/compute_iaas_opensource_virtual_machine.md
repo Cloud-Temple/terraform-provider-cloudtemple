@@ -99,6 +99,7 @@ Read-Only:
 
 - `id` (String)
 - `name` (String)
+- `type` (String)
 
 
 <a id="nestedatt--pool"></a>
