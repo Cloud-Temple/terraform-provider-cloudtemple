@@ -31,7 +31,8 @@ func dataSourceOpenIaasVirtualDisk() *schema.Resource {
 				diag.Errorf("failed to find virtual disk named %q", name)
 			} else {
 				id := d.Get("id").(string)
-				disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, id)
+				var err error
+				disk, err = c.Compute().OpenIaaS().VirtualDisk().Read(ctx, id)
 				if err == nil && disk == nil {
 					diag.Errorf("failed to find virtual disk with id %q", id)
 				}

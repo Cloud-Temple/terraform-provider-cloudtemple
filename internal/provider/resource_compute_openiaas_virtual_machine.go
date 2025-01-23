@@ -378,7 +378,7 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 			if err != nil {
 				return diag.Errorf("failed to power %s virtual machine, %s", powerState, err)
 			}
-			// We have to wait for the tools to be mounted, otherwise, operations like creating new network adapters will fail
+			// We have to wait for the tools to be mounted, otherwise, operations like creating new network adapters will fail. If tools are not found after 30 seconds, we continue anyway.
 			_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForTools(ctx, d.Id(), getWaiterOptions(ctx))
 			if err != nil {
 				return diag.Errorf("failed to get tools on virtual machine, %s", err)

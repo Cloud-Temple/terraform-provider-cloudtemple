@@ -34,8 +34,9 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 				diag.Errorf("failed to find template named %q", name)
 			} else {
 				id := d.Get("id").(string)
-				template, err := c.Compute().OpenIaaS().Template().Read(ctx, id)
-				if err == nil && template == nil {
+				var err error
+				template, err = c.Compute().OpenIaaS().Template().Read(ctx, id)
+				if err != nil && template == nil {
 					diag.Errorf("failed to find template with id %q", id)
 				}
 			}

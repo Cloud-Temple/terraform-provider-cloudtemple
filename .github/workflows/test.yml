@@ -44,6 +44,10 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
+      - uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 'v1.5.7'
+          terraform_wrapper: false
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:

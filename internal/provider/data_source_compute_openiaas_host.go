@@ -32,7 +32,8 @@ func dataSourceOpenIaasHost() *schema.Resource {
 				diag.Errorf("failed to find host named %q", name)
 			} else {
 				id := d.Get("id").(string)
-				host, err := c.Compute().OpenIaaS().Host().Read(ctx, id)
+				var err error
+				host, err = c.Compute().OpenIaaS().Host().Read(ctx, id)
 				if err == nil && host == nil {
 					diag.Errorf("failed to find host with id %q", id)
 				}
