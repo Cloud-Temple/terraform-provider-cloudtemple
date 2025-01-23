@@ -1,8 +1,12 @@
-## 0.15.1 (January 22nd, 2025)
+## 0.15.1 (January 23nd, 2025)
 
-BUG FIXES:
+BUG FIXES :
 
   * Fixed a bug causing provider plugin to crash when using a datasource from iaas opensource with an ID.
+
+NEW FEATURES :
+
+  * Added ability to mount and unmount ISO files on `cloudtemple_compute_iaas_opensource_virtual_machine`.
 
 ## 0.15.0 (December 20th, 2024)
 
