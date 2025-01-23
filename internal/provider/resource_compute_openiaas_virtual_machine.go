@@ -72,9 +72,9 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 					ValidateFunc: validation.StringInSlice([]string{"Hard-Drive", "DVD-Drive", "Network"}, false),
 				},
 			},
-			"dvd_drive": {
+			"mount_iso": {
 				Type:         schema.TypeString,
-				Description:  "An ISO disk to mount to on the virtual machine.",
+				Description:  "An ISO disk to mount to on the virtual machine DVD Drive.",
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
 			},
@@ -138,22 +138,22 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			// "dvd_drive": {
-			// 	Type:     schema.TypeList,
-			// 	Computed: true,
-			// 	Elem: &schema.Resource{
-			// 		Schema: map[string]*schema.Schema{
-			// 			"name": {
-			// 				Type:     schema.TypeString,
-			// 				Computed: true,
-			// 			},
-			// 			"attached": {
-			// 				Type:     schema.TypeBool,
-			// 				Computed: true,
-			// 			},
-			// 		},
-			// 	},
-			// },
+			"dvd_drive": {
+				Type:     schema.TypeList,
+				Computed: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"name": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"attached": {
+							Type:     schema.TypeBool,
+							Computed: true,
+						},
+					},
+				},
+			},
 			"tools": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -316,15 +316,30 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		return diag.Errorf("failed to update virtual machine, %s", err)
 	}
 
-	if d.HasChange("dvd_drive") {
-		dvdDrive := d.Get("dvd_drive").(string)
-		activityId, err := c.Compute().OpenIaaS().VirtualMachine().MountISO(ctx, d.Id(), dvdDrive)
-		if err != nil {
-			return diag.Errorf("failed to mount DVD drive: %s", err)
+	if d.HasChange("mount_iso") {
+		old, new := d.GetChange("mount_iso")
+
+		if old != "" {
+			activityId, err := c.Compute().OpenIaaS().VirtualMachine().UnmountISO(ctx, d.Id())
+			if err != nil {
+				return diag.Errorf("failed to unmount DVD drive: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to unmount DVD drive, %s", err)
+			}
 		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		if err != nil {
-			return diag.Errorf("failed to mount DVD drive, %s", err)
+
+		if new != "" {
+			virtualDiskId := d.Get("mount_iso").(string)
+			activityId, err := c.Compute().OpenIaaS().VirtualMachine().MountISO(ctx, d.Id(), virtualDiskId)
+			if err != nil {
+				return diag.Errorf("failed to mount DVD drive: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to mount DVD drive, %s", err)
+			}
 		}
 	}
 
