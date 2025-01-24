@@ -23,7 +23,7 @@ To manage this resource you will need the following roles:
 
 ### Required
 
-- `mode` (String) The mode of the virtual disk.
+- `mode` (String) The mode of the virtual disk. Available values are RW (Read/Write) and RO (Read-Only).
 - `name` (String) The name of the virtual disk.
 - `size` (Number) The size of the virtual disk in bytes.
 - `storage_repository_id` (String) The ID of the storage repository where the virtual disk is stored.

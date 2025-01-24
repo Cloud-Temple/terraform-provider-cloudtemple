@@ -23,20 +23,20 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 					MachineManagerID: d.Get("machine_manager_id").(string),
 				})
 				if err != nil {
-					diag.Errorf("failed to find virtual machine named %q: %s", name, err)
+					return diag.Errorf("failed to find virtual machine named %q: %s", name, err)
 				}
 				for _, currVirtualMachine := range virtualMachines {
 					if currVirtualMachine.Name == name {
 						virtualMachine = currVirtualMachine
 					}
 				}
-				diag.Errorf("failed to find virtual machine named %q", name)
+				return diag.Errorf("failed to find virtual machine named %q", name)
 			} else {
 				id := d.Get("id").(string)
 				var err error
 				virtualMachine, err = c.Compute().OpenIaaS().VirtualMachine().Read(ctx, id)
 				if err == nil && virtualMachine == nil {
-					diag.Errorf("failed to find virtual machine with id %q", id)
+					return diag.Errorf("failed to find virtual machine with id %q", id)
 				}
 			}
 

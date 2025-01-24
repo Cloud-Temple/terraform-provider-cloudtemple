@@ -32,7 +32,7 @@ func resourceOpenIaasVirtualDisk() *schema.Resource {
 			},
 			"mode": {
 				Type:         schema.TypeString,
-				Description:  "The mode of the virtual disk.",
+				Description:  "The mode of the virtual disk. Available values are RW (Read/Write) and RO (Read-Only).",
 				ValidateFunc: validation.StringInSlice([]string{"RW", "RO"}, false),
 				Required:     true,
 				ForceNew:     true,
