@@ -22,20 +22,20 @@ func dataSourceOpenIaasNetwork() *schema.Resource {
 					MachineManagerID: d.Get("machine_manager_id").(string),
 				})
 				if err != nil {
-					diag.Errorf("failed to find network named %q: %s", name, err)
+					return diag.Errorf("failed to find network named %q: %s", name, err)
 				}
 				for _, currNetwork := range networks {
 					if currNetwork.Name == name {
 						network = currNetwork
 					}
 				}
-				diag.Errorf("failed to find network named %q", name)
+				return diag.Errorf("failed to find network named %q", name)
 			} else {
 				id := d.Get("id").(string)
 				var err error
 				network, err = c.Compute().OpenIaaS().Network().Read(ctx, id)
-				if err == nil && network == nil {
-					diag.Errorf("failed to find network with id %q", id)
+				if err != nil || network == nil {
+					return diag.Errorf("failed to find network with id %q", id)
 				}
 			}
 

@@ -24,20 +24,20 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 					PoolId:           d.Get("pool_id").(string),
 				})
 				if err != nil {
-					diag.Errorf("failed to find template named %q: %s", name, err)
+					return diag.Errorf("failed to find template named %q: %s", name, err)
 				}
 				for _, currTemplate := range templates {
 					if currTemplate.Name == name {
 						template = currTemplate
 					}
 				}
-				diag.Errorf("failed to find template named %q", name)
+				return diag.Errorf("failed to find template named %q", name)
 			} else {
 				id := d.Get("id").(string)
 				var err error
 				template, err = c.Compute().OpenIaaS().Template().Read(ctx, id)
 				if err != nil && template == nil {
-					diag.Errorf("failed to find template with id %q", id)
+					return diag.Errorf("failed to find template with id %q", id)
 				}
 			}
 

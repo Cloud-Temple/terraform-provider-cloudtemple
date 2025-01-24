@@ -46,11 +46,13 @@ To manage this resource you will need the following roles:
 - `auto_power_on` (Boolean) Whether to automatically start the virtual machine when the host boots.
 - `backup_sla_policies` (Set of String) The IDs of the SLA policies to assign to the virtual machine.
 - `boot_order` (List of String) The boot order of the virtual machine.
+Available values are 'Hard-Drive', 'DVD-Drive', and 'Network'.
+Order of the elements in the list is the boot order.
 - `high_availability` (String) HA mode to enable on the virtual machine.
 - `host_id` (String) The host identifier.
 - `mount_iso` (String) An ISO disk to mount to on the virtual machine DVD Drive.
 - `num_cores_per_socket` (Number) The number of cores per socket.
-- `power_state` (String) The desired power state of the virtual machine.
+- `power_state` (String) The desired power state of the virtual machine. Available values are 'on' and 'off'.
 - `secure_boot` (Boolean) Whether to enable secure boot.
 - `tags` (Map of String) The tags to attach to the virtual machine.
 

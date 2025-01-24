@@ -53,7 +53,7 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 			},
 			"power_state": {
 				Type:         schema.TypeString,
-				Description:  "The desired power state of the virtual machine.",
+				Description:  "The desired power state of the virtual machine. Available values are 'on' and 'off'.",
 				Optional:     true,
 				ValidateFunc: validation.StringInSlice([]string{"on", "off"}, false),
 			},
@@ -64,9 +64,11 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 				ValidateFunc: validation.IsUUID,
 			},
 			"boot_order": {
-				Type:        schema.TypeList,
-				Description: "The boot order of the virtual machine.",
-				Optional:    true,
+				Type: schema.TypeList,
+				Description: `The boot order of the virtual machine.
+Available values are 'Hard-Drive', 'DVD-Drive', and 'Network'.
+Order of the elements in the list is the boot order.`,
+				Optional: true,
 				Elem: &schema.Schema{
 					Type:         schema.TypeString,
 					ValidateFunc: validation.StringInSlice([]string{"Hard-Drive", "DVD-Drive", "Network"}, false),

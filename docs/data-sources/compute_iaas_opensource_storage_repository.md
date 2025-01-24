@@ -23,7 +23,7 @@ To query this datasource you will need the `compute_iaas_opensource_infrastructu
 - `machine_manager_id` (String)
 - `name` (String)
 - `shared` (Boolean)
-- `type` (String)
+- `type` (String) Available values are: ext, lvm, lvmoiscsi, lvmohba, nfs, smb, iso, nfs_iso, cifs
 
 ### Read-Only
 

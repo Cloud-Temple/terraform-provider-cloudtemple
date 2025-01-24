@@ -22,20 +22,20 @@ func dataSourceOpenIaasHost() *schema.Resource {
 					MachineManagerId: d.Get("machine_manager_id").(string),
 				})
 				if err != nil {
-					diag.Errorf("failed to find host named %q: %s", name, err)
+					return diag.Errorf("failed to find host named %q: %s", name, err)
 				}
 				for _, currHost := range hosts {
 					if currHost.Name == name {
 						host = currHost
 					}
 				}
-				diag.Errorf("failed to find host named %q", name)
+				return diag.Errorf("failed to find host named %q", name)
 			} else {
 				id := d.Get("id").(string)
 				var err error
 				host, err = c.Compute().OpenIaaS().Host().Read(ctx, id)
 				if err == nil && host == nil {
-					diag.Errorf("failed to find host with id %q", id)
+					return diag.Errorf("failed to find host with id %q", id)
 				}
 			}
 

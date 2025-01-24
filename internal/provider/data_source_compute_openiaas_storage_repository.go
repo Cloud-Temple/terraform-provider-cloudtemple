@@ -27,20 +27,20 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 					Shared:           d.Get("shared").(bool),
 				})
 				if err != nil {
-					diag.Errorf("failed to find storage repository named %q: %s", name, err)
+					return diag.Errorf("failed to find storage repository named %q: %s", name, err)
 				}
 				for _, currSr := range repositories {
 					if currSr.Name == name {
 						sr = currSr
 					}
 				}
-				diag.Errorf("failed to find storage repository named %q", name)
+				return diag.Errorf("failed to find storage repository named %q", name)
 			} else {
 				id := d.Get("id").(string)
 				var err error
 				sr, err = c.Compute().OpenIaaS().StorageRepository().Read(ctx, id)
 				if err != nil && sr == nil {
-					diag.Errorf("failed to find storage repository with id %q: %s", id, err)
+					return diag.Errorf("failed to find storage repository with id %q: %s", id, err)
 				}
 			}
 
@@ -96,9 +96,10 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 			},
 			"type": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Computed: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Computed:    true,
+				Description: "Available values are: ext, lvm, lvmoiscsi, lvmohba, nfs, smb, iso, nfs_iso, cifs",
 				ValidateFunc: validation.StringInSlice([]string{
 					"ext",
 					"lvm",

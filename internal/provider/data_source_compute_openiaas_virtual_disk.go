@@ -21,20 +21,20 @@ func dataSourceOpenIaasVirtualDisk() *schema.Resource {
 			if name != "" {
 				disks, err := c.Compute().OpenIaaS().VirtualDisk().List(ctx, d.Get("virtual_machine_id").(string))
 				if err != nil {
-					diag.Errorf("failed to find virtual disk named %q: %s", name, err)
+					return diag.Errorf("failed to find virtual disk named %q: %s", name, err)
 				}
 				for _, currDisk := range disks {
 					if currDisk.Name == name {
 						disk = currDisk
 					}
 				}
-				diag.Errorf("failed to find virtual disk named %q", name)
+				return diag.Errorf("failed to find virtual disk named %q", name)
 			} else {
 				id := d.Get("id").(string)
 				var err error
 				disk, err = c.Compute().OpenIaaS().VirtualDisk().Read(ctx, id)
 				if err == nil && disk == nil {
-					diag.Errorf("failed to find virtual disk with id %q", id)
+					return diag.Errorf("failed to find virtual disk with id %q", id)
 				}
 			}
 

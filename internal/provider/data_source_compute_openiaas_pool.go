@@ -22,20 +22,20 @@ func dataSourceOpenIaasPool() *schema.Resource {
 					MachineManagerId: d.Get("machine_manager_id").(string),
 				})
 				if err != nil {
-					diag.Errorf("failed to find pool named %q: %s", name, err)
+					return diag.Errorf("failed to find pool named %q: %s", name, err)
 				}
 				for _, currPool := range pools {
 					if currPool.Name == name {
 						pool = currPool
 					}
 				}
-				diag.Errorf("failed to find pool named %q", name)
+				return diag.Errorf("failed to find pool named %q", name)
 			} else {
 				id := d.Get("id").(string)
 				var err error
 				pool, err = c.Compute().OpenIaaS().Pool().Read(ctx, id)
 				if err == nil && pool == nil {
-					diag.Errorf("failed to find pool with id %q", id)
+					return diag.Errorf("failed to find pool with id %q", id)
 				}
 			}
 

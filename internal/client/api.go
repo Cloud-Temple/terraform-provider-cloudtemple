@@ -164,6 +164,8 @@ func (r *request) addFilter(filter any) {
 			r.params.Add(name, field.Interface().(string))
 		case "*bool":
 			r.params.Add(name, strconv.FormatBool(*field.Interface().(*bool)))
+		case "bool":
+			r.params.Add(name, strconv.FormatBool(field.Interface().(bool)))
 		case "[]string":
 			stringSlice := field.Interface().([]string)
 			for _, s := range stringSlice {
