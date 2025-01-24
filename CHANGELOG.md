@@ -1,3 +1,10 @@
+## 0.15.2 (January 24th, 2025)
+
+MISCELLANEOUS :
+
+  * Added examples and documentation about the new Open IaaS features.
+  * Improved error handling of new Open IaaS datasources.
+
 ## 0.15.1 (January 23nd, 2025)
 
 BUG FIXES :
