@@ -28,7 +28,9 @@ func dataSourceOpenIaasVirtualDisk() *schema.Resource {
 						disk = currDisk
 					}
 				}
-				return diag.Errorf("failed to find virtual disk named %q", name)
+				if disk == nil {
+					return diag.Errorf("failed to find virtual disk named %q", name)
+				}
 			} else {
 				id := d.Get("id").(string)
 				var err error
