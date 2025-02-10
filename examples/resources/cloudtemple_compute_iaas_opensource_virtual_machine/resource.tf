@@ -32,4 +32,10 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
   tags = {
     environment = "development"
   }
+
+  # Add cloud_init settings to the virtual machine.
+  cloud_init = {
+    cloud_config   = file("./cloud-init/cloud-config.yml")
+    network_config = file("./cloud-init/network-config.yml")
+  }
 }
