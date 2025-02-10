@@ -264,9 +264,13 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 	var cloudInit client.CloudInit
 	cloudInitRaw, ok := d.Get("cloud_init").(map[string]interface{})
 	if ok && cloudInitRaw != nil && len(cloudInitRaw) > 0 {
-		cloudInit = client.CloudInit{
-			CloudConfig:   cloudInitRaw["cloud_config"].(string),
-			NetworkConfig: cloudInitRaw["network_config"].(string),
+		cloudConfig, ok := cloudInitRaw["cloud_config"].(string)
+		if cloudConfig != "" && ok {
+			cloudInit.CloudConfig = cloudConfig
+		}
+		networkConfig, ok := cloudInitRaw["network_config"].(string)
+		if networkConfig != "" && ok {
+			cloudInit.NetworkConfig = networkConfig
 		}
 	}
 	// Create virtual machine itself
