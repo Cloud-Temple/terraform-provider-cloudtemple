@@ -84,8 +84,14 @@ Order of the elements in the list is the boot order.`,
 			},
 			"secure_boot": {
 				Type:        schema.TypeBool,
-				Description: "Whether to enable secure boot.",
+				Description: "Whether to enable secure boot. Only available with UEFI boot firmware.",
 				Optional:    true,
+			},
+			"boot_firmware": {
+				Type:         schema.TypeString,
+				Description:  "The boot firmware to use. Available values are 'bios' and 'uefi'.",
+				Optional:     true,
+				ValidateFunc: validation.StringInSlice([]string{"bios", "uefi"}, false),
 			},
 			"auto_power_on": {
 				Type:        schema.TypeBool,
@@ -255,8 +261,6 @@ Order of the elements in the list is the boot order.`,
 	}
 }
 
-// TODO : Add Tags (needs tag module update)
-
 func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
@@ -347,6 +351,7 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		CPU:               d.Get("cpu").(int),
 		NumCoresPerSocket: d.Get("num_cores_per_socket").(int),
 		Memory:            d.Get("memory").(int),
+		BootFirmware:      d.Get("boot_firmware").(string),
 		SecureBoot:        d.Get("secure_boot").(bool),
 		AutoPowerOn:       d.Get("auto_power_on").(bool),
 		HighAvailability:  d.Get("high_availability").(string),

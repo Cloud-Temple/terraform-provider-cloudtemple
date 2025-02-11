@@ -89,6 +89,7 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
 
 - `auto_power_on` (Boolean) Whether to automatically start the virtual machine when the host boots.
 - `backup_sla_policies` (Set of String) The IDs of the SLA policies to assign to the virtual machine.
+- `boot_firmware` (String) The boot firmware to use. Available values are 'bios' and 'uefi'.
 - `boot_order` (List of String) The boot order of the virtual machine.
 Available values are 'Hard-Drive', 'DVD-Drive', and 'Network'.
 Order of the elements in the list is the boot order.
@@ -109,7 +110,7 @@ Order of the elements in the list is the boot order.
 - `mount_iso` (String) An ISO disk to mount to on the virtual machine DVD Drive.
 - `num_cores_per_socket` (Number) The number of cores per socket.
 - `power_state` (String) The desired power state of the virtual machine. Available values are 'on' and 'off'.
-- `secure_boot` (Boolean) Whether to enable secure boot.
+- `secure_boot` (Boolean) Whether to enable secure boot. Only available with UEFI boot firmware.
 - `tags` (Map of String) The tags to attach to the virtual machine.
 
 ### Read-Only
