@@ -34,7 +34,9 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 						sr = currSr
 					}
 				}
-				return diag.Errorf("failed to find storage repository named %q", name)
+				if sr == nil {
+					return diag.Errorf("failed to find storage repository named %q", name)
+				}
 			} else {
 				id := d.Get("id").(string)
 				var err error

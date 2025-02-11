@@ -3,6 +3,8 @@ package provider
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -113,6 +115,31 @@ Order of the elements in the list is the boot order.`,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
+			},
+			"cloud_init": {
+				Type:     schema.TypeMap,
+				Optional: true,
+				ForceNew: true,
+				Description: `A set of cloud-init compatible key/value used to configure the virtual machine.
+					
+	List of cloud-init compatible keys :
+	- ` + "`cloud_config`" + `
+	- ` + "`network_config`" + `
+
+	Please note that the virtual machine must have a disk in order to use Cloud-Init.
+	
+	If you need more informations, please refer to the cloud-init documentation about the NoCloud datasource.
+
+	NB : The cloud-init configuration is only triggered at virtual machine first startup and requires a cloud-init compatible NoCloud.
+	For exemple, you can use this [Ubuntu Cloud Image](https://cloud-images.ubuntu.com/) and convert it to an NoCloud.
+				`,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				ValidateDiagFunc: validation.MapKeyMatch(regexp.MustCompile(strings.Join([]string{
+					"^cloud_config$",
+					"^network_config$"},
+					"|")), `The following key is not allowed for cloud-init`),
 			},
 
 			//Out
@@ -233,12 +260,26 @@ Order of the elements in the list is the boot order.`,
 func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
+	// Cloud-Init to configure the virtual machine
+	var cloudInit client.CloudInit
+	cloudInitRaw, ok := d.Get("cloud_init").(map[string]interface{})
+	if ok && cloudInitRaw != nil && len(cloudInitRaw) > 0 {
+		cloudConfig, ok := cloudInitRaw["cloud_config"].(string)
+		if cloudConfig != "" && ok {
+			cloudInit.CloudConfig = cloudConfig
+		}
+		networkConfig, ok := cloudInitRaw["network_config"].(string)
+		if networkConfig != "" && ok {
+			cloudInit.NetworkConfig = networkConfig
+		}
+	}
 	// Create virtual machine itself
 	activityId, err := c.Compute().OpenIaaS().VirtualMachine().Create(ctx, &client.CreateOpenIaasVirtualMachineRequest{
 		Name:       d.Get("name").(string),
 		TemplateID: d.Get("template_id").(string),
 		CPU:        d.Get("cpu").(int),
 		Memory:     d.Get("memory").(int),
+		CloudInit:  cloudInit,
 	})
 	if err != nil {
 		return diag.Errorf("the virtual machine could not be created: %s", err)

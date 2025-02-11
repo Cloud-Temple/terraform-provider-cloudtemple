@@ -66,6 +66,12 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
   tags = {
     environment = "development"
   }
+
+  # Add cloud_init settings to the virtual machine.
+  cloud_init = {
+    cloud_config   = file("./cloud-init/cloud-config.yml")
+    network_config = file("./cloud-init/network-config.yml")
+  }
 }
 ```
 
@@ -86,6 +92,18 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
 - `boot_order` (List of String) The boot order of the virtual machine.
 Available values are 'Hard-Drive', 'DVD-Drive', and 'Network'.
 Order of the elements in the list is the boot order.
+- `cloud_init` (Map of String) A set of cloud-init compatible key/value used to configure the virtual machine.
+					
+	List of cloud-init compatible keys :
+	- `cloud_config`
+	- `network_config`
+
+	Please note that the virtual machine must have a disk in order to use Cloud-Init.
+	
+	If you need more informations, please refer to the cloud-init documentation about the NoCloud datasource.
+
+	NB : The cloud-init configuration is only triggered at virtual machine first startup and requires a cloud-init compatible NoCloud.
+	For exemple, you can use this [Ubuntu Cloud Image](https://cloud-images.ubuntu.com/) and convert it to an NoCloud.
 - `high_availability` (String) HA mode to enable on the virtual machine.
 - `host_id` (String) The host identifier.
 - `mount_iso` (String) An ISO disk to mount to on the virtual machine DVD Drive.

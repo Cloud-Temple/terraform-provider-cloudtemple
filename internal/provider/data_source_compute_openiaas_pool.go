@@ -29,7 +29,9 @@ func dataSourceOpenIaasPool() *schema.Resource {
 						pool = currPool
 					}
 				}
-				return diag.Errorf("failed to find pool named %q", name)
+				if pool == nil {
+					return diag.Errorf("failed to find pool named %q", name)
+				}
 			} else {
 				id := d.Get("id").(string)
 				var err error

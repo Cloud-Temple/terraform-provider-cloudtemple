@@ -29,7 +29,9 @@ func dataSourceOpenIaasHost() *schema.Resource {
 						host = currHost
 					}
 				}
-				return diag.Errorf("failed to find host named %q", name)
+				if host == nil {
+					return diag.Errorf("failed to find host named %q", name)
+				}
 			} else {
 				id := d.Get("id").(string)
 				var err error

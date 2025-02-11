@@ -30,7 +30,9 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 						virtualMachine = currVirtualMachine
 					}
 				}
-				return diag.Errorf("failed to find virtual machine named %q", name)
+				if virtualMachine == nil {
+					return diag.Errorf("failed to find virtual machine named %q", name)
+				}
 			} else {
 				id := d.Get("id").(string)
 				var err error

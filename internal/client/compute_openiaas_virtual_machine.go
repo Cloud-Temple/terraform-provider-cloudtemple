@@ -55,11 +55,17 @@ type OpenIaaSVirtualMachineFilter struct {
 	MachineManagerID string `filter:"machineManagerId"`
 }
 
+type CloudInit struct {
+	CloudConfig   string `json:"cloudConfig,omitempty"`
+	NetworkConfig string `json:"networkConfig,omitempty"`
+}
+
 type CreateOpenIaasVirtualMachineRequest struct {
-	Name       string `json:"name"`
-	TemplateID string `json:"templateId"`
-	CPU        int    `json:"cpu"`
-	Memory     int    `json:"memory"`
+	Name       string    `json:"name"`
+	TemplateID string    `json:"templateId"`
+	CPU        int       `json:"cpu"`
+	Memory     int       `json:"memory"`
+	CloudInit  CloudInit `json:"cloudInit,omitempty"`
 }
 
 func (c *OpenIaaSVirtualMachineClient) Create(ctx context.Context, req *CreateOpenIaasVirtualMachineRequest) (string, error) {
