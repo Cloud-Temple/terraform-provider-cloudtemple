@@ -118,14 +118,14 @@ func (v *OpenIaaSVirtualMachineClient) Read(ctx context.Context, id string) (*Op
 }
 
 type UpdateOpenIaasVirtualMachineRequest struct {
-	Name              string `json:"name"`
-	CPU               int    `json:"cpu"`
-	NumCoresPerSocket int    `json:"numCoresPerSocket"`
-	Memory            int    `json:"memory"`
-	SecureBoot        bool   `json:"secureBoot"`
-	BootFirmware      string `json:"bootFirmware"`
-	AutoPowerOn       bool   `json:"autoPowerOn"`
-	HighAvailability  string `json:"highAvailability"`
+	Name              string `json:"name,omitempty"`
+	CPU               int    `json:"cpu,omitempty"`
+	NumCoresPerSocket int    `json:"numCoresPerSocket,omitempty"`
+	Memory            int    `json:"memory,omitempty"`
+	SecureBoot        bool   `json:"secureBoot,omitempty"`
+	BootFirmware      string `json:"bootFirmware,omitempty"`
+	AutoPowerOn       bool   `json:"autoPowerOn,omitempty"`
+	HighAvailability  string `json:"highAvailability,omitempty"`
 }
 
 func (v *OpenIaaSVirtualMachineClient) Update(ctx context.Context, id string, req *UpdateOpenIaasVirtualMachineRequest) (string, error) {
