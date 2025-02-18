@@ -49,7 +49,7 @@ type BackupSLAPolicyFilter struct {
 }
 
 func (c *BackupSLAPolicyClient) List(ctx context.Context, filter *BackupSLAPolicyFilter) ([]*BackupSLAPolicy, error) {
-	r := c.c.newRequest("GET", "/backup/v1/policies")
+	r := c.c.newRequest("GET", "/backup/v1/spp/policies")
 	r.addFilter(filter)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
@@ -69,7 +69,7 @@ func (c *BackupSLAPolicyClient) List(ctx context.Context, filter *BackupSLAPolic
 }
 
 func (c *BackupSLAPolicyClient) Read(ctx context.Context, id string) (*BackupSLAPolicy, error) {
-	r := c.c.newRequest("GET", "/backup/v1/policies/%s", id)
+	r := c.c.newRequest("GET", "/backup/v1/spp/policies/%s", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -94,7 +94,7 @@ type BackupAssignVirtualMachineRequest struct {
 }
 
 func (c *BackupSLAPolicyClient) AssignVirtualMachine(ctx context.Context, req *BackupAssignVirtualMachineRequest) (string, error) {
-	r := c.c.newRequest("POST", "/backup/v1/policies/assign/virtual_machine")
+	r := c.c.newRequest("POST", "/backup/v1/spp/policies/assign/virtual_machine")
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
@@ -105,7 +105,7 @@ type BackupAssignVirtualDiskRequest struct {
 }
 
 func (c *BackupSLAPolicyClient) AssignVirtualDisk(ctx context.Context, req *BackupAssignVirtualDiskRequest) (string, error) {
-	r := c.c.newRequest("POST", "/backup/v1/policies/assign/virtual_disk")
+	r := c.c.newRequest("POST", "/backup/v1/spp/policies/assign/virtual_disk")
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }

@@ -1,3 +1,14 @@
+## 0.16.0 (February 18th, 2025)
+
+NEW FEATURES :
+
+  * Added cloud-init to resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
+  * Added ability to update the boot firmware of a `cloudtemple_compute_iaas_opensource_virtual_machine`.
+
+BUG FIXES :
+
+  * Fixed a bug causing communications with the Backup module to crash.
+
 ## 0.15.2 (January 24th, 2025)
 
 MISCELLANEOUS :
