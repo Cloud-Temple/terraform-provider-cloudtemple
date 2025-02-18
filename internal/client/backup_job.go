@@ -77,7 +77,7 @@ type BackupJobRunRequest struct {
 }
 
 func (c *BackupJobClient) Run(ctx context.Context, req *BackupJobRunRequest) (string, error) {
-	r := c.c.newRequest("POST", "/spp/jobs/run")
+	r := c.c.newRequest("POST", "/backup/v1/spp/jobs/run")
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
