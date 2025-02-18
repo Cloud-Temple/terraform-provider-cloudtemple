@@ -19,7 +19,7 @@ type BackupVCenter struct {
 }
 
 func (c *BackupVCenterClient) List(ctx context.Context, sppServerId string) ([]*BackupVCenter, error) {
-	r := c.c.newRequest("GET", "/backup/v1/vcenters")
+	r := c.c.newRequest("GET", "/backup/v1/spp/vcenters")
 	r.params.Add("sppServerId", sppServerId)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {

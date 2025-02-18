@@ -33,7 +33,7 @@ type BackupStorageCapacity struct {
 }
 
 func (c *BackupStorageClient) List(ctx context.Context) ([]*BackupStorage, error) {
-	r := c.c.newRequest("GET", "/backup/v1/storages")
+	r := c.c.newRequest("GET", "/backup/v1/spp/storages")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

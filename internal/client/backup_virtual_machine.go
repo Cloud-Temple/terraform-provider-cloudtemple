@@ -38,7 +38,7 @@ type BackupVirtualMachine struct {
 }
 
 func (c *BackupVirtualMachineClient) Read(ctx context.Context, id string) (*BackupVirtualMachine, error) {
-	r := c.c.newRequest("GET", "/backup/v1/virtual_machines/%s", id)
+	r := c.c.newRequest("GET", "/backup/v1/spp/virtual_machines/%s", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

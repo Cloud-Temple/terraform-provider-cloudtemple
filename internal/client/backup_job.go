@@ -30,7 +30,7 @@ type BackupJobFilter struct {
 }
 
 func (c *BackupJobClient) List(ctx context.Context, filter *BackupJobFilter) ([]*BackupJob, error) {
-	r := c.c.newRequest("GET", "/backup/v1/jobs")
+	r := c.c.newRequest("GET", "/backup/v1/spp/jobs")
 	if filter != nil && filter.Type != "" {
 		r.params.Add("type", filter.Type)
 	}
@@ -52,7 +52,7 @@ func (c *BackupJobClient) List(ctx context.Context, filter *BackupJobFilter) ([]
 }
 
 func (c *BackupJobClient) Read(ctx context.Context, id string) (*BackupJob, error) {
-	r := c.c.newRequest("GET", "/backup/v1/jobs/%s", id)
+	r := c.c.newRequest("GET", "/backup/v1/spp/jobs/%s", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -77,7 +77,7 @@ type BackupJobRunRequest struct {
 }
 
 func (c *BackupJobClient) Run(ctx context.Context, req *BackupJobRunRequest) (string, error) {
-	r := c.c.newRequest("POST", "/backup/v1/jobs/run")
+	r := c.c.newRequest("POST", "/backup/v1/spp/jobs/run")
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }

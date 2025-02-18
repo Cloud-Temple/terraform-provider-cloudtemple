@@ -48,7 +48,7 @@ func (b *BackupVirtualDiskNotFoundError) Error() string {
 }
 
 func (c *BackupVirtualDiskClient) Read(ctx context.Context, id string) (*BackupVirtualDisk, error) {
-	r := c.c.newRequest("GET", "/backup/v1/virtual_disks/%s", id)
+	r := c.c.newRequest("GET", "/backup/v1/spp/virtual_disks/%s", id)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
