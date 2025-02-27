@@ -104,7 +104,10 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 		return diag.Errorf("the virtual disk could not be read: %s", err)
 	}
 	if virtualDisk == nil {
-		return diag.Errorf("the virtual disk could not be found: %s", err)
+		// Si le disque virtuel n'existe pas, on définit l'ID à une chaîne vide
+		// pour indiquer à Terraform que la ressource n'existe plus
+		d.SetId("")
+		return nil
 	}
 
 	// Set the retrieved data to the schema

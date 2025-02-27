@@ -1,3 +1,9 @@
+## 0.16.1 (February 27th, 2025)
+
+BUG FIXES :
+
+  * Fixed a bug in `cloudtemple_compute_iaas_opensource_virtual_disk` resource that prevented Terraform from recreating the resource when it was deleted outside of Terraform by properly setting the ID to empty when the resource is not found.
+
 ## 0.16.0 (February 18th, 2025)
 
 NEW FEATURES :
