@@ -15,6 +15,9 @@ func resourceOpenIaasVirtualDisk() *schema.Resource {
 		ReadContext:   openIaasVirtualDiskRead,
 		//UpdateContext: openIaasVirtualDiskUpdate,
 		DeleteContext: openIaasVirtualDiskDelete,
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -110,12 +113,41 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 		return nil
 	}
 
+	// TODO : REWORK THAT PART OF THE CODE TO BE ABLE TO HANDLE MULTIPLE VIRTUAL MACHINES ATTACHMENT
+
 	// Set the retrieved data to the schema
 	sw := newStateWriter(d)
 	sw.set("name", virtualDisk.Name)
 	sw.set("size", virtualDisk.Size)
 	sw.set("usage", virtualDisk.Usage)
 	sw.set("storage_repository_id", virtualDisk.StorageRepository.ID)
+
+	// Set virtual_machine_id if available
+	if len(virtualDisk.VirtualMachines) > 0 {
+		sw.set("virtual_machine_id", virtualDisk.VirtualMachines[0].ID)
+
+		// Set mode based on ReadOnly flag
+		if virtualDisk.VirtualMachines[0].ReadOnly {
+			sw.set("mode", "RO")
+		} else {
+			sw.set("mode", "RW")
+		}
+	} else {
+		// Default values if no virtual machine is attached
+		sw.set("mode", "RW") // Default to RW
+
+		// Keep the existing virtual_machine_id if it's already set
+		if vmID, ok := d.GetOk("virtual_machine_id"); ok {
+			sw.set("virtual_machine_id", vmID)
+		}
+	}
+
+	// Set bootable (default to false if not set)
+	if bootable, ok := d.GetOk("bootable"); ok {
+		sw.set("bootable", bootable)
+	} else {
+		sw.set("bootable", false)
+	}
 
 	return sw.diags
 }

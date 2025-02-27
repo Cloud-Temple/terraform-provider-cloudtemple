@@ -1,5 +1,9 @@
 ## 0.16.1 (February 27th, 2025)
 
+NEW FEATURES :
+
+  * Added import capability to resource `cloudtemple_compute_iaas_opensource_virtual_disk`.
+
 BUG FIXES :
 
   * Fixed a bug in `cloudtemple_compute_iaas_opensource_virtual_disk` resource that prevented Terraform from recreating the resource when it was deleted outside of Terraform by properly setting the ID to empty when the resource is not found.
