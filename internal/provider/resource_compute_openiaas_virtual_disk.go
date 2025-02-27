@@ -113,6 +113,8 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 		return nil
 	}
 
+	// TODO : REWORK THAT PART OF THE CODE TO BE ABLE TO HANDLE MULTIPLE VIRTUAL MACHINES ATTACHMENT
+
 	// Set the retrieved data to the schema
 	sw := newStateWriter(d)
 	sw.set("name", virtualDisk.Name)
