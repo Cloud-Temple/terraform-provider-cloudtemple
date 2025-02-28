@@ -40,17 +40,17 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 			},
 			"cpu": {
 				Type:        schema.TypeInt,
-				Description: "The number of virtual CPUs.",
+				Description: "The number of virtual CPUs. Note: Changing this value for a running VM will cause it to be powered off and back on.",
 				Required:    true,
 			},
 			"num_cores_per_socket": {
 				Type:        schema.TypeInt,
-				Description: "The number of cores per socket.",
+				Description: "The number of cores per socket. Note: Changing this value for a running VM will cause it to be powered off and back on.",
 				Optional:    true,
 			},
 			"memory": {
 				Type:        schema.TypeInt,
-				Description: "The amount of memory in MB.",
+				Description: "The amount of memory in MB. Note: Changing this value for a running VM will cause it to be powered off and back on.",
 				Required:    true,
 			},
 			"power_state": {
@@ -346,6 +346,38 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
+	// Check if hardware-related properties have changed
+	needsReboot := d.HasChange("cpu") || d.HasChange("memory") || d.HasChange("num_cores_per_socket")
+	wasRunning := false
+
+	// If hardware-related properties have changed, we need to power off the VM first
+	if needsReboot {
+		// Get current VM state to check if it's running
+		vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
+		if err != nil {
+			return diag.Errorf("failed to read virtual machine state: %s", err)
+		}
+
+		// Only power off if the VM is running
+		if vm.PowerState == "Running" {
+			wasRunning = true
+
+			// Power off the VM
+			activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
+				PowerState: "off",
+				Force:      true,
+			})
+			if err != nil {
+				return diag.Errorf("failed to power off virtual machine: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to power off virtual machine: %s", err)
+			}
+		}
+	}
+
+	// Update the VM properties
 	activityId, err := c.Compute().OpenIaaS().VirtualMachine().Update(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachineRequest{
 		Name:              d.Get("name").(string),
 		CPU:               d.Get("cpu").(int),
@@ -362,6 +394,27 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 	if err != nil {
 		return diag.Errorf("failed to update virtual machine, %s", err)
+	}
+
+	// If VM was running before and we powered it off, power it back on
+	if needsReboot && wasRunning {
+		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
+			PowerState: "on",
+			Force:      false,
+		})
+		if err != nil {
+			return diag.Errorf("failed to power on virtual machine: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to power on virtual machine: %s", err)
+		}
+
+		// Wait for tools to be available
+		_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForTools(ctx, d.Id(), getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to get tools on virtual machine after power on, %s", err)
+		}
 	}
 
 	if d.HasChange("mount_iso") {

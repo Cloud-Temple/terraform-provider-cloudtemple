@@ -4,6 +4,10 @@ NEW FEATURES :
 
   * Added import capability to resource `cloudtemple_compute_iaas_opensource_virtual_disk`.
 
+IMPROVEMENTS :
+
+  * Added automatic power cycling for `cloudtemple_compute_iaas_opensource_virtual_machine` when CPU, memory, or cores per socket are updated on a running VM.
+
 BUG FIXES :
 
   * Fixed a bug in `cloudtemple_compute_iaas_opensource_virtual_disk` resource that prevented Terraform from recreating the resource when it was deleted outside of Terraform by properly setting the ID to empty when the resource is not found.

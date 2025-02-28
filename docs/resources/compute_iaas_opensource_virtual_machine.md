@@ -80,8 +80,8 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
 
 ### Required
 
-- `cpu` (Number) The number of virtual CPUs.
-- `memory` (Number) The amount of memory in MB.
+- `cpu` (Number) The number of virtual CPUs. Note: Changing this value for a running VM will cause it to be powered off and back on.
+- `memory` (Number) The amount of memory in MB. Note: Changing this value for a running VM will cause it to be powered off and back on.
 - `name` (String) The name of the virtual machine.
 - `template_id` (String) The template identifier.
 
@@ -108,7 +108,7 @@ Order of the elements in the list is the boot order.
 - `high_availability` (String) HA mode to enable on the virtual machine.
 - `host_id` (String) The host identifier.
 - `mount_iso` (String) An ISO disk to mount to on the virtual machine DVD Drive.
-- `num_cores_per_socket` (Number) The number of cores per socket.
+- `num_cores_per_socket` (Number) The number of cores per socket. Note: Changing this value for a running VM will cause it to be powered off and back on.
 - `power_state` (String) The desired power state of the virtual machine. Available values are 'on' and 'off'.
 - `secure_boot` (Boolean) Whether to enable secure boot. Only available with UEFI boot firmware.
 - `tags` (Map of String) The tags to attach to the virtual machine.
