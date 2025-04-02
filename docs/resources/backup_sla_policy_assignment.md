@@ -89,5 +89,8 @@ resource "cloudtemple_backup_sla_policy_assignment" "foo" {
 Import is supported using the following syntax:
 
 ```shell
-$ terraform import cloudtemple_backup_sla_policy_assignment.example 12345678-1234-1234-1234-123456789abc
+#!/bin/bash
+
+# Import a backup SLA policy assignment using its ID
+terraform import cloudtemple_backup_sla_policy_assignment.example 12345678-1234-1234-1234-123456789abc
 ```
