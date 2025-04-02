@@ -60,4 +60,10 @@ resource "cloudtemple_compute_iaas_opensource_network_adapter" "VIF-1" {
 - `mtu` (Number) The MTU of the network adapter.
 - `name` (String) The name of the network adapter.
 
+## Import
 
+Import is supported using the following syntax:
+
+```shell
+$ terraform import cloudtemple_compute_iaas_opensource_network_adapter.example 12345678-1234-1234-1234-123456789abc
+```

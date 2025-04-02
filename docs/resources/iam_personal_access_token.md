@@ -45,4 +45,10 @@ output "token" {
 - `id` (String) The ID of this resource.
 - `secret_id` (String, Sensitive)
 
+## Import
 
+Import is supported using the following syntax:
+
+```shell
+$ terraform import cloudtemple_iam_personal_access_token.example 12345678-1234-1234-1234-123456789abc
+```

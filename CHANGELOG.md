@@ -1,3 +1,20 @@
+## 0.16.2 (Unreleased)
+
+NEW FEATURES :
+
+  * Added import capability to resources:
+    - `cloudtemple_compute_openiaas_network_adapter`
+    - `cloudtemple_iam_personal_access_token`
+  
+IMPROVEMENTS :
+
+  * Added import documentation to resources:
+    - `cloudtemple_backup_sla_policy_assignment`
+    - `cloudtemple_compute_iaas_opensource_virtual_disk`
+    - `cloudtemple_compute_iaas_opensource_virtual_machine`
+    - `cloudtemple_compute_virtual_controller`
+    - `cloudtemple_compute_virtual_disk`
+
 ## 0.16.1 (February 27th, 2025)
 
 NEW FEATURES :

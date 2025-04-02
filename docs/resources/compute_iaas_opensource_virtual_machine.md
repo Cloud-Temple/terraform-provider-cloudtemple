@@ -179,4 +179,10 @@ Read-Only:
 - `detected` (Boolean)
 - `version` (String)
 
+## Import
 
+Import is supported using the following syntax:
+
+```shell
+$ terraform import cloudtemple_compute_iaas_opensource_virtual_machine.example 12345678-1234-1234-1234-123456789abc
+```
