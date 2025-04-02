@@ -62,4 +62,13 @@ resource "cloudtemple_compute_iaas_opensource_virtual_disk" "openiaas-disk-02" {
 - `id` (String) The ID of the virtual disk.
 - `usage` (Number) The usage of the virtual disk.
 
+## Import
 
+Import is supported using the following syntax:
+
+```shell
+#!/bin/bash
+
+# Import a virtual disk using its ID
+terraform import cloudtemple_compute_iaas_opensource_virtual_disk.example 12345678-1234-1234-1234-123456789abc
+```

@@ -84,4 +84,13 @@ resource "cloudtemple_backup_sla_policy_assignment" "foo" {
 
 - `id` (String) The ID of this resource.
 
+## Import
 
+Import is supported using the following syntax:
+
+```shell
+#!/bin/bash
+
+# Import a backup SLA policy assignment using its ID
+terraform import cloudtemple_backup_sla_policy_assignment.example 12345678-1234-1234-1234-123456789abc
+```

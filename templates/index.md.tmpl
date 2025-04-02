@@ -14,7 +14,18 @@ in your Cloud Temple account.
 ## Example Usage
 {{ tffile "examples/provider/provider.tf" }}
 {{- end }}
-{{ .SchemaMarkdown | trimspace }}
+## Schema
+
+### Required
+
+- `client_id` (String) The client ID to login to the API with. Can also be specified with the environment variable `CLOUDTEMPLE_CLIENT_ID`.
+- `secret_id` (String, Sensitive) The secret ID to login to the API with. Can also be specified with the environment variable `CLOUDTEMPLE_SECRET_ID`.
+
+### Optional
+
+- `address` (String) The HTTP address to connect to the API. Defaults to `shiva.cloud-temple.com`. Can also be specified with the environment variable `CLOUDTEMPLE_HTTP_ADDR`.
+- `api_suffix` (Boolean) Specify whether it is necessary to use an /api suffix after the address. (Used for development purpose only)
+- `scheme` (String) The URL scheme to used to connect to the API. Default to `https`. Can also be specified with the environment variable `CLOUDTEMPLE_HTTP_SCHEME`.
 
 ## Logging
 

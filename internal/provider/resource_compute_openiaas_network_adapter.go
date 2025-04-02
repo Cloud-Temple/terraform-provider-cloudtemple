@@ -15,6 +15,9 @@ func resourceOpenIaasNetworkAdapter() *schema.Resource {
 		ReadContext:   openIaasNetworkAdapterRead,
 		UpdateContext: openIaasNetworkAdapterUpdate,
 		DeleteContext: openIaasNetworkAdapterDelete,
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
 
 		Schema: map[string]*schema.Schema{
 			// In

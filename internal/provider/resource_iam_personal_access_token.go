@@ -18,6 +18,10 @@ func resourcePersonalAccessToken() *schema.Resource {
 		ReadContext:   resourcePersonalAccessTokenRead,
 		DeleteContext: resourcePersonalAccessTokenDelete,
 
+		Importer: &schema.ResourceImporter{
+			StateContext: schema.ImportStatePassthroughContext,
+		},
+
 		Schema: map[string]*schema.Schema{
 			// In
 			"name": {
