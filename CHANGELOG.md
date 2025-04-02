@@ -15,6 +15,10 @@ IMPROVEMENTS :
     - `cloudtemple_compute_virtual_controller`
     - `cloudtemple_compute_virtual_disk`
 
+BUG FIXES :
+
+  * Fixed provider documentation to properly display client_id and secret_id as required fields by customizing the template
+
 ## 0.16.1 (February 27th, 2025)
 
 NEW FEATURES :
