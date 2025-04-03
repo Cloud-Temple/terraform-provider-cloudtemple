@@ -1,3 +1,9 @@
+## 0.16.3-rc.1 (April 3rd, 2025)
+
+MISCELLANEOUS :
+
+  * Updated the way the ID of the `cloudtemple_compute_iaas_opensource_virtual_machine` resource is retreived from the activity.
+
 ## 0.16.2 (April 2nd, 2025)
 
 NEW FEATURES :
