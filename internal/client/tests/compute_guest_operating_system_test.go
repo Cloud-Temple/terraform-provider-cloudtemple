@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +37,7 @@ func TestCompute_GuestOperatingSystemRead(t *testing.T) {
 	folder, err := client.Compute().GuestOperatingSystem().Read(ctx, os.Getenv(MachineManagerId), os.Getenv(OperationSystemMoref))
 	require.NoError(t, err)
 
-	expected := &GuestOperatingSystem{
+	expected := &clientpkg.GuestOperatingSystem{
 		Moref:    os.Getenv(OperationSystemMoref),
 		Family:   os.Getenv(OperationSystemFamily),
 		FullName: os.Getenv(OperationSystemFullName),

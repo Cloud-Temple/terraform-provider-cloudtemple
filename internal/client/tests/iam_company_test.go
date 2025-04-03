@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,7 +15,7 @@ func TestIAM_Company(t *testing.T) {
 	company, err := client.IAM().Company().Read(ctx, companyID)
 	require.NoError(t, err)
 
-	expected := &Company{
+	expected := &clientpkg.Company{
 		ID:   companyID,
 		Name: "Cloud Temple",
 	}

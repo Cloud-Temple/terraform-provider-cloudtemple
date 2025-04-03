@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/sethvargo/go-retry"
 	"github.com/stretchr/testify/require"
 )
@@ -48,7 +49,7 @@ func TestCompute_NetworkAdapterRead(t *testing.T) {
 
 func TestNetworkAdapterClient_Create(t *testing.T) {
 	ctx := context.Background()
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-network-adapter",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -61,20 +62,20 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 
 	instanceId := activity.ConcernedItems[0].ID
 
-	jobs, err := client.Backup().Job().List(ctx, &BackupJobFilter{
+	jobs, err := client.Backup().Job().List(ctx, &clientpkg.BackupJobFilter{
 		Type: "catalog",
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(jobs), 0)
 
-	var job = &BackupJob{}
+	var job = &clientpkg.BackupJob{}
 	for _, currJob := range jobs {
 		if currJob.Name == "Hypervisor Inventory" {
 			job = currJob
 		}
 	}
 
-	activityId, err = client.Backup().Job().Run(ctx, &BackupJobRunRequest{
+	activityId, err = client.Backup().Job().Run(ctx, &clientpkg.BackupJobRunRequest{
 		JobId: job.ID,
 	})
 	require.NoError(t, err)
@@ -85,7 +86,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 	_, err = client.Backup().Job().WaitForCompletion(ctx, jobs[0].ID, nil)
 	require.NoError(t, err)
 
-	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &BackupAssignVirtualMachineRequest{
+	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &clientpkg.BackupAssignVirtualMachineRequest{
 		VirtualMachineIds: []string{instanceId},
 		SLAPolicies:       []string{os.Getenv(PolicyId)},
 	})
@@ -97,7 +98,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 	vm, err := client.Compute().VirtualMachine().Read(ctx, instanceId)
 	require.NoError(t, err)
 
-	activityId, err = client.Compute().NetworkAdapter().Create(ctx, &CreateNetworkAdapterRequest{
+	activityId, err = client.Compute().NetworkAdapter().Create(ctx, &clientpkg.CreateNetworkAdapterRequest{
 		VirtualMachineId: instanceId,
 		NetworkId:        os.Getenv(NetworkId),
 		Type:             os.Getenv(NetworkAdapterType),
@@ -118,7 +119,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.Type)
 	require.Equal(t, os.Getenv(NetworkId), networkAdapter.NetworkId)
 
-	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
+	activityId, err = client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 		ID:             vm.ID,
 		DatacenterId:   vm.DatacenterId,
 		PowerAction:    "on",
@@ -149,7 +150,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
-	activityId, err = client.Compute().NetworkAdapter().Update(ctx, &UpdateNetworkAdapterRequest{
+	activityId, err = client.Compute().NetworkAdapter().Update(ctx, &clientpkg.UpdateNetworkAdapterRequest{
 		ID:           networkAdapterId,
 		MacType:      "ASSIGNED",
 		NewNetworkId: "1a2e7257-0747-474a-ba49-942ee463a94c",
@@ -163,7 +164,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 	require.Equal(t, "ASSIGNED", networkAdapter.MacType)
 	require.NotEqual(t, "00:50:57:CB:89:B7", networkAdapter.MacAddress)
 
-	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
+	activityId, err = client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 		ID:             vm.ID,
 		DatacenterId:   vm.DatacenterId,
 		PowerAction:    "off",

@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +23,7 @@ const (
 
 func TestCompute_ContentLibraryList(t *testing.T) {
 	ctx := context.Background()
-	contentLibraries, err := client.Compute().ContentLibrary().List(ctx, &ContentLibraryFilter{
+	contentLibraries, err := client.Compute().ContentLibrary().List(ctx, &clientpkg.ContentLibraryFilter{
 		Name:             os.Getenv(ContentLibraryName),
 		MachineManagerId: os.Getenv(MachineManagerId),
 	})
@@ -45,11 +46,11 @@ func TestCompute_ContentLibraryRead(t *testing.T) {
 	contentLibrary, err := client.Compute().ContentLibrary().Read(ctx, os.Getenv(ContentLibraryId))
 	require.NoError(t, err)
 
-	expected := &ContentLibrary{
+	expected := &clientpkg.ContentLibrary{
 		ID:   os.Getenv(ContentLibraryId),
 		Name: os.Getenv(ContentLibraryName),
 		Type: os.Getenv(ContentLibraryType),
-		Datastore: DatastoreLink{
+		Datastore: clientpkg.DatastoreLink{
 			ID:   os.Getenv(DataStoreId),
 			Name: os.Getenv(DataStoreName),
 		},
@@ -59,14 +60,14 @@ func TestCompute_ContentLibraryRead(t *testing.T) {
 
 func TestContentLibraryClient_ListItems(t *testing.T) {
 	ctx := context.Background()
-	items, err := client.Compute().ContentLibrary().ListItems(ctx, &ContentLibraryItemFilter{
+	items, err := client.Compute().ContentLibrary().ListItems(ctx, &clientpkg.ContentLibraryItemFilter{
 		ContentLibraryId: os.Getenv(ContentLibraryId),
 	})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(items), 1)
 
-	var clItem *ContentLibraryItem
+	var clItem *clientpkg.ContentLibraryItem
 	for _, item := range items {
 		if item.ID == os.Getenv(ContentLibraryItemId) {
 			clItem = item
@@ -92,7 +93,7 @@ func TestContentLibraryClient_ReadItem(t *testing.T) {
 
 func TestContentLibraryClient_Clone(t *testing.T) {
 	ctx := context.Background()
-	activityId, err := client.Compute().ContentLibrary().Deploy(ctx, &ComputeContentLibraryItemDeployRequest{
+	activityId, err := client.Compute().ContentLibrary().Deploy(ctx, &clientpkg.ComputeContentLibraryItemDeployRequest{
 		ContentLibraryId:     os.Getenv(ContentLibraryId),
 		ContentLibraryItemId: os.Getenv(ContentLibraryItemId),
 		Name:                 "test-client-content-library-deploy",

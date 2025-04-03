@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,7 +27,7 @@ func TestIAM_RolesRead(t *testing.T) {
 	role, err := client.IAM().Role().Read(context.Background(), roleID)
 	require.NoError(t, err)
 
-	expected := &Role{
+	expected := &clientpkg.Role{
 		ID:   roleID,
 		Name: "iam_read",
 	}

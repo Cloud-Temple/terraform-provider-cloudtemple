@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +32,7 @@ func TestBackupJobClient_List(t *testing.T) {
 	}
 	require.True(t, found)
 
-	jobs, err = client.Backup().Job().List(ctx, &BackupJobFilter{
+	jobs, err = client.Backup().Job().List(ctx, &clientpkg.BackupJobFilter{
 		Type: os.Getenv(JobType),
 	})
 	require.NoError(t, err)
@@ -53,7 +54,7 @@ func TestBackupJobClient_Read(t *testing.T) {
 func TestBackupJobClient_Run(t *testing.T) {
 	ctx := context.Background()
 
-	activityId, err := client.Backup().Job().Run(ctx, &BackupJobRunRequest{
+	activityId, err := client.Backup().Job().Run(ctx, &clientpkg.BackupJobRunRequest{
 		JobId: os.Getenv(JobId),
 	})
 	require.NoError(t, err)

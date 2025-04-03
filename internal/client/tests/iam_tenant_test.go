@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,14 +16,14 @@ func TestIAM_Tenants(t *testing.T) {
 	require.Len(t, tenants, 2)
 
 	companyID := os.Getenv(testCompanyIDEnvName)
-	expected := &Tenant{
+	expected := &clientpkg.Tenant{
 		ID:        os.Getenv(TenantId),
 		Name:      os.Getenv(TenantName),
 		SNC:       true,
 		CompanyID: companyID,
 	}
 
-	var rightTenant = &Tenant{}
+	var rightTenant = &clientpkg.Tenant{}
 	for _, tenant := range tenants {
 		if tenant.ID == expected.ID {
 			rightTenant = tenant

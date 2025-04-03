@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -49,7 +50,7 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 func TestCompute_VirtualMachineCreateDelete(t *testing.T) {
 	ctx := context.Background()
 
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -71,7 +72,7 @@ func TestCompute_VirtualMachineCreateDelete(t *testing.T) {
 func TestCompute_UpdateAndPower(t *testing.T) {
 	ctx := context.Background()
 
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-power",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -84,20 +85,20 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 
 	instanceId := activity.ConcernedItems[0].ID
 
-	jobs, err := client.Backup().Job().List(ctx, &BackupJobFilter{
+	jobs, err := client.Backup().Job().List(ctx, &clientpkg.BackupJobFilter{
 		Type: "catalog",
 	})
 	require.NoError(t, err)
 	require.Greater(t, len(jobs), 0)
 
-	var job = &BackupJob{}
+	var job = &clientpkg.BackupJob{}
 	for _, currJob := range jobs {
 		if currJob.Name == "Hypervisor Inventory" {
 			job = currJob
 		}
 	}
 
-	activityId, err = client.Backup().Job().Run(ctx, &BackupJobRunRequest{
+	activityId, err = client.Backup().Job().Run(ctx, &clientpkg.BackupJobRunRequest{
 		JobId: job.ID,
 	})
 	require.NoError(t, err)
@@ -108,7 +109,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 	_, err = client.Backup().Job().WaitForCompletion(ctx, jobs[0].ID, nil)
 	require.NoError(t, err)
 
-	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &BackupAssignVirtualMachineRequest{
+	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &clientpkg.BackupAssignVirtualMachineRequest{
 		VirtualMachineIds: []string{instanceId},
 		SLAPolicies:       []string{os.Getenv(PolicyId)},
 	})
@@ -118,9 +119,9 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "stopped", vm.PowerState)
 
-	activityId, err = client.Compute().VirtualMachine().Update(ctx, &UpdateVirtualMachineRequest{
+	activityId, err = client.Compute().VirtualMachine().Update(ctx, &clientpkg.UpdateVirtualMachineRequest{
 		Id: instanceId,
-		BootOptions: &BootOptions{
+		BootOptions: &clientpkg.BootOptions{
 			BootDelay:        0,
 			BootRetryDelay:   10000,
 			BootRetryEnabled: false,
@@ -132,7 +133,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
-	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
+	activityId, err = client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 		ID:           instanceId,
 		DatacenterId: vm.DatacenterId,
 		PowerAction:  "on",
@@ -141,7 +142,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 
-	activityId, err = client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
+	activityId, err = client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 		ID:           instanceId,
 		DatacenterId: vm.DatacenterId,
 		PowerAction:  "off",
@@ -159,7 +160,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 func TestVirtualMachineClient_Rename(t *testing.T) {
 	ctx := context.Background()
 
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-rename",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -188,7 +189,7 @@ func TestVirtualMachineClient_Rename(t *testing.T) {
 func TestVirtualMachineClient_Clone(t *testing.T) {
 	ctx := context.Background()
 
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-clone",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -202,7 +203,7 @@ func TestVirtualMachineClient_Clone(t *testing.T) {
 
 	instanceId := activity.ConcernedItems[0].ID
 
-	activityId, err = client.Compute().VirtualMachine().Clone(ctx, &CloneVirtualMachineRequest{
+	activityId, err = client.Compute().VirtualMachine().Clone(ctx, &clientpkg.CloneVirtualMachineRequest{
 		Name:              "test-client-cloned",
 		VirtualMachineId:  instanceId,
 		DatacenterId:      os.Getenv(DataCenterId),
@@ -231,7 +232,7 @@ func TestVirtualMachineClient_Clone(t *testing.T) {
 func TestVirtualMachineClient_Relocate(t *testing.T) {
 	ctx := context.Background()
 
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-relocate",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -244,7 +245,7 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 
 	instanceId := activity.ConcernedItems[0].ID
 
-	activityId, err = client.Compute().VirtualMachine().Relocate(ctx, &RelocateVirtualMachineRequest{
+	activityId, err = client.Compute().VirtualMachine().Relocate(ctx, &clientpkg.RelocateVirtualMachineRequest{
 		VirtualMachines:    []string{instanceId},
 		Priority:           "highPriority",
 		DatacenterId:       os.Getenv(DataCenterId),
@@ -272,7 +273,7 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 func TestVirtualMachineClient_Guest(t *testing.T) {
 	ctx := context.Background()
 
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-clone",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -285,7 +286,7 @@ func TestVirtualMachineClient_Guest(t *testing.T) {
 
 	instanceId := activity.ConcernedItems[0].ID
 
-	activityId, err = client.Compute().VirtualMachine().Guest(ctx, instanceId, &UpdateGuestRequest{
+	activityId, err = client.Compute().VirtualMachine().Guest(ctx, instanceId, &clientpkg.UpdateGuestRequest{
 		GuestOperatingSystemMoref: "vmwarePhoton64Guest",
 	})
 	require.NoError(t, err)

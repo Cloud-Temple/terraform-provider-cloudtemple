@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +21,7 @@ func TestBackupJobSessionClient_List(t *testing.T) {
 
 	require.GreaterOrEqual(t, len(jobSessions), 1)
 
-	var jobSession *BackupJobSession
+	var jobSession *clientpkg.BackupJobSession
 	for _, jb := range jobSessions {
 		if jb.ID == os.Getenv(JobSessionId) {
 			jobSession = jb

@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -36,7 +37,7 @@ func TestBackupSPPServerClient_Read(t *testing.T) {
 	slaPolicy, err := client.Backup().SPPServer().Read(ctx, os.Getenv(SppServerId))
 	require.NoError(t, err)
 
-	expected := &BackupSPPServer{
+	expected := &clientpkg.BackupSPPServer{
 		ID:      os.Getenv(SppServerId),
 		Name:    os.Getenv(SppServerName),
 		Address: os.Getenv(SppServerAddress),

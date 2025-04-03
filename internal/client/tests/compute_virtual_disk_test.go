@@ -6,6 +6,7 @@ import (
 	"strconv"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,7 +47,7 @@ func TestCompute_VirtualDiskRead(t *testing.T) {
 
 func TestVirtualDiskClient_Create(t *testing.T) {
 	ctx := context.Background()
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-disk",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -60,7 +61,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 	vm, err := client.Compute().VirtualMachine().Read(ctx, activity.ConcernedItems[0].ID)
 	require.NoError(t, err)
 
-	activityId, err = client.Compute().VirtualDisk().Create(ctx, &CreateVirtualDiskRequest{
+	activityId, err = client.Compute().VirtualDisk().Create(ctx, &clientpkg.CreateVirtualDiskRequest{
 		ProvisioningType:   "dynamic",
 		DiskMode:           "persistent",
 		Capacity:           10737418240,
@@ -83,7 +84,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 
 	require.Equal(
 		t,
-		&VirtualDisk{
+		&clientpkg.VirtualDisk{
 			ID:               diskId,
 			VirtualMachineId: vm.ID,
 			MachineManagerId: os.Getenv(MachineManagerId2),
@@ -97,7 +98,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		disk,
 	)
 
-	activityId, err = client.Compute().VirtualDisk().Update(ctx, &UpdateVirtualDiskRequest{
+	activityId, err = client.Compute().VirtualDisk().Update(ctx, &clientpkg.UpdateVirtualDiskRequest{
 		ID:          diskId,
 		NewCapacity: 2 * 10737418240,
 	})
@@ -116,7 +117,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 
 	require.Equal(
 		t,
-		&VirtualDisk{
+		&clientpkg.VirtualDisk{
 			ID:               diskId,
 			VirtualMachineId: vm.ID,
 			MachineManagerId: os.Getenv(MachineManagerId2),
@@ -148,7 +149,7 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 
 func TestVirtualDiskClient_Unmount(t *testing.T) {
 	ctx := context.Background()
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-disk-unmount",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -162,7 +163,7 @@ func TestVirtualDiskClient_Unmount(t *testing.T) {
 	vm, err := client.Compute().VirtualMachine().Read(ctx, activity.ConcernedItems[0].ID)
 	require.NoError(t, err)
 
-	activityId, err = client.Compute().VirtualDisk().Create(ctx, &CreateVirtualDiskRequest{
+	activityId, err = client.Compute().VirtualDisk().Create(ctx, &clientpkg.CreateVirtualDiskRequest{
 		ProvisioningType:   "dynamic",
 		DiskMode:           "persistent",
 		Capacity:           10737418240,

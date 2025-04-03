@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -44,7 +45,7 @@ func TestBackupMetricsClient_Policies(t *testing.T) {
 
 	require.GreaterOrEqual(t, len(policiesMetrics), 1)
 
-	expected := &BackupMetricsPolicies{
+	expected := &clientpkg.BackupMetricsPolicies{
 		Name:        os.Getenv(MetricPolicyName),
 		TriggerType: os.Getenv(MetricPolicyTriggerType),
 	}

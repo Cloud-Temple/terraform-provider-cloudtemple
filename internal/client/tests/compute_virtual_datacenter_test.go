@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,7 +36,7 @@ func TestCompute_VirtualDatacenterRead(t *testing.T) {
 	virtualDatacenter, err := client.Compute().VirtualDatacenter().Read(ctx, os.Getenv(VirtualDatacenterId))
 	require.NoError(t, err)
 
-	expected := &VirtualDatacenter{
+	expected := &clientpkg.VirtualDatacenter{
 		ID:               os.Getenv(VirtualDatacenterId),
 		Name:             os.Getenv(VirtualDatacenterName),
 		MachineManagerID: os.Getenv(MachineManagerId),

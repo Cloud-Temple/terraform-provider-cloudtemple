@@ -5,13 +5,14 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
 func TestTagClient(t *testing.T) {
 	ctx := context.Background()
 
-	activityId, err := client.Compute().VirtualMachine().Create(ctx, &CreateVirtualMachineRequest{
+	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-tags",
 		DatacenterId:              os.Getenv(DataCenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
@@ -28,12 +29,12 @@ func TestTagClient(t *testing.T) {
 	tags, err := client.Tag().Resource().Read(ctx, instanceId)
 	require.NoError(t, err)
 
-	require.Equal(t, []*Tag{}, tags)
+	require.Equal(t, []*clientpkg.Tag{}, tags)
 
-	err = client.Tag().Resource().Create(ctx, &CreateTagRequest{
+	err = client.Tag().Resource().Create(ctx, &clientpkg.CreateTagRequest{
 		Key:   "Test",
 		Value: "working",
-		Resources: []*CreateTagRequestResource{
+		Resources: []*clientpkg.CreateTagRequestResource{
 			{
 				UUID:   instanceId,
 				Type:   "vcenter_virtual_machine",
@@ -48,7 +49,7 @@ func TestTagClient(t *testing.T) {
 
 	require.Equal(
 		t,
-		[]*Tag{
+		[]*clientpkg.Tag{
 			{
 				Key:      "Test",
 				Value:    "working",
@@ -64,7 +65,7 @@ func TestTagClient(t *testing.T) {
 
 	require.Equal(
 		t,
-		[]*Tag{
+		[]*clientpkg.Tag{
 			{
 				Key:      "Test",
 				Value:    "working",

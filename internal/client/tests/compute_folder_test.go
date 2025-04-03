@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -35,7 +36,7 @@ func TestCompute_FolderRead(t *testing.T) {
 	folder, err := client.Compute().Folder().Read(ctx, os.Getenv(FolderId))
 	require.NoError(t, err)
 
-	expected := &Folder{
+	expected := &clientpkg.Folder{
 		ID:               os.Getenv(FolderId),
 		Name:             os.Getenv(FolderName),
 		MachineManagerId: os.Getenv(MachineManagerId),

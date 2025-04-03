@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,7 +21,7 @@ func TestBackupSiteClient_List(t *testing.T) {
 
 	require.GreaterOrEqual(t, len(backupSites), 1)
 
-	var backupSite *BackupSite
+	var backupSite *clientpkg.BackupSite
 	for _, bs := range backupSites {
 		if bs.ID == os.Getenv(SiteId) {
 			backupSite = bs
@@ -29,7 +30,7 @@ func TestBackupSiteClient_List(t *testing.T) {
 	}
 	require.NotNil(t, backupSite)
 
-	expected := &BackupSite{
+	expected := &clientpkg.BackupSite{
 		ID:   os.Getenv(SiteId),
 		Name: os.Getenv(SiteName),
 	}

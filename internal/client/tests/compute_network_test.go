@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +17,7 @@ const (
 
 func TestCompute_NetworkList(t *testing.T) {
 	ctx := context.Background()
-	networks, err := client.Compute().Network().List(ctx, &NetworkFilter{})
+	networks, err := client.Compute().Network().List(ctx, &clientpkg.NetworkFilter{})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(networks), 1)

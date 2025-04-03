@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +18,7 @@ const (
 	testCompanyIDEnvName = "SHIVA_TEST_COMPANY_ID"
 )
 
-var client *Client = nil
+var client *clientpkg.Client = nil
 
 func TestMain(m *testing.M) {
 
@@ -43,13 +44,13 @@ func TestMain(m *testing.M) {
 		os.Exit(1)
 	}
 
-	config := DefaultConfig()
+	config := clientpkg.DefaultConfig()
 	config.ClientID = os.Getenv(testClientIDEnvName)
 	config.SecretID = os.Getenv(testSecretIDEnvName)
 
-	config.errorOnUnexpectedActivity = true
+	config.ErrorOnUnexpectedActivity = true
 
-	c, err := NewClient(config)
+	c, err := clientpkg.NewClient(config)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)
@@ -72,7 +73,7 @@ func TestMain(m *testing.M) {
 					os.Exit(1)
 				}
 
-				activityId, err := client.Compute().VirtualMachine().Power(ctx, &PowerRequest{
+				activityId, err := client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 					ID:           vm.ID,
 					DatacenterId: vm.DatacenterId,
 					PowerAction:  "off",
@@ -147,13 +148,13 @@ func testUserID(t *testing.T) string {
 	return lt.UserID()
 }
 
-func testRole(t *testing.T) *Role {
+func testRole(t *testing.T) *clientpkg.Role {
 	t.Helper()
 
 	roles, err := client.IAM().Role().List(context.Background())
 	require.NoError(t, err)
 
-	var role *Role
+	var role *clientpkg.Role
 	for _, r := range roles {
 		if r.Name == "iam_read" {
 			role = r
@@ -166,17 +167,17 @@ func testRole(t *testing.T) *Role {
 }
 
 func TestAPI_token(t *testing.T) {
-	token, err := client.token(context.Background())
+	token, err := client.JWT(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, token)
-	require.NotNil(t, client.savedToken)
+	require.NotNil(t, client.SavedToken)
 }
 
 func TestAPI_tokenCache(t *testing.T) {
-	token, err := client.token(context.Background())
+	token, err := client.JWT(context.Background())
 	require.NoError(t, err)
 
-	newToken, err := client.token(context.Background())
+	newToken, err := client.JWT(context.Background())
 	require.NoError(t, err)
 
 	require.Equal(t, token.Raw, newToken.Raw)
@@ -187,12 +188,12 @@ func TestAPI_tokenExpiration(t *testing.T) {
 		t.Skip("Set the CLIENT_RUN_LONG_TESTS environment variable to run this test")
 	}
 
-	token, err := client.token(context.Background())
+	token, err := client.JWT(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, token)
 
 	time.Sleep(28 * time.Minute)
-	newToken, err := client.token(context.Background())
+	newToken, err := client.JWT(context.Background())
 	require.NoError(t, err)
 	require.NotNil(t, token)
 

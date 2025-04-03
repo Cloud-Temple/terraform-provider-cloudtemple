@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +17,7 @@ const (
 
 func TestCompute_VirtualSwitchList(t *testing.T) {
 	ctx := context.Background()
-	virtualSwitchs, err := client.Compute().VirtualSwitch().List(ctx, &VirtualSwitchFilter{})
+	virtualSwitchs, err := client.Compute().VirtualSwitch().List(ctx, &clientpkg.VirtualSwitchFilter{})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(virtualSwitchs), 1)
@@ -36,7 +37,7 @@ func TestCompute_VirtualSwitchRead(t *testing.T) {
 	virtualSwitch, err := client.Compute().VirtualSwitch().Read(ctx, os.Getenv(VirtualSwitchId))
 	require.NoError(t, err)
 
-	expected := &VirtualSwitch{
+	expected := &clientpkg.VirtualSwitch{
 		ID:    os.Getenv(VirtualSwitchId),
 		Name:  os.Getenv(VirtualSwitchName),
 		Moref: os.Getenv(VirtualSwitchMoref),

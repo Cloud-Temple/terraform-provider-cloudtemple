@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	providerpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -147,12 +148,12 @@ func TestMain(m *testing.M) {
 // to create a provider server to which the CLI can reattach.
 var providerFactories = map[string]func() (*schema.Provider, error){
 	"cloudtemple": func() (*schema.Provider, error) {
-		return New("dev")(), nil
+		return providerpkg.New("dev")(), nil
 	},
 }
 
 func TestProvider(t *testing.T) {
-	if err := New("dev")().InternalValidate(); err != nil {
+	if err := providerpkg.New("dev")().InternalValidate(); err != nil {
 		t.Fatalf("err: %s", err)
 	}
 }
@@ -160,12 +161,12 @@ func TestProvider(t *testing.T) {
 func testAccPreCheck(t *testing.T) {}
 
 func TestIDValidation(t *testing.T) {
-	provider := New("dev")()
+	provider := providerpkg.New("dev")()
 
 	checkUUID := func(name string, r *schema.Resource) func(t *testing.T) {
 		expected := map[uintptr]struct{}{
-			reflect.ValueOf(validation.IsUUID).Pointer(): {},
-			reflect.ValueOf(IsNumber).Pointer():          {},
+			reflect.ValueOf(validation.IsUUID).Pointer():    {},
+			reflect.ValueOf(providerpkg.IsNumber).Pointer(): {},
 		}
 
 		var validateSchema func(r *schema.Resource)
@@ -205,7 +206,7 @@ func TestIDValidation(t *testing.T) {
 }
 
 func TestImport(t *testing.T) {
-	provider := New("dev")()
+	provider := providerpkg.New("dev")()
 
 	skip := map[string]struct{}{
 		// Access tokens cannot be imported because there is no way of getting the secret
@@ -227,7 +228,7 @@ func TestImport(t *testing.T) {
 }
 
 func TestExample(t *testing.T) {
-	provider := New("dev")()
+	provider := providerpkg.New("dev")()
 
 	test := func(typ, name string) func(t *testing.T) {
 		return func(t *testing.T) {

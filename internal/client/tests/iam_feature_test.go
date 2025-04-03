@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +18,7 @@ func TestIAM_Features(t *testing.T) {
 	features, err := client.IAM().Feature().List(context.Background())
 	require.NoError(t, err)
 
-	var rtms *Feature
+	var rtms *clientpkg.Feature
 	for _, feature := range features {
 		if feature.Name == "rtms" {
 			rtms = feature

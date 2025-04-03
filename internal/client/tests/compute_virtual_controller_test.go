@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -21,7 +22,7 @@ func TestCompute_VirtualControllerList(t *testing.T) {
 
 	require.GreaterOrEqual(t, len(virtualControllers), 1)
 
-	var virtualController *VirtualController
+	var virtualController *clientpkg.VirtualController
 	for _, vc := range virtualControllers {
 		if vc.ID == os.Getenv(VirtualControllerId) {
 			virtualController = vc

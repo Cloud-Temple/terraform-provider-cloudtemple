@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +19,7 @@ const (
 
 func TestCompute_DatastoreList(t *testing.T) {
 	ctx := context.Background()
-	datastores, err := client.Compute().Datastore().List(ctx, &DatastoreFilter{
+	datastores, err := client.Compute().Datastore().List(ctx, &clientpkg.DatastoreFilter{
 		DatacenterId: os.Getenv(DataStoreDataCenterId),
 	})
 	require.NoError(t, err)
