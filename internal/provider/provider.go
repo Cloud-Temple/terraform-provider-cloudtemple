@@ -295,6 +295,59 @@ func (sw *stateWriter) set(key string, value any) {
 	}
 }
 
+// processFlattenedStructs parcourt l'objet à la recherche de structures avec le tag terraform_flatten
+// et définit leurs champs directement dans le schéma Terraform au niveau supérieur.
+func (sw *stateWriter) processFlattenedStructs(obj interface{}) {
+	val := reflect.ValueOf(obj)
+	if val.Kind() == reflect.Ptr {
+		val = val.Elem()
+	}
+
+	// Ne traiter que les structures
+	if val.Kind() != reflect.Struct {
+		return
+	}
+
+	typ := val.Type()
+
+	// Parcourir tous les champs de la structure
+	for i := 0; i < val.NumField(); i++ {
+		field := val.Field(i)
+		fieldType := typ.Field(i)
+
+		// Vérifier si le champ est une structure
+		if field.Kind() == reflect.Struct {
+			// Vérifier si la structure a le tag terraform_flatten
+			prefix, shouldFlatten := fieldType.Tag.Lookup("terraform_flatten")
+			if shouldFlatten {
+				// Si le tag terraform_flatten est "true", utiliser le nom du champ
+				if prefix == "true" || prefix == "" {
+					prefix = strings.ToLower(fieldType.Name)
+				}
+
+				// Parcourir tous les champs de la structure à aplatir
+				nestedType := field.Type()
+				for j := 0; j < field.NumField(); j++ {
+					nestedField := field.Field(j)
+					nestedFieldType := nestedType.Field(j)
+
+					// Obtenir le nom du champ dans le schéma Terraform
+					name, found := nestedFieldType.Tag.Lookup("terraform")
+					if !found || name == "-" {
+						continue
+					}
+
+					// Construire le nom complet du champ aplati
+					flatName := prefix + "_" + name
+
+					// Définir le champ aplati dans le schéma Terraform
+					sw.set(flatName, nestedField.Interface())
+				}
+			}
+		}
+	}
+}
+
 func (sw *stateWriter) save(obj any, skip []string) {
 	skipFields := map[string]struct{}{}
 	for _, s := range skip {
@@ -315,6 +368,11 @@ func (sw *stateWriter) save(obj any, skip []string) {
 			item = item.Elem()
 		}
 		for _, field := range reflect.VisibleFields(item.Type()) {
+			// Ignorer les champs qui ont le tag terraform_flatten
+			if _, shouldFlatten := field.Tag.Lookup("terraform_flatten"); shouldFlatten {
+				continue
+			}
+
 			name, found := field.Tag.Lookup("terraform")
 			if name == "-" {
 				continue
@@ -337,6 +395,9 @@ func (sw *stateWriter) save(obj any, skip []string) {
 		converted := sw.convert(value, false, name, skipFields)
 		sw.set(name, converted)
 	}
+
+	// Traiter les structures aplaties
+	sw.processFlattenedStructs(obj)
 }
 
 func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string, skipFields map[string]struct{}) any {

@@ -58,8 +58,13 @@ func dataSourceOpenIaasBackupPolicy() *schema.Resource {
 			"machine_manager_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
+				Computed:      true,
 				ConflictsWith: []string{"id"},
 				RequiredWith:  []string{"name"},
+			},
+			"machine_manager_name": {
+				Type:     schema.TypeString,
+				Computed: true,
 			},
 
 			// Out
@@ -75,22 +80,22 @@ func dataSourceOpenIaasBackupPolicy() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			"machine_manager": {
-				Type:     schema.TypeList,
-				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
-			},
+			// "machine_manager": {
+			// 	Type:     schema.TypeList,
+			// 	Computed: true,
+			// 	Elem: &schema.Resource{
+			// 		Schema: map[string]*schema.Schema{
+			// 			"id": {
+			// 				Type:     schema.TypeString,
+			// 				Computed: true,
+			// 			},
+			// 			"name": {
+			// 				Type:     schema.TypeString,
+			// 				Computed: true,
+			// 			},
+			// 		},
+			// 	},
+			// },
 			"schedulers": {
 				Type:     schema.TypeList,
 				Computed: true,

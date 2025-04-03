@@ -19,7 +19,7 @@ type BackupOpenIaasPolicy struct {
 	MachineManager struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
-	} `terraform:"machine_manager"`
+	} `terraform_flatten:"machine_manager"`
 	Schedulers []struct {
 		TemporarilyDisabled bool   `terraform:"temporarily_disabled"`
 		Retention           int    `terraform:"retention"`
