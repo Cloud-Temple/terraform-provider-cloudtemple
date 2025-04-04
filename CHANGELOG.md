@@ -1,3 +1,9 @@
+## 0.16.3 (April 4th, 2025)
+
+BUG FIXES :
+
+  * Fixed a bug causing the provider to wait indefinitely the result of an activity when the PAT doesn't have the `activity_read` permission. 
+
 ## 0.16.3-rc.1 (April 3rd, 2025)
 
 MISCELLANEOUS :
