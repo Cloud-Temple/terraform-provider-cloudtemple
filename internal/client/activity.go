@@ -157,11 +157,11 @@ func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string, optio
 		count++
 		activity, err := c.Read(ctx, id)
 		if err != nil {
-			return options.retryableError(&ActivityCompletionError{
-				message:  fmt.Sprintf("an error occured while getting the status of activity %q: %s", id, err),
-				activity: activity,
+			return options.error(&ActivityCompletionError{
+				message: fmt.Sprintf("an error occured while getting the status of activity %q: %s", id, err),
 			})
 		}
+
 		if activity == nil {
 			err := &ActivityCompletionError{
 				message: fmt.Sprintf("the activity %q could not be found", id),
