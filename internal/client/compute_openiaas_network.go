@@ -15,7 +15,8 @@ type OpenIaaSNetwork struct {
 	MachineManager struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
-	} `terraform:"machine_manager"`
+		Type string `terraform:"type"`
+	} `terraform_flatten:"machine_manager"`
 	InternalID                 string   `terraform:"internal_id"`
 	Name                       string   `terraform:"name"`
 	Pool                       Pool     `terraform:"pool"`

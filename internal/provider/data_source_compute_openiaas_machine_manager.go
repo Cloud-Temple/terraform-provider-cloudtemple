@@ -14,11 +14,9 @@ func dataSourceOpenIaasMachineManager() *schema.Resource {
 		Description: "Used to retrieve an Availability Zone.",
 
 		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			var machineManager *client.OpenIaaSMachineManager
-			var err error
 			id := d.Get("id").(string)
 			if id != "" {
-				machineManager, err = c.Compute().OpenIaaS().MachineManager().Read(ctx, id)
+				machineManager, err := c.Compute().OpenIaaS().MachineManager().Read(ctx, id)
 				if err == nil && machineManager == nil {
 					return nil, fmt.Errorf("failed to find machine manager with id %q", id)
 				}

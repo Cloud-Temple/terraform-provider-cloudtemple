@@ -11,9 +11,13 @@ func (c *ComputeOpenIaaSClient) NetworkAdapter() *OpenIaaSNetworkAdapterClient {
 }
 
 type OpenIaaSNetworkAdapter struct {
-	ID               string `terraform:"id"`
-	Name             string `terraform:"name"`
-	MachineManagerID string `terraform:"machine_manager_id"`
+	ID             string `terraform:"id"`
+	Name           string `terraform:"name"`
+	MachineManager struct {
+		ID   string `terraform:"id"`
+		Name string `terraform:"name"`
+		Type string `terraform:"type"`
+	} `terraform_flatten:"machine_manager"`
 	InternalID       string `terraform:"internal_id"`
 	VirtualMachineID string `terraform:"virtual_machine_id"`
 	MacAddress       string `terraform:"mac_address"`

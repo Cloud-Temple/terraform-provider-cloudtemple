@@ -16,7 +16,7 @@ type OpenIaaSHost struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
 		Type string `terraform:"type"`
-	} `terraform:"machine_manager_id"`
+	} `terraform_flatten:"machine_manager"`
 	InternalId string `terraform:"internal_id"`
 	Pool       struct {
 		ID   string `terraform:"id"`

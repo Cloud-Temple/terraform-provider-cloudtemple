@@ -116,7 +116,7 @@ func openIaasNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, met
 	sw := newStateWriter(d)
 	// Set the retrieved data to the schema
 	sw.set("name", networkAdapter.Name)
-	sw.set("machine_manager_id", networkAdapter.MachineManagerID) // DevNote : This will change in future API versions
+	sw.set("machine_manager_id", networkAdapter.MachineManager.ID) // DevNote : This will change in future API versions
 	sw.set("mtu", networkAdapter.MTU)
 	sw.set("attached", networkAdapter.Attached)
 	sw.set("mac_address", networkAdapter.MacAddress)
