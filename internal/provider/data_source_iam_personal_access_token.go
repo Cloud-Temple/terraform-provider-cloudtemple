@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,27 +14,45 @@ func dataSourcePersonalAccessToken() *schema.Resource {
 		Description: "",
 
 		ReadContext: readResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, []string, error) {
-			token, err := getBy(
-				ctx,
-				d,
-				"personal access token",
-				func(id string) (any, error) {
-					return client.IAM().PAT().Read(ctx, id)
-				},
-				func(d *schema.ResourceData) (any, error) {
-					userId, err := getUserID(ctx, client, d)
-					if err != nil {
-						return nil, err
+			// Recherche par ID
+			id := d.Get("id").(string)
+			if id != "" {
+				token, err := client.IAM().PAT().Read(ctx, id)
+				if err != nil {
+					return nil, []string{"secret"}, err
+				}
+				if token == nil {
+					return nil, []string{"secret"}, fmt.Errorf("failed to find personal access token with id %q", id)
+				}
+				return token, []string{"secret"}, nil
+			}
+
+			// Obtenir les IDs utilisateur et tenant
+			userId, err := getUserID(ctx, client, d)
+			if err != nil {
+				return nil, []string{"secret"}, err
+			}
+			tenantId, err := getTenantID(ctx, client, d)
+			if err != nil {
+				return nil, []string{"secret"}, err
+			}
+
+			// Recherche par nom
+			name := d.Get("name").(string)
+			if name != "" {
+				tokens, err := client.IAM().PAT().List(ctx, userId, tenantId)
+				if err != nil {
+					return nil, []string{"secret"}, fmt.Errorf("failed to list personal access tokens: %s", err)
+				}
+				for _, token := range tokens {
+					if token.Name == name {
+						return token, []string{"secret"}, nil
 					}
-					tenantId, err := getTenantID(ctx, client, d)
-					if err != nil {
-						return nil, err
-					}
-					return client.IAM().PAT().List(ctx, userId, tenantId)
-				},
-				[]string{"name"},
-			)
-			return token, []string{"secret"}, err
+				}
+				return nil, []string{"secret"}, fmt.Errorf("failed to find personal access token with name %q", name)
+			}
+
+			return nil, []string{"secret"}, fmt.Errorf("either id or name must be specified")
 		}),
 
 		Schema: map[string]*schema.Schema{

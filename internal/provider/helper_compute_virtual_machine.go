@@ -61,8 +61,8 @@ func getPowerRecommendation(vm *client.VirtualMachine, powerState string, ctx co
 	if powerState == "on" || powerState == "running" {
 		recommendations, err = c.Compute().VirtualMachine().Recommendation(ctx, &client.VirtualMachineRecommendationFilter{
 			Id:            vm.ID,
-			DatacenterId:  vm.DatacenterId,
-			HostClusterId: vm.HostClusterId,
+			DatacenterId:  vm.Datacenter.ID,
+			HostClusterId: vm.HostCluster.ID,
 		})
 		if err != nil {
 			return nil, err
@@ -124,7 +124,7 @@ func flattenOSDiskData(osDisk *client.VirtualDisk) interface{} {
 	disk := make(map[string]interface{})
 
 	disk["id"] = osDisk.ID
-	disk["machine_manager_id"] = osDisk.MachineManagerId
+	disk["machine_manager_id"] = osDisk.MachineManager.ID
 	disk["name"] = osDisk.Name
 	disk["capacity"] = osDisk.Capacity
 	disk["disk_unit_number"] = osDisk.DiskUnitNumber

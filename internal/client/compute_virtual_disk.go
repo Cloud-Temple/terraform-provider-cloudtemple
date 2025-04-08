@@ -11,22 +11,26 @@ func (c *ComputeClient) VirtualDisk() *VirtualDiskClient {
 }
 
 type VirtualDisk struct {
-	ID                  string `terraform:"id"`
-	VirtualMachineId    string `terraform:"virtual_machine_id"`
-	MachineManagerId    string `terraform:"machine_manager_id"`
-	Name                string `terraform:"name"`
-	Capacity            int    `terraform:"capacity"`
-	DiskUnitNumber      int    `terraform:"disk_unit_number"`
-	ControllerBusNumber int    `terraform:"controller_bus_number"`
-	ControllerId        string `terraform:"controller_id"`
-	DatastoreId         string `terraform:"datastore_id"`
-	DatastoreName       string `terraform:"datastore_name"`
-	InstantAccess       bool   `terraform:"instant_access"`
-	NativeId            string `terraform:"native_id"`
-	DiskPath            string `terraform:"disk_path"`
-	ProvisioningType    string `terraform:"provisioning_type"`
-	DiskMode            string `terraform:"disk_mode"`
-	Editable            bool   `terraform:"editable"`
+	ID                  string     `terraform:"id"`
+	VirtualMachineId    string     `terraform:"virtual_machine_id"`
+	MachineManager      BaseObject `terraform_flatten:"machine_manager"`
+	Name                string     `terraform:"name"`
+	Capacity            int        `terraform:"capacity"`
+	DiskUnitNumber      int        `terraform:"disk_unit_number"`
+	ControllerBusNumber int        `terraform:"controller_bus_number"`
+	DatastoreId         string     `terraform:"datastore_id"`
+	DatastoreName       string     `terraform:"datastore_name"`
+	InstantAccess       bool       `terraform:"instant_access"`
+	NativeId            string     `terraform:"native_id"`
+	DiskPath            string     `terraform:"disk_path"`
+	ProvisioningType    string     `terraform:"provisioning_type"`
+	DiskMode            string     `terraform:"disk_mode"`
+	Editable            bool       `terraform:"editable"`
+	Controller          struct {
+		ID        string `terraform:"id"`
+		BusNumber int    `terraform:"bus_number"`
+		Type      string `terraform:"type"`
+	} `terraform_flatten:"controller"`
 }
 
 func (v *VirtualDiskClient) List(ctx context.Context, virtualMachineId string) ([]*VirtualDisk, error) {

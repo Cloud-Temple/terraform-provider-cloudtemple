@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,19 +14,40 @@ func dataSourceNetworkAdapter() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			return getBy(
-				ctx,
-				d,
-				"network adapter",
-				func(id string) (any, error) {
-					return client.Compute().NetworkAdapter().Read(ctx, id)
-				},
-				func(d *schema.ResourceData) (any, error) {
-					virtualMachineId := d.Get("virtual_machine_id").(string)
-					return client.Compute().NetworkAdapter().List(ctx, virtualMachineId)
-				},
-				[]string{"name"},
-			)
+			// Recherche par nom
+			name := d.Get("name").(string)
+			if name != "" {
+				virtualMachineId := d.Get("virtual_machine_id").(string)
+				if virtualMachineId == "" {
+					return nil, fmt.Errorf("virtual_machine_id is required when searching by name")
+				}
+
+				adapters, err := client.Compute().NetworkAdapter().List(ctx, virtualMachineId)
+				if err != nil {
+					return nil, fmt.Errorf("failed to find network adapter named %q: %s", name, err)
+				}
+				for _, adapter := range adapters {
+					if adapter.Name == name {
+						return adapter, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find network adapter named %q", name)
+			}
+
+			// Recherche par ID
+			id := d.Get("id").(string)
+			if id != "" {
+				adapter, err := client.Compute().NetworkAdapter().Read(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				if adapter == nil {
+					return nil, fmt.Errorf("failed to find network adapter with id %q", id)
+				}
+				return adapter, nil
+			}
+
+			return nil, fmt.Errorf("either id or name must be specified")
 		}),
 
 		Schema: map[string]*schema.Schema{

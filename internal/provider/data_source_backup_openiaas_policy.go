@@ -80,22 +80,6 @@ func dataSourceOpenIaasBackupPolicy() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			// "machine_manager": {
-			// 	Type:     schema.TypeList,
-			// 	Computed: true,
-			// 	Elem: &schema.Resource{
-			// 		Schema: map[string]*schema.Schema{
-			// 			"id": {
-			// 				Type:     schema.TypeString,
-			// 				Computed: true,
-			// 			},
-			// 			"name": {
-			// 				Type:     schema.TypeString,
-			// 				Computed: true,
-			// 			},
-			// 		},
-			// 	},
-			// },
 			"schedulers": {
 				Type:     schema.TypeList,
 				Computed: true,

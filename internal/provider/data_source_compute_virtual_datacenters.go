@@ -39,6 +39,26 @@ func dataSourceVirtualDatacenters() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
+						"machine_manager_name": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"vcenter": {
+							Type:     schema.TypeList,
+							Computed: true,
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"id": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+									"name": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+								},
+							},
+						},
 						"tenant_id": {
 							Type:     schema.TypeString,
 							Computed: true,

@@ -12,6 +12,7 @@ func dataSourceResourcePools() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
+			// TODO - add filter
 			resourcePools, err := client.Compute().ResourcePool().List(ctx, "", "", "")
 			return map[string]interface{}{
 				"id":             "resource_pools",
@@ -35,9 +36,22 @@ func dataSourceResourcePools() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
-						"machine_manager_id": {
-							Type:     schema.TypeString,
+						"machine_manager": {
+							Type:     schema.TypeList,
 							Computed: true,
+
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"id": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+									"name": {
+										Type:     schema.TypeString,
+										Computed: true,
+									},
+								},
+							},
 						},
 						"moref": {
 							Type:     schema.TypeString,

@@ -562,6 +562,18 @@ func resourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
+			"datastore_cluster_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"host_cluster_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"datacenter_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 			"consolidation_needed": {
 				Type:     schema.TypeBool,
 				Computed: true,
@@ -1108,7 +1120,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		if vm.PowerState == "running" {
 			activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 				ID:           d.Id(),
-				DatacenterId: vm.DatacenterId,
+				DatacenterId: vm.Datacenter.ID,
 				PowerAction:  "off",
 			})
 			if err != nil {
@@ -1139,7 +1151,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 
 			activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 				ID:             d.Id(),
-				DatacenterId:   vm.DatacenterId,
+				DatacenterId:   vm.Datacenter.ID,
 				PowerAction:    "on",
 				Recommendation: recommendation,
 			})
@@ -1250,7 +1262,6 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 					NewNetworkId: networkAdapter["network_id"].(string),
 					AutoConnect:  networkAdapter["auto_connect"].(bool),
 					MacAddress:   macAddress,
-					MacType:      macType,
 				})
 				if err != nil {
 					return diag.Errorf("failed to update network adapter, %s", err)
@@ -1307,7 +1318,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 
 		activityId, err = c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 			ID:             d.Id(),
-			DatacenterId:   vm.DatacenterId,
+			DatacenterId:   vm.Datacenter.ID,
 			PowerAction:    powerState,
 			Recommendation: recommendation,
 		})
@@ -1334,7 +1345,7 @@ func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, me
 	if vm.PowerState == "running" {
 		activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 			ID:           d.Id(),
-			DatacenterId: vm.DatacenterId,
+			DatacenterId: vm.Datacenter.ID,
 			PowerAction:  "off",
 		})
 		if err != nil {

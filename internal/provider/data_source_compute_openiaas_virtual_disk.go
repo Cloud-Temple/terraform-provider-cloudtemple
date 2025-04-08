@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,59 +13,30 @@ func dataSourceOpenIaasVirtualDisk() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific virtual disk from an Open IaaS infrastructure.",
 
-		ReadContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-			c := getClient(meta)
-			var disk *client.OpenIaaSVirtualDisk
-
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 			name := d.Get("name").(string)
 			if name != "" {
 				disks, err := c.Compute().OpenIaaS().VirtualDisk().List(ctx, d.Get("virtual_machine_id").(string))
 				if err != nil {
-					return diag.Errorf("failed to find virtual disk named %q: %s", name, err)
+					return nil, fmt.Errorf("failed to find virtual disk named %q: %s", name, err)
 				}
-				for _, currDisk := range disks {
-					if currDisk.Name == name {
-						disk = currDisk
+				for _, disk := range disks {
+					if disk.Name == name {
+						return disk, nil
 					}
 				}
-				if disk == nil {
-					return diag.Errorf("failed to find virtual disk named %q", name)
-				}
-			} else {
-				id := d.Get("id").(string)
-				var err error
-				disk, err = c.Compute().OpenIaaS().VirtualDisk().Read(ctx, id)
+			}
+
+			id := d.Get("id").(string)
+			if id != "" {
+				disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, id)
 				if err == nil && disk == nil {
-					return diag.Errorf("failed to find virtual disk with id %q", id)
+					return nil, fmt.Errorf("failed to find virtual disk with id %q", id)
 				}
+				return disk, err
 			}
-
-			sw := newStateWriter(d)
-
-			d.SetId(disk.ID)
-			d.Set("name", disk.Name)
-			d.Set("description", disk.Description)
-			d.Set("size", disk.Size)
-			d.Set("usage", disk.Usage)
-			d.Set("snapshots", disk.Snapshots)
-			d.Set("storage_repository", []interface{}{
-				map[string]interface{}{
-					"id":          disk.StorageRepository.ID,
-					"name":        disk.StorageRepository.Name,
-					"description": disk.StorageRepository.Description,
-				},
-			})
-			var virtualMachines []interface{}
-			for _, vm := range disk.VirtualMachines {
-				virtualMachines = append(virtualMachines, map[string]interface{}{
-					"id":        vm.ID,
-					"read_only": vm.ReadOnly,
-				})
-			}
-			d.Set("virtual_machines", virtualMachines)
-
-			return sw.diags
-		},
+			return nil, fmt.Errorf("either id or name must be specified")
+		}),
 
 		Schema: map[string]*schema.Schema{
 			// In

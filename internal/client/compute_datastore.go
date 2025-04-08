@@ -11,15 +11,18 @@ func (c *ComputeClient) Datastore() *DatastoreClient {
 }
 
 type Datastore struct {
-	ID                    string   `terraform:"id"`
-	Name                  string   `terraform:"name"`
-	Moref                 string   `terraform:"moref"`
-	MaxCapacity           int      `terraform:"max_capacity"`
-	FreeCapacity          int      `terraform:"free_capacity"`
-	Accessible            int      `terraform:"accessible"`
-	MaintenanceStatus     bool     `terraform:"maintenance_status"`
-	UniqueId              string   `terraform:"unique_id"`
-	MachineManagerId      string   `terraform:"machine_manager_id"`
+	ID                string `terraform:"id"`
+	Name              string `terraform:"name"`
+	Moref             string `terraform:"moref"`
+	MaxCapacity       int    `terraform:"max_capacity"`
+	FreeCapacity      int    `terraform:"free_capacity"`
+	Accessible        int    `terraform:"accessible"`
+	MaintenanceStatus bool   `terraform:"maintenance_status"`
+	UniqueId          string `terraform:"unique_id"`
+	MachineManager    struct {
+		ID   string `terraform:"id"`
+		Name string `terraform:"name"`
+	} `terraform_flatten:"machine_manager"`
 	Type                  string   `terraform:"type"`
 	VirtualMachinesNumber int      `terraform:"virtual_machines_number"`
 	HostsNumber           int      `terraform:"hosts_number"`

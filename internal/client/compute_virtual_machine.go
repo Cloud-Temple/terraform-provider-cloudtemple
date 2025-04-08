@@ -16,10 +16,11 @@ type VirtualMachine struct {
 	ID                             string                          `terraform:"id"`
 	Name                           string                          `terraform:"name"`
 	Moref                          string                          `terraform:"moref"`
-	MachineManagerType             string                          `terraform:"machine_manager_type"`
-	MachineManagerId               string                          `terraform:"machine_manager_id"`
-	MachineManagerName             string                          `terraform:"machine_manager_name"`
-	DatastoreName                  string                          `terraform:"datastore_name"`
+	MachineManager                 BaseObject                      `terraform_flatten:"machine_manager"`
+	Datacenter                     BaseObject                      `terraform_flatten:"datacenter"`
+	HostCluster                    BaseObject                      `terraform_flatten:"host_cluster"`
+	Datastore                      BaseObject                      `terraform_flatten:"datastore"`
+	DatastoreCluster               BaseObject                      `terraform_flatten:"datastore_cluster"`
 	ConsolidationNeeded            bool                            `terraform:"consolidation_needed"`
 	Template                       bool                            `terraform:"template"`
 	PowerState                     string                          `terraform:"power_state"`
@@ -36,10 +37,6 @@ type VirtualMachine struct {
 	MemoryUsage                    int                             `terraform:"memory_usage"`
 	Tools                          string                          `terraform:"tools"`
 	ToolsVersion                   int                             `terraform:"tools_version"`
-	DatacenterId                   string                          `terraform:"datacenter_id"`
-	HostClusterId                  string                          `terraform:"host_cluster_id"`
-	DatastoreId                    string                          `terraform:"datastore_id"`
-	DatastoreClusterId             string                          `terraform:"datastore_cluster_id"`
 	DistributedVirtualPortGroupIds []string                        `terraform:"distributed_virtual_port_group_ids"`
 	SppMode                        string                          `terraform:"spp_mode"`
 	Snapshoted                     bool                            `terraform:"snapshoted"`

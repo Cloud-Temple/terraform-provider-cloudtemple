@@ -11,12 +11,15 @@ func (c *ComputeClient) ResourcePool() *ResourcePoolClient {
 }
 
 type ResourcePool struct {
-	ID               string              `terraform:"id"`
-	Name             string              `terraform:"name"`
-	MachineManagerID string              `terraform:"machine_manager_id"`
-	Moref            string              `terraform:"moref"`
-	Parent           ResourcePoolParent  `terraform:"parent"`
-	Metrics          ResourcePoolMetrics `terraform:"metrics"`
+	ID             string `terraform:"id"`
+	Name           string `terraform:"name"`
+	MachineManager struct {
+		ID   string `terraform:"id"`
+		Name string `terraform:"name"`
+	} `terraform_flatten:"machine_manager" terraform:"machine_manager"`
+	Moref   string              `terraform:"moref"`
+	Parent  ResourcePoolParent  `terraform:"parent"`
+	Metrics ResourcePoolMetrics `terraform:"metrics"`
 }
 
 type ResourcePoolParent struct {

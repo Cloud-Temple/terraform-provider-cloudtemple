@@ -11,12 +11,15 @@ func (c *ComputeClient) Host() *HostClient {
 }
 
 type Host struct {
-	ID               string                    `terraform:"id"`
-	Name             string                    `terraform:"name"`
-	Moref            string                    `terraform:"moref"`
-	MachineManagerID string                    `terraform:"machine_manager_id"`
-	Metrics          HostMetrics               `terraform:"metrics"`
-	VirtualMachines  []HostVirtualMachinesStub `terraform:"virtual_machines"`
+	ID             string `terraform:"id"`
+	Name           string `terraform:"name"`
+	Moref          string `terraform:"moref"`
+	MachineManager struct {
+		ID   string `terraform:"id"`
+		Name string `terraform:"name"`
+	} `terraform_flatten:"machine_manager"`
+	Metrics         HostMetrics               `terraform:"metrics"`
+	VirtualMachines []HostVirtualMachinesStub `terraform:"virtual_machines"`
 }
 
 type HostMetrics struct {

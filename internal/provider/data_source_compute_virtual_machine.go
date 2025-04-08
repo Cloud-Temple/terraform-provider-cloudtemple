@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,18 +14,35 @@ func dataSourceVirtualMachine() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			return getBy(
-				ctx,
-				d,
-				"virtual machine",
-				func(id string) (any, error) {
-					return client.Compute().VirtualMachine().Read(ctx, id)
-				},
-				func(d *schema.ResourceData) (any, error) {
-					return client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
-				},
-				[]string{"name"},
-			)
+			// Recherche par nom
+			name := d.Get("name").(string)
+			if name != "" {
+				virtualMachines, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
+				if err != nil {
+					return nil, fmt.Errorf("failed to find virtual machine named %q: %s", name, err)
+				}
+				for _, vm := range virtualMachines {
+					if vm.Name == name {
+						return vm, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find virtual machine named %q", name)
+			}
+
+			// Recherche par ID
+			id := d.Get("id").(string)
+			if id != "" {
+				vm, err := client.Compute().VirtualMachine().Read(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				if vm == nil {
+					return nil, fmt.Errorf("failed to find virtual machine with id %q", id)
+				}
+				return vm, nil
+			}
+
+			return nil, fmt.Errorf("either id or name must be specified")
 		}),
 
 		Schema: map[string]*schema.Schema{
@@ -48,15 +66,15 @@ func dataSourceVirtualMachine() *schema.Resource {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			"machine_manager_type": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"machine_manager_id": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
 			"machine_manager_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"machine_manager_type": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},

@@ -17,18 +17,13 @@ type OpenIaaSNetwork struct {
 		Name string `terraform:"name"`
 		Type string `terraform:"type"`
 	} `terraform_flatten:"machine_manager"`
-	InternalID                 string   `terraform:"internal_id"`
-	Name                       string   `terraform:"name"`
-	Pool                       Pool     `terraform:"pool"`
-	MaximumTransmissionUnit    int      `terraform:"maximum_transmission_unit"`
-	NetworkAdapters            []string `terraform:"network_adapters"`
-	NetworkBlockDevice         bool     `terraform:"network_block_device"`
-	InsecureNetworkBlockDevice bool     `terraform:"insecure_network_block_device"`
-}
-
-type Pool struct {
-	ID   string `terraform:"id"`
-	Name string `terraform:"name"`
+	InternalID                 string     `terraform:"internal_id"`
+	Name                       string     `terraform:"name"`
+	Pool                       BaseObject `terraform:"pool"`
+	MaximumTransmissionUnit    int        `terraform:"maximum_transmission_unit"`
+	NetworkAdapters            []string   `terraform:"network_adapters"`
+	NetworkBlockDevice         bool       `terraform:"network_block_device"`
+	InsecureNetworkBlockDevice bool       `terraform:"insecure_network_block_device"`
 }
 
 type OpenIaaSNetworkFilter struct {

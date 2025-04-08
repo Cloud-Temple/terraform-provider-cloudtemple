@@ -81,7 +81,6 @@ type UpdateNetworkAdapterRequest struct {
 	NewNetworkId string `json:"newNetworkId"`
 	AutoConnect  bool   `json:"autoConnect"`
 	MacAddress   string `json:"macAddress,omitempty"`
-	MacType      string `json:"macType,omitempty"`
 }
 
 func (n *NetworkAdapterClient) Update(ctx context.Context, req *UpdateNetworkAdapterRequest) (string, error) {

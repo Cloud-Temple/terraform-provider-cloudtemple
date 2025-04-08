@@ -11,32 +11,23 @@ func (c *ComputeOpenIaaSClient) StorageRepository() *OpenIaaSStorageRepositoryCl
 }
 
 type OpenIaaSStorageRepository struct {
-	ID                string   `terraform:"id"`
-	InternalId        string   `terraform:"internal_id"`
-	Name              string   `terraform:"name"`
-	Description       string   `terraform:"description"`
-	MaintenanceStatus bool     `terraform:"maintenance_status"`
-	MaxCapacity       int      `terraform:"max_capacity"`
-	FreeCapacity      int      `terraform:"free_capacity"`
-	StorageType       string   `terraform:"storage_type"`
-	VirtualDisks      []string `terraform:"virtual_disks"`
-	Shared            bool     `terraform:"shared"`
-	Accessible        int      `terraform:"accessible"`
-
-	MachineManager struct {
+	ID                string     `terraform:"id"`
+	InternalId        string     `terraform:"internal_id"`
+	Name              string     `terraform:"name"`
+	Description       string     `terraform:"description"`
+	MaintenanceStatus bool       `terraform:"maintenance_status"`
+	MaxCapacity       int        `terraform:"max_capacity"`
+	FreeCapacity      int        `terraform:"free_capacity"`
+	StorageType       string     `terraform:"type"`
+	VirtualDisks      []string   `terraform:"virtual_disks"`
+	Shared            bool       `terraform:"shared"`
+	Accessible        int        `terraform:"accessible"`
+	Host              BaseObject `terraform:"host"`
+	Pool              BaseObject `terraform:"pool"`
+	MachineManager    struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
-	} `terraform:"machine_manager"`
-
-	Host struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform:"host"`
-
-	Pool struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform:"pool"`
+	} `terraform_flatten:"machine_manager"`
 }
 
 type StorageRepositoryFilter struct {

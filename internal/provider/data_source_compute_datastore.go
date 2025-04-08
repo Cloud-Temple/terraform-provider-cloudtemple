@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,24 +14,41 @@ func dataSourceDatastore() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			return getBy(
-				ctx,
-				d,
-				"datastore",
-				func(id string) (any, error) {
-					return c.Compute().Datastore().Read(ctx, id)
-				},
-				func(d *schema.ResourceData) (any, error) {
-					return c.Compute().Datastore().List(ctx, &client.DatastoreFilter{
-						Name:             d.Get("name").(string),
-						MachineManagerId: d.Get("machine_manager_id").(string),
-						DatacenterId:     d.Get("datacenter_id").(string),
-						HostId:           d.Get("host_id").(string),
-						HostClusterId:    d.Get("host_cluster_id").(string),
-					})
-				},
-				[]string{"name"},
-			)
+			// Recherche par nom
+			name := d.Get("name").(string)
+			if name != "" {
+				datastores, err := c.Compute().Datastore().List(ctx, &client.DatastoreFilter{
+					Name:             name,
+					MachineManagerId: d.Get("machine_manager_id").(string),
+					DatacenterId:     d.Get("datacenter_id").(string),
+					HostId:           d.Get("host_id").(string),
+					HostClusterId:    d.Get("host_cluster_id").(string),
+				})
+				if err != nil {
+					return nil, fmt.Errorf("failed to find datastore named %q: %s", name, err)
+				}
+				for _, datastore := range datastores {
+					if datastore.Name == name {
+						return datastore, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find datastore named %q", name)
+			}
+
+			// Recherche par ID
+			id := d.Get("id").(string)
+			if id != "" {
+				datastore, err := c.Compute().Datastore().Read(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				if datastore == nil {
+					return nil, fmt.Errorf("failed to find datastore with id %q", id)
+				}
+				return datastore, nil
+			}
+
+			return nil, fmt.Errorf("either id or name must be specified")
 		}),
 
 		Schema: map[string]*schema.Schema{
@@ -77,6 +95,10 @@ func dataSourceDatastore() *schema.Resource {
 			},
 
 			// Out
+			"machine_manager_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 			"moref": {
 				Type:     schema.TypeString,
 				Computed: true,

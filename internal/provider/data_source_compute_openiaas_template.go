@@ -2,9 +2,9 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,10 +13,7 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific template from an Open IaaS infrastructure.",
 
-		ReadContext: func(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-			c := getClient(meta)
-			var template *client.OpenIaasTemplate
-
+		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
 			name := d.Get("name").(string)
 			if name != "" {
 				templates, err := c.Compute().OpenIaaS().Template().List(ctx, &client.OpenIaaSTemplateFilter{
@@ -24,45 +21,26 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 					PoolId:           d.Get("pool_id").(string),
 				})
 				if err != nil {
-					return diag.Errorf("failed to find template named %q: %s", name, err)
+					return nil, fmt.Errorf("failed to find template named %q: %s", name, err)
 				}
-				for _, currTemplate := range templates {
-					if currTemplate.Name == name {
-						template = currTemplate
+				for _, template := range templates {
+					if template.Name == name {
+						return template, nil
 					}
-				}
-				if template == nil {
-					return diag.Errorf("failed to find template named %q", name)
-				}
-			} else {
-				id := d.Get("id").(string)
-				var err error
-				template, err = c.Compute().OpenIaaS().Template().Read(ctx, id)
-				if err != nil && template == nil {
-					return diag.Errorf("failed to find template with id %q", id)
 				}
 			}
 
-			sw := newStateWriter(d)
-
-			d.SetId(template.ID)
-
-			d.Set("name", template.Name)
-			d.Set("machine_manager_id", template.MachineManager.ID)
-			d.Set("internal_id", template.InternalID)
-			d.Set("cpu", template.CPU)
-			d.Set("num_cores_per_socket", template.NumCoresPerSocket)
-			d.Set("memory", template.Memory)
-			d.Set("power_state", template.PowerState)
-			d.Set("snapshots", template.Snapshots)
-			d.Set("sla_policies", template.SLAPolicies)
-			d.Set("disks", flattenDisks(template.Disks))
-			d.Set("network_adapters", flattenNetworkAdapters(template.NetworkAdapters))
-
-			diag.Errorf("network_adapters: %v", template.NetworkAdapters)
-
-			return sw.diags
-		},
+			id := d.Get("id").(string)
+			if id != "" {
+				var err error
+				template, err := c.Compute().OpenIaaS().Template().Read(ctx, id)
+				if err != nil && template == nil {
+					return nil, fmt.Errorf("failed to find template with id %q", id)
+				}
+				return template, err
+			}
+			return nil, fmt.Errorf("either id or name must be specified")
+		}),
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -92,6 +70,14 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 			},
 
 			// Out
+			"machine_manager_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"machine_manager_type": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
 			"internal_id": {
 				Type:     schema.TypeString,
 				Computed: true,

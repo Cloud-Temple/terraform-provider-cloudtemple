@@ -41,7 +41,7 @@ type OpenIaaSVirtualMachine struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
 		Type string `terraform:"type"`
-	} `terraform:"machine_manager"`
+	} `terraform_flatten:"machine_manager"`
 	Host BaseObject `terraform:"host"`
 	Pool BaseObject `terraform:"pool"`
 }

@@ -16,7 +16,7 @@ type OpenIaasPool struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
 		Type string `terraform:"type"`
-	} `terraform:"machine_manager"`
+	} `terraform_flatten:"machine_manager"`
 	InternalID              string   `terraform:"internal_id"`
 	Name                    string   `terraform:"name"`
 	HighAvailabilityEnabled bool     `terraform:"high_availability_enabled"`

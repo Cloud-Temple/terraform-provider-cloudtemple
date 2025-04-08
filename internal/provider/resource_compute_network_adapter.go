@@ -114,7 +114,6 @@ func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, me
 		NewNetworkId: d.Get("network_id").(string),
 		AutoConnect:  d.Get("auto_connect").(bool),
 		MacAddress:   macAddress,
-		MacType:      macType,
 	})
 	if err != nil {
 		return diag.Errorf("failed to update network adapter, %s", err)

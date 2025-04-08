@@ -11,9 +11,12 @@ func (c *ComputeClient) Folder() *FolderClient {
 }
 
 type Folder struct {
-	ID               string `terraform:"id"`
-	Name             string `terraform:"name"`
-	MachineManagerId string `terraform:"machine_manager_id"`
+	ID             string `terraform:"id"`
+	Name           string `terraform:"name"`
+	MachineManager struct {
+		ID   string `terraform:"id"`
+		Name string `terraform:"name"`
+	} `terraform_flatten:"machine_manager"`
 }
 
 func (f *FolderClient) List(

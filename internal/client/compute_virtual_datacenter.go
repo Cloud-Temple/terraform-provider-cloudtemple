@@ -11,10 +11,11 @@ func (c *ComputeClient) VirtualDatacenter() *VirtualDatacenterClient {
 }
 
 type VirtualDatacenter struct {
-	ID               string `terraform:"id"`
-	Name             string `terraform:"name"`
-	MachineManagerID string `terraform:"machine_manager_id"`
-	TenantID         string `terraform:"tenant_id"`
+	ID             string     `terraform:"id"`
+	Name           string     `terraform:"name"`
+	TenantID       string     `terraform:"tenant_id"`
+	VCenter        BaseObject `terraform:"vcenter"`
+	MachineManager BaseObject `terraform_flatten:"machine_manager"`
 }
 
 type VirtualDatacenterFilter struct {

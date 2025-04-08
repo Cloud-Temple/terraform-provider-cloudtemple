@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,22 +14,63 @@ func dataSourceUser() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			return getBy(
-				ctx,
-				d,
-				"user",
-				func(id string) (any, error) {
-					return client.IAM().User().Read(ctx, id)
-				},
-				func(d *schema.ResourceData) (any, error) {
-					companyId, err := getCompanyID(ctx, client, d)
-					if err != nil {
-						return nil, err
+			// Recherche par ID
+			id := d.Get("id").(string)
+			if id != "" {
+				user, err := client.IAM().User().Read(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				if user == nil {
+					return nil, fmt.Errorf("failed to find user with id %q", id)
+				}
+				return user, nil
+			}
+
+			// Obtenir la liste des utilisateurs
+			companyId, err := getCompanyID(ctx, client, d)
+			if err != nil {
+				return nil, err
+			}
+			users, err := client.IAM().User().List(ctx, companyId)
+			if err != nil {
+				return nil, fmt.Errorf("failed to list users: %s", err)
+			}
+
+			// Recherche par internal_id
+			internalId := d.Get("internal_id").(string)
+			if internalId != "" {
+				for _, user := range users {
+					if user.InternalID == internalId {
+						return user, nil
 					}
-					return client.IAM().User().List(ctx, companyId)
-				},
-				[]string{"internal_id", "name", "email"},
-			)
+				}
+				return nil, fmt.Errorf("failed to find user with internal_id %q", internalId)
+			}
+
+			// Recherche par name
+			name := d.Get("name").(string)
+			if name != "" {
+				for _, user := range users {
+					if user.Name == name {
+						return user, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find user with name %q", name)
+			}
+
+			// Recherche par email
+			email := d.Get("email").(string)
+			if email != "" {
+				for _, user := range users {
+					if user.Email == email {
+						return user, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find user with email %q", email)
+			}
+
+			return nil, fmt.Errorf("either id, internal_id, name or email must be specified")
 		}),
 
 		Schema: map[string]*schema.Schema{

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -13,18 +14,35 @@ func dataSourceResourcePool() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			return getBy(
-				ctx,
-				d,
-				"resource pool",
-				func(id string) (any, error) {
-					return client.Compute().ResourcePool().Read(ctx, id)
-				},
-				func(d *schema.ResourceData) (any, error) {
-					return client.Compute().ResourcePool().List(ctx, "", "", "")
-				},
-				[]string{"name"},
-			)
+			// Recherche par nom
+			name := d.Get("name").(string)
+			if name != "" {
+				resourcePools, err := client.Compute().ResourcePool().List(ctx, "", "", "")
+				if err != nil {
+					return nil, fmt.Errorf("failed to find resource pool named %q: %s", name, err)
+				}
+				for _, pool := range resourcePools {
+					if pool.Name == name {
+						return pool, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find resource pool named %q", name)
+			}
+
+			// Recherche par ID
+			id := d.Get("id").(string)
+			if id != "" {
+				pool, err := client.Compute().ResourcePool().Read(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				if pool == nil {
+					return nil, fmt.Errorf("failed to find resource pool with id %q", id)
+				}
+				return pool, nil
+			}
+
+			return nil, fmt.Errorf("either id or name must be specified")
 		}),
 
 		Schema: map[string]*schema.Schema{

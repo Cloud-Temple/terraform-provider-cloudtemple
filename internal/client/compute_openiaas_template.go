@@ -31,7 +31,7 @@ type OpenIaasTemplate struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
 		Type string `terraform:"type"`
-	} `terraform:"machine_manager"`
+	} `terraform_flatten:"machine_manager"`
 	InternalID        string                   `terraform:"internal_id"`
 	Name              string                   `terraform:"name"`
 	CPU               int                      `terraform:"cpu"`

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -12,18 +13,35 @@ func dataSourceBackupJob() *schema.Resource {
 		Description: "",
 
 		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			return getBy(
-				ctx,
-				d,
-				"job",
-				func(id string) (any, error) {
-					return client.Backup().Job().Read(ctx, id)
-				},
-				func(d *schema.ResourceData) (any, error) {
-					return client.Backup().Job().List(ctx, nil)
-				},
-				[]string{"name"},
-			)
+			// Recherche par nom
+			name := d.Get("name").(string)
+			if name != "" {
+				jobs, err := client.Backup().Job().List(ctx, nil)
+				if err != nil {
+					return nil, fmt.Errorf("failed to find job named %q: %s", name, err)
+				}
+				for _, job := range jobs {
+					if job.Name == name {
+						return job, nil
+					}
+				}
+				return nil, fmt.Errorf("failed to find job named %q", name)
+			}
+
+			// Recherche par ID
+			id := d.Get("id").(string)
+			if id != "" {
+				job, err := client.Backup().Job().Read(ctx, id)
+				if err != nil {
+					return nil, err
+				}
+				if job == nil {
+					return nil, fmt.Errorf("failed to find job with id %q", id)
+				}
+				return job, nil
+			}
+
+			return nil, fmt.Errorf("either id or name must be specified")
 		}),
 
 		Schema: map[string]*schema.Schema{
