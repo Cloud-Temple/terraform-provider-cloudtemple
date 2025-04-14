@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,13 +13,7 @@ func dataSourceBackupJobSessions() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			jobSessions, err := client.Backup().JobSession().List(ctx, nil)
-			return map[string]interface{}{
-				"id":           "job_sessions",
-				"job_sessions": jobSessions,
-			}, err
-		}),
+		ReadContext: backupJobSessionsRead,
 
 		Schema: map[string]*schema.Schema{
 			// Out
@@ -114,4 +110,33 @@ func dataSourceBackupJobSessions() *schema.Resource {
 			},
 		},
 	}
+}
+
+// backupJobSessionsRead lit les sessions de job de backup et les mappe dans le state Terraform
+func backupJobSessionsRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	// Utilisation explicite du type client.Client pour que l'import soit reconnu
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les données
+	jobSessions, err := c.Backup().JobSession().List(ctx, nil)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("job_sessions")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfJobSessions := make([]map[string]interface{}, len(jobSessions))
+	for i, js := range jobSessions {
+		tfJobSessions[i] = helpers.FlattenBackupJobSession(js)
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("job_sessions", tfJobSessions); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

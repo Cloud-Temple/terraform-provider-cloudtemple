@@ -54,15 +54,17 @@ type HostVirtualMachinesStub struct {
 	Type string `terraform:"type"`
 }
 
-func (h *HostClient) List(
-	ctx context.Context,
-	machineManagerID string,
-	DatacenterID string,
-	hostClusterID string,
-	datastoreID string) ([]*Host, error) {
+type HostFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerID string `filter:"machineManagerId"`
+	DatacenterID     string `filter:"datacenterId"`
+	HostClusterID    string `filter:"hostClusterId"`
+	DatastoreID      string `filter:"datastoreId"`
+}
 
-	// TODO: filters
+func (h *HostClient) List(ctx context.Context, filter *HostFilter) ([]*Host, error) {
 	r := h.c.newRequest("GET", "/compute/v1/vcenters/hosts")
+	r.addFilter(filter)
 	resp, err := h.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

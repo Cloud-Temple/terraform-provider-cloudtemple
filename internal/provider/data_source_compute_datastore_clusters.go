@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,19 +13,7 @@ func dataSourceDatastoreClusters() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			datastoreClusters, err := c.Compute().DatastoreCluster().List(ctx, &client.DatastoreClusterFilter{
-				Name:             d.Get("name").(string),
-				MachineManagerId: d.Get("machine_manager_id").(string),
-				DatacenterId:     d.Get("datacenter_id").(string),
-				HostId:           d.Get("host_id").(string),
-				HostClusterId:    d.Get("host_cluster_id").(string),
-			})
-			return map[string]interface{}{
-				"id":                 "datastore_clusters",
-				"datastore_clusters": datastoreClusters,
-			}, err
-		}),
+		ReadContext: computeDatastoreClustersRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -72,6 +62,10 @@ func dataSourceDatastoreClusters() *schema.Resource {
 							Computed: true,
 						},
 						"machine_manager_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"datacenter_id": {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
@@ -149,4 +143,38 @@ func dataSourceDatastoreClusters() *schema.Resource {
 			},
 		},
 	}
+}
+
+// computeDatastoreClustersRead lit les clusters de datastores et les mappe dans le state Terraform
+func computeDatastoreClustersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les clusters de datastores
+	datastoreClusters, err := c.Compute().DatastoreCluster().List(ctx, &client.DatastoreClusterFilter{
+		Name:             d.Get("name").(string),
+		MachineManagerId: d.Get("machine_manager_id").(string),
+		DatacenterId:     d.Get("datacenter_id").(string),
+		HostId:           d.Get("host_id").(string),
+		HostClusterId:    d.Get("host_cluster_id").(string),
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("datastore_clusters")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfDatastoreClusters := make([]map[string]interface{}, len(datastoreClusters))
+	for i, datastoreCluster := range datastoreClusters {
+		tfDatastoreClusters[i] = helpers.FlattenDatastoreCluster(datastoreCluster)
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("datastore_clusters", tfDatastoreClusters); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

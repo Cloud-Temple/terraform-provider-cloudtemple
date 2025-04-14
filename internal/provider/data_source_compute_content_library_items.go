@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -12,16 +14,7 @@ func dataSourceContentLibraryItems() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			contentLibraryItems, err := c.Compute().ContentLibrary().ListItems(ctx, &client.ContentLibraryItemFilter{
-				Name:             d.Get("name").(string),
-				ContentLibraryId: d.Get("content_library_id").(string),
-			})
-			return map[string]interface{}{
-				"id":                    "content_library_items",
-				"content_library_items": contentLibraryItems,
-			}, err
-		}),
+		ReadContext: computeContentLibraryItemsRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -43,10 +36,6 @@ func dataSourceContentLibraryItems() *schema.Resource {
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"content_library_id": {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
@@ -91,4 +80,35 @@ func dataSourceContentLibraryItems() *schema.Resource {
 			},
 		},
 	}
+}
+
+// computeContentLibraryItemsRead lit les éléments d'une bibliothèque de contenu et les mappe dans le state Terraform
+func computeContentLibraryItemsRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les éléments de la bibliothèque de contenu
+	contentLibraryItems, err := c.Compute().ContentLibrary().ListItems(ctx, &client.ContentLibraryItemFilter{
+		Name:             d.Get("name").(string),
+		ContentLibraryId: d.Get("content_library_id").(string),
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("content_library_items")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfContentLibraryItems := make([]map[string]interface{}, len(contentLibraryItems))
+	for i, item := range contentLibraryItems {
+		tfContentLibraryItems[i] = helpers.FlattenContentLibraryItem(item)
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("content_library_items", tfContentLibraryItems); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

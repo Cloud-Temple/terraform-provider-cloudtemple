@@ -11,12 +11,13 @@ func (c *ComputeClient) DatastoreCluster() *DatastoreClusterClient {
 }
 
 type DatastoreCluster struct {
-	ID               string                  `terraform:"id"`
-	Name             string                  `terraform:"name"`
-	Moref            string                  `terraform:"moref"`
-	MachineManagerId string                  `terraform:"machine_manager_id"`
-	Datastores       []string                `terraform:"datastores"`
-	Metrics          DatastoreClusterMetrics `terraform:"metrics"`
+	ID             string                  `terraform:"id"`
+	Name           string                  `terraform:"name"`
+	Moref          string                  `terraform:"moref"`
+	MachineManager BaseObject              `terraform:"machine_manager"`
+	Datacenter     BaseObject              `terraform:"datacenter"`
+	Datastores     []string                `terraform:"datastores"`
+	Metrics        DatastoreClusterMetrics `terraform:"metrics"`
 }
 
 type DatastoreClusterFilter struct {

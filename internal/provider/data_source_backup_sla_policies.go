@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,15 +13,26 @@ func dataSourceBackupSLAPolicies() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			slaPolicies, err := client.Backup().SLAPolicy().List(ctx, nil)
-			return map[string]interface{}{
-				"id":           "sla_policies",
-				"sla_policies": slaPolicies,
-			}, err
-		}),
+		ReadContext: backupSLAPoliciesRead,
 
 		Schema: map[string]*schema.Schema{
+			// In
+			"name": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+			"virtual_machine_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+			"virtual_disk_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+
 			// Out
 			"sla_policies": {
 				Type:     schema.TypeList,
@@ -120,4 +133,35 @@ func dataSourceBackupSLAPolicies() *schema.Resource {
 			},
 		},
 	}
+}
+
+// backupSLAPoliciesRead lit les politiques SLA de backup et les mappe dans le state Terraform
+func backupSLAPoliciesRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les politiques SLA
+	slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
+		VirtualMachineId: d.Get("virtual_machine_id").(string),
+		VirtualDiskId:    d.Get("virtual_disk_id").(string),
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("sla_policies")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfSLAPolicies := make([]map[string]interface{}, len(slaPolicies))
+	for i, policy := range slaPolicies {
+		tfSLAPolicies[i] = helpers.FlattenBackupSLAPolicy(policy)
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("sla_policies", tfSLAPolicies); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

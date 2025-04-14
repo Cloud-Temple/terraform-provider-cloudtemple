@@ -24,15 +24,13 @@ type OpenIaaSStorageRepository struct {
 	Accessible        int        `terraform:"accessible"`
 	Host              BaseObject `terraform:"host"`
 	Pool              BaseObject `terraform:"pool"`
-	MachineManager    struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform_flatten:"machine_manager"`
+	MachineManager    BaseObject `terraform:"machine_manager"`
 }
 
 type StorageRepositoryFilter struct {
-	// TODO : Add filter by name
 	MachineManagerId string   `filter:"machineManagerId"`
+	PoolId           string   `filter:"poolId"`
+	HostId           string   `filter:"hostId"`
 	StorageTypes     []string `filter:"types,omitempty"`
 	Shared           bool     `filter:"shared"`
 }

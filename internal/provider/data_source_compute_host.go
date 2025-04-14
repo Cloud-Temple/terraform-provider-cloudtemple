@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,37 +15,7 @@ func dataSourceHost() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			// Recherche par nom
-			name := d.Get("name").(string)
-			if name != "" {
-				hosts, err := client.Compute().Host().List(ctx, "", "", "", "")
-				if err != nil {
-					return nil, fmt.Errorf("failed to find host named %q: %s", name, err)
-				}
-				for _, host := range hosts {
-					if host.Name == name {
-						return host, nil
-					}
-				}
-				return nil, fmt.Errorf("failed to find host named %q", name)
-			}
-
-			// Recherche par ID
-			id := d.Get("id").(string)
-			if id != "" {
-				host, err := client.Compute().Host().Read(ctx, id)
-				if err != nil {
-					return nil, err
-				}
-				if host == nil {
-					return nil, fmt.Errorf("failed to find host with id %q", id)
-				}
-				return host, nil
-			}
-
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: computeHostRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -67,10 +39,6 @@ func dataSourceHost() *schema.Resource {
 				Computed: true,
 			},
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"machine_manager_name": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
@@ -177,4 +145,65 @@ func dataSourceHost() *schema.Resource {
 			},
 		},
 	}
+}
+
+// computeHostRead lit un hôte et le mappe dans le state Terraform
+func computeHostRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var host *client.Host
+	var err error
+
+	// Recherche par nom
+	name := d.Get("name").(string)
+	if name != "" {
+		hosts, err := c.Compute().Host().List(ctx, &client.HostFilter{
+			Name:             name,
+			MachineManagerID: d.Get("machine_manager_id").(string),
+			DatacenterID:     d.Get("datacenter_id").(string),
+			HostClusterID:    d.Get("host_cluster_id").(string),
+			DatastoreID:      d.Get("datastore_id").(string),
+		})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to find host named %q: %s", name, err))
+		}
+		for _, h := range hosts {
+			if h.Name == name {
+				host = h
+				break
+			}
+		}
+		if host == nil {
+			return diag.FromErr(fmt.Errorf("failed to find host named %q", name))
+		}
+	} else {
+		// Recherche par ID
+		id := d.Get("id").(string)
+		if id != "" {
+			host, err = c.Compute().Host().Read(ctx, id)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			if host == nil {
+				return diag.FromErr(fmt.Errorf("failed to find host with id %q", id))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(host.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	hostData := helpers.FlattenHost(host)
+
+	// Définir les données dans le state
+	for k, v := range hostData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

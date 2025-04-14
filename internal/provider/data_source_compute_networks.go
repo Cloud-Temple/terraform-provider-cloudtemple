@@ -4,22 +4,65 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceNetworks() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			networks, err := c.Compute().Network().List(ctx, &client.NetworkFilter{})
-			return map[string]interface{}{
-				"id":       "networks",
-				"networks": networks,
-			}, err
-		}),
+		ReadContext: computeNetworksRead,
 
 		Schema: map[string]*schema.Schema{
+			// In
+			"name": {
+				Type:     schema.TypeString,
+				Optional: true,
+			},
+			"machine_manager_id": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
+			},
+			"datacenter_id": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
+			},
+			"virtual_machine_id": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
+			},
+			"type": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.StringInSlice([]string{"Network", "DistributedVirtualPortgroup"}, false),
+			},
+			"virtual_switch_id": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
+			},
+			"host_id": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
+			},
+			"folder_id": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
+			},
+			"host_cluster_id": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
+			},
+
 			// Out
 			"networks": {
 				Type:     schema.TypeList,
@@ -64,4 +107,42 @@ func dataSourceNetworks() *schema.Resource {
 			},
 		},
 	}
+}
+
+// computeNetworksRead lit les réseaux et les mappe dans le state Terraform
+func computeNetworksRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les réseaux
+	networks, err := c.Compute().Network().List(ctx, &client.NetworkFilter{
+		Name:             d.Get("name").(string),
+		MachineManagerId: d.Get("machine_manager_id").(string),
+		DatacenterId:     d.Get("datacenter_id").(string),
+		VirtualMachineId: d.Get("virtual_machine_id").(string),
+		Type:             d.Get("type").(string),
+		VirtualSwitchId:  d.Get("virtual_switch_id").(string),
+		HostId:           d.Get("host_id").(string),
+		FolderId:         d.Get("folder_id").(string),
+		HostClusterId:    d.Get("host_cluster_id").(string),
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("networks")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfNetworks := make([]map[string]interface{}, len(networks))
+	for i, network := range networks {
+		tfNetworks[i] = helpers.FlattenNetwork(network)
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("networks", tfNetworks); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

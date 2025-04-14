@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,44 +13,7 @@ func dataSourceBackupMetrics() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			rang := d.Get("range").(int)
-
-			coverage, err := client.Backup().Metrics().Coverage(ctx)
-			if err != nil {
-				return nil, err
-			}
-			history, err := client.Backup().Metrics().History(ctx, rang)
-			if err != nil {
-				return nil, err
-			}
-			platform, err := client.Backup().Metrics().Platform(ctx)
-			if err != nil {
-				return nil, err
-			}
-			platformCPU, err := client.Backup().Metrics().PlatformCPU(ctx)
-			if err != nil {
-				return nil, err
-			}
-			policies, err := client.Backup().Metrics().Policies(ctx)
-			if err != nil {
-				return nil, err
-			}
-			virtualMachines, err := client.Backup().Metrics().VirtualMachines(ctx)
-			if err != nil {
-				return nil, err
-			}
-
-			return map[string]interface{}{
-				"id":               "job_sessions",
-				"coverage":         *coverage,
-				"history":          *history,
-				"platform":         *platform,
-				"platform_cpu":     *platformCPU,
-				"policies":         policies,
-				"virtual_machines": *virtualMachines,
-			}, nil
-		}),
+		ReadContext: backupMetricsRead,
 
 		Schema: map[string]*schema.Schema{
 			"range": {
@@ -218,4 +183,72 @@ func dataSourceBackupMetrics() *schema.Resource {
 			},
 		},
 	}
+}
+
+// backupMetricsRead lit les métriques de backup et les mappe dans le state Terraform
+func backupMetricsRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer le paramètre range
+	rang := d.Get("range").(int)
+
+	// Récupérer les données
+	coverage, err := c.Backup().Metrics().Coverage(ctx)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	history, err := c.Backup().Metrics().History(ctx, rang)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	platform, err := c.Backup().Metrics().Platform(ctx)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	platformCPU, err := c.Backup().Metrics().PlatformCPU(ctx)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	policies, err := c.Backup().Metrics().Policies(ctx)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	virtualMachines, err := c.Backup().Metrics().VirtualMachines(ctx)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("job_sessions")
+
+	// Mapper les données en utilisant les fonctions helper
+	if err := d.Set("coverage", []interface{}{helpers.FlattenBackupMetricsCoverage(coverage)}); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("history", []interface{}{helpers.FlattenBackupMetricsHistory(history)}); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("platform", []interface{}{helpers.FlattenBackupMetricsPlatform(platform)}); err != nil {
+		return diag.FromErr(err)
+	}
+	if err := d.Set("platform_cpu", []interface{}{helpers.FlattenBackupMetricsPlatformCPU(platformCPU)}); err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Mapper les policies
+	tfPolicies := make([]map[string]interface{}, len(policies))
+	for i, policy := range policies {
+		tfPolicies[i] = helpers.FlattenBackupMetricsPolicy(policy)
+	}
+	if err := d.Set("policies", tfPolicies); err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Mapper les virtual machines
+	if err := d.Set("virtual_machines", []interface{}{helpers.FlattenBackupMetricsVirtualMachines(virtualMachines)}); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

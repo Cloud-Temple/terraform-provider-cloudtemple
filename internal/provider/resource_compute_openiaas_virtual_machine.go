@@ -2,11 +2,11 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -149,25 +149,9 @@ Order of the elements in the list is the boot order.`,
 			},
 
 			//Out
-			"machine_manager": {
-				Type:     schema.TypeList,
+			"machine_manager_id": {
+				Type:     schema.TypeString,
 				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"type": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
 			},
 			"internal_id": {
 				Type:     schema.TypeString,
@@ -225,37 +209,9 @@ Order of the elements in the list is the boot order.`,
 					},
 				},
 			},
-			"pool": {
-				Type:     schema.TypeList,
+			"pool_id": {
+				Type:     schema.TypeString,
 				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
-			},
-			"host": {
-				Type:     schema.TypeList,
-				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
 			},
 		},
 	}
@@ -316,31 +272,54 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 }
 
 func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	reader := readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-		vm, err := client.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
-		if err != nil {
-			return nil, err
+	c := getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer la machine virtuelle par son ID
+	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("the virtual machine could not be read: %s", err)
+	}
+	if vm == nil {
+		d.SetId("") // La VM n'existe plus, marquer la ressource comme supprimée
+		return nil
+	}
+
+	// Normaliser le power state pour qu'il soit cohérent avec l'entrée
+	switch vm.PowerState {
+	case "Running":
+		vm.PowerState = "on"
+	case "Halted":
+		vm.PowerState = "off"
+	default:
+		return diag.Errorf("unknown power state %q", vm.PowerState)
+	}
+
+	// Récupérer les tags
+	// readTags(ctx, sw, client, d.Id())
+
+	tags, err := c.Tag().Resource().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to get tags: %s", err)
+	}
+
+	tagsMap := make(map[string]interface{})
+	for _, tag := range tags {
+		tagsMap[tag.Key] = tag.Value
+	}
+	d.Set("tags", tagsMap)
+
+	// Mapper les données en utilisant la fonction helper
+	vmData := helpers.FlattenOpenIaaSVirtualMachine(vm)
+
+	// Définir les données dans le state
+	for k, v := range vmData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
 		}
-		if vm == nil {
-			return nil, nil
-		}
+	}
 
-		// Normalize the power state so that we can use it as input
-		switch vm.PowerState {
-		case "Running":
-			vm.PowerState = "on"
-		case "Halted":
-			vm.PowerState = "off"
-		default:
-			return nil, fmt.Errorf("unknown power state %q", vm.PowerState)
-		}
-
-		readTags(ctx, sw, client, d.Id())
-
-		return vm, nil
-	})
-
-	return reader(ctx, d, meta)
+	return diags
 }
 
 func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {

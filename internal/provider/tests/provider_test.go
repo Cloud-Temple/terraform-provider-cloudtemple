@@ -58,7 +58,7 @@ func TestMain(m *testing.M) {
 
 	// Clean resources from previous tests run
 	ctx := context.Background()
-	vms, err := c.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
+	vms, err := c.Compute().VirtualMachine().List(ctx, &client.VirtualMachineFilter{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)
@@ -89,7 +89,7 @@ func TestMain(m *testing.M) {
 			if vm.PowerState == "running" {
 				activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
 					ID:           vm.ID,
-					DatacenterId: vm.DatacenterId,
+					DatacenterId: vm.Datacenter.ID,
 					PowerAction:  "off",
 				})
 				if err != nil {

@@ -41,9 +41,13 @@ func (t *UserClient) Read(ctx context.Context, userID string) (*User, error) {
 	return &out, nil
 }
 
-func (t *UserClient) List(ctx context.Context, companyID string) ([]*User, error) {
+type UserFilter struct {
+	CompanyID string `filter:"companyId"`
+}
+
+func (t *UserClient) List(ctx context.Context, filter *UserFilter) ([]*User, error) {
 	r := t.c.newRequest("GET", "/iam/v2/users")
-	r.params.Add("companyId", companyID)
+	r.addFilter(filter)
 	resp, err := t.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

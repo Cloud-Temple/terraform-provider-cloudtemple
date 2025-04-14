@@ -19,13 +19,15 @@ type Folder struct {
 	} `terraform_flatten:"machine_manager"`
 }
 
-func (f *FolderClient) List(
-	ctx context.Context,
-	machineManagerId string,
-	datacenterId string) ([]*Folder, error) {
+type FolderFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerID string `filter:"machineManagerId"`
+	DatacenterID     string `filter:"datacenterId"`
+}
 
-	// TODO: filters
+func (f *FolderClient) List(ctx context.Context, filter *FolderFilter) ([]*Folder, error) {
 	r := f.c.newRequest("GET", "/compute/v1/vcenters/folders")
+	r.addFilter(filter)
 	resp, err := f.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

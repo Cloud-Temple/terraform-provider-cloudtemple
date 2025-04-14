@@ -48,8 +48,15 @@ func (v *BackupOpenIaasPolicyClient) Read(ctx context.Context, id string) (*Back
 	return &out, nil
 }
 
-func (v *BackupOpenIaasPolicyClient) List(ctx context.Context) ([]*BackupOpenIaasPolicy, error) {
+type BackupOpenIaasPolicyFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerId string `filter:"machineManagerId"`
+	VirtualMachineId string `filter:"virtualMachineId"`
+}
+
+func (v *BackupOpenIaasPolicyClient) List(ctx context.Context, filter *BackupOpenIaasPolicyFilter) ([]*BackupOpenIaasPolicy, error) {
 	r := v.c.newRequest("GET", "/backup/v1/open_iaas/policies")
+	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

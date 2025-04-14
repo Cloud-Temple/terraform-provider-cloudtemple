@@ -22,6 +22,7 @@ type OpenIaaSVirtualMachine struct {
 	InternalID          string   `terraform:"internal_id"`
 	PowerState          string   `terraform:"power_state"`
 	SecureBoot          bool     `terraform:"secure_boot"`
+	BootFirmware        string   `terraform:"boot_firmware"`
 	AutoPowerOn         bool     `terraform:"auto_power_on"`
 	DvdDrive            DvdDrive `terraform:"dvd_drive"`
 	BootOrder           []string `terraform:"boot_order"`

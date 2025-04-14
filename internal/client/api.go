@@ -169,7 +169,7 @@ func (r *request) addFilter(filter any) {
 		case "[]string":
 			stringSlice := field.Interface().([]string)
 			for _, s := range stringSlice {
-				r.params.Add(name, s)
+				r.params.Add(name+"[]", s)
 			}
 		default:
 			panic(fmt.Sprintf("unknown type: %q", typ))

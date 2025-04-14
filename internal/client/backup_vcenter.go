@@ -18,9 +18,13 @@ type BackupVCenter struct {
 	Name        string `terraform:"name"`
 }
 
-func (c *BackupVCenterClient) List(ctx context.Context, sppServerId string) ([]*BackupVCenter, error) {
+type BackupVCenterFilter struct {
+	SppServerId string `filter:"sppServerId"`
+}
+
+func (c *BackupVCenterClient) List(ctx context.Context, filter *BackupVCenterFilter) ([]*BackupVCenter, error) {
 	r := c.c.newRequest("GET", "/backup/v1/spp/vcenters")
-	r.params.Add("sppServerId", sppServerId)
+	r.addFilter(filter)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

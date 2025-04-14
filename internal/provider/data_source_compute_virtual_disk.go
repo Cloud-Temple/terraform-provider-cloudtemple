@@ -5,40 +5,17 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceVirtualDisk() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a specific virtual disk from a vCenter infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			name := d.Get("name").(string)
-			if name != "" {
-				disks, err := c.Compute().VirtualDisk().List(ctx, d.Get("virtual_machine_id").(string))
-				if err != nil {
-					return nil, fmt.Errorf("failed to find disk named %q: %s", name, err)
-				}
-				for _, disk := range disks {
-					if disk.Name == name {
-						return disk, nil
-					}
-				}
-				return nil, fmt.Errorf("failed to find disk named %q", name)
-			}
-
-			id := d.Get("id").(string)
-			if id != "" {
-				disk, err := c.Compute().VirtualDisk().Read(ctx, id)
-				if err != nil || disk == nil {
-					return nil, fmt.Errorf("failed to find disk with id %q", id)
-				}
-				return disk, err
-			}
-
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: dataSourceVirtualDiskRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -66,10 +43,6 @@ func dataSourceVirtualDisk() *schema.Resource {
 
 			// Out
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"machine_manager_name": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
@@ -127,4 +100,62 @@ func dataSourceVirtualDisk() *schema.Resource {
 			},
 		},
 	}
+}
+
+// dataSourceVirtualDiskRead lit un disque virtuel et le mappe dans le state Terraform
+func dataSourceVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var disk *client.VirtualDisk
+	var err error
+
+	// Recherche par nom
+	name := d.Get("name").(string)
+	if name != "" {
+		disks, err := c.Compute().VirtualDisk().List(ctx, &client.VirtualDiskFilter{
+			Name:             name,
+			VirtualMachineID: d.Get("virtual_machine_id").(string),
+		})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to find disk named %q: %s", name, err))
+		}
+		for _, d := range disks {
+			if d.Name == name {
+				disk = d
+				break
+			}
+		}
+		if disk == nil {
+			return diag.FromErr(fmt.Errorf("failed to find disk named %q", name))
+		}
+	} else {
+		// Recherche par ID
+		id := d.Get("id").(string)
+		if id != "" {
+			disk, err = c.Compute().VirtualDisk().Read(ctx, id)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			if disk == nil {
+				return diag.FromErr(fmt.Errorf("failed to find disk with id %q", id))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(disk.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	diskData := helpers.FlattenVirtualDisk(disk)
+
+	// Définir les données dans le state
+	for k, v := range diskData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

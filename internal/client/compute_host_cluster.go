@@ -17,14 +17,16 @@ type HostCluster struct {
 	Hosts                 []HostClusterHostStub `terraform:"hosts"`
 	Metrics               HostClusterMetrics    `terraform:"metrics"`
 	VirtualMachinesNumber int                   `terraform:"virtual_machines_number"`
-	MachineManagerId      string                `terraform:"machine_manager_id"`
+	MachineManager        BaseObject            `terraform:"machine_manager"`
+	Datacenter            BaseObject            `terraform:"datacenter"`
 }
 
 type HostClusterFilter struct {
-	Name             string `filter:"name"`
-	MachineManagerId string `filter:"machineManagerId"`
-	DatacenterId     string `filter:"datacenterId"`
-	DatastoreId      string `filter:"datastoreId"`
+	Name               string `filter:"name"`
+	MachineManagerId   string `filter:"machineManagerId"`
+	DatacenterId       string `filter:"datacenterId"`
+	DatastoreId        string `filter:"datastoreId"`
+	DatastoreClusterId string `filter:"datastoreClusterId"`
 }
 
 type HostClusterHostStub struct {

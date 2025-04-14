@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,34 +15,7 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific template from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			name := d.Get("name").(string)
-			if name != "" {
-				templates, err := c.Compute().OpenIaaS().Template().List(ctx, &client.OpenIaaSTemplateFilter{
-					MachineManagerId: d.Get("machine_manager_id").(string),
-					PoolId:           d.Get("pool_id").(string),
-				})
-				if err != nil {
-					return nil, fmt.Errorf("failed to find template named %q: %s", name, err)
-				}
-				for _, template := range templates {
-					if template.Name == name {
-						return template, nil
-					}
-				}
-			}
-
-			id := d.Get("id").(string)
-			if id != "" {
-				var err error
-				template, err := c.Compute().OpenIaaS().Template().Read(ctx, id)
-				if err != nil && template == nil {
-					return nil, fmt.Errorf("failed to find template with id %q", id)
-				}
-				return template, err
-			}
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: computeOpenIaaSTemplateRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -193,35 +168,60 @@ func dataSourceOpenIaasTemplate() *schema.Resource {
 	}
 }
 
-func flattenDisks(disks []client.TemplateDisk) []interface{} {
-	if disks != nil {
-		result := make([]interface{}, len(disks))
-		for i, disk := range disks {
-			result[i] = map[string]interface{}{
-				"name":               disk.Name,
-				"description":        disk.Description,
-				"size":               disk.Size,
-				"storage_repository": flattenBaseObject(disk.StorageRepository),
-			}
-		}
-		return result
-	}
-	return make([]interface{}, 0)
-}
+// computeOpenIaaSTemplateRead lit un template OpenIaaS et le mappe dans le state Terraform
+func computeOpenIaaSTemplateRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var template *client.OpenIaasTemplate
+	var err error
 
-func flattenNetworkAdapters(adapters []client.TemplateNetworkAdapter) []interface{} {
-	if adapters != nil {
-		result := make([]interface{}, len(adapters))
-		for i, adapter := range adapters {
-			result[i] = map[string]interface{}{
-				"name":        adapter.Name,
-				"mac_address": adapter.MacAddress,
-				"mtu":         adapter.MTU,
-				"attached":    adapter.Attached,
-				"network":     flattenBaseObject(adapter.Network),
+	// Recherche par nom
+	name := d.Get("name").(string)
+	if name != "" {
+		templates, err := c.Compute().OpenIaaS().Template().List(ctx, &client.OpenIaaSTemplateFilter{
+			MachineManagerId: d.Get("machine_manager_id").(string),
+			PoolId:           d.Get("pool_id").(string),
+		})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to find template named %q: %s", name, err))
+		}
+		for _, t := range templates {
+			if t.Name == name {
+				template = t
+				break
 			}
 		}
-		return result
+		if template == nil {
+			return diag.FromErr(fmt.Errorf("failed to find template named %q", name))
+		}
+	} else {
+		// Recherche par ID
+		id := d.Get("id").(string)
+		if id != "" {
+			template, err = c.Compute().OpenIaaS().Template().Read(ctx, id)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			if template == nil {
+				return diag.FromErr(fmt.Errorf("failed to find template with id %q", id))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
 	}
-	return make([]interface{}, 0)
+
+	// Définir l'ID de la datasource
+	d.SetId(template.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	templateData := helpers.FlattenOpenIaaSTemplate(template)
+
+	// Définir les données dans le state
+	for k, v := range templateData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

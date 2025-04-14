@@ -11,21 +11,24 @@ func (c *ComputeOpenIaaSClient) VirtualDisk() *OpenIaaSVirtualDiskClient {
 }
 
 type OpenIaaSVirtualDisk struct {
-	ID                string   `terraform:"id"`
-	Name              string   `terraform:"name"`
-	Description       string   `terraform:"description"`
-	Size              int      `terraform:"size"`
-	Usage             int      `terraform:"usage"`
-	Snapshots         []string `terraform:"snapshots"`
-	StorageRepository struct {
-		ID          string `terraform:"id"`
-		Name        string `terraform:"name"`
-		Description string `terraform:"description"`
-	} `terraform:"storage_repository"`
-	VirtualMachines []struct {
+	ID                string     `terraform:"id"`
+	InternalID        string     `terraform:"internal_id"`
+	Name              string     `terraform:"name"`
+	Description       string     `terraform:"description"`
+	Size              int        `terraform:"size"`
+	Usage             int        `terraform:"usage"`
+	IsSnapshot        bool       `terraform:"is_snapshot"`
+	StorageRepository BaseObject `terraform:"storage_repository"`
+	VirtualMachines   []struct {
 		ID       string `terraform:"id"`
+		Name     string `terraform:"name"`
 		ReadOnly bool   `terraform:"read_only"`
 	} `terraform:"virtual_machines"`
+	Templates []struct {
+		ID       string `terraform:"id"`
+		Name     string `terraform:"name"`
+		ReadOnly bool   `terraform:"read_only"`
+	} `terraform:"templates"`
 }
 
 type OpenIaaSVirtualDiskCreateRequest struct {
@@ -63,11 +66,15 @@ func (v *OpenIaaSVirtualDiskClient) Read(ctx context.Context, id string) (*OpenI
 	return &out, nil
 }
 
-func (v *OpenIaaSVirtualDiskClient) List(ctx context.Context, virtualMachineId string) ([]*OpenIaaSVirtualDisk, error) {
+type OpenIaaSVirtualDiskFilter struct {
+	VirtualMachineID    string `filter:"virtualMachineId"`
+	TemplateID          string `filter:"templateId"`
+	StorageRepositoryID string `filter:"storageRepositoryId"`
+}
+
+func (v *OpenIaaSVirtualDiskClient) List(ctx context.Context, filter *OpenIaaSVirtualDiskFilter) ([]*OpenIaaSVirtualDisk, error) {
 	r := v.c.newRequest("GET", "/compute/v1/open_iaas/virtual_disks")
-	if virtualMachineId != "" {
-		r.params.Add("virtualMachineId", virtualMachineId)
-	}
+	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

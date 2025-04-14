@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,43 +15,7 @@ func dataSourceDatastore() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			// Recherche par nom
-			name := d.Get("name").(string)
-			if name != "" {
-				datastores, err := c.Compute().Datastore().List(ctx, &client.DatastoreFilter{
-					Name:             name,
-					MachineManagerId: d.Get("machine_manager_id").(string),
-					DatacenterId:     d.Get("datacenter_id").(string),
-					HostId:           d.Get("host_id").(string),
-					HostClusterId:    d.Get("host_cluster_id").(string),
-				})
-				if err != nil {
-					return nil, fmt.Errorf("failed to find datastore named %q: %s", name, err)
-				}
-				for _, datastore := range datastores {
-					if datastore.Name == name {
-						return datastore, nil
-					}
-				}
-				return nil, fmt.Errorf("failed to find datastore named %q", name)
-			}
-
-			// Recherche par ID
-			id := d.Get("id").(string)
-			if id != "" {
-				datastore, err := c.Compute().Datastore().Read(ctx, id)
-				if err != nil {
-					return nil, err
-				}
-				if datastore == nil {
-					return nil, fmt.Errorf("failed to find datastore with id %q", id)
-				}
-				return datastore, nil
-			}
-
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: computeDatastoreRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -93,12 +59,15 @@ func dataSourceDatastore() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
 			},
+			"datastore_cluster_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
+				AtLeastOneOf:  []string{"id", "name"},
+				ConflictsWith: []string{"id"},
+			},
 
 			// Out
-			"machine_manager_name": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"moref": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -149,4 +118,66 @@ func dataSourceDatastore() *schema.Resource {
 			},
 		},
 	}
+}
+
+// computeDatastoreRead lit un datastore et le mappe dans le state Terraform
+func computeDatastoreRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var datastore *client.Datastore
+	var err error
+
+	// Recherche par nom
+	name := d.Get("name").(string)
+	if name != "" {
+		datastores, err := c.Compute().Datastore().List(ctx, &client.DatastoreFilter{
+			Name:               name,
+			MachineManagerId:   d.Get("machine_manager_id").(string),
+			DatacenterId:       d.Get("datacenter_id").(string),
+			HostId:             d.Get("host_id").(string),
+			HostClusterId:      d.Get("host_cluster_id").(string),
+			DatastoreClusterId: d.Get("datastore_cluster_id").(string),
+		})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to find datastore named %q: %s", name, err))
+		}
+		for _, ds := range datastores {
+			if ds.Name == name {
+				datastore = ds
+				break
+			}
+		}
+		if datastore == nil {
+			return diag.FromErr(fmt.Errorf("failed to find datastore named %q", name))
+		}
+	} else {
+		// Recherche par ID
+		id := d.Get("id").(string)
+		if id != "" {
+			datastore, err = c.Compute().Datastore().Read(ctx, id)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			if datastore == nil {
+				return diag.FromErr(fmt.Errorf("failed to find datastore with id %q", id))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(datastore.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	datastoreData := helpers.FlattenDatastore(datastore)
+
+	// Définir les données dans le state
+	for k, v := range datastoreData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

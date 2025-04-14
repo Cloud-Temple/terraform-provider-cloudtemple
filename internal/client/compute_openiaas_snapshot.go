@@ -38,9 +38,13 @@ func (v *OpenIaaSSnapshotClient) Read(ctx context.Context, id string) (*OpenIaaS
 	return &out, nil
 }
 
-func (v *OpenIaaSSnapshotClient) List(ctx context.Context, virtualMachineId string) ([]*OpenIaaSSnapshot, error) {
+type OpenIaaSSnapshotFilter struct {
+	VirtualMachineID string `filter:"virtualMachineId"`
+}
+
+func (v *OpenIaaSSnapshotClient) List(ctx context.Context, filter *OpenIaaSSnapshotFilter) ([]*OpenIaaSSnapshot, error) {
 	r := v.c.newRequest("GET", "/compute/v1/open_iaas/snapshots")
-	r.params.Add("virtualMachineId", virtualMachineId)
+	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

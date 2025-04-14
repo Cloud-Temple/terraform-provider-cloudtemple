@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -12,17 +14,7 @@ func dataSourceOpenIaasBackups() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a list of backups from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			backups, err := c.Backup().OpenIaaS().Backup().List(ctx, &client.OpenIaasBackupFilter{
-				MachineManagerId: d.Get("machine_manager_id").(string),
-				VirtualMachineId: d.Get("virtual_machine_id").(string),
-				Deleted:          d.Get("deleted").(bool),
-			})
-			return map[string]interface{}{
-				"id":      "backups",
-				"backups": backups,
-			}, err
-		}),
+		ReadContext: backupOpenIaasBackupsRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -110,4 +102,36 @@ func dataSourceOpenIaasBackups() *schema.Resource {
 			},
 		},
 	}
+}
+
+// backupOpenIaasBackupsRead lit les backups OpenIaaS et les mappe dans le state Terraform
+func backupOpenIaasBackupsRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les backups
+	backups, err := c.Backup().OpenIaaS().Backup().List(ctx, &client.OpenIaasBackupFilter{
+		MachineManagerId: d.Get("machine_manager_id").(string),
+		VirtualMachineId: d.Get("virtual_machine_id").(string),
+		Deleted:          d.Get("deleted").(bool),
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("backups")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfBackups := make([]map[string]interface{}, len(backups))
+	for i, backup := range backups {
+		tfBackups[i] = helpers.FlattenBackupOpenIaasBackup(backup)
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("backups", tfBackups); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

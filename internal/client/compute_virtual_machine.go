@@ -16,11 +16,11 @@ type VirtualMachine struct {
 	ID                             string                          `terraform:"id"`
 	Name                           string                          `terraform:"name"`
 	Moref                          string                          `terraform:"moref"`
-	MachineManager                 BaseObject                      `terraform_flatten:"machine_manager"`
-	Datacenter                     BaseObject                      `terraform_flatten:"datacenter"`
-	HostCluster                    BaseObject                      `terraform_flatten:"host_cluster"`
-	Datastore                      BaseObject                      `terraform_flatten:"datastore"`
-	DatastoreCluster               BaseObject                      `terraform_flatten:"datastore_cluster"`
+	MachineManager                 BaseObject                      `terraform:"machine_manager" terraform_flatten:"machine_manager"`
+	Datacenter                     BaseObject                      `terraform:"datacenter" terraform_flatten:"datacenter"`
+	HostCluster                    BaseObject                      `terraform:"host_cluster" terraform_flatten:"host_cluster"`
+	Datastore                      BaseObject                      `terraform:"datastore" terraform_flatten:"datastore"`
+	DatastoreCluster               BaseObject                      `terraform:"datastore_cluster" terraform_flatten:"datastore_cluster"`
 	ConsolidationNeeded            bool                            `terraform:"consolidation_needed"`
 	Template                       bool                            `terraform:"template"`
 	PowerState                     string                          `terraform:"power_state"`
@@ -138,20 +138,20 @@ type CustomizeGuestOSRequest struct {
 	WindowsConfig *CustomGuestWindowsConfig `json:"windowsConfig,omitempty"`
 }
 
-func (v *VirtualMachineClient) List(
-	ctx context.Context,
-	allOptions bool,
-	machineManagerId string,
-	replicated bool,
-	template bool,
-	datacenters []string,
-	networks []string,
-	datastores []string,
-	hosts []string,
-	vmwareToolsVersions []int) ([]*VirtualMachine, error) {
+type VirtualMachineFilter struct {
+	Name             string   `filter:"name"`
+	MachineManagerID string   `filter:"machineManagerId"`
+	AllOptions       bool     `filter:"allOptions"`
+	Datacenters      []string `filter:"datacenters"`
+	Networks         []string `filter:"networks"`
+	Datastores       []string `filter:"datastores"`
+	Hosts            []string `filter:"hosts"`
+	HostClusters     []string `filter:"hostClusters"`
+}
 
-	// TODO: filters
+func (v *VirtualMachineClient) List(ctx context.Context, filter *VirtualMachineFilter) ([]*VirtualMachine, error) {
 	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_machines")
+	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

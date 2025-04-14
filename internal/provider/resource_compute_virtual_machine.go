@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -297,11 +298,13 @@ func resourceVirtualMachine() *schema.Resource {
 			"datastore_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Computed:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 			"datastore_cluster_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
+				Computed:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 			"memory": {
@@ -456,12 +459,6 @@ func resourceVirtualMachine() *schema.Resource {
 							Computed: true,
 						},
 						"mac_address": {
-							Type:         schema.TypeString,
-							Optional:     true,
-							Computed:     true,
-							ComputedWhen: []string{"mac_type"},
-						},
-						"mac_type": {
 							Type:     schema.TypeString,
 							Optional: true,
 							Computed: true,
@@ -487,6 +484,10 @@ func resourceVirtualMachine() *schema.Resource {
 							Computed: true,
 						},
 						"type": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"mac_type": {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
@@ -857,32 +858,36 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 	}
 
-	disks, err := c.Compute().VirtualDisk().List(ctx, d.Id())
+	disks, err := c.Compute().VirtualDisk().List(ctx, &client.VirtualDiskFilter{
+		VirtualMachineID: d.Id(),
+	})
 	if err != nil {
 		return diag.Errorf("failed to retrieve OS disks: %s", err)
 	}
 
 	// Overwrite with the desired config
-	osDisks := updateNestedMapItems(d, flattenOSDisksData(disks), "os_disk")
+	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOSDisksData(disks), "os_disk")
 
 	if err := d.Set("os_disk", osDisks); err != nil {
 		return diag.FromErr(err)
 	}
 
-	networkAdapters, err := c.Compute().NetworkAdapter().List(ctx, d.Id())
+	networkAdapters, err := c.Compute().NetworkAdapter().List(ctx, &client.NetworkAdapterFilter{
+		VirtualMachineID: d.Id(),
+	})
 	if err != nil {
 		return diag.Errorf("failed to retrieve OS network adapters: %s", err)
 	}
 
 	// Overwrite with the desired config
-	osNetworkAdapters := updateNestedMapItems(d, flattenOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
+	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
 
 	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
 		return diag.FromErr(err)
 	}
 
 	if len(d.Get("customize").([]interface{})) > 0 {
-		customizationRequest := buildGuestOSCustomizationRequest(ctx, d)
+		customizationRequest := helpers.BuildGuestOSCustomizationRequest(ctx, d)
 		activityId, err = c.Compute().VirtualMachine().CustomizeGuestOS(ctx, d.Id(), customizationRequest)
 		if err != nil {
 			return diag.Errorf("failed to customize virtual machine guest os: %s", err)
@@ -949,81 +954,101 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 }
 
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	reader := readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-		id := d.Id()
-		vm, err := c.Compute().VirtualMachine().Read(ctx, id)
-		if err != nil {
-			return nil, err
-		}
-		if vm == nil {
-			return nil, nil
-		}
+	c := getClient(meta)
+	var diags diag.Diagnostics
 
-		// Normalize the power state so that we can use it as input
-		switch vm.PowerState {
-		case "running":
-			vm.PowerState = "on"
-		case "stopped":
-			vm.PowerState = "off"
-		default:
-			return nil, fmt.Errorf("unknown power state %q", vm.PowerState)
-		}
+	// Récupérer la machine virtuelle par son ID
+	id := d.Id()
+	vm, err := c.Compute().VirtualMachine().Read(ctx, id)
+	if err != nil {
+		return diag.Errorf("the virtual machine could not be read: %s", err)
+	}
+	if vm == nil {
+		d.SetId("") // La VM n'existe plus, marquer la ressource comme supprimée
+		return nil
+	}
 
-		// Normalize the backup_sla_policies
-		slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
-			VirtualMachineId: d.Id(),
-		})
-		if err != nil {
-			return nil, err
-		}
+	// Normaliser le power state pour qu'il soit cohérent avec l'entrée
+	switch vm.PowerState {
+	case "running":
+		vm.PowerState = "on"
+	case "stopped":
+		vm.PowerState = "off"
+	default:
+		return diag.Errorf("unknown power state %q", vm.PowerState)
+	}
 
-		slaPoliciesIds := []string{}
-		for _, slaPolicy := range slaPolicies {
-			slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
-		}
-
-		sw.set("backup_sla_policies", slaPoliciesIds)
-
-		osDisks := []interface{}{}
-		for _, osDisk := range d.Get("os_disk").([]interface{}) {
-			if osDisk == nil {
-				continue
-			}
-			osDiskId := osDisk.(map[string]interface{})["id"].(string)
-			if osDiskId != "" {
-				disk, err := c.Compute().VirtualDisk().Read(ctx, osDiskId)
-				if err != nil {
-					return nil, err
-				}
-				osDisks = append(osDisks, flattenOSDiskData(disk))
-			}
-		}
-
-		sw.set("os_disk", osDisks)
-
-		osNetworkAdapters := []interface{}{}
-		for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
-			if osNetworkAdapter == nil {
-				continue
-			}
-			osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
-			if osNetworkAdapterId != "" {
-				networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, osNetworkAdapterId)
-				if err != nil {
-					return nil, err
-				}
-				osNetworkAdapters = append(osNetworkAdapters, flattenOSNetworkAdapterData(networkAdapter))
-			}
-		}
-
-		sw.set("os_network_adapter", osNetworkAdapters)
-
-		readTags(ctx, sw, c, d.Id())
-
-		return vm, nil
+	// Récupérer les SLA policies
+	slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
+		VirtualMachineId: d.Id(),
 	})
+	if err != nil {
+		return diag.Errorf("failed to get sla policies: %s", err)
+	}
 
-	return reader(ctx, d, meta)
+	slaPoliciesIds := []string{}
+	for _, slaPolicy := range slaPolicies {
+		slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
+	}
+
+	// Mapper les données en utilisant la fonction helper
+	vmData := helpers.FlattenVirtualMachine(vm)
+	vmData["backup_sla_policies"] = slaPoliciesIds
+
+	// Récupérer les OS disks
+	osDisks := []interface{}{}
+	for _, osDisk := range d.Get("os_disk").([]interface{}) {
+		if osDisk == nil {
+			continue
+		}
+		osDiskId := osDisk.(map[string]interface{})["id"].(string)
+		if osDiskId != "" {
+			disk, err := c.Compute().VirtualDisk().Read(ctx, osDiskId)
+			if err != nil {
+				return diag.Errorf("failed to read os disk: %s", err)
+			}
+			osDisks = append(osDisks, helpers.FlattenOSDiskData(disk))
+		}
+	}
+	vmData["os_disk"] = osDisks
+
+	// Récupérer les OS network adapters
+	osNetworkAdapters := []interface{}{}
+	for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+		if osNetworkAdapter == nil {
+			continue
+		}
+		osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
+		if osNetworkAdapterId != "" {
+			networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, osNetworkAdapterId)
+			if err != nil {
+				return diag.Errorf("failed to read os network adapter: %s", err)
+			}
+			osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOSNetworkAdapterData(networkAdapter))
+		}
+	}
+	vmData["os_network_adapter"] = osNetworkAdapters
+
+	// Récupérer les tags
+	tags, err := c.Tag().Resource().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to get tags: %s", err)
+	}
+
+	tagsMap := make(map[string]interface{})
+	for _, tag := range tags {
+		tagsMap[tag.Key] = tag.Value
+	}
+	vmData["tags"] = tagsMap
+
+	// Définir les données dans le state
+	for k, v := range vmData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }
 
 func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
@@ -1132,7 +1157,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 			}
 		}
 
-		customizationRequest := buildGuestOSCustomizationRequest(ctx, d)
+		customizationRequest := helpers.BuildGuestOSCustomizationRequest(ctx, d)
 		activityId, err = c.Compute().VirtualMachine().CustomizeGuestOS(ctx, d.Id(), customizationRequest)
 		if err != nil {
 			return diag.Errorf("failed to customize virtual machine guest os: %s", err)
@@ -1144,7 +1169,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 
 		if vm.PowerState == "running" {
-			recommendation, err := getPowerRecommendation(vm, vm.PowerState, ctx, c)
+			recommendation, err := helpers.GetPowerRecommendation(vm, vm.PowerState, ctx, c)
 			if err != nil {
 				return diag.Errorf("failed to get power recommendation for virtual machine: %s", err)
 			}
@@ -1311,7 +1336,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 			return diag.Errorf("failed to read virtual machine: %s", err)
 		}
 
-		recommendation, err := getPowerRecommendation(vm, powerState, ctx, c)
+		recommendation, err := helpers.GetPowerRecommendation(vm, powerState, ctx, c)
 		if err != nil {
 			return diag.Errorf("failed to get power recommendation for virtual machine: %s", err)
 		}

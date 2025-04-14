@@ -21,14 +21,14 @@ type VirtualController struct {
 	VirtualDisks     []string `terraform:"virtual_disks"`
 }
 
-func (v *VirtualControllerClient) List(
-	ctx context.Context,
-	virtualMachineId string,
-	types string) ([]*VirtualController, error) {
+type VirtualControllerFilter struct {
+	VirtualMachineId string   `filter:"virtualMachineId"`
+	Types            []string `filter:"types"`
+}
 
-	// TODO: filters
+func (v *VirtualControllerClient) List(ctx context.Context, filter *VirtualControllerFilter) ([]*VirtualController, error) {
 	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_controllers")
-	r.params.Add("virtualMachineId", virtualMachineId)
+	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

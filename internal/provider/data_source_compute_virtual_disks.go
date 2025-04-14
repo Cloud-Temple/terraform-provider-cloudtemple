@@ -4,21 +4,17 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceVirtualDisks() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve all virtual disks for a specific virtual machine.",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			disks, err := client.Compute().VirtualDisk().List(ctx, d.Get("virtual_machine_id").(string))
-			return map[string]interface{}{
-				"id":            "virtual_disks",
-				"virtual_disks": disks,
-			}, err
-		}),
+		ReadContext: dataSourceVirtualDisksRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -57,6 +53,14 @@ func dataSourceVirtualDisks() *schema.Resource {
 						},
 						"disk_unit_number": {
 							Type:     schema.TypeInt,
+							Computed: true,
+						},
+						"controller_id": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"controller_type": {
+							Type:     schema.TypeString,
 							Computed: true,
 						},
 						"controller_bus_number": {
@@ -100,4 +104,36 @@ func dataSourceVirtualDisks() *schema.Resource {
 			},
 		},
 	}
+}
+
+// dataSourceVirtualDisksRead lit les disques virtuels et les mappe dans le state Terraform
+func dataSourceVirtualDisksRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les disques virtuels
+	virtualMachineId := d.Get("virtual_machine_id").(string)
+	disks, err := c.Compute().VirtualDisk().List(ctx, &client.VirtualDiskFilter{
+		VirtualMachineID: virtualMachineId,
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("virtual_disks")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfDisks := make([]map[string]interface{}, len(disks))
+	for i, disk := range disks {
+		tfDisks[i] = helpers.FlattenVirtualDisk(disk)
+		tfDisks[i]["id"] = disk.ID
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("virtual_disks", tfDisks); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

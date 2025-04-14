@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -51,6 +52,11 @@ func resourceOpenIaasNetworkAdapter() *schema.Resource {
 			"id": {
 				Type:        schema.TypeString,
 				Description: "The ID of the network adapter.",
+				Computed:    true,
+			},
+			"internal_id": {
+				Type:        schema.TypeString,
+				Description: "The internal ID of the network adapter.",
 				Computed:    true,
 			},
 			"name": {
@@ -104,26 +110,29 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 
 func openIaasNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
+	var diags diag.Diagnostics
 
+	// Récupérer l'adaptateur réseau par son ID
 	networkAdapter, err := c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, d.Id())
 	if err != nil {
-		return diag.Errorf("the network adapter could not be read: %s", err)
+		return diag.FromErr(err)
 	}
 	if networkAdapter == nil {
-		return diag.Errorf("the network adapter was not found")
+		d.SetId("") // L'adaptateur n'existe plus, marquer la ressource comme supprimée
+		return nil
 	}
 
-	sw := newStateWriter(d)
-	// Set the retrieved data to the schema
-	sw.set("name", networkAdapter.Name)
-	sw.set("machine_manager_id", networkAdapter.MachineManager.ID) // DevNote : This will change in future API versions
-	sw.set("mtu", networkAdapter.MTU)
-	sw.set("attached", networkAdapter.Attached)
-	sw.set("mac_address", networkAdapter.MacAddress)
-	sw.set("network_id", networkAdapter.Network.ID)
-	sw.set("virtual_machine_id", networkAdapter.VirtualMachineID)
+	// Mapper les données en utilisant la fonction helper
+	adapterData := helpers.FlattenOpenIaaSNetworkAdapter(networkAdapter)
 
-	return sw.diags
+	// Définir les données dans le state
+	for k, v := range adapterData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }
 
 func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {

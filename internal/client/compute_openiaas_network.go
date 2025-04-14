@@ -28,6 +28,7 @@ type OpenIaaSNetwork struct {
 
 type OpenIaaSNetworkFilter struct {
 	MachineManagerID string `filter:"machineManagerId"`
+	PoolID           string `filter:"poolId"`
 }
 
 func (n *OpenIaaSNetworkClient) List(

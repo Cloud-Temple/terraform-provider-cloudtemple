@@ -5,22 +5,17 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceCompany() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve information about a specific company.",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			id := d.Get("id").(string)
-			company, err := client.IAM().Company().Read(ctx, id)
-			if err == nil && company == nil {
-				return nil, fmt.Errorf("failed to find company with id %q", id)
-			}
-			return company, err
-		}),
+		ReadContext: dataSourceCompanyRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -37,4 +32,37 @@ func dataSourceCompany() *schema.Resource {
 			},
 		},
 	}
+}
+
+// dataSourceCompanyRead lit une company et la mappe dans le state Terraform
+func dataSourceCompanyRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer l'ID de la company
+	id := d.Get("id").(string)
+
+	// Récupérer la company
+	company, err := c.IAM().Company().Read(ctx, id)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	if company == nil {
+		return diag.FromErr(fmt.Errorf("failed to find company with id %q", id))
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(company.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	companyData := helpers.FlattenCompany(company)
+
+	// Définir les données dans le state
+	for k, v := range companyData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

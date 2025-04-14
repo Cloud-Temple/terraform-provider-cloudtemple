@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,43 +15,7 @@ func dataSourceBackupSPPServer() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			// Recherche par ID
-			id := d.Get("id").(string)
-			if id != "" {
-				server, err := client.Backup().SPPServer().Read(ctx, id)
-				if err != nil {
-					return nil, err
-				}
-				if server == nil {
-					return nil, fmt.Errorf("failed to find SPP server with id %q", id)
-				}
-				return server, nil
-			}
-
-			// Obtenir la liste des serveurs SPP
-			tenantId, err := getTenantID(ctx, client, d)
-			if err != nil {
-				return nil, err
-			}
-			servers, err := client.Backup().SPPServer().List(ctx, tenantId)
-			if err != nil {
-				return nil, fmt.Errorf("failed to list SPP servers: %s", err)
-			}
-
-			// Recherche par name
-			name := d.Get("name").(string)
-			if name != "" {
-				for _, server := range servers {
-					if server.Name == name {
-						return server, nil
-					}
-				}
-				return nil, fmt.Errorf("failed to find SPP server with name %q", name)
-			}
-
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: backupSPPServerRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -80,4 +46,67 @@ func dataSourceBackupSPPServer() *schema.Resource {
 			},
 		},
 	}
+}
+
+// backupSPPServerRead lit un serveur SPP de backup et le mappe dans le state Terraform
+func backupSPPServerRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var server *client.BackupSPPServer
+	var err error
+
+	// Recherche par ID
+	id := d.Get("id").(string)
+	if id != "" {
+		server, err = c.Backup().SPPServer().Read(ctx, id)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		if server == nil {
+			return diag.FromErr(fmt.Errorf("failed to find SPP server with id %q", id))
+		}
+	} else {
+		// Obtenir la liste des serveurs SPP
+		tenantId, err := getTenantID(ctx, c, d)
+		if err != nil {
+			return diag.FromErr(err)
+		}
+		servers, err := c.Backup().SPPServer().List(ctx, &client.BackupSPPServerFilter{
+			TenantId: tenantId,
+		})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to list SPP servers: %s", err))
+		}
+
+		// Recherche par name
+		name := d.Get("name").(string)
+		if name != "" {
+			for _, s := range servers {
+				if s.Name == name {
+					server = s
+					break
+				}
+			}
+			if server == nil {
+				return diag.FromErr(fmt.Errorf("failed to find SPP server with name %q", name))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(server.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	serverData := helpers.FlattenBackupSPPServer(server)
+
+	// Définir les données dans le state
+	for k, v := range serverData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

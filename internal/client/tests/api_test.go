@@ -75,7 +75,7 @@ func TestMain(m *testing.M) {
 
 				activityId, err := client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 					ID:           vm.ID,
-					DatacenterId: vm.DatacenterId,
+					DatacenterId: vm.Datacenter.ID,
 					PowerAction:  "off",
 				})
 				if err != nil {

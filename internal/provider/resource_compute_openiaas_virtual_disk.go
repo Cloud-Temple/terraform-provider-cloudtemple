@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -73,6 +74,64 @@ func resourceOpenIaasVirtualDisk() *schema.Resource {
 				Computed:    true,
 				Description: "The usage of the virtual disk.",
 			},
+			"internal_id": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The internal ID of the virtual disk.",
+			},
+			"is_snapshot": {
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether the virtual disk is a snapshot.",
+			},
+			"virtual_machines": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The virtual machines to which the virtual disk is attached.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the virtual machine.",
+						},
+						"name": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the virtual machine.",
+						},
+						"read_only": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the virtual disk is attached in read-only mode.",
+						},
+					},
+				},
+			},
+			"templates": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The templates to which the virtual disk is attached.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the template.",
+						},
+						"name": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the template.",
+						},
+						"read_only": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the virtual disk is attached in read-only mode.",
+						},
+					},
+				},
+			},
 		},
 	}
 }
@@ -102,54 +161,40 @@ func openIaasVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta
 
 func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer le disque virtuel par son ID
 	virtualDisk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
-	if err != nil {
-		return diag.Errorf("the virtual disk could not be read: %s", err)
-	}
-	if virtualDisk == nil {
+	if virtualDisk == nil || err != nil {
 		// Si le disque virtuel n'existe pas, on définit l'ID à une chaîne vide
 		// pour indiquer à Terraform que la ressource n'existe plus
 		d.SetId("")
 		return nil
 	}
 
-	// TODO : REWORK THAT PART OF THE CODE TO BE ABLE TO HANDLE MULTIPLE VIRTUAL MACHINES ATTACHMENT
+	// Mapper les données en utilisant la fonction helper
+	diskData := helpers.FlattenOpenIaaSVirtualDisk(virtualDisk)
 
-	// Set the retrieved data to the schema
-	sw := newStateWriter(d)
-	sw.set("name", virtualDisk.Name)
-	sw.set("size", virtualDisk.Size)
-	sw.set("usage", virtualDisk.Usage)
-	sw.set("storage_repository_id", virtualDisk.StorageRepository.ID)
+	// // Conserver l'ID de la VM existante si aucune VM n'est attachée
+	// if len(virtualDisk.VirtualMachines) == 0 {
+	// 	if vmID, ok := d.GetOk("virtual_machine_id"); ok {
+	// 		diskData["virtual_machine_id"] = vmID.(string)
+	// 	}
+	// }
 
-	// Set virtual_machine_id if available
-	if len(virtualDisk.VirtualMachines) > 0 {
-		sw.set("virtual_machine_id", virtualDisk.VirtualMachines[0].ID)
+	// // Préserver la valeur bootable existante si elle est définie
+	// if bootable, ok := d.GetOk("bootable"); ok {
+	// 	diskData["bootable"] = bootable
+	// }
 
-		// Set mode based on ReadOnly flag
-		if virtualDisk.VirtualMachines[0].ReadOnly {
-			sw.set("mode", "RO")
-		} else {
-			sw.set("mode", "RW")
-		}
-	} else {
-		// Default values if no virtual machine is attached
-		sw.set("mode", "RW") // Default to RW
-
-		// Keep the existing virtual_machine_id if it's already set
-		if vmID, ok := d.GetOk("virtual_machine_id"); ok {
-			sw.set("virtual_machine_id", vmID)
+	// Définir les données dans le state
+	for k, v := range diskData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
 		}
 	}
 
-	// Set bootable (default to false if not set)
-	if bootable, ok := d.GetOk("bootable"); ok {
-		sw.set("bootable", bootable)
-	} else {
-		sw.set("bootable", false)
-	}
-
-	return sw.diags
+	return diags
 }
 
 func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {

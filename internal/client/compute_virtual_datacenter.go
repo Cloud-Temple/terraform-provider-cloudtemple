@@ -15,7 +15,7 @@ type VirtualDatacenter struct {
 	Name           string     `terraform:"name"`
 	TenantID       string     `terraform:"tenant_id"`
 	VCenter        BaseObject `terraform:"vcenter"`
-	MachineManager BaseObject `terraform_flatten:"machine_manager"`
+	MachineManager BaseObject `terraform:"machine_manager" terraform_flatten:"machine_manager"`
 }
 
 type VirtualDatacenterFilter struct {

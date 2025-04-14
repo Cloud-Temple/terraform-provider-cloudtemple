@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,35 +15,7 @@ func dataSourceOpenIaasHost() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific host from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			name := d.Get("name").(string)
-			if name != "" {
-				hosts, err := c.Compute().OpenIaaS().Host().List(ctx, &client.OpenIaasHostFilter{
-					MachineManagerId: d.Get("machine_manager_id").(string),
-				})
-				if err != nil {
-					return nil, fmt.Errorf("failed to find host named %q: %s", name, err)
-				}
-				for _, host := range hosts {
-					if host.Name == name {
-						return host, nil
-					}
-				}
-				return nil, fmt.Errorf("failed to find host named %q", name)
-			}
-
-			id := d.Get("id").(string)
-			if id != "" {
-				var err error
-				host, err := c.Compute().OpenIaaS().Host().Read(ctx, id)
-				if err == nil && host == nil {
-					return nil, fmt.Errorf("failed to find host with id %q", id)
-				}
-				return host, err
-			}
-
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: computeOpenIaaSHostRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -64,16 +38,15 @@ func dataSourceOpenIaasHost() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
 			},
+			"pool_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				Default:       "",
+				ConflictsWith: []string{"id"},
+				AtLeastOneOf:  []string{"id", "name"},
+			},
 
 			// Out
-			"machine_manager_type": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"machine_manager_name": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"internal_id": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -227,4 +200,62 @@ func dataSourceOpenIaasHost() *schema.Resource {
 			},
 		},
 	}
+}
+
+// computeOpenIaaSHostRead lit un hôte OpenIaaS et le mappe dans le state Terraform
+func computeOpenIaaSHostRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var host *client.OpenIaaSHost
+	var err error
+
+	// Recherche par nom
+	name := d.Get("name").(string)
+	if name != "" {
+		hosts, err := c.Compute().OpenIaaS().Host().List(ctx, &client.OpenIaasHostFilter{
+			MachineManagerId: d.Get("machine_manager_id").(string),
+			PoolId:           d.Get("pool_id").(string),
+		})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to find host named %q: %s", name, err))
+		}
+		for _, h := range hosts {
+			if h.Name == name {
+				host = h
+				break
+			}
+		}
+		if host == nil {
+			return diag.FromErr(fmt.Errorf("failed to find host named %q", name))
+		}
+	} else {
+		// Recherche par ID
+		id := d.Get("id").(string)
+		if id != "" {
+			host, err = c.Compute().OpenIaaS().Host().Read(ctx, id)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			if host == nil {
+				return diag.FromErr(fmt.Errorf("failed to find host with id %q", id))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(host.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	hostData := helpers.FlattenOpenIaaSHost(host)
+
+	// Définir les données dans le state
+	for k, v := range hostData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

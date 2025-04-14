@@ -11,23 +11,20 @@ func (c *ComputeClient) Datastore() *DatastoreClient {
 }
 
 type Datastore struct {
-	ID                string `terraform:"id"`
-	Name              string `terraform:"name"`
-	Moref             string `terraform:"moref"`
-	MaxCapacity       int    `terraform:"max_capacity"`
-	FreeCapacity      int    `terraform:"free_capacity"`
-	Accessible        int    `terraform:"accessible"`
-	MaintenanceStatus bool   `terraform:"maintenance_status"`
-	UniqueId          string `terraform:"unique_id"`
-	MachineManager    struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform_flatten:"machine_manager"`
-	Type                  string   `terraform:"type"`
-	VirtualMachinesNumber int      `terraform:"virtual_machines_number"`
-	HostsNumber           int      `terraform:"hosts_number"`
-	HostsNames            []string `terraform:"hosts_names"`
-	AssociatedFolder      string   `terraform:"associated_folder"`
+	ID                    string     `terraform:"id"`
+	Name                  string     `terraform:"name"`
+	MachineManager        BaseObject `terraform:"machine_manager"`
+	Moref                 string     `terraform:"moref"`
+	MaxCapacity           int        `terraform:"max_capacity"`
+	FreeCapacity          int        `terraform:"free_capacity"`
+	Accessible            int        `terraform:"accessible"`
+	MaintenanceStatus     bool       `terraform:"maintenance_status"`
+	UniqueId              string     `terraform:"unique_id"`
+	Type                  string     `terraform:"type"`
+	VirtualMachinesNumber int        `terraform:"virtual_machines_number"`
+	HostsNumber           int        `terraform:"hosts_number"`
+	HostsNames            []string   `terraform:"hosts_names"`
+	AssociatedFolder      string     `terraform:"associated_folder"`
 }
 
 type DatastoreFilter struct {
@@ -43,7 +40,6 @@ func (d *DatastoreClient) List(
 	ctx context.Context,
 	filter *DatastoreFilter) ([]*Datastore, error) {
 
-	// TODO: filters
 	r := d.c.newRequest("GET", "/compute/v1/vcenters/datastores")
 	r.addFilter(filter)
 	resp, err := d.c.doRequest(ctx, r)

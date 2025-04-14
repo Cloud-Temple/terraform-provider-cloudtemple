@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -98,6 +99,10 @@ func resourceVirtualDisk() *schema.Resource {
 			},
 			"controller_bus_number": {
 				Type:     schema.TypeInt,
+				Computed: true,
+			},
+			"controller_type": {
+				Type:     schema.TypeString,
 				Computed: true,
 			},
 			"datastore_name": {
@@ -200,34 +205,45 @@ func computeVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta 
 }
 
 func computeVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	reader := readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-		disk, err := c.Compute().VirtualDisk().Read(ctx, d.Id())
-		if err != nil {
-			return nil, err
-		}
-		if disk == nil {
-			return nil, nil
-		}
+	c := getClient(meta)
+	var diags diag.Diagnostics
 
-		// Normalize the backup_sla_policies
-		slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
-			VirtualDiskId: d.Id(),
-		})
-		if err != nil {
-			return nil, err
-		}
+	// Récupérer le disque par son ID
+	id := d.Id()
+	disk, err := c.Compute().VirtualDisk().Read(ctx, id)
+	if err != nil {
+		return diag.Errorf("the virtual machine could not be read: %s", err)
+	}
+	if disk == nil {
+		d.SetId("") // Le disque n'existe plus, marquer la ressource comme supprimée
+		return nil
+	}
 
-		slaPoliciesIds := []string{}
-		for _, slaPolicy := range slaPolicies {
-			slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
-		}
-
-		sw.set("backup_sla_policies", slaPoliciesIds)
-
-		return disk, nil
+	// Normalize the backup_sla_policies
+	slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
+		VirtualDiskId: d.Id(),
 	})
+	if err != nil {
+		return diag.Errorf("failed to get sla policies: %s", err)
+	}
 
-	return reader(ctx, d, meta)
+	slaPoliciesIds := []string{}
+	for _, slaPolicy := range slaPolicies {
+		slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
+	}
+
+	// Mapper les données en utilisant la fonction helper
+	diskData := helpers.FlattenVirtualDisk(disk)
+	diskData["backup_sla_policies"] = slaPoliciesIds
+
+	// Définir les données dans le state
+	for k, v := range diskData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }
 
 func computeVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {

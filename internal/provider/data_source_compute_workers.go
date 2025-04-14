@@ -4,20 +4,16 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func dataSourceWorkers() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve all workers (vCenters) from the infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			workers, err := client.Compute().Worker().List(ctx, "")
-			return map[string]interface{}{
-				"id":               "machine_managers",
-				"machine_managers": workers,
-			}, err
-		}),
+		ReadContext: dataSourceWorkersRead,
 
 		Schema: map[string]*schema.Schema{
 			// Out
@@ -100,4 +96,32 @@ func dataSourceWorkers() *schema.Resource {
 			},
 		},
 	}
+}
+
+// dataSourceWorkersRead lit les workers et les mappe dans le state Terraform
+func dataSourceWorkersRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les workers
+	workers, err := c.Compute().Worker().List(ctx, "")
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("machine_managers")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfWorkers := make([]map[string]interface{}, len(workers))
+	for i, worker := range workers {
+		tfWorkers[i] = helpers.FlattenWorker(worker)
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("machine_managers", tfWorkers); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,33 +15,7 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific virtual machine from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			name := d.Get("name").(string)
-			if name != "" {
-				virtualMachines, err := c.Compute().OpenIaaS().VirtualMachine().List(ctx, &client.OpenIaaSVirtualMachineFilter{
-					MachineManagerID: d.Get("machine_manager_id").(string),
-				})
-				if err != nil {
-					return nil, fmt.Errorf("failed to find virtual machine named %q: %s", name, err)
-				}
-				for _, vm := range virtualMachines {
-					if vm.Name == name {
-						return vm, nil
-					}
-				}
-				return nil, fmt.Errorf("failed to find virtual machine named %q", name)
-			}
-			id := d.Get("id").(string)
-			if id != "" {
-				var err error
-				virtualMachine, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, id)
-				if err == nil && virtualMachine == nil {
-					return nil, fmt.Errorf("failed to find virtual machine with id %q", id)
-				}
-				return virtualMachine, err
-			}
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: computeOpenIaaSVirtualMachineRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -64,14 +40,6 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 			},
 
 			// Out
-			"machine_manager_name": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"machine_manager_type": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"internal_id": {
 				Type:     schema.TypeString,
 				Computed: true,
@@ -82,6 +50,10 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 			},
 			"secure_boot": {
 				Type:     schema.TypeBool,
+				Computed: true,
+			},
+			"boot_firmware": {
+				Type:     schema.TypeString,
 				Computed: true,
 			},
 			"auto_power_on": {
@@ -159,38 +131,71 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 					},
 				},
 			},
-			"pool": {
-				Type:     schema.TypeList,
+			"pool_id": {
+				Type:     schema.TypeString,
 				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
 			},
-			"host": {
-				Type:     schema.TypeList,
+			"host_id": {
+				Type:     schema.TypeString,
 				Computed: true,
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
 			},
 		},
 	}
+}
+
+// computeOpenIaaSVirtualMachineRead lit une machine virtuelle OpenIaaS et la mappe dans le state Terraform
+func computeOpenIaaSVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var vm *client.OpenIaaSVirtualMachine
+	var err error
+
+	// Recherche par nom
+	name := d.Get("name").(string)
+	if name != "" {
+		virtualMachines, err := c.Compute().OpenIaaS().VirtualMachine().List(ctx, &client.OpenIaaSVirtualMachineFilter{
+			MachineManagerID: d.Get("machine_manager_id").(string),
+		})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to find virtual machine named %q: %s", name, err))
+		}
+		for _, v := range virtualMachines {
+			if v.Name == name {
+				vm = v
+				break
+			}
+		}
+		if vm == nil {
+			return diag.FromErr(fmt.Errorf("failed to find virtual machine named %q", name))
+		}
+	} else {
+		// Recherche par ID
+		id := d.Get("id").(string)
+		if id != "" {
+			vm, err = c.Compute().OpenIaaS().VirtualMachine().Read(ctx, id)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			if vm == nil {
+				return diag.FromErr(fmt.Errorf("failed to find virtual machine with id %q", id))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(vm.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	vmData := helpers.FlattenOpenIaaSVirtualMachine(vm)
+
+	// Définir les données dans le state
+	for k, v := range vmData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

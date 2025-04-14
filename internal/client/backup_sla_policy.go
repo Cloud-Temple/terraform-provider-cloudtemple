@@ -45,7 +45,6 @@ type BackupSLAPolicyTrigger struct {
 type BackupSLAPolicyFilter struct {
 	VirtualMachineId string `filter:"virtualMachineId"`
 	VirtualDiskId    string `filter:"virtualDiskId"`
-	Assignable       *bool  `filter:"assignable"`
 }
 
 func (c *BackupSLAPolicyClient) List(ctx context.Context, filter *BackupSLAPolicyFilter) ([]*BackupSLAPolicy, error) {

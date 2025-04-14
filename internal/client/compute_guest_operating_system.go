@@ -16,16 +16,19 @@ type GuestOperatingSystem struct {
 	FullName string `terraform:"full_name"`
 }
 
+type GuestOperatingSystemFilter struct {
+	HostID        string `filter:"hostId"`
+	HostClusterID string `filter:"hostClusterId"`
+	OsFamily      string `filter:"osFamily"`
+	Version       string `filter:"version"`
+}
+
 func (g *GuestOperatingSystemClient) List(
 	ctx context.Context,
-	machineManagerId string,
-	hostClusterId string,
-	hostId string,
-	osFamily string) ([]*GuestOperatingSystem, error) {
+	filter *GuestOperatingSystemFilter) ([]*GuestOperatingSystem, error) {
 
-	// TODO: filters
 	r := g.c.newRequest("GET", "/compute/v1/vcenters/guest_operating_systems")
-	r.params.Add("machineManagerId", machineManagerId)
+	r.addFilter(filter)
 	resp, err := g.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -44,9 +47,9 @@ func (g *GuestOperatingSystemClient) List(
 	return out, nil
 }
 
-func (g *GuestOperatingSystemClient) Read(ctx context.Context, machineManagerId string, moref string) (*GuestOperatingSystem, error) {
+func (g *GuestOperatingSystemClient) Read(ctx context.Context, moref string, filter *GuestOperatingSystemFilter) (*GuestOperatingSystem, error) {
 	r := g.c.newRequest("GET", "/compute/v1/vcenters/guest_operating_systems/%s", moref)
-	r.params.Add("machineManagerId", machineManagerId)
+	r.addFilter(filter)
 	resp, err := g.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

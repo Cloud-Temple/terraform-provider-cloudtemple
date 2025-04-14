@@ -5,45 +5,17 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceVirtualMachine() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a specific virtual machine from a vCenter infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			// Recherche par nom
-			name := d.Get("name").(string)
-			if name != "" {
-				virtualMachines, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
-				if err != nil {
-					return nil, fmt.Errorf("failed to find virtual machine named %q: %s", name, err)
-				}
-				for _, vm := range virtualMachines {
-					if vm.Name == name {
-						return vm, nil
-					}
-				}
-				return nil, fmt.Errorf("failed to find virtual machine named %q", name)
-			}
-
-			// Recherche par ID
-			id := d.Get("id").(string)
-			if id != "" {
-				vm, err := client.Compute().VirtualMachine().Read(ctx, id)
-				if err != nil {
-					return nil, err
-				}
-				if vm == nil {
-					return nil, fmt.Errorf("failed to find virtual machine with id %q", id)
-				}
-				return vm, nil
-			}
-
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: dataSourceVirtualMachineRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -60,21 +32,20 @@ func dataSourceVirtualMachine() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
 			},
+			"machine_manager_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"id"},
+				RequiredWith:  []string{"name"},
+			},
 
 			// Out
-			"moref": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"machine_manager_name": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
-			"machine_manager_type": {
+			"moref": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
@@ -330,4 +301,63 @@ func dataSourceVirtualMachine() *schema.Resource {
 			},
 		},
 	}
+}
+
+// dataSourceVirtualMachineRead lit une machine virtuelle et la mappe dans le state Terraform
+func dataSourceVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var vm *client.VirtualMachine
+	var err error
+
+	// Recherche par nom
+	name := d.Get("name").(string)
+	if name != "" {
+		virtualMachines, err := c.Compute().VirtualMachine().List(ctx, &client.VirtualMachineFilter{
+			Name:             name,
+			MachineManagerID: d.Get("machine_manager_id").(string),
+			AllOptions:       true,
+		})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to find virtual machine named %q: %s", name, err))
+		}
+		for _, v := range virtualMachines {
+			if v.Name == name {
+				vm = v
+				break
+			}
+		}
+		if vm == nil {
+			return diag.FromErr(fmt.Errorf("failed to find virtual machine named %q", name))
+		}
+	} else {
+		// Recherche par ID
+		id := d.Get("id").(string)
+		if id != "" {
+			vm, err = c.Compute().VirtualMachine().Read(ctx, id)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			if vm == nil {
+				return diag.FromErr(fmt.Errorf("failed to find virtual machine with id %q", id))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(vm.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	vmData := helpers.FlattenVirtualMachine(vm)
+
+	// Définir les données dans le state
+	for k, v := range vmData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

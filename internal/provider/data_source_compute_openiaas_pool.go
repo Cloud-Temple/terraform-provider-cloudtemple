@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,35 +15,7 @@ func dataSourceOpenIaasPool() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific pool from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			name := d.Get("name").(string)
-			if name != "" {
-				pools, err := c.Compute().OpenIaaS().Pool().List(ctx, &client.OpenIaasPoolFilter{
-					MachineManagerId: d.Get("machine_manager_id").(string),
-				})
-				if err != nil {
-					return nil, fmt.Errorf("failed to find pool named %q: %s", name, err)
-				}
-				for _, pool := range pools {
-					if pool.Name == name {
-						return pool, nil
-					}
-				}
-			}
-
-			id := d.Get("id").(string)
-			if id != "" {
-				id := d.Get("id").(string)
-				var err error
-				pool, err := c.Compute().OpenIaaS().Pool().Read(ctx, id)
-				if err == nil && pool == nil {
-					return nil, fmt.Errorf("failed to find pool with id %q", id)
-				}
-				return pool, err
-			}
-
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: computeOpenIaaSPoolRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -91,14 +65,6 @@ func dataSourceOpenIaasPool() *schema.Resource {
 					},
 				},
 			},
-			"machine_manager_name": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
-			"machine_manager_type": {
-				Type:     schema.TypeString,
-				Computed: true,
-			},
 			"hosts": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -126,4 +92,61 @@ func dataSourceOpenIaasPool() *schema.Resource {
 			},
 		},
 	}
+}
+
+// computeOpenIaaSPoolRead lit un pool OpenIaaS et le mappe dans le state Terraform
+func computeOpenIaaSPoolRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var pool *client.OpenIaasPool
+	var err error
+
+	// Recherche par nom
+	name := d.Get("name").(string)
+	if name != "" {
+		pools, err := c.Compute().OpenIaaS().Pool().List(ctx, &client.OpenIaasPoolFilter{
+			MachineManagerId: d.Get("machine_manager_id").(string),
+		})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to find pool named %q: %s", name, err))
+		}
+		for _, p := range pools {
+			if p.Name == name {
+				pool = p
+				break
+			}
+		}
+		if pool == nil {
+			return diag.FromErr(fmt.Errorf("failed to find pool named %q", name))
+		}
+	} else {
+		// Recherche par ID
+		id := d.Get("id").(string)
+		if id != "" {
+			pool, err = c.Compute().OpenIaaS().Pool().Read(ctx, id)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			if pool == nil {
+				return diag.FromErr(fmt.Errorf("failed to find pool with id %q", id))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(pool.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	poolData := helpers.FlattenOpenIaaSPool(pool)
+
+	// Définir les données dans le state
+	for k, v := range poolData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

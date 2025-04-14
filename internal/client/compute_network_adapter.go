@@ -22,9 +22,13 @@ type NetworkAdapter struct {
 	AutoConnect      bool   `terraform:"auto_connect"`
 }
 
-func (n *NetworkAdapterClient) List(ctx context.Context, virtualMachineId string) ([]*NetworkAdapter, error) {
+type NetworkAdapterFilter struct {
+	VirtualMachineID string `filter:"virtualMachineId"`
+}
+
+func (n *NetworkAdapterClient) List(ctx context.Context, filter *NetworkAdapterFilter) ([]*NetworkAdapter, error) {
 	r := n.c.newRequest("GET", "/compute/v1/vcenters/network_adapters")
-	r.params.Add("virtualMachineId", virtualMachineId)
+	r.addFilter(filter)
 	resp, err := n.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

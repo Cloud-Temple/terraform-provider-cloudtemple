@@ -4,6 +4,8 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -11,15 +13,36 @@ func dataSourceHosts() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			hosts, err := client.Compute().Host().List(ctx, "", "", "", "")
-			return map[string]interface{}{
-				"id":    "hosts",
-				"hosts": hosts,
-			}, err
-		}),
+		ReadContext: computeHostsRead,
 
 		Schema: map[string]*schema.Schema{
+			// In
+			"name": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+			"machine_manager_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+			"datacenter_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+			"datastore_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+			"host_cluster_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+
 			// Out
 			"hosts": {
 				Type:     schema.TypeList,
@@ -149,4 +172,38 @@ func dataSourceHosts() *schema.Resource {
 			},
 		},
 	}
+}
+
+// computeHostsRead lit les hôtes et les mappe dans le state Terraform
+func computeHostsRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les hôtes
+	hosts, err := c.Compute().Host().List(ctx, &client.HostFilter{
+		Name:             d.Get("name").(string),
+		MachineManagerID: d.Get("machine_manager_id").(string),
+		DatacenterID:     d.Get("datacenter_id").(string),
+		HostClusterID:    d.Get("host_cluster_id").(string),
+		DatastoreID:      d.Get("datastore_id").(string),
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("hosts")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfHosts := make([]map[string]interface{}, len(hosts))
+	for i, host := range hosts {
+		tfHosts[i] = helpers.FlattenHost(host)
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("hosts", tfHosts); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

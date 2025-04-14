@@ -4,22 +4,65 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func dataSourceVirtualMachines() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve all virtual machines from a vCenter infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			virtualMachines, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
-			return map[string]interface{}{
-				"id":               "virtual_machines",
-				"virtual_machines": virtualMachines,
-			}, err
-		}),
+		ReadContext: dataSourceVirtualMachinesRead,
 
 		Schema: map[string]*schema.Schema{
+			// In
+			"name": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+			"machine_manager_id": {
+				Type:     schema.TypeString,
+				Optional: true,
+				Default:  "",
+			},
+			"datacenters": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+			"networks": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+			"datastores": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+			"hosts": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+			"host_clusters": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
+
 			// Out
 			"virtual_machines": {
 				Type:     schema.TypeList,
@@ -39,10 +82,6 @@ func dataSourceVirtualMachines() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
-						"machine_manager_type": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
 						"machine_manager_id": {
 							Type:     schema.TypeString,
 							Computed: true,
@@ -51,7 +90,7 @@ func dataSourceVirtualMachines() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
-						"datastore_name": {
+						"datacenter_id": {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
@@ -59,11 +98,15 @@ func dataSourceVirtualMachines() *schema.Resource {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
-						"datastore_cluster_id": {
+						"datastore_id": {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
-						"datastore_id": {
+						"datastore_name": {
+							Type:     schema.TypeString,
+							Computed: true,
+						},
+						"datastore_cluster_id": {
 							Type:     schema.TypeString,
 							Computed: true,
 						},
@@ -133,10 +176,6 @@ func dataSourceVirtualMachines() *schema.Resource {
 						},
 						"tools_version": {
 							Type:     schema.TypeInt,
-							Computed: true,
-						},
-						"datacenter_id": {
-							Type:     schema.TypeString,
 							Computed: true,
 						},
 						"distributed_virtual_port_group_ids": {
@@ -306,4 +345,42 @@ func dataSourceVirtualMachines() *schema.Resource {
 			},
 		},
 	}
+}
+
+// dataSourceVirtualMachinesRead lit les machines virtuelles et les mappe dans le state Terraform
+func dataSourceVirtualMachinesRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer les machines virtuelles
+	virtualMachines, err := c.Compute().VirtualMachine().List(ctx, &client.VirtualMachineFilter{
+		Name:             d.Get("name").(string),
+		MachineManagerID: d.Get("machine_manager_id").(string),
+		Datacenters:      GetStringList(d, "datacenters"),
+		Networks:         GetStringList(d, "networks"),
+		Datastores:       GetStringList(d, "datastores"),
+		Hosts:            GetStringList(d, "hosts"),
+		HostClusters:     GetStringList(d, "host_clusters"),
+		AllOptions:       true,
+	})
+	if err != nil {
+		return diag.FromErr(err)
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId("virtual_machines")
+
+	// Mapper manuellement les données en utilisant la fonction helper
+	tfVirtualMachines := make([]map[string]interface{}, len(virtualMachines))
+	for i, vm := range virtualMachines {
+		tfVirtualMachines[i] = helpers.FlattenVirtualMachine(vm)
+		tfVirtualMachines[i]["id"] = vm.ID
+	}
+
+	// Définir les données dans le state
+	if err := d.Set("virtual_machines", tfVirtualMachines); err != nil {
+		return diag.FromErr(err)
+	}
+
+	return diags
 }

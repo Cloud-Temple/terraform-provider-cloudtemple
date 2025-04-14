@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,37 +15,7 @@ func dataSourceBackupSLAPolicy() *schema.Resource {
 	return &schema.Resource{
 		Description: "",
 
-		ReadContext: readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			// Recherche par nom
-			name := d.Get("name").(string)
-			if name != "" {
-				policies, err := client.Backup().SLAPolicy().List(ctx, nil)
-				if err != nil {
-					return nil, fmt.Errorf("failed to find SLA policy named %q: %s", name, err)
-				}
-				for _, policy := range policies {
-					if policy.Name == name {
-						return policy, nil
-					}
-				}
-				return nil, fmt.Errorf("failed to find SLA policy named %q", name)
-			}
-
-			// Recherche par ID
-			id := d.Get("id").(string)
-			if id != "" {
-				policy, err := client.Backup().SLAPolicy().Read(ctx, id)
-				if err != nil {
-					return nil, err
-				}
-				if policy == nil {
-					return nil, fmt.Errorf("failed to find SLA policy with id %q", id)
-				}
-				return policy, nil
-			}
-
-			return nil, fmt.Errorf("either id or name must be specified")
-		}),
+		ReadContext: backupSLAPolicyRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -144,4 +116,59 @@ func dataSourceBackupSLAPolicy() *schema.Resource {
 			},
 		},
 	}
+}
+
+// backupSLAPolicyRead lit une politique SLA de backup et la mappe dans le state Terraform
+func backupSLAPolicyRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+	var policy *client.BackupSLAPolicy
+	var err error
+
+	// Recherche par nom
+	name := d.Get("name").(string)
+	if name != "" {
+		policies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{})
+		if err != nil {
+			return diag.FromErr(fmt.Errorf("failed to find SLA policy named %q: %s", name, err))
+		}
+		for _, p := range policies {
+			if p.Name == name {
+				policy = p
+				break
+			}
+		}
+		if policy == nil {
+			return diag.FromErr(fmt.Errorf("failed to find SLA policy named %q", name))
+		}
+	} else {
+		// Recherche par ID
+		id := d.Get("id").(string)
+		if id != "" {
+			policy, err = c.Backup().SLAPolicy().Read(ctx, id)
+			if err != nil {
+				return diag.FromErr(err)
+			}
+			if policy == nil {
+				return diag.FromErr(fmt.Errorf("failed to find SLA policy with id %q", id))
+			}
+		} else {
+			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+		}
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(policy.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	policyData := helpers.FlattenBackupSLAPolicy(policy)
+
+	// Définir les données dans le state
+	for k, v := range policyData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

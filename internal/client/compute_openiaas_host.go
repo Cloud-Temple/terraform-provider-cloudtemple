@@ -16,7 +16,7 @@ type OpenIaaSHost struct {
 		ID   string `terraform:"id"`
 		Name string `terraform:"name"`
 		Type string `terraform:"type"`
-	} `terraform_flatten:"machine_manager"`
+	} `terraform:"machine_manager"`
 	InternalId string `terraform:"internal_id"`
 	Pool       struct {
 		ID   string `terraform:"id"`
@@ -58,6 +58,7 @@ type OpenIaaSHost struct {
 type OpenIaasHostFilter struct {
 	// TODO : Add filter by name
 	MachineManagerId string `filter:"machineManagerId"`
+	PoolId           string `filter:"poolId"`
 }
 
 func (h *OpenIaaSHostClient) List(

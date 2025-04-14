@@ -14,11 +14,11 @@ func (c *ComputeClient) ContentLibrary() *ContentLibraryClient {
 }
 
 type ContentLibrary struct {
-	ID               string        `terraform:"id"`
-	Name             string        `terraform:"name"`
-	MachineManagerID string        `terraform:"machine_manager_id"`
-	Type             string        `terraform:"type"`
-	Datastore        DatastoreLink `terraform:"datastore"`
+	ID             string        `terraform:"id"`
+	Name           string        `terraform:"name"`
+	MachineManager BaseObject    `terraform:"machine_manager"`
+	Type           string        `terraform:"type"`
+	Datastore      DatastoreLink `terraform:"datastore"`
 }
 
 type DatastoreLink struct {
@@ -73,7 +73,6 @@ func (c *ContentLibraryClient) Read(ctx context.Context, id string) (*ContentLib
 
 type ContentLibraryItem struct {
 	ID               string    `terraform:"id"`
-	ContentLibraryId string    `terraform:"content_library_id"`
 	Name             string    `terraform:"name"`
 	Description      string    `terraform:"description"`
 	Type             string    `terraform:"type"`

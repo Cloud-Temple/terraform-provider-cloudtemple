@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -117,18 +118,30 @@ func computeVirtualControllerCreate(ctx context.Context, d *schema.ResourceData,
 }
 
 func computeVirtualControllerRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	reader := readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-		controller, err := client.Compute().VirtualController().Read(ctx, d.Id())
-		if err != nil {
-			return nil, err
-		}
-		if controller == nil {
-			return nil, nil
-		}
-		return controller, nil
-	})
+	c := getClient(meta)
+	var diags diag.Diagnostics
 
-	return reader(ctx, d, meta)
+	// Récupérer l'adaptateur réseau par son ID
+	virtualController, err := c.Compute().VirtualController().Read(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	if virtualController == nil {
+		d.SetId("") // L'adaptateur n'existe plus, marquer la ressource comme supprimée
+		return nil
+	}
+
+	// Mapper les données en utilisant la fonction helper
+	controllerData := helpers.FlattenVirtualController(virtualController)
+
+	// Définir les données dans le state
+	for k, v := range controllerData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }
 
 func computeVirtualControllerUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {

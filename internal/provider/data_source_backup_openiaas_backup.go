@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -13,18 +15,7 @@ func dataSourceOpenIaasBackup() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a specific backup from an Open IaaS infrastructure.",
 
-		ReadContext: readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-			id := d.Get("id").(string)
-			if id != "" {
-				backup, err := c.Backup().OpenIaaS().Backup().Read(ctx, id)
-				if err == nil && backup == nil {
-					return nil, fmt.Errorf("failed to find backup with id %q", id)
-				}
-				return backup, err
-			}
-
-			return nil, fmt.Errorf("id must be specified")
-		}),
+		ReadContext: backupOpenIaasBackupRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
@@ -89,4 +80,40 @@ func dataSourceOpenIaasBackup() *schema.Resource {
 			},
 		},
 	}
+}
+
+// backupOpenIaasBackupRead lit un backup OpenIaaS et le mappe dans le state Terraform
+func backupOpenIaasBackupRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	var c *client.Client = getClient(meta)
+	var diags diag.Diagnostics
+
+	// Récupérer l'ID du backup
+	id := d.Get("id").(string)
+	if id == "" {
+		return diag.FromErr(fmt.Errorf("id must be specified"))
+	}
+
+	// Récupérer le backup
+	backup, err := c.Backup().OpenIaaS().Backup().Read(ctx, id)
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	if backup == nil {
+		return diag.FromErr(fmt.Errorf("failed to find backup with id %q", id))
+	}
+
+	// Définir l'ID de la datasource
+	d.SetId(backup.ID)
+
+	// Mapper les données en utilisant la fonction helper
+	backupData := helpers.FlattenBackupOpenIaasBackup(backup)
+
+	// Définir les données dans le state
+	for k, v := range backupData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }

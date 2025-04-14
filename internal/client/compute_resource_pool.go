@@ -11,15 +11,12 @@ func (c *ComputeClient) ResourcePool() *ResourcePoolClient {
 }
 
 type ResourcePool struct {
-	ID             string `terraform:"id"`
-	Name           string `terraform:"name"`
-	MachineManager struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform_flatten:"machine_manager" terraform:"machine_manager"`
-	Moref   string              `terraform:"moref"`
-	Parent  ResourcePoolParent  `terraform:"parent"`
-	Metrics ResourcePoolMetrics `terraform:"metrics"`
+	ID             string              `terraform:"id"`
+	Name           string              `terraform:"name"`
+	Moref          string              `terraform:"moref"`
+	Parent         ResourcePoolParent  `terraform:"parent"`
+	Metrics        ResourcePoolMetrics `terraform:"metrics"`
+	MachineManager BaseObject          `terraform:"machine_manager" terraform_flatten:"machine_manager"`
 }
 
 type ResourcePoolParent struct {
@@ -43,14 +40,15 @@ type ResourcePoolMemoryMetrics struct {
 	BalloonedMemory int `terraform:"ballooned_memory"`
 }
 
-func (rp *ResourcePoolClient) List(
-	ctx context.Context,
-	machineManagerID string,
-	DatacenterID string,
-	hostClusterID string) ([]*ResourcePool, error) {
+type ResourcePoolFilter struct {
+	MachineManagerID string `filter:"machineManagerId"`
+	DatacenterID     string `filter:"datacenterId"`
+	HostClusterID    string `filter:"hostClusterId"`
+}
 
-	// TODO: filters
+func (rp *ResourcePoolClient) List(ctx context.Context, filter *ResourcePoolFilter) ([]*ResourcePool, error) {
 	r := rp.c.newRequest("GET", "/compute/v1/vcenters/resource_pools")
+	r.addFilter(filter)
 	resp, err := rp.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

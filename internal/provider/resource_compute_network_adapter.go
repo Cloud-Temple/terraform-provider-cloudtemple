@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -43,15 +44,9 @@ func resourceNetworkAdapter() *schema.Resource {
 				ForceNew: true,
 			},
 			"mac_address": {
-				Type:         schema.TypeString,
-				Optional:     true,
-				Computed:     true,
-				ComputedWhen: []string{"mac_type"},
-			},
-			"mac_type": {
 				Type:     schema.TypeString,
 				Optional: true,
-				Default:  "MANUAL",
+				Computed: true,
 			},
 			"auto_connect": {
 				Type:     schema.TypeBool,
@@ -64,6 +59,10 @@ func resourceNetworkAdapter() *schema.Resource {
 
 			// Out
 			"name": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+			"mac_type": {
 				Type:     schema.TypeString,
 				Computed: true,
 			},
@@ -94,26 +93,39 @@ func computeNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, me
 }
 
 func computeNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	reader := readFullResource(func(ctx context.Context, client *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-		return client.Compute().NetworkAdapter().Read(ctx, d.Id())
-	})
+	c := getClient(meta)
+	var diags diag.Diagnostics
 
-	return reader(ctx, d, meta)
+	// Récupérer l'adaptateur réseau par son ID
+	networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, d.Id())
+	if err != nil {
+		return diag.FromErr(err)
+	}
+	if networkAdapter == nil {
+		d.SetId("") // L'adaptateur n'existe plus, marquer la ressource comme supprimée
+		return nil
+	}
+
+	// Mapper les données en utilisant la fonction helper
+	adapterData := helpers.FlattenNetworkAdapter(networkAdapter)
+
+	// Définir les données dans le state
+	for k, v := range adapterData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }
 
 func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
-
-	macType := d.Get("mac_type").(string)
-	macAddress := d.Get("mac_address").(string)
-	if macType == "ASSIGNED" {
-		macAddress = ""
-	}
 	activityId, err := c.Compute().NetworkAdapter().Update(ctx, &client.UpdateNetworkAdapterRequest{
 		ID:           d.Id(),
 		NewNetworkId: d.Get("network_id").(string),
 		AutoConnect:  d.Get("auto_connect").(bool),
-		MacAddress:   macAddress,
+		MacAddress:   d.Get("mac_address").(string),
 	})
 	if err != nil {
 		return diag.Errorf("failed to update network adapter, %s", err)

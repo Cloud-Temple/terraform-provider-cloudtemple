@@ -19,11 +19,7 @@ type OpenIaaSNetworkAdapter struct {
 	MTU              int        `terraform:"mtu"`
 	Attached         bool       `terraform:"attached"`
 	Network          BaseObject `terraform:"network"`
-	MachineManager   struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-		Type string `terraform:"type"`
-	} `terraform_flatten:"machine_manager"`
+	MachineManager   BaseObject `terraform:"machine_manager"`
 }
 
 type CreateOpenIaasNetworkAdapterRequest struct {
@@ -58,9 +54,13 @@ func (v *OpenIaaSNetworkAdapterClient) Read(ctx context.Context, id string) (*Op
 	return &out, nil
 }
 
-func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, virtualMachineId string) ([]*OpenIaaSNetworkAdapter, error) {
+type OpenIaaSNetworkAdapterFilter struct {
+	VirtualMachineId string `filter:"virtualMachineId"`
+}
+
+func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaaSNetworkAdapterFilter) ([]*OpenIaaSNetworkAdapter, error) {
 	r := v.c.newRequest("GET", "/compute/v1/open_iaas/network_adapters")
-	r.params.Add("virtualMachineId", virtualMachineId)
+	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
