@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_folder Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific folder.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_folder (Data Source)
+
+Used to retrieve a specific folder.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -27,11 +30,9 @@ data "cloudtemple_compute_folder" "name" {
 
 ### Optional
 
-- `name` (String)
-
-### Read-Only
-
-- `id` (String) The ID of this resource.
-- `machine_manager_id` (String)
+- `datacenter_id` (String) The ID of the datacenter containing the folder. Required when using `name`.
+- `id` (String) The ID of the folder to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter folders by. Required when using `name`.
+- `name` (String) The name of the folder to retrieve. Conflicts with `id`. Requires `datacenter_id`.
 
 

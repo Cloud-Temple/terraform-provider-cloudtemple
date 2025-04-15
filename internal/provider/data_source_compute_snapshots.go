@@ -22,30 +22,36 @@ func dataSourceSnapshots() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "The ID of the virtual machine to retrieve snapshots for.",
 			},
 
 			// Out
 			"snapshots": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of snapshots for the specified virtual machine.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the snapshot.",
 						},
 						"virtual_machine_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the virtual machine this snapshot belongs to.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the snapshot.",
 						},
 						"create_time": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The timestamp when the snapshot was created (in Unix time format).",
 						},
 					},
 				},

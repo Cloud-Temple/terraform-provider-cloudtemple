@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_virtual_machine Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific virtual machine from a vCenter infrastructure.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_virtual_machine (Data Source)
+
+Used to retrieve a specific virtual machine from a vCenter infrastructure.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -27,45 +30,44 @@ data "cloudtemple_compute_virtual_machine" "name" {
 
 ### Optional
 
-- `name` (String)
+- `id` (String) The ID of the virtual machine to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager (vCenter) where the virtual machine is located. Required when using `name`.
+- `name` (String) The name of the virtual machine to retrieve. Conflicts with `id`. Requires `machine_manager_id`.
 
 ### Read-Only
 
-- `boot_options` (List of Object) (see [below for nested schema](#nestedatt--boot_options))
-- `consolidation_needed` (Boolean)
-- `cpu` (Number)
-- `cpu_hot_add_enabled` (Boolean)
-- `cpu_hot_remove_enabled` (Boolean)
-- `cpu_usage` (Number)
-- `datacenter_id` (String)
-- `datastore_cluster_id` (String)
-- `datastore_id` (String)
-- `datastore_name` (String)
-- `distributed_virtual_port_group_ids` (List of String)
-- `expose_hardware_virtualization` (Boolean)
-- `extra_config` (List of Object) (see [below for nested schema](#nestedatt--extra_config))
-- `guest_operating_system_moref` (String)
-- `hardware_version` (String)
-- `host_cluster_id` (String)
-- `id` (String) The ID of this resource.
-- `machine_manager_id` (String)
-- `machine_manager_name` (String)
-- `machine_manager_type` (String)
-- `memory` (Number)
-- `memory_hot_add_enabled` (Boolean)
-- `memory_usage` (Number)
-- `moref` (String)
-- `num_cores_per_socket` (Number)
-- `operating_system_name` (String)
-- `power_state` (String)
-- `replication_config` (List of Object) (see [below for nested schema](#nestedatt--replication_config))
-- `snapshoted` (Boolean)
-- `spp_mode` (String)
-- `storage` (List of Object) (see [below for nested schema](#nestedatt--storage))
-- `template` (Boolean)
-- `tools` (String)
-- `tools_version` (Number)
-- `triggered_alarms` (List of Object) (see [below for nested schema](#nestedatt--triggered_alarms))
+- `boot_options` (List of Object) Boot configuration options for the virtual machine. (see [below for nested schema](#nestedatt--boot_options))
+- `consolidation_needed` (Boolean) Whether the virtual machine needs consolidation.
+- `cpu` (Number) The number of virtual CPUs allocated to the virtual machine.
+- `cpu_hot_add_enabled` (Boolean) Whether CPU hot add is enabled for the virtual machine.
+- `cpu_hot_remove_enabled` (Boolean) Whether CPU hot remove is enabled for the virtual machine.
+- `cpu_usage` (Number) The current CPU usage of the virtual machine in MHz.
+- `datacenter_id` (String) The ID of the datacenter where the virtual machine is located.
+- `datastore_cluster_id` (String) The ID of the datastore cluster where the virtual machine is stored.
+- `datastore_id` (String) The ID of the datastore where the virtual machine is stored.
+- `datastore_name` (String) The name of the datastore where the virtual machine is stored.
+- `distributed_virtual_port_group_ids` (List of String) List of distributed virtual port group IDs associated with the virtual machine.
+- `expose_hardware_virtualization` (Boolean) Whether hardware virtualization is exposed to the guest operating system.
+- `extra_config` (List of Object) Extra configuration parameters for the virtual machine. (see [below for nested schema](#nestedatt--extra_config))
+- `guest_operating_system_moref` (String) The managed object reference ID of the guest operating system in the hypervisor.
+- `hardware_version` (String) The hardware version of the virtual machine.
+- `host_cluster_id` (String) The ID of the host cluster where the virtual machine is running.
+- `machine_manager_name` (String) The name of the machine manager (vCenter) where the virtual machine is located.
+- `memory` (Number) The amount of memory allocated to the virtual machine in Bytes.
+- `memory_hot_add_enabled` (Boolean) Whether memory hot add is enabled for the virtual machine.
+- `memory_usage` (Number) The current memory usage of the virtual machine in Bytes.
+- `moref` (String) The managed object reference ID of the virtual machine in the hypervisor.
+- `num_cores_per_socket` (Number) The number of cores per socket in the virtual machine.
+- `operating_system_name` (String) The name of the operating system running on the virtual machine.
+- `power_state` (String) The power state of the virtual machine (e.g., poweredOn, poweredOff, suspended).
+- `replication_config` (List of Object) Configuration for virtual machine replication. (see [below for nested schema](#nestedatt--replication_config))
+- `snapshoted` (Boolean) Whether the virtual machine has snapshots.
+- `spp_mode` (String) The SPP (Storage Policy Protection) mode of the virtual machine.
+- `storage` (List of Object) Storage usage information for the virtual machine. (see [below for nested schema](#nestedatt--storage))
+- `template` (Boolean) Whether the virtual machine is a template.
+- `tools` (String) The status of VMware Tools in the virtual machine.
+- `tools_version` (Number) The version of VMware Tools installed in the virtual machine.
+- `triggered_alarms` (List of Object) List of alarms that have been triggered for this virtual machine. (see [below for nested schema](#nestedatt--triggered_alarms))
 
 <a id="nestedatt--boot_options"></a>
 ### Nested Schema for `boot_options`

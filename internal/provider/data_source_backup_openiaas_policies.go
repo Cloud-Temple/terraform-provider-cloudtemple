@@ -18,75 +18,91 @@ func dataSourceOpenIaasBackupPolicies() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// In
 			"name": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Filter policies by name.",
 			},
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Filter policies by machine manager ID.",
 			},
 			"virtual_machine_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Filter policies by virtual machine ID.",
 			},
 			// Out
 			"policies": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of backup policies matching the filter criteria.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the backup policy.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the backup policy.",
 						},
 						"internal_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The internal identifier of the policy in the Open IaaS system.",
 						},
 						"running": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Indicates whether the policy is currently running.",
 						},
 						"mode": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The backup mode of the policy",
 						},
 						"machine_manager_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the machine manager associated with this policy.",
 						},
 						"machine_manager_name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the machine manager associated with this policy.",
 						},
 						"schedulers": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "List of schedulers configured for this backup policy.",
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"temporarily_disabled": {
-										Type:     schema.TypeBool,
-										Computed: true,
+										Type:        schema.TypeBool,
+										Computed:    true,
+										Description: "Indicates whether the scheduler is temporarily disabled.",
 									},
 									"retention": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The retention period for backups created by this scheduler (in days).",
 									},
 									"cron": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The cron expression defining the schedule.",
 									},
 									"timezone": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The timezone used for the scheduler.",
 									},
 								},
 							},

@@ -11,118 +11,140 @@ import (
 
 func dataSourceHostClusters() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a list of host clusters.",
 
 		ReadContext: computeHostClustersRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
 			"name": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Filter host clusters by name.",
 			},
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Filter host clusters by machine manager ID.",
 			},
 			"datacenter_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Filter host clusters by datacenter ID.",
 			},
 			"datastore_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Filter host clusters by datastore ID.",
 			},
 			"datastore_cluster_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Filter host clusters by datastore cluster ID.",
 			},
 
 			// Out
 			"host_clusters": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of host clusters matching the filter criteria.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the host cluster.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the host cluster.",
 						},
 						"moref": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The managed object reference ID of the host cluster.",
 						},
 						"hosts": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "List of hosts that are part of this host cluster.",
 
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"id": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The ID of the host.",
 									},
 									"type": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The type of the host.",
 									},
 								},
 							},
 						},
 						"metrics": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Resource metrics for the host cluster.",
 
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"total_cpu": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The total CPU capacity of the host cluster in MHz.",
 									},
 									"total_memory": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The total memory capacity of the host cluster in bytes.",
 									},
 									"total_storage": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The total storage capacity of the host cluster in bytes.",
 									},
 									"cpu_used": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The amount of CPU currently used in the host cluster in MHz.",
 									},
 									"memory_used": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The amount of memory currently used in the host cluster in bytes.",
 									},
 									"storage_used": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The amount of storage currently used in the host cluster in bytes.",
 									},
 								},
 							},
 						},
 						"virtual_machines_number": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The number of virtual machines running on this host cluster.",
 						},
 						"machine_manager_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the machine manager this host cluster belongs to.",
 						},
 						"datacenter_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the datacenter this host cluster belongs to.",
 						},
 					},
 				},

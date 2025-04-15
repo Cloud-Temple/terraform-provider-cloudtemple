@@ -11,25 +11,28 @@ import (
 
 func dataSourceBackupSites() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a list of backup sites.",
 
 		ReadContext: backupSitesRead,
 
 		Schema: map[string]*schema.Schema{
 			// Out
 			"sites": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of backup sites.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the backup site.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the backup site.",
 						},
 					},
 				},

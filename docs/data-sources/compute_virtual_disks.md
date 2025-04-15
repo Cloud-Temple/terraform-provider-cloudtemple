@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_virtual_disks Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve all virtual disks for a specific virtual machine.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_virtual_disks (Data Source)
+
+Used to retrieve all virtual disks for a specific virtual machine.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -23,12 +26,12 @@ data "cloudtemple_compute_virtual_disks" "foo" {
 
 ### Required
 
-- `virtual_machine_id` (String)
+- `virtual_machine_id` (String) The ID of the virtual machine to retrieve disks for.
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `virtual_disks` (List of Object) (see [below for nested schema](#nestedatt--virtual_disks))
+- `virtual_disks` (List of Object) List of virtual disks attached to the specified virtual machine. (see [below for nested schema](#nestedatt--virtual_disks))
 
 <a id="nestedatt--virtual_disks"></a>
 ### Nested Schema for `virtual_disks`
@@ -37,6 +40,8 @@ Read-Only:
 
 - `capacity` (Number)
 - `controller_bus_number` (Number)
+- `controller_id` (String)
+- `controller_type` (String)
 - `datastore_id` (String)
 - `datastore_name` (String)
 - `disk_mode` (String)

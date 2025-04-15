@@ -22,21 +22,25 @@ func dataSourceOpenIaasBackups() *schema.Resource {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "Filter backups by machine manager ID.",
 			},
 			"virtual_machine_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "Filter backups by virtual machine ID.",
 			},
 			"deleted": {
-				Type:     schema.TypeBool,
-				Optional: true,
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Include backups of deleted virtual machines when set to true.",
 			},
 
 			// Out
 			"backups": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of backups matching the filter criteria.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
@@ -44,58 +48,70 @@ func dataSourceOpenIaasBackups() *schema.Resource {
 							Type:         schema.TypeString,
 							Required:     true,
 							ValidateFunc: validation.IsUUID,
+							Description:  "The unique identifier of the backup.",
 						},
 						"internal_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The internal identifier of the backup in the Open IaaS system.",
 						},
 						"mode": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The backup mode (e.g., full, incremental).",
 						},
 						"virtual_machine": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Information about the virtual machine associated with this backup.",
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"id": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The ID of the virtual machine.",
 									},
 									"name": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The name of the virtual machine.",
 									},
 								},
 							},
 						},
 						"policy": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Information about the backup policy used for this backup.",
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"id": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The ID of the backup policy.",
 									},
 									"name": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The name of the backup policy.",
 									},
 								},
 							},
 						},
 						"is_virtual_machine_deleted": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Indicates whether the associated virtual machine has been deleted.",
 						},
 						"size": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The size of the backup in bytes.",
 						},
 						"timestamp": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The timestamp when the backup was created (Unix timestamp).",
 						},
 					},
 				},

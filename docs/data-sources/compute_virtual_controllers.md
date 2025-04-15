@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_virtual_controllers Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve all virtual controllers for a specific virtual machine.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_virtual_controllers (Data Source)
+
+Used to retrieve all virtual controllers for a specific virtual machine.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -23,12 +26,16 @@ data "cloudtemple_compute_virtual_controllers" "foo" {
 
 ### Required
 
-- `virtual_machine_id` (String)
+- `virtual_machine_id` (String) The ID of the virtual machine to retrieve controllers for.
+
+### Optional
+
+- `types` (List of String) Filter controllers by type. If not specified, all controller types will be returned.
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `virtual_controllers` (List of Object) (see [below for nested schema](#nestedatt--virtual_controllers))
+- `virtual_controllers` (List of Object) List of virtual controllers for the specified virtual machine. (see [below for nested schema](#nestedatt--virtual_controllers))
 
 <a id="nestedatt--virtual_controllers"></a>
 ### Nested Schema for `virtual_controllers`
@@ -38,6 +45,7 @@ Read-Only:
 - `hot_add_remove` (Boolean)
 - `id` (String)
 - `label` (String)
+- `sub_type` (String)
 - `summary` (String)
 - `type` (String)
 - `virtual_disks` (List of String)

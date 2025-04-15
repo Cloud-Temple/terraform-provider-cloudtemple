@@ -53,39 +53,22 @@ output "storage_repository-2" {
 
 ### Optional
 
-- `machine_manager_id` (String)
-- `name` (String)
-- `shared` (Boolean)
+- `host_id` (String) The ID of the host to filter storage repositories by.
+- `id` (String) The ID of the storage repository to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter storage repositories by. Required when searching by `name`.
+- `name` (String) The name of the storage repository to retrieve. Conflicts with `id`.
+- `pool_id` (String) The ID of the pool to filter storage repositories by.
+- `shared` (Boolean) Filter storage repositories by whether they are shared or not.
 - `type` (String) Available values are: ext, lvm, lvmoiscsi, lvmohba, nfs, smb, iso, nfs_iso, cifs
 
 ### Read-Only
 
-- `accessible` (Number)
-- `description` (String)
-- `free_capacity` (Number)
-- `host` (List of Object) (see [below for nested schema](#nestedatt--host))
-- `id` (String) The ID of this resource.
-- `internal_id` (String)
-- `maintenance_status` (Boolean)
-- `max_capacity` (Number)
-- `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
-- `virtual_disks` (List of String)
-
-<a id="nestedatt--host"></a>
-### Nested Schema for `host`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
-
-
-<a id="nestedatt--pool"></a>
-### Nested Schema for `pool`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
+- `accessible` (Number) Indicates if the storage repository is accessible (1) or not (0).
+- `description` (String) The description of the storage repository.
+- `free_capacity` (Number) The available free space in the storage repository in bytes.
+- `internal_id` (String) The internal identifier of the storage repository in the Open IaaS system.
+- `maintenance_status` (Boolean) Whether the storage repository is in maintenance mode.
+- `max_capacity` (Number) The maximum capacity of the storage repository in bytes.
+- `virtual_disks` (List of String) List of virtual disk IDs stored in this repository.
 
 

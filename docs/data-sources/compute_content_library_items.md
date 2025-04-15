@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_content_library_items Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a list of items from a content library.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_content_library_items (Data Source)
+
+Used to retrieve a list of items from a content library.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -27,15 +30,15 @@ data "cloudtemple_compute_content_library_items" "items" {
 
 ### Required
 
-- `content_library_id` (String)
+- `content_library_id` (String) The ID of the content library to retrieve items from.
 
 ### Optional
 
-- `name` (String)
+- `name` (String) Filter items by name.
 
 ### Read-Only
 
-- `content_library_items` (List of Object) (see [below for nested schema](#nestedatt--content_library_items))
+- `content_library_items` (List of Object) List of content library items matching the filter criteria. (see [below for nested schema](#nestedatt--content_library_items))
 - `id` (String) The ID of this resource.
 
 <a id="nestedatt--content_library_items"></a>
@@ -43,7 +46,6 @@ data "cloudtemple_compute_content_library_items" "items" {
 
 Read-Only:
 
-- `content_library_id` (String)
 - `creation_time` (String)
 - `description` (String)
 - `id` (String)

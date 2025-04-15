@@ -23,12 +23,14 @@ func dataSourceCompany() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "The ID of the company to retrieve.",
 			},
 
 			// Out
 			"name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the company.",
 			},
 		},
 	}

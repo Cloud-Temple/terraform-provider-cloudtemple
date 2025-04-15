@@ -66,11 +66,11 @@ resource "cloudtemple_compute_network_adapter" "foo" {
 - `auto_connect` (Boolean)
 - `connected` (Boolean)
 - `mac_address` (String)
-- `mac_type` (String)
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
+- `mac_type` (String)
 - `name` (String)
 
 ## Import

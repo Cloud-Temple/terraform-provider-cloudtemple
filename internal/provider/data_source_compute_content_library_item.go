@@ -13,7 +13,7 @@ import (
 
 func dataSourceContentLibraryItem() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a specific item from a content library.",
 
 		ReadContext: computeContentLibraryItemRead,
 
@@ -23,6 +23,7 @@ func dataSourceContentLibraryItem() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "The ID of the content library containing the item.",
 			},
 			"id": {
 				Type:          schema.TypeString,
@@ -30,42 +31,51 @@ func dataSourceContentLibraryItem() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the content library item to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The name of the content library item to retrieve. Conflicts with `id`.",
 			},
 
 			// Out
 			"description": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The description of the content library item.",
 			},
 			"type": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The type of the content library item (e.g., OVF, ISO).",
 			},
 			"creation_time": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The timestamp when the content library item was created.",
 			},
 			"size": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The size of the content library item in bytes.",
 			},
 			"stored": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Flag that indicates whether the item is stored or not. If not, the item must be synchronized.",
 			},
 			"last_modified_time": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The timestamp when the content library item was last modified.",
 			},
 			"ovf_properties": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of OVF properties associated with the content library item.",
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,

@@ -49,26 +49,27 @@ output "virtual_machine-2" {
 
 ### Optional
 
-- `machine_manager_id` (String)
-- `name` (String)
+- `id` (String) The ID of the virtual machine to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter virtual machines by. Required when searching by `name`.
+- `name` (String) The name of the virtual machine to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `addresses` (List of Object) (see [below for nested schema](#nestedatt--addresses))
-- `auto_power_on` (Boolean)
-- `boot_order` (List of String)
-- `cpu` (Number)
-- `dvd_drive` (List of Object) (see [below for nested schema](#nestedatt--dvd_drive))
-- `host` (List of Object) (see [below for nested schema](#nestedatt--host))
-- `id` (String) The ID of this resource.
-- `internal_id` (String)
-- `memory` (Number)
-- `num_cores_per_socket` (Number)
-- `operating_system_name` (String)
-- `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
-- `power_state` (String)
-- `secure_boot` (Boolean)
-- `tools` (List of Object) (see [below for nested schema](#nestedatt--tools))
+- `addresses` (List of Object) The network addresses assigned to the virtual machine. (see [below for nested schema](#nestedatt--addresses))
+- `auto_power_on` (Boolean) Whether the virtual machine is configured to automatically power on when the host starts.
+- `boot_firmware` (String) The boot firmware type used by the virtual machine (e.g., BIOS, EFI).
+- `boot_order` (List of String) The boot order of the virtual machine, listing devices in the order they will be tried during boot.
+- `cpu` (Number) The number of virtual CPUs allocated to the virtual machine.
+- `dvd_drive` (List of Object) Information about the virtual machine's DVD drive. (see [below for nested schema](#nestedatt--dvd_drive))
+- `host_id` (String) The ID of the host the virtual machine is running on.
+- `internal_id` (String) The internal identifier of the virtual machine in the Open IaaS system.
+- `memory` (Number) The amount of memory allocated to the virtual machine in Bytes.
+- `num_cores_per_socket` (Number) The number of cores per CPU socket in the virtual machine.
+- `operating_system_name` (String) The name of the operating system installed on the virtual machine.
+- `pool_id` (String) The ID of the resource pool the virtual machine belongs to.
+- `power_state` (String) The current power state of the virtual machine (e.g., Running, Halted, Paused, etc...).
+- `secure_boot` (Boolean) Whether secure boot is enabled for the virtual machine.
+- `tools` (List of Object) Information about the virtualization tools installed in the virtual machine. (see [below for nested schema](#nestedatt--tools))
 
 <a id="nestedatt--addresses"></a>
 ### Nested Schema for `addresses`
@@ -85,24 +86,6 @@ Read-Only:
 Read-Only:
 
 - `attached` (Boolean)
-- `name` (String)
-
-
-<a id="nestedatt--host"></a>
-### Nested Schema for `host`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
-
-
-<a id="nestedatt--pool"></a>
-### Nested Schema for `pool`
-
-Read-Only:
-
-- `id` (String)
 - `name` (String)
 
 

@@ -25,12 +25,14 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the storage repository to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The name of the storage repository to retrieve. Conflicts with `id`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
@@ -38,6 +40,7 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the machine manager to filter storage repositories by. Required when searching by `name`.",
 			},
 			"pool_id": {
 				Type:          schema.TypeString,
@@ -45,6 +48,7 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the pool to filter storage repositories by.",
 			},
 			"host_id": {
 				Type:          schema.TypeString,
@@ -52,6 +56,7 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the host to filter storage repositories by.",
 			},
 			"type": {
 				Type:        schema.TypeString,
@@ -71,38 +76,46 @@ func dataSourceOpenIaasStorageRepository() *schema.Resource {
 				}, true),
 			},
 			"shared": {
-				Type:     schema.TypeBool,
-				Optional: true,
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Filter storage repositories by whether they are shared or not.",
 			},
 
 			// Out
 			"internal_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The internal identifier of the storage repository in the Open IaaS system.",
 			},
 			"description": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The description of the storage repository.",
 			},
 			"maintenance_status": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether the storage repository is in maintenance mode.",
 			},
 			"accessible": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "Indicates if the storage repository is accessible (1) or not (0).",
 			},
 			"free_capacity": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The available free space in the storage repository in bytes.",
 			},
 			"max_capacity": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The maximum capacity of the storage repository in bytes.",
 			},
 			"virtual_disks": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of virtual disk IDs stored in this repository.",
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,

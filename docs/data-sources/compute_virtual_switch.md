@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_virtual_switch Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific virtual switch from a vCenter infrastructure.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_virtual_switch (Data Source)
+
+Used to retrieve a specific virtual switch from a vCenter infrastructure.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -29,15 +32,15 @@ data "cloudtemple_compute_virtual_switch" "name" {
 
 ### Optional
 
-- `datacenter_id` (String)
-- `host_cluster_id` (String)
-- `machine_manager_id` (String)
-- `name` (String)
+- `datacenter_id` (String) The ID of the datacenter where the virtual switch is located. Used when searching by name.
+- `host_cluster_id` (String) The ID of the host cluster where the virtual switch is located. Used when searching by name.
+- `id` (String) The ID of the virtual switch to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager where the virtual switch is located. Used when searching by name.
+- `name` (String) The name of the virtual switch to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `folder_id` (String)
-- `id` (String) The ID of this resource.
-- `moref` (String)
+- `folder_id` (String) The ID of the folder where the virtual switch is located.
+- `moref` (String) The managed object reference ID of the virtual switch in the hypervisor.
 
 

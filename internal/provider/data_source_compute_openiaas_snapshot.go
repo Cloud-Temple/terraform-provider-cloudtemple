@@ -25,12 +25,14 @@ func dataSourceOpenIaasSnapshot() *schema.Resource {
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the snapshot to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The name of the snapshot to retrieve. Conflicts with `id`.",
 			},
 			"virtual_machine_id": {
 				Type:          schema.TypeString,
@@ -38,16 +40,19 @@ func dataSourceOpenIaasSnapshot() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				RequiredWith:  []string{"name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the virtual machine the snapshot belongs to. Required when searching by `name`.",
 			},
 
 			// Out
 			"description": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The description of the snapshot.",
 			},
 			"create_time": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The timestamp when the snapshot was created.",
 			},
 		},
 	}

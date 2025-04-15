@@ -25,12 +25,14 @@ func dataSourceOpenIaasNetworkAdapter() *schema.Resource {
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the network adapter to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The name of the network adapter to retrieve. Conflicts with `id`.",
 			},
 			"virtual_machine_id": {
 				Type:          schema.TypeString,
@@ -38,32 +40,39 @@ func dataSourceOpenIaasNetworkAdapter() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				RequiredWith:  []string{"name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the virtual machine the network adapter is attached to. Required when searching by `name`.",
 			},
 
 			// Out
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The ID of the machine manager this network adapter belongs to.",
 			},
 			"internal_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The internal identifier of the network adapter in the Open IaaS system.",
 			},
 			"network_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The ID of the network this adapter is connected to.",
 			},
 			"mac_address": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The MAC address of the network adapter.",
 			},
 			"mtu": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The Maximum Transmission Unit (MTU) size in bytes.",
 			},
 			"attached": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether the network adapter is attached to a virtual machine.",
 			},
 		},
 	}

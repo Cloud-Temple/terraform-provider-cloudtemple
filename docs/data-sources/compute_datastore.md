@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_datastore Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific datastore.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_datastore (Data Source)
+
+Used to retrieve a specific datastore.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -34,25 +37,26 @@ data "cloudtemple_compute_datastore" "name" {
 
 ### Optional
 
-- `datacenter_id` (String)
-- `host_cluster_id` (String)
-- `host_id` (String)
-- `machine_manager_id` (String)
-- `name` (String)
+- `datacenter_id` (String) The ID of the datacenter to filter datastores by. Only used when searching by name.
+- `datastore_cluster_id` (String) The ID of the datastore cluster to filter datastores by. Only used when searching by name.
+- `host_cluster_id` (String) The ID of the host cluster to filter datastores by. Only used when searching by name.
+- `host_id` (String) The ID of the host to filter datastores by. Only used when searching by name.
+- `id` (String) The ID of the datastore to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter datastores by. Only used when searching by name.
+- `name` (String) The name of the datastore to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `accessible` (Number)
-- `associated_folder` (String)
-- `free_capacity` (Number)
-- `hosts_names` (List of String)
-- `hosts_number` (Number)
-- `id` (String) The ID of this resource.
-- `maintenance_status` (Boolean)
-- `max_capacity` (Number)
-- `moref` (String)
-- `type` (String)
-- `unique_id` (String)
-- `virtual_machines_number` (Number)
+- `accessible` (Number) Indicates whether the datastore is accessible (1 for accessible, 0 for not accessible).
+- `associated_folder` (String) The folder associated with this datastore.
+- `free_capacity` (Number) The free capacity of the datastore in bytes.
+- `hosts_names` (List of String) List of host names that have access to this datastore.
+- `hosts_number` (Number) The number of hosts that have access to this datastore.
+- `maintenance_status` (Boolean) Indicates whether the datastore is in maintenance mode.
+- `max_capacity` (Number) The maximum capacity of the datastore in bytes.
+- `moref` (String) The managed object reference ID of the datastore.
+- `type` (String) The type of the datastore (e.g., VMFS, NFS).
+- `unique_id` (String) The unique identifier of the datastore in the infrastructure.
+- `virtual_machines_number` (Number) The number of virtual machines using this datastore.
 
 

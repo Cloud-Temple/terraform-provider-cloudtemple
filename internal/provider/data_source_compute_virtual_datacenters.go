@@ -18,42 +18,50 @@ func dataSourceVirtualDatacenters() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// Out
 			"virtual_datacenters": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of all virtual datacenters in the vCenter infrastructure.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the virtual datacenter.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the virtual datacenter.",
 						},
 						"machine_manager_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the machine manager (vCenter) where this virtual datacenter is located.",
 						},
 						"vcenter": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Information about the vCenter server where this virtual datacenter is located.",
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"id": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The ID of the vCenter server.",
 									},
 									"name": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The name of the vCenter server.",
 									},
 								},
 							},
 						},
 						"tenant_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the tenant that owns this virtual datacenter.",
 						},
 					},
 				},

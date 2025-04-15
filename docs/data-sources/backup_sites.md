@@ -3,10 +3,13 @@
 page_title: "cloudtemple_backup_sites Data Source - terraform-provider-cloudtemple"
 subcategory: "Backup"
 description: |-
+  Used to retrieve a list of backup sites.
   To query this datasource you will need the backup_iaas_spp_read role.
 ---
 
 # cloudtemple_backup_sites (Data Source)
+
+Used to retrieve a list of backup sites.
 
 To query this datasource you will need the `backup_iaas_spp_read` role.
 
@@ -22,7 +25,7 @@ data "cloudtemple_backup_sites" "foo" {}
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `sites` (List of Object) (see [below for nested schema](#nestedatt--sites))
+- `sites` (List of Object) List of backup sites. (see [below for nested schema](#nestedatt--sites))
 
 <a id="nestedatt--sites"></a>
 ### Nested Schema for `sites`

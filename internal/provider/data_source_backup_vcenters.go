@@ -12,7 +12,7 @@ import (
 
 func dataSourceBackupVCenters() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a list of vCenter servers registered with a backup SPP server.",
 
 		ReadContext: backupVCentersRead,
 
@@ -22,34 +22,41 @@ func dataSourceBackupVCenters() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "The ID of the SPP server to retrieve vCenters from.",
 			},
 
 			// Out
 			"vcenters": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of vCenter servers registered with the specified SPP server.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the vCenter server.",
 						},
 						"internal_id": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The internal ID of the vCenter server in the backup system.",
 						},
 						"instance_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The instance ID of the vCenter server.",
 						},
 						"spp_server_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the SPP server this vCenter is registered with.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the vCenter server.",
 						},
 					},
 				},

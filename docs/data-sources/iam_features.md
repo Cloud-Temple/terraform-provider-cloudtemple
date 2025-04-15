@@ -3,10 +3,13 @@
 page_title: "cloudtemple_iam_features Data Source - terraform-provider-cloudtemple"
 subcategory: "IAM"
 description: |-
+  Used to retrieve all available features in the platform.
   To query this datasource you will need the iam_read role.
 ---
 
 # cloudtemple_iam_features (Data Source)
+
+Used to retrieve all available features in the platform.
 
 To query this datasource you will need the `iam_read` role.
 
@@ -21,7 +24,7 @@ data "cloudtemple_iam_features" "foo" {}
 
 ### Read-Only
 
-- `features` (List of Object) (see [below for nested schema](#nestedatt--features))
+- `features` (List of Object) List of all available features in the platform. (see [below for nested schema](#nestedatt--features))
 - `id` (String) The ID of this resource.
 
 <a id="nestedatt--features"></a>

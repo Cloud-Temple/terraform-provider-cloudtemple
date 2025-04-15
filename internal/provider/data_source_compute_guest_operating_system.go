@@ -13,15 +13,16 @@ import (
 
 func dataSourceGuestOperatingSystem() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a specific guest operating system by its managed object reference ID.",
 
 		ReadContext: computeGuestOperatingSystemRead,
 
 		Schema: map[string]*schema.Schema{
 			// In
 			"moref": {
-				Type:     schema.TypeString,
-				Required: true,
+				Type:        schema.TypeString,
+				Required:    true,
+				Description: "The managed object reference ID of the guest operating system to retrieve.",
 			},
 			"host_id": {
 				Type:          schema.TypeString,
@@ -29,6 +30,7 @@ func dataSourceGuestOperatingSystem() *schema.Resource {
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"host_cluster_id"},
 				AtLeastOneOf:  []string{"host_id", "host_cluster_id"},
+				Description:   "The ID of the host to filter guest operating systems by. Conflicts with `host_cluster_id`.",
 			},
 			"host_cluster_id": {
 				Type:          schema.TypeString,
@@ -36,16 +38,19 @@ func dataSourceGuestOperatingSystem() *schema.Resource {
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"host_id"},
 				AtLeastOneOf:  []string{"host_id", "host_cluster_id"},
+				Description:   "The ID of the host cluster to filter guest operating systems by. Conflicts with `host_id`.",
 			},
 
 			// Out
 			"family": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The family of the guest operating system (e.g., Windows, Linux).",
 			},
 			"full_name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The full name of the guest operating system.",
 			},
 		},
 	}

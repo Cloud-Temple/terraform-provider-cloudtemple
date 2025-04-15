@@ -3,10 +3,13 @@
 page_title: "cloudtemple_backup_sla_policy Data Source - terraform-provider-cloudtemple"
 subcategory: "Backup"
 description: |-
+  Used to retrieve a specific backup SLA policy.
   To query this datasource you will need the backup_iaas_spp_read role.
 ---
 
 # cloudtemple_backup_sla_policy (Data Source)
+
+Used to retrieve a specific backup SLA policy.
 
 To query this datasource you will need the `backup_iaas_spp_read` role.
 
@@ -29,12 +32,12 @@ data "cloudtemple_backup_sla_policy" "name" {
 
 ### Optional
 
-- `name` (String)
+- `id` (String) The ID of the SLA policy to retrieve. Conflicts with `name`.
+- `name` (String) The name of the SLA policy to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `sub_policies` (List of Object) (see [below for nested schema](#nestedatt--sub_policies))
+- `sub_policies` (List of Object) List of sub-policies contained within this SLA policy. (see [below for nested schema](#nestedatt--sub_policies))
 
 <a id="nestedatt--sub_policies"></a>
 ### Nested Schema for `sub_policies`

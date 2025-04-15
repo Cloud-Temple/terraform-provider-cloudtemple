@@ -51,11 +51,13 @@ output "host-2" {
 
 - `machine_manager_id` (String)
 - `name` (String)
+- `pool_id` (String)
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
 - `internal_id` (String)
+- `master` (Boolean)
 - `metrics` (List of Object) (see [below for nested schema](#nestedatt--metrics))
 - `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
 - `power_state` (String)

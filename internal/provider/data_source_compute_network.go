@@ -13,7 +13,7 @@ import (
 
 func dataSourceNetwork() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a specific network in a virtual infrastructure.",
 
 		ReadContext: computeNetworkRead,
 
@@ -25,78 +25,92 @@ func dataSourceNetwork() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the network to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The name of the network to retrieve. Conflicts with `id`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter networks by the ID of the machine manager they belong to. Only used when searching by `name`.",
 			},
 			"datacenter_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter networks by the ID of the datacenter they belong to. Only used when searching by `name`.",
 			},
 			"virtual_machine_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter networks by the ID of a virtual machine connected to them. Only used when searching by `name`.",
 			},
 			"type": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.StringInSlice([]string{"Network", "DistributedVirtualPortgroup"}, false),
 				ConflictsWith: []string{"id"},
+				Description:   "Filter networks by type (Network or DistributedVirtualPortgroup). Only used when searching by `name`.",
 			},
 			"virtual_switch_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter networks by the ID of the virtual switch they are connected to. Only used when searching by `name`.",
 			},
 			"host_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter networks by the ID of a host they are connected to. Only used when searching by `name`.",
 			},
 			"folder_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter networks by the ID of the folder they belong to. Only used when searching by `name`.",
 			},
 			"host_cluster_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter networks by the ID of the host cluster they are connected to. Only used when searching by `name`.",
 			},
 
 			// Out
 			"moref": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The managed object reference ID of the network in the hypervisor.",
 			},
 			"virtual_machines_number": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The number of virtual machines connected to this network.",
 			},
 			"host_number": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The number of hosts connected to this network.",
 			},
 			"host_names": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The list of host names connected to this network.",
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,

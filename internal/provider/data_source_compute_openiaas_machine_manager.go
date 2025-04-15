@@ -13,7 +13,7 @@ import (
 
 func dataSourceOpenIaasMachineManager() *schema.Resource {
 	return &schema.Resource{
-		Description: "Used to retrieve an Availability Zone.",
+		Description: "Used to retrieve a specific machine manager from an Open IaaS infrastructure.",
 
 		ReadContext: computeOpenIaaSMachineManagerRead,
 
@@ -25,26 +25,31 @@ func dataSourceOpenIaasMachineManager() *schema.Resource {
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the machine manager to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The name of the machine manager to retrieve. Conflicts with `id`.",
 			},
 
 			// Out
 			"os_version": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The operating system version of the machine manager.",
 			},
 			"os_name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The operating system name of the machine manager.",
 			},
 			"xoa_version": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The XOA version of the machine manager.",
 			},
 		},
 	}

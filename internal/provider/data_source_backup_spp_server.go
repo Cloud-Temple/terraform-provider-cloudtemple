@@ -13,7 +13,7 @@ import (
 
 func dataSourceBackupSPPServer() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a specific backup SPP server.",
 
 		ReadContext: backupSPPServerRead,
 
@@ -25,24 +25,28 @@ func dataSourceBackupSPPServer() *schema.Resource {
 				ValidateFunc:  validation.IsUUID,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
+				Description:   "The ID of the SPP server to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The name of the SPP server to retrieve. Conflicts with `id`.",
 			},
 			"tenant_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "The tenant ID to filter SPP servers by. Only used when searching by name.",
 			},
 
 			// Out
 			"address": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The network address of the SPP server.",
 			},
 		},
 	}

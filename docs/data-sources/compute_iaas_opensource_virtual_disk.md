@@ -49,27 +49,31 @@ output "virtual_disk-2" {
 
 ### Optional
 
-- `name` (String)
-- `virtual_machine_id` (String)
+- `attachable` (Boolean) Filter virtual disks by whether they can be attached to a virtual machine.
+- `id` (String) The ID of the virtual disk to retrieve. Conflicts with `name`.
+- `name` (String) The name of the virtual disk to retrieve. Conflicts with `id`.
+- `storage_repository_id` (String) Filter virtual disks by the ID of the storage repository they are located on.
+- `template_id` (String) Filter virtual disks by the ID of the template they are attached to.
+- `virtual_machine_id` (String) Filter virtual disks by the ID of the virtual machine they are attached to.
 
 ### Read-Only
 
-- `description` (String)
-- `id` (String) The ID of this resource.
-- `size` (Number)
-- `snapshots` (List of String)
-- `storage_repository` (List of Object) (see [below for nested schema](#nestedatt--storage_repository))
-- `usage` (Number)
-- `virtual_machines` (List of Object) (see [below for nested schema](#nestedatt--virtual_machines))
+- `description` (String) The description of the virtual disk.
+- `internal_id` (String) The internal identifier of the virtual disk in the Open IaaS system.
+- `is_snapshot` (Boolean) Whether the virtual disk is a snapshot.
+- `size` (Number) The size of the virtual disk in bytes.
+- `templates` (List of Object) List of templates this disk is attached to. (see [below for nested schema](#nestedatt--templates))
+- `usage` (Number) The amount of space used on the virtual disk in bytes.
+- `virtual_machines` (List of Object) List of virtual machines this disk is attached to. (see [below for nested schema](#nestedatt--virtual_machines))
 
-<a id="nestedatt--storage_repository"></a>
-### Nested Schema for `storage_repository`
+<a id="nestedatt--templates"></a>
+### Nested Schema for `templates`
 
 Read-Only:
 
-- `description` (String)
 - `id` (String)
 - `name` (String)
+- `read_only` (Boolean)
 
 
 <a id="nestedatt--virtual_machines"></a>
@@ -78,6 +82,7 @@ Read-Only:
 Read-Only:
 
 - `id` (String)
+- `name` (String)
 - `read_only` (Boolean)
 
 

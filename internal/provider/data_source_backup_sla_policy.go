@@ -13,7 +13,7 @@ import (
 
 func dataSourceBackupSLAPolicy() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a specific backup SLA policy.",
 
 		ReadContext: backupSLAPolicyRead,
 
@@ -25,88 +25,105 @@ func dataSourceBackupSLAPolicy() *schema.Resource {
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the SLA policy to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The name of the SLA policy to retrieve. Conflicts with `id`.",
 			},
 
 			// Out
 			"sub_policies": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of sub-policies contained within this SLA policy.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The type of the sub-policy.",
 						},
 						"use_encryption": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Indicates whether encryption is used for this sub-policy.",
 						},
 						"software": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Indicates whether this is a software-based sub-policy.",
 						},
 						"site": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The site associated with this sub-policy.",
 						},
 						"retention": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Retention settings for this sub-policy.",
 
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"age": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The retention age in days for backups created by this sub-policy.",
 									},
 								},
 							},
 						},
 						"trigger": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Trigger settings for this sub-policy.",
 
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"frequency": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The frequency of the trigger",
 									},
 									"type": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The type of the trigger. (eg. SUBHOURLY, HOURLY, DAILY, WEEKLY, MONTHLY)",
 									},
 									"activate_date": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The activation date of the trigger as a Unix timestamp.",
 									},
 								},
 							},
 						},
 						"target": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Target settings for this sub-policy.",
 
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"id": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The ID of the target resource.",
 									},
 									"href": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The href (URL) of the target resource.",
 									},
 									"resource_type": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The type of the target resource.",
 									},
 								},
 							},

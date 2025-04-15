@@ -11,41 +11,48 @@ import (
 
 func dataSourceBackupJobs() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Provides information about backup jobs.",
 
 		ReadContext: backupJobsRead,
 
 		Schema: map[string]*schema.Schema{
 			// Out
 			"jobs": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of backup jobs.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the backup job.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the backup job.",
 						},
 						"display_name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The display name of the backup job.",
 						},
 						"type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The type of the backup job.",
 						},
 						"status": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The current status of the backup job.",
 						},
 						"policy_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the SLA policy associated with the backup job.",
 						},
 					},
 				},

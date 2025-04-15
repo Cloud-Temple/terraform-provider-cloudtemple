@@ -25,12 +25,14 @@ func dataSourceOpenIaasBackupPolicy() *schema.Resource {
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the backup policy to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The name of the backup policy to retrieve. Conflicts with `id`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
@@ -38,45 +40,55 @@ func dataSourceOpenIaasBackupPolicy() *schema.Resource {
 				Computed:      true,
 				ConflictsWith: []string{"id"},
 				RequiredWith:  []string{"name"},
+				Description:   "The ID of the machine manager to filter policies by. Required when using `name`.",
 			},
 
 			// Out
 			"machine_manager_name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the machine manager associated with this policy.",
 			},
 			"internal_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The internal identifier of the policy in the Open IaaS system.",
 			},
 			"running": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Indicates whether the policy is currently running.",
 			},
 			"mode": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The backup mode of the policy (e.g., full, incremental).",
 			},
 			"schedulers": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of schedulers configured for this backup policy.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"temporarily_disabled": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Indicates whether the scheduler is temporarily disabled.",
 						},
 						"retention": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The retention period for backups created by this scheduler (in days).",
 						},
 						"cron": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The cron expression defining the schedule.",
 						},
 						"timezone": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The timezone used for the scheduler.",
 						},
 					},
 				},

@@ -3,13 +3,13 @@
 page_title: "cloudtemple_compute_iaas_opensource_availability_zone Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
-  Used to retrieve an Availability Zone.
+  Used to retrieve a specific machine manager from an Open IaaS infrastructure.
   To query this datasource you will need the compute_iaas_opensource_read role.
 ---
 
 # cloudtemple_compute_iaas_opensource_availability_zone (Data Source)
 
-Used to retrieve an Availability Zone.
+Used to retrieve a specific machine manager from an Open IaaS infrastructure.
 
 To query this datasource you will need the `compute_iaas_opensource_read` role.
 
@@ -43,13 +43,13 @@ output "availability_zone-2" {
 
 ### Optional
 
-- `name` (String)
+- `id` (String) The ID of the machine manager to retrieve. Conflicts with `name`.
+- `name` (String) The name of the machine manager to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `os_name` (String)
-- `os_version` (String)
-- `xoa_version` (String)
+- `os_name` (String) The operating system name of the machine manager.
+- `os_version` (String) The operating system version of the machine manager.
+- `xoa_version` (String) The XOA version of the machine manager.
 
 

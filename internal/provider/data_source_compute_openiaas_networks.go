@@ -22,58 +22,70 @@ func dataSourceOpenIaasNetworks() *schema.Resource {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "Filter networks by machine manager ID.",
 			},
 			"pool_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "Filter networks by pool ID.",
 			},
 
 			// Out
 			"networks": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of networks matching the filter criteria.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the network.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the network.",
 						},
 						"internal_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The internal identifier of the network in the Open IaaS system.",
 						},
 						"machine_manager_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the machine manager this network belongs to.",
 						},
 						"pool_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the pool this network belongs to.",
 						},
 						"maximum_transmission_unit": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The Maximum Transmission Unit (MTU) size in bytes for this network.",
 						},
 						"network_adapters": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "List of network adapter IDs connected to this network.",
 							Elem: &schema.Schema{
 								Type: schema.TypeString,
 							},
 						},
 						"network_block_device": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether this network supports network block devices.",
 						},
 						"insecure_network_block_device": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether this network allows insecure network block devices.",
 						},
 					},
 				},

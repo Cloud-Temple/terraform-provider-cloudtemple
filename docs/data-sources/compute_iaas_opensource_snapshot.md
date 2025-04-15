@@ -20,13 +20,13 @@ To query this datasource you will need the `compute_iaas_opensource_read` role.
 
 ### Optional
 
-- `name` (String)
-- `virtual_machine_id` (String)
+- `id` (String) The ID of the snapshot to retrieve. Conflicts with `name`.
+- `name` (String) The name of the snapshot to retrieve. Conflicts with `id`.
+- `virtual_machine_id` (String) The ID of the virtual machine the snapshot belongs to. Required when searching by `name`.
 
 ### Read-Only
 
-- `create_time` (Number)
-- `description` (String)
-- `id` (String) The ID of this resource.
+- `create_time` (Number) The timestamp when the snapshot was created.
+- `description` (String) The description of the snapshot.
 
 

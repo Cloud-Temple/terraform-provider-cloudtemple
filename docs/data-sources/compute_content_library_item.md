@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_content_library_item Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific item from a content library.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_content_library_item (Data Source)
+
+Used to retrieve a specific item from a content library.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -35,21 +38,21 @@ data "cloudtemple_compute_content_library_item" "name" {
 
 ### Required
 
-- `content_library_id` (String)
+- `content_library_id` (String) The ID of the content library containing the item.
 
 ### Optional
 
-- `name` (String)
+- `id` (String) The ID of the content library item to retrieve. Conflicts with `name`.
+- `name` (String) The name of the content library item to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `creation_time` (String)
-- `description` (String)
-- `id` (String) The ID of this resource.
-- `last_modified_time` (String)
-- `ovf_properties` (List of String)
-- `size` (Number)
-- `stored` (Boolean)
-- `type` (String)
+- `creation_time` (String) The timestamp when the content library item was created.
+- `description` (String) The description of the content library item.
+- `last_modified_time` (String) The timestamp when the content library item was last modified.
+- `ovf_properties` (List of String) List of OVF properties associated with the content library item.
+- `size` (Number) The size of the content library item in bytes.
+- `stored` (Boolean) Flag that indicates whether the item is stored or not. If not, the item must be synchronized.
+- `type` (String) The type of the content library item (e.g., OVF, ISO).
 
 

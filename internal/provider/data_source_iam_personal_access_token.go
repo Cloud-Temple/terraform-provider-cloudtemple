@@ -39,12 +39,14 @@ func dataSourcePersonalAccessToken() *schema.Resource {
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the user who owns the personal access token. Used when searching by name.",
 			},
 			"tenant_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the tenant where the personal access token is defined. Used when searching by name.",
 			},
 
 			// Out

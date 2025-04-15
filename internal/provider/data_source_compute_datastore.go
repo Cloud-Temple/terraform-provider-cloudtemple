@@ -13,7 +13,7 @@ import (
 
 func dataSourceDatastore() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a specific datastore.",
 
 		ReadContext: computeDatastoreRead,
 
@@ -25,18 +25,21 @@ func dataSourceDatastore() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the datastore to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The name of the datastore to retrieve. Conflicts with `id`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The ID of the machine manager to filter datastores by. Only used when searching by name.",
 			},
 			"datacenter_id": {
 				Type:          schema.TypeString,
@@ -44,6 +47,7 @@ func dataSourceDatastore() *schema.Resource {
 				Default:       "",
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The ID of the datacenter to filter datastores by. Only used when searching by name.",
 			},
 			"host_id": {
 				Type:          schema.TypeString,
@@ -51,6 +55,7 @@ func dataSourceDatastore() *schema.Resource {
 				Default:       "",
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The ID of the host to filter datastores by. Only used when searching by name.",
 			},
 			"host_cluster_id": {
 				Type:          schema.TypeString,
@@ -58,6 +63,7 @@ func dataSourceDatastore() *schema.Resource {
 				Default:       "",
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The ID of the host cluster to filter datastores by. Only used when searching by name.",
 			},
 			"datastore_cluster_id": {
 				Type:          schema.TypeString,
@@ -65,56 +71,68 @@ func dataSourceDatastore() *schema.Resource {
 				Default:       "",
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The ID of the datastore cluster to filter datastores by. Only used when searching by name.",
 			},
 
 			// Out
 			"moref": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The managed object reference ID of the datastore.",
 			},
 			"max_capacity": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The maximum capacity of the datastore in bytes.",
 			},
 			"free_capacity": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The free capacity of the datastore in bytes.",
 			},
 			"accessible": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "Indicates whether the datastore is accessible (1 for accessible, 0 for not accessible).",
 			},
 			"maintenance_status": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Indicates whether the datastore is in maintenance mode.",
 			},
 			"unique_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The unique identifier of the datastore in the infrastructure.",
 			},
 			"type": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The type of the datastore (e.g., VMFS, NFS).",
 			},
 			"virtual_machines_number": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The number of virtual machines using this datastore.",
 			},
 			"hosts_number": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The number of hosts that have access to this datastore.",
 			},
 			"hosts_names": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of host names that have access to this datastore.",
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
 			},
 			"associated_folder": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The folder associated with this datastore.",
 			},
 		},
 	}

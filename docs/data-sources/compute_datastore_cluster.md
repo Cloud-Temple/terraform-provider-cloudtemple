@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_datastore_cluster Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific datastore cluster.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_datastore_cluster (Data Source)
+
+Used to retrieve a specific datastore cluster.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -34,18 +37,18 @@ data "cloudtemple_compute_datastore_cluster" "name" {
 
 ### Optional
 
-- `datacenter_id` (String)
-- `host_cluster_id` (String)
-- `host_id` (String)
-- `machine_manager_id` (String)
-- `name` (String)
+- `datacenter_id` (String) The ID of the datacenter to filter datastore clusters by. Required when searching by name.
+- `host_cluster_id` (String) The ID of the host cluster to filter datastore clusters by. Only used when searching by name.
+- `host_id` (String) The ID of the host to filter datastore clusters by. Only used when searching by name.
+- `id` (String) The ID of the datastore cluster to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter datastore clusters by. Only used when searching by name.
+- `name` (String) The name of the datastore cluster to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `datastores` (List of String)
-- `id` (String) The ID of this resource.
-- `metrics` (List of Object) (see [below for nested schema](#nestedatt--metrics))
-- `moref` (String)
+- `datastores` (List of String) List of datastore IDs that are part of this datastore cluster.
+- `metrics` (List of Object) Metrics and configuration information for the datastore cluster. (see [below for nested schema](#nestedatt--metrics))
+- `moref` (String) The managed object reference ID of the datastore cluster.
 
 <a id="nestedatt--metrics"></a>
 ### Nested Schema for `metrics`

@@ -18,46 +18,55 @@ func dataSourceFeatures() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// Out
 			"features": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of all available features in the platform.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the feature.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the feature.",
 						},
 						"subfeatures": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "List of subfeatures belonging to this feature.",
 
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"id": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The unique identifier of the subfeature.",
 									},
 									"name": {
-										Type:     schema.TypeString,
-										Computed: true,
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The name of the subfeature.",
 									},
 									"subfeatures": {
-										Type:     schema.TypeList,
-										Computed: true,
+										Type:        schema.TypeList,
+										Computed:    true,
+										Description: "List of nested subfeatures belonging to this subfeature.",
 
 										Elem: &schema.Resource{
 											Schema: map[string]*schema.Schema{
 												"id": {
-													Type:     schema.TypeString,
-													Computed: true,
+													Type:        schema.TypeString,
+													Computed:    true,
+													Description: "The unique identifier of the nested subfeature.",
 												},
 												"name": {
-													Type:     schema.TypeString,
-													Computed: true,
+													Type:        schema.TypeString,
+													Computed:    true,
+													Description: "The name of the nested subfeature.",
 												},
 											},
 										},

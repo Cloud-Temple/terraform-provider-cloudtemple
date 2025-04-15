@@ -11,37 +11,43 @@ import (
 
 func dataSourceOpenIaasMachineManagers() *schema.Resource {
 	return &schema.Resource{
-		Description: "Used to retrieve all Availability Zones in an OpenIaaS infrastructure.",
+		Description: "Used to retrieve all machine managers from an Open IaaS infrastructure.",
 
 		ReadContext: computeOpenIaaSMachineManagersRead,
 
 		Schema: map[string]*schema.Schema{
 			// Out
-			"availability_zones": {
-				Type:     schema.TypeList,
-				Computed: true,
+			"machine_managers": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of all machine managers in the Open IaaS infrastructure.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the machine manager.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the machine manager.",
 						},
 						"os_version": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The operating system version of the machine manager.",
 						},
 						"os_name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The operating system name of the machine manager.",
 						},
 						"xoa_version": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The XOA version of the machine manager.",
 						},
 					},
 				},
@@ -62,7 +68,7 @@ func computeOpenIaaSMachineManagersRead(ctx context.Context, d *schema.ResourceD
 	}
 
 	// Définir l'ID de la datasource
-	d.SetId("openiaas_availability_zones")
+	d.SetId("openiaas_machine_managers")
 
 	// Mapper manuellement les données en utilisant la fonction helper
 	tfMachineManagers := make([]map[string]interface{}, len(machineManagers))
@@ -71,7 +77,7 @@ func computeOpenIaaSMachineManagersRead(ctx context.Context, d *schema.ResourceD
 	}
 
 	// Définir les données dans le state
-	if err := d.Set("availability_zones", tfMachineManagers); err != nil {
+	if err := d.Set("machine_managers", tfMachineManagers); err != nil {
 		return diag.FromErr(err)
 	}
 

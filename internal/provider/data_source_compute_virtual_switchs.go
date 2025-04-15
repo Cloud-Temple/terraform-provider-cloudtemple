@@ -18,48 +18,58 @@ func dataSourceVirtualSwitchs() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// In
 			"name": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Filter virtual switches by name.",
 			},
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Filter virtual switches by machine manager ID.",
 			},
 			"datacenter_id": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Filter virtual switches by datacenter ID.",
 			},
 			"host_cluster_id": {
-				Type:     schema.TypeString,
-				Optional: true,
+				Type:        schema.TypeString,
+				Optional:    true,
+				Description: "Filter virtual switches by host cluster ID.",
 			},
 
 			// Out
 			"virtual_switchs": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of virtual switches matching the specified filters.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the virtual switch.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the virtual switch.",
 						},
 						"moref": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The managed object reference ID of the virtual switch in the hypervisor.",
 						},
 						"folder_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the folder where the virtual switch is located.",
 						},
 						"machine_manager_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the machine manager (vCenter) where the virtual switch is located.",
 						},
 					},
 				},

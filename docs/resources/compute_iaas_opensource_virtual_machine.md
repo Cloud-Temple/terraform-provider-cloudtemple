@@ -81,7 +81,7 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
 ### Required
 
 - `cpu` (Number) The number of virtual CPUs. Note: Changing this value for a running VM will cause it to be powered off and back on.
-- `memory` (Number) The amount of memory in MB. Note: Changing this value for a running VM will cause it to be powered off and back on.
+- `memory` (Number) The amount of memory in Bytes. Note: Changing this value for a running VM will cause it to be powered off and back on.
 - `name` (String) The name of the virtual machine.
 - `template_id` (String) The template identifier.
 
@@ -117,12 +117,11 @@ Order of the elements in the list is the boot order.
 
 - `addresses` (List of Object) (see [below for nested schema](#nestedatt--addresses))
 - `dvd_drive` (List of Object) (see [below for nested schema](#nestedatt--dvd_drive))
-- `host` (List of Object) (see [below for nested schema](#nestedatt--host))
 - `id` (String) The ID of this resource.
 - `internal_id` (String)
-- `machine_manager` (List of Object) (see [below for nested schema](#nestedatt--machine_manager))
+- `machine_manager_id` (String)
 - `operating_system_name` (String)
-- `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
+- `pool_id` (String)
 - `tools` (List of Object) (see [below for nested schema](#nestedatt--tools))
 
 <a id="nestedatt--addresses"></a>
@@ -140,34 +139,6 @@ Read-Only:
 Read-Only:
 
 - `attached` (Boolean)
-- `name` (String)
-
-
-<a id="nestedatt--host"></a>
-### Nested Schema for `host`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
-
-
-<a id="nestedatt--machine_manager"></a>
-### Nested Schema for `machine_manager`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
-- `type` (String)
-
-
-<a id="nestedatt--pool"></a>
-### Nested Schema for `pool`
-
-Read-Only:
-
-- `id` (String)
 - `name` (String)
 
 

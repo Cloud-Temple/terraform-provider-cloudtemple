@@ -359,10 +359,13 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 
 - `consolidation_needed` (Boolean)
 - `cpu_usage` (Number)
+- `datacenter_name` (String)
+- `datastore_cluster_name` (String)
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
 - `extra_config` (List of Object) (see [below for nested schema](#nestedatt--extra_config))
 - `hardware_version` (String)
+- `host_cluster_name` (String)
 - `id` (String) The ID of this resource.
 - `machine_manager_id` (String)
 - `machine_manager_name` (String)
@@ -493,12 +496,12 @@ Optional:
 - `auto_connect` (Boolean)
 - `connected` (Boolean)
 - `mac_address` (String)
-- `mac_type` (String)
 - `network_id` (String)
 
 Read-Only:
 
 - `id` (String) The ID of this resource.
+- `mac_type` (String)
 - `name` (String)
 - `type` (String)
 

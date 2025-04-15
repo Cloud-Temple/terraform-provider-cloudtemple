@@ -3,10 +3,13 @@
 page_title: "cloudtemple_iam_personal_access_token Data Source - terraform-provider-cloudtemple"
 subcategory: "IAM"
 description: |-
+  Used to retrieve information about a specific personal access token.
   To query this datasource you will need the iam_read role.
 ---
 
 # cloudtemple_iam_personal_access_token (Data Source)
+
+Used to retrieve information about a specific personal access token.
 
 To query this datasource you will need the `iam_read` role.
 
@@ -29,14 +32,14 @@ data "cloudtemple_iam_personal_access_token" "name" {
 
 ### Optional
 
-- `name` (String)
-- `tenant_id` (String)
-- `user_id` (String)
+- `id` (String) The ID of the personal access token.
+- `name` (String) The name of the personal access token.
+- `tenant_id` (String) The ID of the tenant where the personal access token is defined. Used when searching by name.
+- `user_id` (String) The ID of the user who owns the personal access token. Used when searching by name.
 
 ### Read-Only
 
-- `expiration_date` (String)
-- `id` (String) The ID of this resource.
-- `roles` (List of String)
+- `expiration_date` (String) The expiration date of the personal access token.
+- `roles` (List of String) The roles associated with the personal access token.
 
 

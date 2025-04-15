@@ -25,6 +25,7 @@ func dataSourceVirtualDatacenter() *schema.Resource {
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the virtual datacenter to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
@@ -32,6 +33,7 @@ func dataSourceVirtualDatacenter() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
 				RequiredWith:  []string{"machine_manager_id"},
+				Description:   "The name of the virtual datacenter to retrieve. Conflicts with `id`. Requires `machine_manager_id`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
@@ -39,28 +41,33 @@ func dataSourceVirtualDatacenter() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
 				RequiredWith:  []string{"name"},
+				Description:   "The ID of the machine manager (vCenter) where the virtual datacenter is located. Required when using `name`.",
 			},
 
 			// Out
 			"vcenter": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "Information about the vCenter server where this virtual datacenter is located.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the vCenter server.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the vCenter server.",
 						},
 					},
 				},
 			},
 			"tenant_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The ID of the tenant that owns this virtual datacenter.",
 			},
 		},
 	}

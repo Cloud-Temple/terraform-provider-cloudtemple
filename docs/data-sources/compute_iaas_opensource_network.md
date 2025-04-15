@@ -49,25 +49,19 @@ output "network-2" {
 
 ### Optional
 
-- `machine_manager_id` (String)
-- `name` (String)
+- `id` (String) The ID of the network to retrieve. Conflicts with `name`, `machine_manager_id`, and `pool_id`.
+- `machine_manager_id` (String) The ID of the machine manager to filter networks by. Required when searching by `name`.
+- `name` (String) The name of the network to retrieve. Conflicts with `id`.
+- `pool_id` (String) The ID of the pool to filter networks by. Required when searching by `name`.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `insecure_network_block_device` (Boolean)
-- `internal_id` (String)
-- `maximum_transmission_unit` (Number)
-- `network_adapters` (List of String)
-- `network_block_device` (Boolean)
-- `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
-
-<a id="nestedatt--pool"></a>
-### Nested Schema for `pool`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
+- `insecure_network_block_device` (Boolean) Whether this network allows insecure network block devices.
+- `internal_id` (String) The internal identifier of the network in the Open IaaS system.
+- `machine_manager_name` (String) The name of the machine manager this network belongs to.
+- `machine_manager_type` (String) The type of the machine manager this network belongs to.
+- `maximum_transmission_unit` (Number) The Maximum Transmission Unit (MTU) size in bytes for this network.
+- `network_adapters` (List of String) List of network adapter IDs connected to this network.
+- `network_block_device` (Boolean) Whether this network supports network block devices.
 
 

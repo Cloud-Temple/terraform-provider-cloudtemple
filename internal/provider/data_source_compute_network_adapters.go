@@ -12,7 +12,7 @@ import (
 
 func dataSourceNetworkAdapters() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve all network adapters attached to a specific virtual machine.",
 
 		ReadContext: computeNetworkAdaptersRead,
 
@@ -22,50 +22,61 @@ func dataSourceNetworkAdapters() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "The ID of the virtual machine to retrieve network adapters for.",
 			},
 
 			// Out
 			"network_adapters": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of network adapters attached to the specified virtual machine.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the network adapter.",
 						},
 						"virtual_machine_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the virtual machine this network adapter is attached to.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the network adapter.",
 						},
 						"network_id": {
-							Type:     schema.TypeString,
-							Required: true,
+							Type:        schema.TypeString,
+							Required:    true,
+							Description: "The ID of the network this adapter is connected to.",
 						},
 						"type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The type of the network adapter (e.g., VMXNET3, E1000).",
 						},
 						"mac_type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The type of MAC address assignment (e.g., MANUAL, ASSIGNED).",
 						},
 						"mac_address": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The MAC address of the network adapter.",
 						},
 						"connected": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the network adapter is currently connected.",
 						},
 						"auto_connect": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the network adapter is configured to connect automatically when the virtual machine powers on.",
 						},
 					},
 				},

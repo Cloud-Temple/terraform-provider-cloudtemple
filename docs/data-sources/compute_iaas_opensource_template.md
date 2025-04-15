@@ -49,22 +49,24 @@ output "template-2" {
 
 ### Optional
 
-- `machine_manager_id` (String)
-- `name` (String)
-- `pool_id` (String)
+- `id` (String) The ID of the template to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter templates by. Required when searching by `name`.
+- `name` (String) The name of the template to retrieve. Conflicts with `id`.
+- `pool_id` (String) The ID of the pool to filter templates by.
 
 ### Read-Only
 
-- `cpu` (Number)
-- `disks` (List of Object) (see [below for nested schema](#nestedatt--disks))
-- `id` (String) The ID of this resource.
-- `internal_id` (String)
-- `memory` (Number)
-- `network_adapters` (List of Object) (see [below for nested schema](#nestedatt--network_adapters))
-- `num_cores_per_socket` (Number)
-- `power_state` (String)
-- `sla_policies` (List of String)
-- `snapshots` (List of String)
+- `cpu` (Number) The number of virtual CPUs in the template.
+- `disks` (List of Object) List of virtual disks attached to this template. (see [below for nested schema](#nestedatt--disks))
+- `internal_id` (String) The internal identifier of the template in the Open IaaS system.
+- `machine_manager_name` (String) The name of the machine manager this template belongs to.
+- `machine_manager_type` (String) The type of the machine manager (e.g., XenServer, VMware).
+- `memory` (Number) The amount of memory in Bytes allocated to the template.
+- `network_adapters` (List of Object) List of network adapters attached to this template. (see [below for nested schema](#nestedatt--network_adapters))
+- `num_cores_per_socket` (Number) The number of cores per CPU socket in the template.
+- `power_state` (String) The current power state of the template (e.g., Running, Halted, Paused, ...).
+- `sla_policies` (List of String) List of SLA policy IDs applied to this template.
+- `snapshots` (List of String) List of snapshot IDs associated with this template.
 
 <a id="nestedatt--disks"></a>
 ### Nested Schema for `disks`

@@ -20,13 +20,13 @@ To query this datasource you will need the `backup_iaas_opensource_read` role.
 
 ### Optional
 
-- `deleted` (Boolean)
-- `machine_manager_id` (String)
-- `virtual_machine_id` (String)
+- `deleted` (Boolean) Include backups of deleted virtual machines when set to true.
+- `machine_manager_id` (String) Filter backups by machine manager ID.
+- `virtual_machine_id` (String) Filter backups by virtual machine ID.
 
 ### Read-Only
 
-- `backups` (List of Object) (see [below for nested schema](#nestedatt--backups))
+- `backups` (List of Object) List of backups matching the filter criteria. (see [below for nested schema](#nestedatt--backups))
 - `id` (String) The ID of this resource.
 
 <a id="nestedatt--backups"></a>

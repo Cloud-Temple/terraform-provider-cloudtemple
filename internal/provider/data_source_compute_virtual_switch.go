@@ -25,40 +25,47 @@ func dataSourceVirtualSwitch() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the virtual switch to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The name of the virtual switch to retrieve. Conflicts with `id`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "The ID of the machine manager where the virtual switch is located. Used when searching by name.",
 			},
 			"datacenter_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "The ID of the datacenter where the virtual switch is located. Used when searching by name.",
 			},
 			"host_cluster_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "The ID of the host cluster where the virtual switch is located. Used when searching by name.",
 			},
 
 			// Out
 			"moref": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The managed object reference ID of the virtual switch in the hypervisor.",
 			},
 			"folder_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The ID of the folder where the virtual switch is located.",
 			},
 		},
 	}

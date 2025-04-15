@@ -22,10 +22,12 @@ func dataSourceVirtualControllers() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "The ID of the virtual machine to retrieve controllers for.",
 			},
 			"types": {
-				Type:     schema.TypeList,
-				Optional: true,
+				Type:        schema.TypeList,
+				Optional:    true,
+				Description: "Filter controllers by type. If not specified, all controller types will be returned.",
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 					ValidateFunc: validation.StringInSlice([]string{
@@ -42,42 +44,51 @@ func dataSourceVirtualControllers() *schema.Resource {
 
 			// Out
 			"virtual_controllers": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of virtual controllers for the specified virtual machine.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the virtual controller.",
 						},
 						"virtual_machine_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the virtual machine this controller belongs to.",
 						},
 						"hot_add_remove": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether devices can be added to or removed from this controller while the virtual machine is running.",
 						},
 						"type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The type of the controller (e.g., SCSI, IDE, USB).",
 						},
 						"sub_type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The sub-type of the controller, providing more specific information about the controller type.",
 						},
 						"label": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The label of the controller as displayed in the virtual machine settings.",
 						},
 						"summary": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "A summary description of the controller.",
 						},
 						"virtual_disks": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "List of virtual disk IDs attached to this controller.",
 
 							Elem: &schema.Schema{
 								Type: schema.TypeString,

@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_machine_manager Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific worker (vCenter) from the infrastructure.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_machine_manager (Data Source)
+
+Used to retrieve a specific worker (vCenter) from the infrastructure.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -17,25 +20,25 @@ To query this datasource you will need the `compute_iaas_vmware_read` role.
 
 ### Optional
 
-- `name` (String)
+- `id` (String) The ID of the worker to retrieve. Conflicts with `name`.
+- `name` (String) The name of the worker to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `api_type` (String)
-- `api_version` (String)
-- `build` (Number)
-- `full_name` (String)
-- `id` (String) The ID of this resource.
-- `instance_uuid` (String)
-- `license_product_name` (String)
-- `license_product_version` (Number)
-- `locale_build` (Number)
-- `locale_version` (String)
-- `os_type` (String)
-- `product_line_id` (String)
-- `tenant_id` (String)
-- `tenant_name` (String)
-- `vendor` (String)
-- `version` (String)
+- `api_type` (String) The type of API provided by the worker.
+- `api_version` (String) The version of the API provided by the worker.
+- `build` (Number) The build number of the worker software.
+- `full_name` (String) The full name of the worker (vCenter), including version information.
+- `instance_uuid` (String) The UUID of the worker instance.
+- `license_product_name` (String) The name of the licensed product.
+- `license_product_version` (Number) The version of the licensed product.
+- `locale_build` (Number) The locale build number of the worker software.
+- `locale_version` (String) The locale version of the worker software.
+- `os_type` (String) The operating system type of the worker.
+- `product_line_id` (String) The product line identifier of the worker.
+- `tenant_id` (String) The ID of the tenant that owns the worker.
+- `tenant_name` (String) The name of the tenant that owns the worker.
+- `vendor` (String) The vendor of the worker (e.g., VMware).
+- `version` (String) The version of the worker software.
 
 

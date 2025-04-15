@@ -3,10 +3,13 @@
 page_title: "cloudtemple_backup_vcenters Data Source - terraform-provider-cloudtemple"
 subcategory: "Backup"
 description: |-
+  Used to retrieve a list of vCenter servers registered with a backup SPP server.
   To query this datasource you will need the backup_iaas_spp_read role.
 ---
 
 # cloudtemple_backup_vcenters (Data Source)
+
+Used to retrieve a list of vCenter servers registered with a backup SPP server.
 
 To query this datasource you will need the `backup_iaas_spp_read` role.
 
@@ -27,12 +30,12 @@ data "cloudtemple_backup_vcenters" "vcenters" {
 
 ### Required
 
-- `spp_server_id` (String)
+- `spp_server_id` (String) The ID of the SPP server to retrieve vCenters from.
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `vcenters` (List of Object) (see [below for nested schema](#nestedatt--vcenters))
+- `vcenters` (List of Object) List of vCenter servers registered with the specified SPP server. (see [below for nested schema](#nestedatt--vcenters))
 
 <a id="nestedatt--vcenters"></a>
 ### Nested Schema for `vcenters`

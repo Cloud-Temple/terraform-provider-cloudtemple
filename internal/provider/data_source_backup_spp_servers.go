@@ -12,7 +12,7 @@ import (
 
 func dataSourceBackupSPPServers() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a list of backup SPP servers.",
 
 		ReadContext: backupSPPServersRead,
 
@@ -22,26 +22,31 @@ func dataSourceBackupSPPServers() *schema.Resource {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "The tenant ID to filter SPP servers by.",
 			},
 
 			// Out
 			"spp_servers": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of SPP servers matching the filter criteria.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the SPP server.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the SPP server.",
 						},
 						"address": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The network address of the SPP server.",
 						},
 					},
 				},

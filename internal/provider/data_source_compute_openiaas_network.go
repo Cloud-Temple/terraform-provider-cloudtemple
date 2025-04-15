@@ -25,12 +25,14 @@ func dataSourceOpenIaasNetwork() *schema.Resource {
 				ConflictsWith: []string{"name", "machine_manager_id", "pool_id"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the network to retrieve. Conflicts with `name`, `machine_manager_id`, and `pool_id`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The name of the network to retrieve. Conflicts with `id`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
@@ -38,6 +40,7 @@ func dataSourceOpenIaasNetwork() *schema.Resource {
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The ID of the machine manager to filter networks by. Required when searching by `name`.",
 			},
 			"pool_id": {
 				Type:          schema.TypeString,
@@ -45,39 +48,47 @@ func dataSourceOpenIaasNetwork() *schema.Resource {
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The ID of the pool to filter networks by. Required when searching by `name`.",
 			},
 
 			// Out
 			"machine_manager_name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the machine manager this network belongs to.",
 			},
 			"machine_manager_type": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The type of the machine manager this network belongs to.",
 			},
 			"internal_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The internal identifier of the network in the Open IaaS system.",
 			},
 			"maximum_transmission_unit": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The Maximum Transmission Unit (MTU) size in bytes for this network.",
 			},
 			"network_adapters": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of network adapter IDs connected to this network.",
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
 			},
 			"network_block_device": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether this network supports network block devices.",
 			},
 			"insecure_network_block_device": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether this network allows insecure network block devices.",
 			},
 		},
 	}

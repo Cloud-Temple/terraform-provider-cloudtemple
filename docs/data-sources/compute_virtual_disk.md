@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_virtual_disk Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific virtual disk from a vCenter infrastructure.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_virtual_disk (Data Source)
+
+Used to retrieve a specific virtual disk from a vCenter infrastructure.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -30,23 +33,25 @@ data "cloudtemple_compute_virtual_disk" "name" {
 
 ### Optional
 
-- `name` (String)
-- `virtual_machine_id` (String)
+- `id` (String) The ID of the virtual disk to retrieve. Conflicts with `name`.
+- `name` (String) The name of the virtual disk to retrieve. Conflicts with `id`. Requires `virtual_machine_id`.
+- `virtual_machine_id` (String) The ID of the virtual machine that the disk is attached to. Required when using `name`.
 
 ### Read-Only
 
-- `capacity` (Number)
-- `controller_bus_number` (Number)
-- `datastore_id` (String)
-- `datastore_name` (String)
-- `disk_mode` (String)
-- `disk_path` (String)
-- `disk_unit_number` (Number)
-- `editable` (Boolean)
-- `id` (String) The ID of this resource.
-- `instant_access` (Boolean)
-- `machine_manager_id` (String)
-- `native_id` (String)
-- `provisioning_type` (String)
+- `capacity` (Number) The capacity of the virtual disk in Bytes.
+- `controller_bus_number` (Number) The bus number of the controller.
+- `controller_id` (String) The ID of the controller this disk is attached to.
+- `controller_type` (String) The type of the controller (e.g., SCSI, IDE, NVME).
+- `datastore_id` (String) The ID of the datastore where this virtual disk is stored.
+- `datastore_name` (String) The name of the datastore where this virtual disk is stored.
+- `disk_mode` (String) The disk mode.
+- `disk_path` (String) The path to the disk file in the datastore.
+- `disk_unit_number` (Number) The unit number of the disk on its controller.
+- `editable` (Boolean) Whether the disk is editable.
+- `instant_access` (Boolean) Whether the disk is an instant access disk.
+- `machine_manager_id` (String) The ID of the machine manager (vCenter) where this virtual disk is located.
+- `native_id` (String) The native ID of the disk in the hypervisor.
+- `provisioning_type` (String) The provisioning type of the disk.
 
 

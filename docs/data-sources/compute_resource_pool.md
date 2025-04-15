@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_resource_pool Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific resource pool from a vCenter infrastructure.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_resource_pool (Data Source)
+
+Used to retrieve a specific resource pool from a vCenter infrastructure.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -27,15 +30,17 @@ data "cloudtemple_compute_resource_pool" "name" {
 
 ### Optional
 
-- `name` (String)
+- `datacenter_id` (String) Filter resource pools by the ID of the datacenter they belong to. Only used when searching by `name`.
+- `host_cluster_id` (String) Filter resource pools by the ID of the host cluster they belong to. Only used when searching by `name`.
+- `id` (String) The ID of the resource pool to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) Filter resource pools by the ID of the machine manager they belong to. Only used when searching by `name`.
+- `name` (String) The name of the resource pool to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `machine_manager_id` (String)
-- `metrics` (List of Object) (see [below for nested schema](#nestedatt--metrics))
-- `moref` (String)
-- `parent` (List of Object) (see [below for nested schema](#nestedatt--parent))
+- `metrics` (List of Object) Resource usage metrics for this resource pool. (see [below for nested schema](#nestedatt--metrics))
+- `moref` (String) The managed object reference ID of the resource pool in the hypervisor.
+- `parent` (List of Object) Information about the parent of this resource pool. (see [below for nested schema](#nestedatt--parent))
 
 <a id="nestedatt--metrics"></a>
 ### Nested Schema for `metrics`

@@ -3,10 +3,13 @@
 page_title: "cloudtemple_backup_job Data Source - terraform-provider-cloudtemple"
 subcategory: "Backup"
 description: |-
+  Provides information about a specific backup job.
   To query this datasource you will need the backup_iaas_spp_read role.
 ---
 
 # cloudtemple_backup_job (Data Source)
+
+Provides information about a specific backup job.
 
 To query this datasource you will need the `backup_iaas_spp_read` role.
 
@@ -27,14 +30,14 @@ data "cloudtemple_backup_job" "name" {
 
 ### Optional
 
-- `name` (String)
+- `id` (String) The ID of the backup job. Conflicts with `name`.
+- `name` (String) The name of the backup job. Conflicts with `id`.
 
 ### Read-Only
 
-- `display_name` (String)
-- `id` (String) The ID of this resource.
-- `policy_id` (String)
-- `status` (String)
-- `type` (String)
+- `display_name` (String) The display name of the backup job.
+- `policy_id` (String) The ID of the SLA policy associated with the backup job.
+- `status` (String) The current status of the backup job.
+- `type` (String) The type of the backup job.
 
 

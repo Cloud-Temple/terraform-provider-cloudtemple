@@ -3,10 +3,13 @@
 page_title: "cloudtemple_iam_role Data Source - terraform-provider-cloudtemple"
 subcategory: "IAM"
 description: |-
+  Used to retrieve information about a specific role.
   To query this datasource you will need the iam_read role.
 ---
 
 # cloudtemple_iam_role (Data Source)
+
+Used to retrieve information about a specific role.
 
 To query this datasource you will need the `iam_read` role.
 
@@ -29,10 +32,7 @@ data "cloudtemple_iam_role" "name" {
 
 ### Optional
 
-- `name` (String)
-
-### Read-Only
-
-- `id` (String) The ID of this resource.
+- `id` (String) The ID of the role.
+- `name` (String) The name of the role.
 
 

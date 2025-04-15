@@ -56,6 +56,7 @@ resource "cloudtemple_compute_iaas_opensource_network_adapter" "VIF-1" {
 ### Read-Only
 
 - `id` (String) The ID of the network adapter.
+- `internal_id` (String) The internal ID of the network adapter.
 - `machine_manager_id` (String) The ID of the machine manager of the network adapter.
 - `mtu` (Number) The MTU of the network adapter.
 - `name` (String) The name of the network adapter.

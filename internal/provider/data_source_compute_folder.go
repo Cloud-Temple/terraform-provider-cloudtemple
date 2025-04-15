@@ -13,7 +13,7 @@ import (
 
 func dataSourceFolder() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a specific folder.",
 
 		ReadContext: computeFolderRead,
 
@@ -25,6 +25,7 @@ func dataSourceFolder() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the folder to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
@@ -32,6 +33,7 @@ func dataSourceFolder() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
 				RequiredWith:  []string{"datacenter_id"},
+				Description:   "The name of the folder to retrieve. Conflicts with `id`. Requires `datacenter_id`.",
 			},
 			"datacenter_id": {
 				Type:          schema.TypeString,
@@ -39,6 +41,7 @@ func dataSourceFolder() *schema.Resource {
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
 				RequiredWith:  []string{"name"},
+				Description:   "The ID of the datacenter containing the folder. Required when using `name`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
@@ -46,6 +49,7 @@ func dataSourceFolder() *schema.Resource {
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
 				RequiredWith:  []string{"name"},
+				Description:   "The ID of the machine manager to filter folders by. Required when using `name`.",
 			},
 		},
 	}

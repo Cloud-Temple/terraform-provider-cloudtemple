@@ -12,7 +12,7 @@ import (
 
 func dataSourceBackupJob() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Provides information about a specific backup job.",
 
 		ReadContext: backupJobRead,
 
@@ -24,30 +24,36 @@ func dataSourceBackupJob() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
 				ValidateFunc:  IsNumber,
+				Description:   "The ID of the backup job. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The name of the backup job. Conflicts with `id`.",
 			},
 
 			// Out
 			"display_name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The display name of the backup job.",
 			},
 			"type": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The type of the backup job.",
 			},
 			"status": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The current status of the backup job.",
 			},
 			"policy_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The ID of the SLA policy associated with the backup job.",
 			},
 		},
 	}

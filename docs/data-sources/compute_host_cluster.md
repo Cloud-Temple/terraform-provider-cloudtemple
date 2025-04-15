@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_host_cluster Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific host cluster.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_host_cluster (Data Source)
+
+Used to retrieve a specific host cluster.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -32,18 +35,19 @@ data "cloudtemple_compute_host_cluster" "name" {
 
 ### Optional
 
-- `datacenter_id` (String)
-- `datastore_id` (String)
-- `machine_manager_id` (String)
-- `name` (String)
+- `datacenter_id` (String) The ID of the datacenter to filter host clusters by. Only used when searching by name.
+- `datastore_cluster_id` (String) The ID of the datastore cluster to filter host clusters by. Only used when searching by name.
+- `datastore_id` (String) The ID of the datastore to filter host clusters by. Only used when searching by name.
+- `id` (String) The ID of the host cluster to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter host clusters by. Only used when searching by name.
+- `name` (String) The name of the host cluster to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `hosts` (List of Object) (see [below for nested schema](#nestedatt--hosts))
-- `id` (String) The ID of this resource.
-- `metrics` (List of Object) (see [below for nested schema](#nestedatt--metrics))
-- `moref` (String)
-- `virtual_machines_number` (Number)
+- `hosts` (List of Object) List of hosts that are part of this host cluster. (see [below for nested schema](#nestedatt--hosts))
+- `metrics` (List of Object) Resource metrics for the host cluster. (see [below for nested schema](#nestedatt--metrics))
+- `moref` (String) The managed object reference ID of the host cluster.
+- `virtual_machines_number` (Number) The number of virtual machines running on this host cluster.
 
 <a id="nestedatt--hosts"></a>
 ### Nested Schema for `hosts`

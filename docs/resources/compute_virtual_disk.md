@@ -85,6 +85,7 @@ resource "cloudtemple_compute_virtual_disk" "foo" {
 ### Read-Only
 
 - `controller_bus_number` (Number)
+- `controller_type` (String)
 - `datastore_name` (String)
 - `disk_path` (String)
 - `disk_unit_number` (Number)

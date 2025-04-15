@@ -19,19 +19,22 @@ func dataSourceOpenIaasStorageRepositories() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// In
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Optional: true,
-				Default:  "",
+				Type:        schema.TypeString,
+				Optional:    true,
+				Default:     "",
+				Description: "Filter storage repositories by machine manager ID.",
 			},
 			"pool_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "Filter storage repositories by pool ID.",
 			},
 			"host_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "Filter storage repositories by host ID.",
 			},
 			"type": {
 				Type:        schema.TypeString,
@@ -50,76 +53,92 @@ func dataSourceOpenIaasStorageRepositories() *schema.Resource {
 				}, true),
 			},
 			"shared": {
-				Type:     schema.TypeBool,
-				Optional: true,
-				Default:  false,
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Default:     false,
+				Description: "Filter storage repositories by whether they are shared or not.",
 			},
 
 			// Out
 			"storage_repositories": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of storage repositories matching the filter criteria.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the storage repository.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the storage repository.",
 						},
 						"internal_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The internal identifier of the storage repository in the Open IaaS system.",
 						},
 						"machine_manager_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the machine manager this storage repository belongs to.",
 						},
 						"pool_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the pool this storage repository belongs to.",
 						},
 						"host_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the host this storage repository is attached to.",
 						},
 						"description": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The description of the storage repository.",
 						},
 						"maintenance_status": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the storage repository is in maintenance mode.",
 						},
 						"max_capacity": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The maximum capacity of the storage repository in bytes.",
 						},
 						"free_capacity": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The available free space in the storage repository in bytes.",
 						},
 						"type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The type of the storage repository (ext, lvm, nfs, etc.).",
 						},
 						"virtual_disks": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "List of virtual disk IDs stored in this repository.",
 							Elem: &schema.Schema{
 								Type: schema.TypeString,
 							},
 						},
 						"shared": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the storage repository is shared across multiple hosts.",
 						},
 						"accessible": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "Indicates if the storage repository is accessible (1) or not (0).",
 						},
 					},
 				},

@@ -25,94 +25,111 @@ func dataSourceResourcePool() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the resource pool to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				AtLeastOneOf:  []string{"id", "name"},
 				ConflictsWith: []string{"id"},
+				Description:   "The name of the resource pool to retrieve. Conflicts with `id`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter resource pools by the ID of the machine manager they belong to. Only used when searching by `name`.",
 			},
 			"datacenter_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter resource pools by the ID of the datacenter they belong to. Only used when searching by `name`.",
 			},
 			"host_cluster_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
+				Description:   "Filter resource pools by the ID of the host cluster they belong to. Only used when searching by `name`.",
 			},
 
 			// Out
 			"moref": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The managed object reference ID of the resource pool in the hypervisor.",
 			},
 			"parent": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "Information about the parent of this resource pool.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the parent object.",
 						},
 						"type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The type of the parent object (e.g., ResourcePool, HostCluster).",
 						},
 					},
 				},
 			},
 			"metrics": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "Resource usage metrics for this resource pool.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"cpu": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "CPU usage metrics for this resource pool.",
 
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"max_usage": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The maximum CPU usage in MHz.",
 									},
 									"reservation_used": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The amount of reserved CPU in MHz that is currently being used.",
 									},
 								},
 							},
 						},
 						"memory": {
-							Type:     schema.TypeList,
-							Computed: true,
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Memory usage metrics for this resource pool.",
 
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"max_usage": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The maximum memory usage in MiB.",
 									},
 									"reservation_used": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The amount of reserved memory in MiB that is currently being used.",
 									},
 									"ballooned_memory": {
-										Type:     schema.TypeInt,
-										Computed: true,
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The amount of memory in MiB that has been reclaimed by the balloon driver.",
 									},
 								},
 							},

@@ -50,7 +50,7 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 			},
 			"memory": {
 				Type:        schema.TypeInt,
-				Description: "The amount of memory in MB. Note: Changing this value for a running VM will cause it to be powered off and back on.",
+				Description: "The amount of memory in Bytes. Note: Changing this value for a running VM will cause it to be powered off and back on.",
 				Required:    true,
 			},
 			"power_state": {

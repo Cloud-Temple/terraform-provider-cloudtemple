@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_network_adapters Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve all network adapters attached to a specific virtual machine.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_network_adapters (Data Source)
+
+Used to retrieve all network adapters attached to a specific virtual machine.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -23,12 +26,12 @@ data "cloudtemple_compute_network_adapters" "foo" {
 
 ### Required
 
-- `virtual_machine_id` (String)
+- `virtual_machine_id` (String) The ID of the virtual machine to retrieve network adapters for.
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `network_adapters` (List of Object) (see [below for nested schema](#nestedatt--network_adapters))
+- `network_adapters` (List of Object) List of network adapters attached to the specified virtual machine. (see [below for nested schema](#nestedatt--network_adapters))
 
 <a id="nestedatt--network_adapters"></a>
 ### Nested Schema for `network_adapters`

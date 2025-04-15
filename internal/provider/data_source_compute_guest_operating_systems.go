@@ -12,7 +12,7 @@ import (
 
 func dataSourceGuestOperatingSystems() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Used to retrieve a list of guest operating systems.",
 
 		ReadContext: computeGuestOperatingSystemsRead,
 
@@ -23,42 +23,50 @@ func dataSourceGuestOperatingSystems() *schema.Resource {
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
 				AtLeastOneOf: []string{"host_cluster_id", "host_id"},
+				Description:  "The ID of the host cluster to filter guest operating systems by. At least one of `host_cluster_id` or `host_id` must be specified.",
 			},
 			"host_id": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.IsUUID,
 				AtLeastOneOf: []string{"host_cluster_id", "host_id"},
+				Description:  "The ID of the host to filter guest operating systems by. At least one of `host_cluster_id` or `host_id` must be specified.",
 			},
 			"os_family": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				Description:  "Filter guest operating systems by OS family (e.g., 'Windows', 'Linux').",
 			},
 			"version": {
 				Type:         schema.TypeString,
 				Optional:     true,
 				ValidateFunc: validation.StringIsNotWhiteSpace,
+				Description:  "Filter guest operating systems by version.",
 			},
 
 			// Out
 			"guest_operating_systems": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of guest operating systems matching the filter criteria.",
 
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"moref": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The managed object reference ID of the guest operating system.",
 						},
 						"family": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The family of the guest operating system (e.g., Windows, Linux).",
 						},
 						"full_name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The full name of the guest operating system.",
 						},
 					},
 				},

@@ -3,10 +3,13 @@
 page_title: "cloudtemple_iam_roles Data Source - terraform-provider-cloudtemple"
 subcategory: "IAM"
 description: |-
+  Used to retrieve all available roles in the platform.
   To query this datasource you will need the iam_read role.
 ---
 
 # cloudtemple_iam_roles (Data Source)
+
+Used to retrieve all available roles in the platform.
 
 To query this datasource you will need the `iam_read` role.
 
@@ -22,7 +25,7 @@ data "cloudtemple_iam_roles" "foo" {}
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `roles` (List of Object) (see [below for nested schema](#nestedatt--roles))
+- `roles` (List of Object) The list of roles. (see [below for nested schema](#nestedatt--roles))
 
 <a id="nestedatt--roles"></a>
 ### Nested Schema for `roles`
