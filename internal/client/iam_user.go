@@ -11,14 +11,14 @@ func (i *IAM) User() *UserClient {
 }
 
 type User struct {
-	ID            string   `terraform:"id"`
-	InternalID    string   `terraform:"internal_id"`
-	Name          string   `terraform:"name"`
-	Type          string   `terraform:"type"`
-	Source        []string `terraform:"source"`
-	SourceID      string   `terraform:"source_id"`
-	EmailVerified bool     `terraform:"email_verified"`
-	Email         string   `terraform:"email"`
+	ID            string
+	InternalID    string
+	Name          string
+	Type          string
+	Source        []string
+	SourceID      string
+	EmailVerified bool
+	Email         string
 }
 
 func (t *UserClient) Read(ctx context.Context, userID string) (*User, error) {

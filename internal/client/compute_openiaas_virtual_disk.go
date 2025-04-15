@@ -11,24 +11,24 @@ func (c *ComputeOpenIaaSClient) VirtualDisk() *OpenIaaSVirtualDiskClient {
 }
 
 type OpenIaaSVirtualDisk struct {
-	ID                string     `terraform:"id"`
-	InternalID        string     `terraform:"internal_id"`
-	Name              string     `terraform:"name"`
-	Description       string     `terraform:"description"`
-	Size              int        `terraform:"size"`
-	Usage             int        `terraform:"usage"`
-	IsSnapshot        bool       `terraform:"is_snapshot"`
-	StorageRepository BaseObject `terraform:"storage_repository"`
+	ID                string
+	InternalID        string
+	Name              string
+	Description       string
+	Size              int
+	Usage             int
+	IsSnapshot        bool
+	StorageRepository BaseObject
 	VirtualMachines   []struct {
-		ID       string `terraform:"id"`
-		Name     string `terraform:"name"`
-		ReadOnly bool   `terraform:"read_only"`
-	} `terraform:"virtual_machines"`
+		ID       string
+		Name     string
+		ReadOnly bool
+	}
 	Templates []struct {
-		ID       string `terraform:"id"`
-		Name     string `terraform:"name"`
-		ReadOnly bool   `terraform:"read_only"`
-	} `terraform:"templates"`
+		ID       string
+		Name     string
+		ReadOnly bool
+	}
 }
 
 type OpenIaaSVirtualDiskCreateRequest struct {

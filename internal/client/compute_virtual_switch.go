@@ -11,11 +11,11 @@ func (c *ComputeClient) VirtualSwitch() *VirtualSwitchClient {
 }
 
 type VirtualSwitch struct {
-	ID             string     `terraform:"id"`
-	Name           string     `terraform:"name"`
-	Moref          string     `terraform:"moref"`
-	FolderID       string     `terraform:"folder_id"`
-	MachineManager BaseObject `terraform:"machine_manager"`
+	ID             string
+	Name           string
+	Moref          string
+	FolderID       string
+	MachineManager BaseObject
 }
 
 type VirtualSwitchFilter struct {

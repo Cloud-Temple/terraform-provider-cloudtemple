@@ -11,14 +11,14 @@ func (c *ComputeClient) HostCluster() *HostClusterClient {
 }
 
 type HostCluster struct {
-	ID                    string                `terraform:"id"`
-	Name                  string                `terraform:"name"`
-	Moref                 string                `terraform:"moref"`
-	Hosts                 []HostClusterHostStub `terraform:"hosts"`
-	Metrics               HostClusterMetrics    `terraform:"metrics"`
-	VirtualMachinesNumber int                   `terraform:"virtual_machines_number"`
-	MachineManager        BaseObject            `terraform:"machine_manager"`
-	Datacenter            BaseObject            `terraform:"datacenter"`
+	ID                    string
+	Name                  string
+	Moref                 string
+	Hosts                 []HostClusterHostStub
+	Metrics               HostClusterMetrics
+	VirtualMachinesNumber int
+	MachineManager        BaseObject
+	Datacenter            BaseObject
 }
 
 type HostClusterFilter struct {
@@ -30,17 +30,17 @@ type HostClusterFilter struct {
 }
 
 type HostClusterHostStub struct {
-	ID   string `terraform:"id"`
-	Type string `terraform:"type"`
+	ID   string
+	Type string
 }
 
 type HostClusterMetrics struct {
-	TotalCpu     int `terraform:"total_cpu"`
-	TotalMemory  int `terraform:"total_memory"`
-	TotalStorage int `terraform:"total_storage"`
-	CpuUsed      int `terraform:"cpu_used"`
-	MemoryUsed   int `terraform:"memory_used"`
-	StorageUsed  int `terraform:"storage_used"`
+	TotalCpu     int
+	TotalMemory  int
+	TotalStorage int
+	CpuUsed      int
+	MemoryUsed   int
+	StorageUsed  int
 }
 
 func (h *HostClusterClient) List(

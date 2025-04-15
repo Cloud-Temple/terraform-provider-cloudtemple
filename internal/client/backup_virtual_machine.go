@@ -17,24 +17,24 @@ func (c *BackupClient) VirtualMachine() *BackupVirtualMachineClient {
 }
 
 type BackupVirtualMachineVolume struct {
-	Name         string `terraform:"name"`
-	Key          string `terraform:"key"`
-	Size         int    `terraform:"size"`
-	ConfigVolume bool   `terraform:"config_volume"`
+	Name         string
+	Key          string
+	Size         int
+	ConfigVolume bool
 }
 
 type BackupVirtualMachine struct {
-	ID                string                       `terraform:"id"`
-	Name              string                       `terraform:"name"`
-	Moref             string                       `terraform:"moref"`
-	InternalId        string                       `terraform:"internal_id"`
-	InternalVCenterId int                          `terraform:"internal_vcenter_id"`
-	VCenterId         string                       `terraform:"vcenter_id"`
-	Href              string                       `terraform:"href"`
-	MetadataPath      string                       `terraform:"matadata_path"`
-	StorageProfiles   []string                     `terraform:"storage_profiles"`
-	DatacenterName    string                       `terraform:"datacenter_name"`
-	Volumes           []BackupVirtualMachineVolume `terraform:"volumes"`
+	ID                string
+	Name              string
+	Moref             string
+	InternalId        string
+	InternalVCenterId int
+	VCenterId         string
+	Href              string
+	MetadataPath      string
+	StorageProfiles   []string
+	DatacenterName    string
+	Volumes           []BackupVirtualMachineVolume
 }
 
 func (c *BackupVirtualMachineClient) Read(ctx context.Context, id string) (*BackupVirtualMachine, error) {

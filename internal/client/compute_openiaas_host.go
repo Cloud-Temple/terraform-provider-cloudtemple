@@ -11,48 +11,44 @@ func (c *ComputeOpenIaaSClient) Host() *OpenIaaSHostClient {
 }
 
 type OpenIaaSHost struct {
-	ID             string `terraform:"id"`
-	MachineManager struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-		Type string `terraform:"type"`
-	} `terraform:"machine_manager"`
-	InternalId string `terraform:"internal_id"`
-	Pool       struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
+	ID             string
+	MachineManager BaseObject
+	InternalId     string
+	Pool           struct {
+		ID   string
+		Name string
 		Type struct {
-			Key         string `terraform:"key"`
-			Description string `terraform:"description"`
-		} `terraform:"type"`
-	} `terraform:"pool"`
-	Name       string `terraform:"name"`
-	Master     bool   `terraform:"master"`
-	Uptime     int    `terraform:"uptime"`
-	PowerState string `terraform:"power_state"`
+			Key         string
+			Description string
+		}
+	}
+	Name       string
+	Master     bool
+	Uptime     int
+	PowerState string
 	UpdateData struct {
-		MaintenanceMode bool   `terraform:"maintenance_mode"`
-		Status          string `terraform:"status"`
-	} `terraform:"update_data"`
-	RebootRequired  bool     `terraform:"reboot_required"`
-	VirtualMachines []string `terraform:"virtual_machines"`
+		MaintenanceMode bool
+		Status          string
+	}
+	RebootRequired  bool
+	VirtualMachines []string
 	Metrics         struct {
 		XOA struct {
-			Version  string `terraform:"version"`
-			FullName string `terraform:"full_name"`
-			Build    string `terraform:"build"`
-		} `terraform:"xoa"`
+			Version  string
+			FullName string
+			Build    string
+		}
 		Memory struct {
-			Usage int `terraform:"usage"`
-			Size  int `terraform:"size"`
-		} `terraform:"memory"`
+			Usage int
+			Size  int
+		}
 		Cpu struct {
-			Sockets   int    `terraform:"sockets"`
-			Cores     int    `terraform:"cores"`
-			Model     string `terraform:"model"`
-			ModelName string `terraform:"model_name"`
-		} `terraform:"cpu"`
-	} `terraform:"metrics"`
+			Sockets   int
+			Cores     int
+			Model     string
+			ModelName string
+		}
+	}
 }
 
 type OpenIaasHostFilter struct {

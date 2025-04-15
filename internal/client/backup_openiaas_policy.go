@@ -11,21 +11,18 @@ func (c *BackupOpenIaasClient) Policy() *BackupOpenIaasPolicyClient {
 }
 
 type BackupOpenIaasPolicy struct {
-	ID             string `terraform:"id"`
-	Name           string `terraform:"name"`
-	InternalID     string `terraform:"internal_id"`
-	Running        bool   `terraform:"running"`
-	Mode           string `terraform:"mode"`
-	MachineManager struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform_flatten:"machine_manager"`
-	Schedulers []struct {
-		TemporarilyDisabled bool   `terraform:"temporarily_disabled"`
-		Retention           int    `terraform:"retention"`
-		Cron                string `terraform:"cron"`
-		Timezone            string `terraform:"timezone"`
-	} `terraform:"schedulers"`
+	ID             string
+	Name           string
+	InternalID     string
+	Running        bool
+	Mode           string
+	MachineManager BaseObject
+	Schedulers     []struct {
+		TemporarilyDisabled bool
+		Retention           int
+		Cron                string
+		Timezone            string
+	}
 }
 
 func (v *BackupOpenIaasPolicyClient) Read(ctx context.Context, id string) (*BackupOpenIaasPolicy, error) {

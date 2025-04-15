@@ -40,11 +40,12 @@ func FlattenResourcePool(pool *client.ResourcePool) map[string]interface{} {
 	}
 
 	return map[string]interface{}{
-		"id":                 pool.ID,
-		"name":               pool.Name,
-		"moref":              pool.Moref,
-		"parent":             parent,
-		"metrics":            metrics,
-		"machine_manager_id": pool.MachineManager.ID,
+		"id":      pool.ID,
+		"name":    pool.Name,
+		"moref":   pool.Moref,
+		"parent":  parent,
+		"metrics": metrics,
+		// "machine_manager_id": pool.MachineManager.ID,
+		"machine_manager_id": pool.MachineManagerID, // DEPRECATED
 	}
 }

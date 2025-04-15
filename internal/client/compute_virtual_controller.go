@@ -11,14 +11,14 @@ func (c *ComputeClient) VirtualController() *VirtualControllerClient {
 }
 
 type VirtualController struct {
-	ID               string   `terraform:"id"`
-	VirtualMachineId string   `terraform:"virtual_machine_id"`
-	HotAddRemove     bool     `terraform:"hot_add_remove"`
-	Type             string   `terraform:"type"`
-	SubType          string   `terraform:"sub_type"`
-	Label            string   `terraform:"label"`
-	Summary          string   `terraform:"summary"`
-	VirtualDisks     []string `terraform:"virtual_disks"`
+	ID               string
+	VirtualMachineId string
+	HotAddRemove     bool
+	Type             string
+	SubType          string
+	Label            string
+	Summary          string
+	VirtualDisks     []string
 }
 
 type VirtualControllerFilter struct {

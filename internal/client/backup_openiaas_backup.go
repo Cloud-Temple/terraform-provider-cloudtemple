@@ -11,20 +11,14 @@ func (c *BackupOpenIaasClient) Backup() *BackupOpenIaasBackupClient {
 }
 
 type Backup struct {
-	ID                      string `terraform:"id"`
-	InternalID              string `terraform:"internal_id"`
-	Mode                    string `terraform:"mode"`
-	IsVirtualMachineDeleted bool   `terraform:"is_virtual_machine_deleted"`
-	Size                    int    `terraform:"size"`
-	Timestamp               int    `terraform:"timestamp"`
-	VirtualMachine          struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform:"virtual_machine"`
-	Policy struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform:"policy"`
+	ID                      string
+	InternalID              string
+	Mode                    string
+	IsVirtualMachineDeleted bool
+	Size                    int
+	Timestamp               int
+	VirtualMachine          BaseObject
+	Policy                  BaseObject
 }
 
 func (v *BackupOpenIaasBackupClient) Read(ctx context.Context, id string) (*Backup, error) {

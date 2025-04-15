@@ -11,9 +11,9 @@ func (c *BackupClient) SPPServer() *BackupSPPServerClient {
 }
 
 type BackupSPPServer struct {
-	ID      string `terraform:"id"`
-	Name    string `terraform:"name"`
-	Address string `terraform:"address"`
+	ID      string
+	Name    string
+	Address string
 }
 
 type BackupSPPServerFilter struct {

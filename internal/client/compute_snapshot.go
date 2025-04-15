@@ -11,10 +11,10 @@ func (c *ComputeClient) Snapshot() *SnapshotClient {
 }
 
 type Snapshot struct {
-	ID               string `terraform:"id"`
-	VirtualMachineId string `terraform:"virtual_machine_id"`
-	Name             string `terraform:"name"`
-	CreateTime       int    `terraform:"create_time"`
+	ID               string
+	VirtualMachineId string
+	Name             string
+	CreateTime       int
 }
 
 type SnapshotFilter struct {

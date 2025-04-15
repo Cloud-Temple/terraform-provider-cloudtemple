@@ -11,19 +11,15 @@ func (c *ComputeOpenIaaSClient) Network() *OpenIaaSNetworkClient {
 }
 
 type OpenIaaSNetwork struct {
-	ID             string `terraform:"id"`
-	MachineManager struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-		Type string `terraform:"type"`
-	} `terraform_flatten:"machine_manager"`
-	InternalID                 string     `terraform:"internal_id"`
-	Name                       string     `terraform:"name"`
-	Pool                       BaseObject `terraform:"pool"`
-	MaximumTransmissionUnit    int        `terraform:"maximum_transmission_unit"`
-	NetworkAdapters            []string   `terraform:"network_adapters"`
-	NetworkBlockDevice         bool       `terraform:"network_block_device"`
-	InsecureNetworkBlockDevice bool       `terraform:"insecure_network_block_device"`
+	ID                         string
+	MachineManager             BaseObject
+	InternalID                 string
+	Name                       string
+	Pool                       BaseObject
+	MaximumTransmissionUnit    int
+	NetworkAdapters            []string
+	NetworkBlockDevice         bool
+	InsecureNetworkBlockDevice bool
 }
 
 type OpenIaaSNetworkFilter struct {

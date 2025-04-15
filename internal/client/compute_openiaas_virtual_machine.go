@@ -17,39 +17,35 @@ func (c *ComputeOpenIaaSClient) VirtualMachine() *OpenIaaSVirtualMachineClient {
 }
 
 type OpenIaaSVirtualMachine struct {
-	ID                  string   `terraform:"id"`
-	Name                string   `terraform:"name"`
-	InternalID          string   `terraform:"internal_id"`
-	PowerState          string   `terraform:"power_state"`
-	SecureBoot          bool     `terraform:"secure_boot"`
-	BootFirmware        string   `terraform:"boot_firmware"`
-	AutoPowerOn         bool     `terraform:"auto_power_on"`
-	DvdDrive            DvdDrive `terraform:"dvd_drive"`
-	BootOrder           []string `terraform:"boot_order"`
-	OperatingSystemName string   `terraform:"operating_system_name"`
-	CPU                 int      `terraform:"cpu"`
-	NumCoresPerSocket   int      `terraform:"num_cores_per_socket"`
-	Memory              int      `terraform:"memory"`
+	ID                  string
+	Name                string
+	InternalID          string
+	PowerState          string
+	SecureBoot          bool
+	BootFirmware        string
+	AutoPowerOn         bool
+	DvdDrive            DvdDrive
+	BootOrder           []string
+	OperatingSystemName string
+	CPU                 int
+	NumCoresPerSocket   int
+	Memory              int
 	Tools               struct {
-		Detected bool   `terraform:"detected"`
-		Version  string `terraform:"version"`
-	} `terraform:"tools"`
+		Detected bool
+		Version  string
+	}
 	Addresses struct {
-		IPv6 string `terraform:"ipv6"`
-		IPv4 string `terraform:"ipv4"`
-	} `terraform:"addresses"`
-	MachineManager struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-		Type string `terraform:"type"`
-	} `terraform_flatten:"machine_manager"`
-	Host BaseObject `terraform:"host"`
-	Pool BaseObject `terraform:"pool"`
+		IPv6 string
+		IPv4 string
+	}
+	MachineManager BaseObject
+	Host           BaseObject
+	Pool           BaseObject
 }
 
 type DvdDrive struct {
-	Name     string `terraform:"name"`
-	Attached bool   `terraform:"attached"`
+	Name     string
+	Attached bool
 }
 
 type OpenIaaSVirtualMachineFilter struct {

@@ -11,33 +11,34 @@ func (c *ComputeClient) ResourcePool() *ResourcePoolClient {
 }
 
 type ResourcePool struct {
-	ID             string              `terraform:"id"`
-	Name           string              `terraform:"name"`
-	Moref          string              `terraform:"moref"`
-	Parent         ResourcePoolParent  `terraform:"parent"`
-	Metrics        ResourcePoolMetrics `terraform:"metrics"`
-	MachineManager BaseObject          `terraform:"machine_manager" terraform_flatten:"machine_manager"`
+	ID               string
+	Name             string
+	Moref            string
+	Parent           ResourcePoolParent
+	Metrics          ResourcePoolMetrics
+	MachineManagerID string // DEPRECATED
+	// MachineManager BaseObject
 }
 
 type ResourcePoolParent struct {
-	ID   string `terraform:"id"`
-	Type string `terraform:"type"`
+	ID   string
+	Type string
 }
 
 type ResourcePoolMetrics struct {
-	CPU    ResourcePoolCPUMetrics    `terraform:"cpu"`
-	Memory ResourcePoolMemoryMetrics `terraform:"memory"`
+	CPU    ResourcePoolCPUMetrics
+	Memory ResourcePoolMemoryMetrics
 }
 
 type ResourcePoolCPUMetrics struct {
-	MaxUsage        int `terraform:"max_usage"`
-	ReservationUsed int `terraform:"reservation_used"`
+	MaxUsage        int
+	ReservationUsed int
 }
 
 type ResourcePoolMemoryMetrics struct {
-	MaxUsage        int `terraform:"max_usage"`
-	ReservationUsed int `terraform:"reservation_used"`
-	BalloonedMemory int `terraform:"ballooned_memory"`
+	MaxUsage        int
+	ReservationUsed int
+	BalloonedMemory int
 }
 
 type ResourcePoolFilter struct {

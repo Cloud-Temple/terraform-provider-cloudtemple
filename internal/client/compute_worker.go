@@ -11,23 +11,23 @@ func (c *ComputeClient) Worker() *WorkerClient {
 }
 
 type Worker struct {
-	ID                    string `terraform:"id"`
-	Name                  string `terraform:"name"`
-	FullName              string `terraform:"full_name"`
-	Vendor                string `terraform:"vendor"`
-	Version               string `terraform:"version"`
-	Build                 int    `terraform:"build"`
-	LocaleVersion         string `terraform:"locale_version"`
-	LocaleBuild           int    `terraform:"locale_build"`
-	OsType                string `terraform:"os_type"`
-	ProductLineID         string `terraform:"product_line_id"`
-	ApiType               string `terraform:"api_type"`
-	ApiVersion            string `terraform:"api_version"`
-	InstanceUuid          string `terraform:"instance_uuid"`
-	LicenseProductName    string `terraform:"license_product_name"`
-	LicenseProductVersion int    `terraform:"license_product_version"`
-	TenantID              string `terraform:"tenant_id"`
-	TenantName            string `terraform:"tenant_name"`
+	ID                    string
+	Name                  string
+	FullName              string
+	Vendor                string
+	Version               string
+	Build                 int
+	LocaleVersion         string
+	LocaleBuild           int
+	OsType                string
+	ProductLineID         string
+	ApiType               string
+	ApiVersion            string
+	InstanceUuid          string
+	LicenseProductName    string
+	LicenseProductVersion int
+	TenantID              string
+	TenantName            string
 }
 
 func (v *WorkerClient) List(ctx context.Context, name string) ([]*Worker, error) {

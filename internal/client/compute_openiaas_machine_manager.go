@@ -11,11 +11,11 @@ func (c *ComputeOpenIaaSClient) MachineManager() *OpenIaaSMachineManagerClient {
 }
 
 type OpenIaaSMachineManager struct {
-	ID         string `terraform:"id"`
-	Name       string `terraform:"name"`
-	OSVersion  string `terraform:"os_version"`
-	OSName     string `terraform:"os_name"`
-	XOAVersion string `terraform:"xoa_version"`
+	ID         string
+	Name       string
+	OSVersion  string
+	OSName     string
+	XOAVersion string
 }
 
 func (v *OpenIaaSMachineManagerClient) Read(ctx context.Context, id string) (*OpenIaaSMachineManager, error) {

@@ -11,28 +11,23 @@ func (c *ComputeOpenIaaSClient) Pool() *OpenIaasPoolClient {
 }
 
 type OpenIaasPool struct {
-	ID             string `terraform:"id"`
-	MachineManager struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-		Type string `terraform:"type"`
-	} `terraform_flatten:"machine_manager"`
-	InternalID              string   `terraform:"internal_id"`
-	Name                    string   `terraform:"name"`
-	HighAvailabilityEnabled bool     `terraform:"high_availability_enabled"`
-	Hosts                   []string `terraform:"hosts"`
+	ID                      string
+	MachineManager          BaseObject
+	InternalID              string
+	Name                    string
+	HighAvailabilityEnabled bool
+	Hosts                   []string
 	Cpu                     struct {
-		Cores   int `terraform:"cores"`
-		Sockets int `terraform:"sockets"`
-	} `terraform:"cpu"`
+		Cores   int
+		Sockets int
+	}
 	Type struct {
-		Key         string `terraform:"key"`
-		Description string `terraform:"description"`
-	} `terraform:"type"`
+		Key         string
+		Description string
+	}
 }
 
 type OpenIaasPoolFilter struct {
-	// TODO : Add filter by name
 	MachineManagerId string `filter:"machineManagerId"`
 }
 

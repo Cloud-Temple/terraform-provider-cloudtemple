@@ -234,8 +234,10 @@ func FlattenOSDiskData(osDisk *client.VirtualDisk) interface{} {
 	disk["capacity"] = osDisk.Capacity
 	disk["disk_unit_number"] = osDisk.DiskUnitNumber
 	disk["controller_bus_number"] = osDisk.Controller.BusNumber
-	disk["datastore_id"] = osDisk.Datastore.ID
-	disk["datastore_name"] = osDisk.Datastore.Name
+	// disk["datastore_id"] = osDisk.Datastore.ID
+	// disk["datastore_name"] = osDisk.Datastore.Name
+	disk["datastore_id"] = osDisk.DatastoreID     // DEPRECATED
+	disk["datastore_name"] = osDisk.DatastoreName // DEPRECATED
 	disk["instant_access"] = osDisk.InstantAccess
 	disk["native_id"] = osDisk.NativeId
 	disk["disk_path"] = osDisk.DiskPath

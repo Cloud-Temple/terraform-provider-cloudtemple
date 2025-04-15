@@ -11,8 +11,8 @@ func (i *IAM) Role() *RoleClient {
 }
 
 type Role struct {
-	ID   string `terraform:"id"`
-	Name string `terraform:"name"`
+	ID   string
+	Name string
 }
 
 func (r *RoleClient) List(ctx context.Context) ([]*Role, error) {

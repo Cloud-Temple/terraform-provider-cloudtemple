@@ -11,9 +11,9 @@ func (c *ComputeClient) GuestOperatingSystem() *GuestOperatingSystemClient {
 }
 
 type GuestOperatingSystem struct {
-	Moref    string `terraform:"moref"`
-	Family   string `terraform:"family"`
-	FullName string `terraform:"full_name"`
+	Moref    string
+	Family   string
+	FullName string
 }
 
 type GuestOperatingSystemFilter struct {

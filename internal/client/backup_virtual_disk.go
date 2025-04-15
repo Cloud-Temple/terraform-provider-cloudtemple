@@ -17,12 +17,12 @@ func (c *BackupClient) VirtualDisk() *BackupVirtualDiskClient {
 }
 
 type BackupVirtualDisk struct {
-	ID               string `terraform:"id"`
-	Name             string `terraform:"name"`
-	InternalId       string `terraform:"internal_id"`
-	InstanceId       string `terraform:"instance_id"`
-	SPPServerId      string `terraform:"spp_server_id"`
-	VirtualMachineId string `terraform:"virtual_machine_id"`
+	ID               string
+	Name             string
+	InternalId       string
+	InstanceId       string
+	SPPServerId      string
+	VirtualMachineId string
 }
 
 type BackupVirtualDiskNotFoundError struct {

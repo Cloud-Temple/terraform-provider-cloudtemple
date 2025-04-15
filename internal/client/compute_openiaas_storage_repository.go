@@ -11,20 +11,20 @@ func (c *ComputeOpenIaaSClient) StorageRepository() *OpenIaaSStorageRepositoryCl
 }
 
 type OpenIaaSStorageRepository struct {
-	ID                string     `terraform:"id"`
-	InternalId        string     `terraform:"internal_id"`
-	Name              string     `terraform:"name"`
-	Description       string     `terraform:"description"`
-	MaintenanceStatus bool       `terraform:"maintenance_status"`
-	MaxCapacity       int        `terraform:"max_capacity"`
-	FreeCapacity      int        `terraform:"free_capacity"`
-	StorageType       string     `terraform:"type"`
-	VirtualDisks      []string   `terraform:"virtual_disks"`
-	Shared            bool       `terraform:"shared"`
-	Accessible        int        `terraform:"accessible"`
-	Host              BaseObject `terraform:"host"`
-	Pool              BaseObject `terraform:"pool"`
-	MachineManager    BaseObject `terraform:"machine_manager"`
+	ID                string
+	InternalId        string
+	Name              string
+	Description       string
+	MaintenanceStatus bool
+	MaxCapacity       int
+	FreeCapacity      int
+	StorageType       string
+	VirtualDisks      []string
+	Shared            bool
+	Accessible        int
+	Host              BaseObject
+	Pool              BaseObject
+	MachineManager    BaseObject
 }
 
 type StorageRepositoryFilter struct {

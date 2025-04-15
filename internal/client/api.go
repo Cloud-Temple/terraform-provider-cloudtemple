@@ -72,8 +72,8 @@ func DefaultConfig() *Config {
 }
 
 type BaseObject struct {
-	ID   string `terraform:"id"`
-	Name string `terraform:"name"`
+	ID   string
+	Name string
 }
 
 type Client struct {

@@ -11,11 +11,11 @@ func (c *ComputeOpenIaaSClient) Snapshot() *OpenIaaSSnapshotClient {
 }
 
 type OpenIaaSSnapshot struct {
-	ID               string `terraform:"id"`
-	Description      string `terraform:"description"`
-	VirtualMachineID string `terraform:"virtual_machine_id"`
-	Name             string `terraform:"name"`
-	CreateTime       int    `terraform:"create_time"`
+	ID               string
+	Description      string
+	VirtualMachineID string
+	Name             string
+	CreateTime       int
 }
 
 func (v *OpenIaaSSnapshotClient) Read(ctx context.Context, id string) (*OpenIaaSSnapshot, error) {

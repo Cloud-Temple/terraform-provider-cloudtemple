@@ -10,7 +10,7 @@ func FlattenNetwork(network *client.Network) map[string]interface{} {
 		"id":                      network.ID,
 		"name":                    network.Name,
 		"moref":                   network.Moref,
-		"machine_manager_id":      network.MachineManagerId,
+		"machine_manager_id":      network.MachineManager.ID,
 		"virtual_machines_number": network.VirtualMachinesNumber,
 		"host_number":             network.HostNumber,
 		"host_names":              network.HostNames,

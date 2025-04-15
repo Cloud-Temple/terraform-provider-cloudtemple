@@ -13,8 +13,8 @@ func (i *IAM) Company() *CompanyClient {
 }
 
 type Company struct {
-	ID   string `terraform:"id"`
-	Name string `terraform:"name"`
+	ID   string
+	Name string
 }
 
 func (c *CompanyClient) Read(ctx context.Context, companyID string) (*Company, error) {

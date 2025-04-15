@@ -11,12 +11,10 @@ func (c *ComputeClient) Folder() *FolderClient {
 }
 
 type Folder struct {
-	ID             string `terraform:"id"`
-	Name           string `terraform:"name"`
-	MachineManager struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-	} `terraform_flatten:"machine_manager"`
+	ID               string
+	Name             string
+	MachineManagerID string // DEPRECATED
+	// MachineManager   BaseObject
 }
 
 type FolderFilter struct {

@@ -11,37 +11,33 @@ func (c *ComputeOpenIaaSClient) Template() *OpenIaasTemplateClient {
 }
 
 type TemplateDisk struct {
-	Name              string     `terraform:"name"`
-	Description       string     `terraform:"description"`
-	Size              int        `terraform:"size"`
-	StorageRepository BaseObject `terraform:"storage_repository"`
+	Name              string
+	Description       string
+	Size              int
+	StorageRepository BaseObject
 }
 
 type TemplateNetworkAdapter struct {
-	Name       string     `terraform:"name"`
-	MacAddress string     `terraform:"mac_address"`
-	MTU        int        `terraform:"mtu"`
-	Attached   bool       `terraform:"attached"`
-	Network    BaseObject `terraform:"network"`
+	Name       string
+	MacAddress string
+	MTU        int
+	Attached   bool
+	Network    BaseObject
 }
 
 type OpenIaasTemplate struct {
-	ID             string `terraform:"id"`
-	MachineManager struct {
-		ID   string `terraform:"id"`
-		Name string `terraform:"name"`
-		Type string `terraform:"type"`
-	} `terraform_flatten:"machine_manager"`
-	InternalID        string                   `terraform:"internal_id"`
-	Name              string                   `terraform:"name"`
-	CPU               int                      `terraform:"cpu"`
-	NumCoresPerSocket int                      `terraform:"num_cores_per_socket"`
-	Memory            int                      `terraform:"memory"`
-	PowerState        string                   `terraform:"power_state"`
-	Snapshots         []string                 `terraform:"snapshots"`
-	SLAPolicies       []string                 `terraform:"sla_policies"`
-	Disks             []TemplateDisk           `terraform:"disks"`
-	NetworkAdapters   []TemplateNetworkAdapter `terraform:"network_adapters"`
+	ID                string
+	MachineManager    BaseObject
+	InternalID        string
+	Name              string
+	CPU               int
+	NumCoresPerSocket int
+	Memory            int
+	PowerState        string
+	Snapshots         []string
+	SLAPolicies       []string
+	Disks             []TemplateDisk
+	NetworkAdapters   []TemplateNetworkAdapter
 }
 
 type OpenIaaSTemplateFilter struct {
