@@ -51,7 +51,7 @@ resource "cloudtemple_compute_iaas_opensource_network_adapter" "VIF-1" {
 ### Optional
 
 - `attached` (Boolean) Whether the network adapter is attached.
-- `mac_address` (String) The MAC address of the network adapter.
+- `mac_address` (String) The MAC address of the network adapter. If not specified, a random MAC address will be generated.
 
 ### Read-Only
 

@@ -115,14 +115,14 @@ Order of the elements in the list is the boot order.
 
 ### Read-Only
 
-- `addresses` (List of Object) (see [below for nested schema](#nestedatt--addresses))
-- `dvd_drive` (List of Object) (see [below for nested schema](#nestedatt--dvd_drive))
+- `addresses` (List of Object) The addresses of the virtual machine. (see [below for nested schema](#nestedatt--addresses))
+- `dvd_drive` (List of Object) The DVD drive of the virtual machine. (see [below for nested schema](#nestedatt--dvd_drive))
 - `id` (String) The ID of this resource.
-- `internal_id` (String)
-- `machine_manager_id` (String)
-- `operating_system_name` (String)
-- `pool_id` (String)
-- `tools` (List of Object) (see [below for nested schema](#nestedatt--tools))
+- `internal_id` (String) The internal identifier of the virtual machine.
+- `machine_manager_id` (String) The identifier of the machine manager (availability zone).
+- `operating_system_name` (String) The name of the operating system installed on the virtual machine.
+- `pool_id` (String) The identifier of the pool to which the virtual machine belongs.
+- `tools` (List of Object) The tools installed on the virtual machine. Please note that the tools are only available when the virtual machine is powered on. (see [below for nested schema](#nestedatt--tools))
 
 <a id="nestedatt--addresses"></a>
 ### Nested Schema for `addresses`

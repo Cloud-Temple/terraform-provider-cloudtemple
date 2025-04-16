@@ -85,7 +85,7 @@ resource "cloudtemple_compute_virtual_controller" "baz" {
 ### Required
 
 - `type` (String) Can be one of : USB2, USB3, SCSI, CD/DVD, NVME
-- `virtual_machine_id` (String)
+- `virtual_machine_id` (String) The virtual machine ID the virtual controller is attached to.
 
 ### Optional
 
@@ -97,12 +97,12 @@ resource "cloudtemple_compute_virtual_controller" "baz" {
 
 ### Read-Only
 
-- `hot_add_remove` (Boolean)
+- `hot_add_remove` (Boolean) Whether the virtual controller supports hot add/remove.
 - `id` (String) The ID of this resource.
-- `label` (String)
-- `shared_bus` (String)
-- `summary` (String)
-- `virtual_disks` (List of String)
+- `label` (String) The label of the virtual controller.
+- `shared_bus` (String) The shared bus type of the virtual controller.
+- `summary` (String) The summary of the virtual controller.
+- `virtual_disks` (List of String) The virtual disks attached to the virtual controller.
 
 ## Import
 

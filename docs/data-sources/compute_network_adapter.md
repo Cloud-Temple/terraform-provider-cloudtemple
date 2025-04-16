@@ -40,7 +40,7 @@ data "cloudtemple_compute_network_adapter" "name" {
 - `auto_connect` (Boolean) Whether the network adapter is configured to connect automatically when the virtual machine powers on.
 - `connected` (Boolean) Whether the network adapter is currently connected.
 - `mac_address` (String) The MAC address of the network adapter.
-- `mac_type` (String) The type of MAC address assignment (e.g., MANUAL, ASSIGNED).
+- `mac_type` (String) The type of MAC address assignment (e.g., MANUAL, GENERATED).
 - `network_id` (String) The ID of the network this adapter is connected to.
 - `type` (String) The type of the network adapter (e.g., VMXNET3, E1000).
 

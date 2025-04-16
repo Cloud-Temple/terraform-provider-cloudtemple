@@ -57,21 +57,21 @@ resource "cloudtemple_compute_network_adapter" "foo" {
 
 ### Required
 
-- `network_id` (String)
-- `type` (String)
-- `virtual_machine_id` (String)
+- `network_id` (String) The ID of the network to which the adapter will be connected.
+- `type` (String) The type of the network adapter. Supported types are defined by the Guest OS, usually E1000 or VMXNET3.
+- `virtual_machine_id` (String) The ID of the virtual machine to which the network adapter will be attached.
 
 ### Optional
 
-- `auto_connect` (Boolean)
-- `connected` (Boolean)
-- `mac_address` (String)
+- `auto_connect` (Boolean) Whether the network adapter should connect to the network automatically when the virtual machine is powered on.
+- `connected` (Boolean) Whether the network adapter should be connected to the network. Defaults to true.
+- `mac_address` (String) The MAC address of the network adapter. If not provided, a MAC address will be generated automatically.
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `mac_type` (String)
-- `name` (String)
+- `mac_type` (String) The type of MAC address assignment. Possible values are MANUAL and GENERATED.
+- `name` (String) The name of the network adapter.
 
 ## Import
 
