@@ -61,7 +61,7 @@ func dataSourceNetworkAdapters() *schema.Resource {
 						"mac_type": {
 							Type:        schema.TypeString,
 							Computed:    true,
-							Description: "The type of MAC address assignment (e.g., MANUAL, ASSIGNED).",
+							Description: "The type of MAC address assignment (e.g., MANUAL, GENERATED).",
 						},
 						"mac_address": {
 							Type:        schema.TypeString,

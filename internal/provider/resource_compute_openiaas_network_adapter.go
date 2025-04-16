@@ -37,7 +37,7 @@ func resourceOpenIaasNetworkAdapter() *schema.Resource {
 			},
 			"mac_address": {
 				Type:        schema.TypeString,
-				Description: "The MAC address of the network adapter.",
+				Description: "The MAC address of the network adapter. If not specified, a random MAC address will be generated.",
 				Optional:    true,
 				Computed:    true,
 			},

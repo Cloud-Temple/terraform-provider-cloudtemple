@@ -210,6 +210,7 @@ func (v *VirtualMachineClient) Read(ctx context.Context, id string) (*VirtualMac
 type UpdateVirtualMachineRequest struct {
 	Id                           string       `json:"id"`
 	Ram                          int          `json:"ram"`
+	MemoryReservation            int          `json:"memoryReservation"`
 	Cpu                          int          `json:"cpu"`
 	CorePerSocket                int          `json:"corePerSocket"`
 	HotCpuAdd                    bool         `json:"hotCpuAdd"`

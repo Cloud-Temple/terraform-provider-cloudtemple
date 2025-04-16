@@ -175,18 +175,6 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 	// Mapper les données en utilisant la fonction helper
 	diskData := helpers.FlattenOpenIaaSVirtualDisk(virtualDisk)
 
-	// // Conserver l'ID de la VM existante si aucune VM n'est attachée
-	// if len(virtualDisk.VirtualMachines) == 0 {
-	// 	if vmID, ok := d.GetOk("virtual_machine_id"); ok {
-	// 		diskData["virtual_machine_id"] = vmID.(string)
-	// 	}
-	// }
-
-	// // Préserver la valeur bootable existante si elle est définie
-	// if bootable, ok := d.GetOk("bootable"); ok {
-	// 	diskData["bootable"] = bootable
-	// }
-
 	// Définir les données dans le state
 	for k, v := range diskData {
 		if err := d.Set(k, v); err != nil {

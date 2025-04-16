@@ -150,52 +150,62 @@ Order of the elements in the list is the boot order.`,
 
 			//Out
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The identifier of the machine manager (availability zone).",
 			},
 			"internal_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The internal identifier of the virtual machine.",
 			},
 			"dvd_drive": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The DVD drive of the virtual machine.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the ISO mounted in the DVD drive.",
 						},
 						"attached": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the DVD drive is attached.",
 						},
 					},
 				},
 			},
 			"tools": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The tools installed on the virtual machine. Please note that the tools are only available when the virtual machine is powered on.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"detected": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the tools are detected.",
 						},
 						"version": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The version of the tools.",
 						},
 					},
 				},
 			},
 			"operating_system_name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the operating system installed on the virtual machine.",
 			},
 			"addresses": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The addresses of the virtual machine.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"ipv6": {
@@ -210,8 +220,9 @@ Order of the elements in the list is the boot order.`,
 				},
 			},
 			"pool_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The identifier of the pool to which the virtual machine belongs.",
 			},
 		},
 	}

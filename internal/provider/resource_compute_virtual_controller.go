@@ -29,6 +29,7 @@ func resourceVirtualController() *schema.Resource {
 				Required:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
+				Description:  "The virtual machine ID the virtual controller is attached to.",
 			},
 			"type": {
 				Type:         schema.TypeString,
@@ -70,24 +71,29 @@ func resourceVirtualController() *schema.Resource {
 
 			//Out
 			"hot_add_remove": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether the virtual controller supports hot add/remove.",
 			},
 			"shared_bus": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The shared bus type of the virtual controller.",
 			},
 			"label": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The label of the virtual controller.",
 			},
 			"summary": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The summary of the virtual controller.",
 			},
 			"virtual_disks": {
-				Type:     schema.TypeList,
-				Computed: true,
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The virtual disks attached to the virtual controller.",
 
 				Elem: &schema.Schema{
 					Type: schema.TypeString,

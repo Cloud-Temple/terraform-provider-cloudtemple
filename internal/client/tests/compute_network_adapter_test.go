@@ -121,7 +121,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 		ID:             vm.ID,
-		DatacenterId:   vm.DatacenterId,
+		DatacenterId:   vm.Datacenter.ID,
 		PowerAction:    "on",
 		ForceEnterBIOS: false,
 	})
@@ -152,7 +152,6 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 
 	activityId, err = client.Compute().NetworkAdapter().Update(ctx, &clientpkg.UpdateNetworkAdapterRequest{
 		ID:           networkAdapterId,
-		MacType:      "ASSIGNED",
 		NewNetworkId: "1a2e7257-0747-474a-ba49-942ee463a94c",
 	})
 	require.NoError(t, err)
@@ -166,7 +165,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 		ID:             vm.ID,
-		DatacenterId:   vm.DatacenterId,
+		DatacenterId:   vm.Datacenter.ID,
 		PowerAction:    "off",
 		ForceEnterBIOS: false,
 	})

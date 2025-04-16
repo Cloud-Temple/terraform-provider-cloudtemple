@@ -309,9 +309,14 @@ func resourceVirtualMachine() *schema.Resource {
 			},
 			"memory": {
 				Type:        schema.TypeInt,
-				Description: "The quantity of memory to start the virtual machine with.",
+				Description: "In bytes. The quantity of memory to start the virtual machine with.",
 				Optional:    true,
 				Default:     33554432,
+			},
+			"memory_reservation": {
+				Type:        schema.TypeInt,
+				Description: "In bytes. Amount of resource that is guaranteed available to the virtual machine. Reserved resources are not wasted if they are not used. If the utilization is less than the reservation, the resources can be utilized by other running virtual machines.",
+				Optional:    true,
 			},
 			"cpu": {
 				Type:        schema.TypeInt,
@@ -320,21 +325,25 @@ func resourceVirtualMachine() *schema.Resource {
 				Default:     1,
 			},
 			"num_cores_per_socket": {
-				Type:     schema.TypeInt,
-				Optional: true,
-				Default:  1,
+				Type:        schema.TypeInt,
+				Optional:    true,
+				Default:     1,
+				Description: "Number of cores per socket.",
 			},
 			"cpu_hot_add_enabled": {
-				Type:     schema.TypeBool,
-				Optional: true,
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Flag that indicate if hot add of CPU is enabled or not.",
 			},
 			"cpu_hot_remove_enabled": {
-				Type:     schema.TypeBool,
-				Optional: true,
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Flag that indicate if hot remove of CPU is enabled or not.",
 			},
 			"memory_hot_add_enabled": {
-				Type:     schema.TypeBool,
-				Optional: true,
+				Type:        schema.TypeBool,
+				Optional:    true,
+				Description: "Flag that indicate if hot add of memory is enabled or not.",
 			},
 			"expose_hardware_virtualization": {
 				Type:        schema.TypeBool,
@@ -369,7 +378,7 @@ func resourceVirtualMachine() *schema.Resource {
 			},
 			"disks_provisioning_type": {
 				Type:         schema.TypeString,
-				Description:  "Overrides the provisioning type for the os_disks of an OVF.",
+				Description:  "Overrides the provisioning type for the os_disks of an OVF. Possible values are: `dynamic`, `staticImmediate`, `staticDiffered`.",
 				Optional:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.StringInSlice([]string{"dynamic", "staticImmediate", "staticDiffered"}, false),
@@ -383,64 +392,81 @@ func resourceVirtualMachine() *schema.Resource {
 					Schema: map[string]*schema.Schema{
 						// In
 						"capacity": {
-							Type:     schema.TypeInt,
-							Optional: true,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Optional:    true,
+							Computed:    true,
+							Description: "The size of the disk in bytes. The size must be greater than or equal to the size of the virtual machine's operating system disk.",
 						},
 						"disk_mode": {
 							Type:     schema.TypeString,
 							Optional: true,
 							Computed: true,
+							Description: `Possible values are: persistent, independent_nonpersistent, independent_persistent.
+Persistent: Changes are immediately and permanently written to the virtual disk
+Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots
+Independent persistent: Changes are immediately and permanently written to the virtual disk. Not affected by snapshots`,
 						},
 
 						// Out
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the virtual disk.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the virtual disk.",
 						},
 						"machine_manager_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the machine manager that manages the virtual disk.",
 						},
 						"disk_unit_number": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The disk unit number of the virtual disk.",
 						},
 						"controller_bus_number": {
-							Type:     schema.TypeInt,
-							Computed: true,
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The bus number of the controller to which the virtual disk is attached.",
 						},
 						"datastore_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the datastore where the virtual disk is stored.",
 						},
 						"datastore_name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the datastore where the virtual disk is stored.",
 						},
 						"instant_access": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the disk is an instant access disk.",
 						},
 						"native_id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The native ID of the disk in the hypervisor.",
 						},
 						"disk_path": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The path to the disk file in the datastore.",
 						},
 						"provisioning_type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The provisioning type of the virtual disk. Possible values are: `dynamic`, `staticImmediate`, `staticDiffered`.",
 						},
 						"editable": {
-							Type:     schema.TypeBool,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the virtual disk is editable.",
 						},
 					},
 				},
@@ -454,42 +480,50 @@ func resourceVirtualMachine() *schema.Resource {
 					Schema: map[string]*schema.Schema{
 						// In
 						"network_id": {
-							Type:     schema.TypeString,
-							Optional: true,
-							Computed: true,
+							Type:        schema.TypeString,
+							Optional:    true,
+							Computed:    true,
+							Description: "The ID of the network to which the virtual machine is connected.",
 						},
 						"mac_address": {
-							Type:     schema.TypeString,
-							Optional: true,
-							Computed: true,
+							Type:        schema.TypeString,
+							Optional:    true,
+							Computed:    true,
+							Description: "The MAC address of the network adapter. If not specified, a random MAC address will be generated.",
 						},
 						"auto_connect": {
-							Type:     schema.TypeBool,
-							Optional: true,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Computed:    true,
+							Description: "Whether the network adapter should be automatically connected when the virtual machine is powered on.",
 						},
 						"connected": {
-							Type:     schema.TypeBool,
-							Optional: true,
-							Computed: true,
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Computed:    true,
+							Description: "Whether the network adapter is connected to the network.",
 						},
 
 						// Out
 						"id": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the network adapter.",
 						},
 						"name": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the network adapter.",
 						},
 						"type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The type of the network adapter (e.g., VMXNET3, E1000).",
 						},
 						"mac_type": {
-							Type:     schema.TypeString,
-							Computed: true,
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The type of MAC address assignment (e.g., MANUAL, GENERATED).",
 						},
 					},
 				},
@@ -544,8 +578,9 @@ func resourceVirtualMachine() *schema.Resource {
 
 			// Out
 			"moref": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "Virtual machine vSphere identifier.",
 			},
 			"machine_manager_type": {
 				Type:     schema.TypeString,
@@ -578,10 +613,22 @@ func resourceVirtualMachine() *schema.Resource {
 			"consolidation_needed": {
 				Type:     schema.TypeBool,
 				Computed: true,
+				Description: `The most typical causes for VMs to shows ‘Virtual Machine disks consolidation is needed’ Alert:
+
+-Snapshots cannot be deleted/consolidated after completing backups.
+
+-There is not enough space on the Datastore to perform consolidation. VM disk/disks would be residing on the datastore which has less than 1 GB available space.
+
+-Third-party backup application (Veeam, Unitrends, Dataprotect) has locked snapshot files, and failed to remove the snapshot after completing backups or failed to initiate backups. vCenter server and the ESXi host connectivity issues.
+
+-When there are more than the VMware recommended number of snapshots, consolidation may fail. (VMware recommends only 32 as the maximum number of snapshots under best practices).
+
+-When large snapshots are undergoing consolidation, VM may show unresponsive/frozen but the alert continues to show up.`,
 			},
 			"template": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Flag that indicate whether the VM is a template or not.",
 			},
 			"hardware_version": {
 				Type:     schema.TypeString,
@@ -618,6 +665,9 @@ func resourceVirtualMachine() *schema.Resource {
 			"spp_mode": {
 				Type:     schema.TypeString,
 				Computed: true,
+				Description: `Clone mode creates copies of virtual machines for use cases that require permanent or long-running copies for data mining or duplication of a test environment in a fenced network. Virtual machines created in clone mode are also given unique names and identifiers to avoid conflicts within your production environment. With clone mode, you must be sensitive to resource consumption because clone mode creates permanent or long-term virtual machines.
+
+Test mode creates temporary virtual machines for development or testing, snapshot verification, and disaster recovery verification on a scheduled, repeatable basis without affecting production environments. Test machines are kept running as long as needed to complete testing and verification and are then cleaned up. Through fenced networking, you can establish a safe environment to test your jobs without interfering with virtual machines used for production. Virtual machines that are created in test mode are also given unique names and identifiers to avoid conflicts within your production environment.`,
 			},
 			"snapshoted": {
 				Type:     schema.TypeBool,
@@ -1061,6 +1111,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 	req := &client.UpdateVirtualMachineRequest{
 		Id:                           d.Id(),
 		Ram:                          d.Get("memory").(int),
+		MemoryReservation:            d.Get("memory_reservation").(int),
 		Cpu:                          d.Get("cpu").(int),
 		CorePerSocket:                d.Get("num_cores_per_socket").(int),
 		HotCpuAdd:                    d.Get("cpu_hot_add_enabled").(bool),
@@ -1276,17 +1327,11 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 			}
 			networkAdapter := osNetworkAdapter.(map[string]interface{})
 			if networkAdapter["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_network_adapter.%d", i)) {
-				macType := networkAdapter["mac_type"].(string)
-				macAddress := networkAdapter["mac_address"].(string)
-				if macType == "ASSIGNED" {
-					macAddress = ""
-				}
-
 				activityId, err := c.Compute().NetworkAdapter().Update(ctx, &client.UpdateNetworkAdapterRequest{
 					ID:           networkAdapter["id"].(string),
 					NewNetworkId: networkAdapter["network_id"].(string),
 					AutoConnect:  networkAdapter["auto_connect"].(bool),
-					MacAddress:   macAddress,
+					MacAddress:   networkAdapter["mac_address"].(string),
 				})
 				if err != nil {
 					return diag.Errorf("failed to update network adapter, %s", err)

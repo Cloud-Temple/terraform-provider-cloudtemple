@@ -38,21 +38,23 @@ func resourceVirtualDisk() *schema.Resource {
 				ValidateFunc: validation.IsUUID,
 			},
 			"provisioning_type": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true,
+				Description: "The provisioning type of the virtual disk. Possible values are: `dynamic`, `staticImmediate`, `staticDiffered`.",
 			},
 			"disk_mode": {
 				Type:     schema.TypeString,
 				Required: true,
-				Description: `disk_mode can have multiple different values :
+				Description: `disk_mode can have multiple different values (persistent, independent_nonpersistent, independent_persistent) :
 					- Persistent: Changes are immediately and permanently written to the virtual disk.
 					- Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots.
 					- Independent persistent: Changes are immediately and permanently written to the virtual disk. Not affected by snapshots.`,
 			},
 			"capacity": {
-				Type:     schema.TypeInt,
-				Required: true,
+				Type:        schema.TypeInt,
+				Required:    true,
+				Description: "The size of the disk in bytes. The size must be greater than or equal to the size of the virtual machine's operating system disk.",
 			},
 			"datastore_id": {
 				Type:          schema.TypeString,
@@ -86,44 +88,54 @@ func resourceVirtualDisk() *schema.Resource {
 
 			// Out
 			"name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the virtual disk.",
 			},
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The ID of the machine manager of the network adapter.",
 			},
 			"disk_unit_number": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The disk unit number of the virtual disk.",
 			},
 			"controller_bus_number": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The bus number of the controller to which the virtual disk is attached.",
 			},
 			"controller_type": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "Virtual controller type.",
 			},
 			"datastore_name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the datastore where the virtual disk is stored.",
 			},
 			"instant_access": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Flag that indicates if the disk is in instant access mode.",
 			},
 			"native_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "Virtual disk vSphere identifier.",
 			},
 			"disk_path": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The path to the disk file in the datastore.",
 			},
 			"editable": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether the virtual disk is editable.",
 			},
 		},
 	}
