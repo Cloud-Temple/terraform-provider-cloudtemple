@@ -245,7 +245,7 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		return diag.Errorf("the virtual machine could not be created: %s", err)
 	}
 	activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	setIdFromActivityConcernedItems(d, activity, "virtual_machine")
+	setIdFromActivityState(d, activity)
 	if err != nil {
 		return diag.Errorf("failed to create virtual machine, %s", err)
 	}

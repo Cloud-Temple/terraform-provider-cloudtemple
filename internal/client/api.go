@@ -361,6 +361,8 @@ func requireNotFoundOrOK(resp *http.Response, notFoundCode int) (bool, error) {
 		return true, nil
 	case 404, notFoundCode:
 		return false, nil
+	case 403:
+		return false, fmt.Errorf("Access denied: %s", resp.Status)
 	default:
 		return false, generateUnexpectedResponseCodeError(resp)
 	}
