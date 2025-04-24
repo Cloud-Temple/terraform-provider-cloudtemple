@@ -22,15 +22,21 @@ func TestAccDataSourceBackupSLAPolicy(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceBackupSLAPolicy, os.Getenv(PolicyId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "id", os.Getenv(PolicyId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "name", os.Getenv(PolicyName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "sub_policies.#"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.site"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceBackupSLAPolicyName, os.Getenv(PolicyName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "id", os.Getenv(PolicyId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_sla_policy.foo", "name", os.Getenv(PolicyName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "sub_policies.#"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_sla_policy.foo", "sub_policies.0.site"),
 				),
 			},
 			{

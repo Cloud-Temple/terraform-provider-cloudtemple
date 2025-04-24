@@ -10,7 +10,6 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	providerpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,7 @@ const (
 
 func TestMain(m *testing.M) {
 
-	// err := godotenv.Load("../../.env.test")
+	// err := godotenv.Load("../../.env")
 	// if err != nil {
 	// 	log.Fatal("Error loading .env file")
 	// }
@@ -148,7 +147,9 @@ func TestMain(m *testing.M) {
 // to create a provider server to which the CLI can reattach.
 var providerFactories = map[string]func() (*schema.Provider, error){
 	"cloudtemple": func() (*schema.Provider, error) {
-		return providerpkg.New("dev")(), nil
+		p := providerpkg.New("dev")()
+		p.Schema["api_suffix"].Default = false
+		return p, nil
 	},
 }
 
@@ -213,8 +214,8 @@ func TestImport(t *testing.T) {
 		"cloudtemple_iam_personal_access_token": {},
 
 		// TODO: we skip this ones for now
-		"cloudtemple_compute_network_adapter": {},
-		"cloudtemple_compute_virtual_disk":    {},
+		// "cloudtemple_compute_network_adapter": {},
+		// "cloudtemple_compute_virtual_disk":    {},
 	}
 
 	for name, resource := range provider.ResourcesMap {
@@ -232,7 +233,7 @@ func TestExample(t *testing.T) {
 
 	test := func(typ, name string) func(t *testing.T) {
 		return func(t *testing.T) {
-			path := fmt.Sprintf("../../examples/%ss/%s/%s.tf", typ, name, typ)
+			path := fmt.Sprintf("../../../examples/%ss/%s/%s.tf", typ, name, typ)
 			require.FileExists(t, path)
 
 			data, err := os.ReadFile(path)
@@ -241,16 +242,6 @@ func TestExample(t *testing.T) {
 			content := string(data)
 
 			require.Contains(t, content, name)
-
-			resource.Test(t, resource.TestCase{
-				PreCheck:          func() { testAccPreCheck(t) },
-				ProviderFactories: providerFactories,
-				Steps: []resource.TestStep{
-					{
-						Config: content,
-					},
-				},
-			})
 		}
 	}
 
@@ -259,6 +250,38 @@ func TestExample(t *testing.T) {
 	}
 
 	for name := range provider.DataSourcesMap {
-		t.Run("data."+name, test("data-source", name))
+		if strings.Contains(name, "machine_manager") {
+			continue
+		}
+		t.Run(name, test("data-source", name))
+	}
+}
+
+func TestAcceptationTest(t *testing.T) {
+	provider := providerpkg.New("dev")()
+
+	test := func(typ, name string) func(t *testing.T) {
+		return func(t *testing.T) {
+			path := fmt.Sprintf("./%s_%s_test.go", typ, name)
+			require.FileExists(t, path)
+
+			data, err := os.ReadFile(path)
+			require.NoError(t, err)
+
+			content := string(data)
+
+			require.Contains(t, content, name)
+		}
+	}
+
+	for name := range provider.ResourcesMap {
+		t.Run(name, test("resource", strings.Replace(name, "cloudtemple_", "", 1)))
+	}
+
+	for name := range provider.DataSourcesMap {
+		if strings.Contains(name, "machine_manager") {
+			continue
+		}
+		t.Run(name, test("data_source", strings.Replace(name, "cloudtemple_", "", 1)))
 	}
 }

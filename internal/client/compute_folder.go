@@ -11,10 +11,9 @@ func (c *ComputeClient) Folder() *FolderClient {
 }
 
 type Folder struct {
-	ID               string
-	Name             string
-	MachineManagerID string // DEPRECATED
-	// MachineManager   BaseObject
+	ID             string
+	Name           string
+	MachineManager BaseObject
 }
 
 type FolderFilter struct {

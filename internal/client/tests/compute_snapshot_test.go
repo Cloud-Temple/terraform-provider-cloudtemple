@@ -2,18 +2,14 @@ package client
 
 import (
 	"context"
-	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
-)
-
-const (
-	SnapShotId = "COMPUTE_SNAPSHOT_ID"
 )
 
 func TestCompute_SnapshotList(t *testing.T) {
 	ctx := context.Background()
-	_, err := client.Compute().Snapshot().List(ctx, os.Getenv(SnapShotId))
+	_, err := client.Compute().Snapshot().List(ctx, &clientpkg.SnapshotFilter{})
 	require.NoError(t, err)
 }

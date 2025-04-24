@@ -10,7 +10,7 @@ func FlattenVirtualSwitch(virtualSwitch *client.VirtualSwitch) map[string]interf
 		"id":                 virtualSwitch.ID,
 		"name":               virtualSwitch.Name,
 		"moref":              virtualSwitch.Moref,
-		"folder_id":          virtualSwitch.FolderID,
+		"folder_id":          virtualSwitch.FolderId,
 		"machine_manager_id": virtualSwitch.MachineManager.ID,
 	}
 }

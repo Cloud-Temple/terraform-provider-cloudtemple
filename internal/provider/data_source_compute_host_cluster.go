@@ -39,6 +39,7 @@ func dataSourceHostCluster() *schema.Resource {
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				ValidateFunc:  validation.IsUUID,
 				Description:   "The ID of the machine manager to filter host clusters by. Only used when searching by name.",
 			},
 			"datacenter_id": {
@@ -47,6 +48,7 @@ func dataSourceHostCluster() *schema.Resource {
 				Default:       "",
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				ValidateFunc:  validation.IsUUID,
 				Description:   "The ID of the datacenter to filter host clusters by. Only used when searching by name.",
 			},
 			"datastore_id": {
@@ -55,6 +57,7 @@ func dataSourceHostCluster() *schema.Resource {
 				Default:       "",
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				ValidateFunc:  validation.IsUUID,
 				Description:   "The ID of the datastore to filter host clusters by. Only used when searching by name.",
 			},
 			"datastore_cluster_id": {
@@ -63,6 +66,7 @@ func dataSourceHostCluster() *schema.Resource {
 				Default:       "",
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				ValidateFunc:  validation.IsUUID,
 				Description:   "The ID of the datastore cluster to filter host clusters by. Only used when searching by name.",
 			},
 

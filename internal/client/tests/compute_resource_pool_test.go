@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,7 +17,7 @@ const (
 
 func TestCompute_ResourcePoolList(t *testing.T) {
 	ctx := context.Background()
-	resourcePools, err := client.Compute().ResourcePool().List(ctx, "", "", "")
+	resourcePools, err := client.Compute().ResourcePool().List(ctx, &clientpkg.ResourcePoolFilter{})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(resourcePools), 1)
@@ -39,5 +40,5 @@ func TestCompute_ResourcePoolRead(t *testing.T) {
 	require.Equal(t, os.Getenv(ResourcePoolId), resourcePool.ID)
 	require.Equal(t, os.Getenv(ResourcePoolName), resourcePool.Name)
 	require.Equal(t, os.Getenv(ResourcePoolMoRef), resourcePool.Moref)
-	require.Equal(t, os.Getenv(MachineManagerId), resourcePool.MachineManagerID)
+	require.Equal(t, os.Getenv(MachineManagerId), resourcePool.MachineManager.ID)
 }

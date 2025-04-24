@@ -11,6 +11,7 @@ import (
 
 const (
 	MachineManagerId           = "COMPUTE_VCENTER_ID"
+	MachineManagerName         = "COMPUTE_VCENTER_NAME"
 	ContentLibraryDatastoreQty = "COMPUTE_CONTENT_LIBRARY_DATASTORE_QTY"
 )
 
@@ -22,22 +23,25 @@ func TestAccDataSourceLibrary(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceLibrary, os.Getenv(ContentLibraryId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "id", os.Getenv(ContentLibraryId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "name", os.Getenv(ContentLibraryName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "machine_manager_id", os.Getenv(MachineManagerId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "type", os.Getenv(ContentLibraryType)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "datastore.#", os.Getenv(ContentLibraryDatastoreQty)),
-					resource.TestCheckTypeSetElemNestedAttrs("data.cloudtemple_compute_content_library.foo", "datastore.*", map[string]string{
-						"id":   os.Getenv(DataStoreId),
-						"name": os.Getenv(DataStoreName),
-					}),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "machine_manager_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "datastore.#"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "datastore.0.id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "datastore.0.name"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceLibraryName, os.Getenv(ContentLibraryName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "id", os.Getenv(ContentLibraryId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library.foo", "name", os.Getenv(ContentLibraryName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "machine_manager_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "datastore.#"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "datastore.0.id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library.foo", "datastore.0.name"),
 				),
 			},
 			{

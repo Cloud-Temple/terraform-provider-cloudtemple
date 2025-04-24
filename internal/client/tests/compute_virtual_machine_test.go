@@ -14,13 +14,12 @@ const (
 	VirtualMachineId                    = "COMPUTE_VIRTUAL_MACHINE_ID"
 	VirtualMachineName                  = "COMPUTE_VIRTUAL_MACHINE_NAME"
 	VirtualMachineMoref                 = "COMPUTE_VIRTUAL_MACHINE_MOREF"
-	VirtualMachineIdAlternative         = "COMPUTE_VIRTUAL_MACHINE_ID_ALTERNATIVE"
 	VirtualMachineHostClusterIdRelocate = "COMPUTE_VIRTUAL_MACHINE_HOST_CLUSTER_RELOCATE"
 )
 
 func TestCompute_VirtualMachineList(t *testing.T) {
 	ctx := context.Background()
-	virtualMachines, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
+	virtualMachines, err := client.Compute().VirtualMachine().List(ctx, &clientpkg.VirtualMachineFilter{})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(virtualMachines), 1)
@@ -42,7 +41,7 @@ func TestCompute_VirtualMachineRead(t *testing.T) {
 	require.Equal(t, os.Getenv(VirtualMachineId), virtualMachine.ID)
 	require.Equal(t, os.Getenv(VirtualMachineName), virtualMachine.Name)
 	require.Equal(t, os.Getenv(VirtualMachineMoref), virtualMachine.Moref)
-	require.Equal(t, os.Getenv(MachineManagerId2), virtualMachine.MachineManagerId)
+	require.Equal(t, os.Getenv(MachineManagerId2), virtualMachine.MachineManager.ID)
 	require.Equal(t, os.Getenv(VirtualMachineMoref), virtualMachine.Moref)
 
 }
@@ -52,10 +51,10 @@ func TestCompute_VirtualMachineCreateDelete(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 
@@ -74,10 +73,10 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-power",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
@@ -135,7 +134,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 		ID:           instanceId,
-		DatacenterId: vm.DatacenterId,
+		DatacenterId: vm.Datacenter.ID,
 		PowerAction:  "on",
 	})
 	require.NoError(t, err)
@@ -144,7 +143,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 		ID:           instanceId,
-		DatacenterId: vm.DatacenterId,
+		DatacenterId: vm.Datacenter.ID,
 		PowerAction:  "off",
 	})
 	require.NoError(t, err)
@@ -162,10 +161,10 @@ func TestVirtualMachineClient_Rename(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-rename",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
@@ -191,10 +190,10 @@ func TestVirtualMachineClient_Clone(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-clone",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 
 	require.NoError(t, err)
@@ -206,7 +205,7 @@ func TestVirtualMachineClient_Clone(t *testing.T) {
 	activityId, err = client.Compute().VirtualMachine().Clone(ctx, &clientpkg.CloneVirtualMachineRequest{
 		Name:              "test-client-cloned",
 		VirtualMachineId:  instanceId,
-		DatacenterId:      os.Getenv(DataCenterId),
+		DatacenterId:      os.Getenv(DatacenterId),
 		HostClusterId:     os.Getenv(HostClusterId),
 		DatatoreClusterId: os.Getenv(DatastoreClusterId),
 	})
@@ -234,10 +233,10 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-relocate",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
@@ -248,7 +247,7 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 	activityId, err = client.Compute().VirtualMachine().Relocate(ctx, &clientpkg.RelocateVirtualMachineRequest{
 		VirtualMachines:    []string{instanceId},
 		Priority:           "highPriority",
-		DatacenterId:       os.Getenv(DataCenterId),
+		DatacenterId:       os.Getenv(DatacenterId),
 		HostClusterId:      os.Getenv(VirtualMachineHostClusterIdRelocate),
 		DatastoreClusterId: os.Getenv(DatastoreClusterId),
 	})
@@ -261,8 +260,8 @@ func TestVirtualMachineClient_Relocate(t *testing.T) {
 
 	vm, err := client.Compute().VirtualMachine().Read(ctx, newInstanceId)
 	require.NoError(t, err)
-	require.Equal(t, os.Getenv(DataCenterId), vm.DatacenterId)
-	require.Equal(t, os.Getenv(VirtualMachineHostClusterIdRelocate), vm.HostClusterId)
+	require.Equal(t, os.Getenv(DatacenterId), vm.Datacenter.ID)
+	require.Equal(t, os.Getenv(VirtualMachineHostClusterIdRelocate), vm.HostCluster.ID)
 
 	activityId, err = client.Compute().VirtualMachine().Delete(ctx, newInstanceId)
 	require.NoError(t, err)
@@ -275,10 +274,10 @@ func TestVirtualMachineClient_Guest(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-clone",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)

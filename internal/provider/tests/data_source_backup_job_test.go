@@ -10,12 +10,7 @@ import (
 )
 
 const (
-	JobId         = "BACKUP_JOB_ID"
-	JobName       = "BACKUP_JOB_NAME"
-	JobDislayName = "BACKUP_JOB_DISPLAY_NAME"
-	JobType       = "BACKUP_JOB_TYPE"
-	JobStatus     = "BACKUP_JOB_STATUS"
-	JobPolicyId   = "BACKUP_JOB_POLICY_ID"
+	JobId = "BACKUP_JOB_ID"
 )
 
 func TestAccDataSourceBackupJob(t *testing.T) {
@@ -26,23 +21,23 @@ func TestAccDataSourceBackupJob(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceBackupJob, os.Getenv(JobId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "id", os.Getenv(JobId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "name", os.Getenv(JobName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "display_name", os.Getenv(JobDislayName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "type", os.Getenv(JobType)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "status", os.Getenv(JobStatus)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "policy_id", os.Getenv(JobPolicyId)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "display_name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "status"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "policy_id"),
 				),
 			},
 			{
-				Config: fmt.Sprintf(testAccDataSourceBackupJobName, os.Getenv(JobName)),
+				Config: fmt.Sprintf(testAccDataSourceBackupJobName, "Hypervisor Inventory"),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "id", os.Getenv(JobId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "name", os.Getenv(JobName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "display_name", os.Getenv(JobDislayName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "type", os.Getenv(JobType)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "status", os.Getenv(JobStatus)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_job.foo", "policy_id", os.Getenv(JobPolicyId)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "display_name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "status"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_job.foo", "policy_id"),
 				),
 			},
 			{

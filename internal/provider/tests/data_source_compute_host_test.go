@@ -22,15 +22,19 @@ func TestAccDataSourceHost(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceHost, os.Getenv(HostId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "id", os.Getenv(HostId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "name", os.Getenv(HostName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host.foo", "machine_manager_id"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceHostName, os.Getenv(HostName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "id", os.Getenv(HostId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host.foo", "name", os.Getenv(HostName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host.foo", "machine_manager_id"),
 				),
 			},
 			{

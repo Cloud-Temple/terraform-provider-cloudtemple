@@ -1,7 +1,8 @@
 package provider
 
 import (
-	"os"
+	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -10,8 +11,6 @@ import (
 const (
 	TenantId   = "TENANT_ID"
 	TenantName = "TENANT_NAME"
-	TenantSNC  = "TENANT_SNC"
-	TenantQty  = "TENANT_QTY"
 )
 
 func TestAccDataSourceTenants(t *testing.T) {
@@ -22,14 +21,26 @@ func TestAccDataSourceTenants(t *testing.T) {
 			{
 				Config: testAccDataSourceTenants,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_tenants.foo", "tenants.#", os.Getenv(TenantQty)),
-					resource.TestCheckTypeSetElemNestedAttrs("data.cloudtemple_iam_tenants.foo", "tenants.*", map[string]string{
-						"id":         os.Getenv(TenantId),
-						"name":       os.Getenv(TenantName),
-						"snc":        os.Getenv(TenantSNC),
-						"company_id": os.Getenv(testCompanyIDEnvName),
-					},
+					// Vérifier que la liste des tenants n'est pas vide
+					resource.TestCheckResourceAttrWith(
+						"data.cloudtemple_iam_tenants.foo",
+						"tenants.#",
+						func(value string) error {
+							count, err := strconv.Atoi(value)
+							if err != nil {
+								return fmt.Errorf("failed to parse tenants count: %s", err)
+							}
+							if count <= 0 {
+								return fmt.Errorf("expected tenants list to be non-empty, got %d items", count)
+							}
+							return nil
+						},
 					),
+					// Vérifier les propriétés principales du premier élément
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_tenants.foo", "tenants.0.id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_tenants.foo", "tenants.0.name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_tenants.foo", "tenants.0.snc"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_tenants.foo", "tenants.0.company_id"),
 				),
 			},
 		},

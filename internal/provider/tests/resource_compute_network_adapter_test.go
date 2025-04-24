@@ -8,12 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-const (
-	NetworkAdapterType           = "COMPUTE_NETWORK_ADAPTER_TYPE"
-	NetworkAdapterMacAddress     = "COMPUTE_NETWORK_ADAPTER_MAC_ADDRESS"
-	NetworkAdapterMacAddressType = "COMPUTE_NETWORK_ADAPTER_MAC_ADDRESS_TYPE"
-)
-
 func TestAccResourceNetworkAdapter(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
@@ -26,19 +20,14 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
-					os.Getenv(VmPolicyDaily),
-					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
-					os.Getenv(NetworkAdapterType),
-					os.Getenv(NetworkAdapterMacAddress),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "virtual_machine_id"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "network_id", os.Getenv(NetworkId)),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", os.Getenv(NetworkAdapterType)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", "VMXNET3"),
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "mac_address"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "mac_type", "MANUAL"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "auto_connect", "false"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "connected", "false"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
@@ -53,15 +42,12 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(DatastoreClusterName),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
-					os.Getenv(NetworkAdapterType),
-					os.Getenv(NetworkAdapterMacAddressType),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "virtual_machine_id"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "network_id", os.Getenv(NetworkId)),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", os.Getenv(NetworkAdapterType)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", "VMXNET3"),
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "mac_address"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "mac_type", os.Getenv(NetworkAdapterMacAddressType)),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "auto_connect", "false"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "connected", "false"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
@@ -74,19 +60,14 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
-					os.Getenv(VmPolicyDaily),
-					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
-					os.Getenv(NetworkAdapterType),
-					os.Getenv(NetworkAdapterMacAddressType),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "virtual_machine_id"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "network_id", os.Getenv(NetworkId)),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", os.Getenv(NetworkAdapterType)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", "VMXNET3"),
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "mac_address"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "mac_type", os.Getenv(NetworkAdapterMacAddressType)),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "auto_connect", "false"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "connected", "true"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
@@ -99,19 +80,14 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
-					os.Getenv(VmPolicyDaily),
-					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
-					os.Getenv(NetworkAdapterType),
-					os.Getenv(NetworkAdapterMacAddressType),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "virtual_machine_id"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "network_id", os.Getenv(NetworkId)),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", os.Getenv(NetworkAdapterType)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", "VMXNET3"),
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "mac_address"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "mac_type", os.Getenv(NetworkAdapterMacAddressType)),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "auto_connect", "false"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "connected", "false"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
@@ -124,19 +100,14 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
-					os.Getenv(VmPolicyDaily),
-					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
-					os.Getenv(NetworkAdapterType),
-					os.Getenv(NetworkAdapterMacAddressType),
 				),
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "virtual_machine_id"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "network_id", os.Getenv(NetworkId)),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", os.Getenv(NetworkAdapterType)),
+					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "type", "VMXNET3"),
 					resource.TestCheckResourceAttrSet("cloudtemple_compute_network_adapter.foo", "mac_address"),
-					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "mac_type", os.Getenv(NetworkAdapterMacAddressType)),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "auto_connect", "false"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "connected", "false"),
 					resource.TestCheckResourceAttr("cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
@@ -149,12 +120,8 @@ func TestAccResourceNetworkAdapter(t *testing.T) {
 					os.Getenv(VirtualDatacenterName),
 					os.Getenv(HostClusterName),
 					os.Getenv(DatastoreClusterName),
-					os.Getenv(VmPolicyDaily),
-					os.Getenv(VmPolicyWeekly),
 					os.Getenv(OperatingSystemMoRef),
 					os.Getenv(NetworkName),
-					os.Getenv(NetworkAdapterType),
-					os.Getenv(NetworkAdapterMacAddress),
 				),
 				ResourceName:      "cloudtemple_compute_network_adapter.foo",
 				ImportState:       true,
@@ -184,12 +151,8 @@ data "cloudtemple_compute_datastore_cluster" "cdc" {
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
-data "cloudtemple_backup_sla_policy" "daily" {
-	name = "%s"
-}
-
-data "cloudtemple_backup_sla_policy" "weekly" {
-	name = "%s"
+data "cloudtemple_backup_sla_policy" "nobackup" {
+	name = "nobackup"
 }
 
 resource "cloudtemple_compute_virtual_machine" "foo" {
@@ -201,8 +164,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
   guest_operating_system_moref = "%s"
 
   backup_sla_policies = [
-	data.cloudtemple_backup_sla_policy.weekly.id,
-	data.cloudtemple_backup_sla_policy.daily.id,
+		data.cloudtemple_backup_sla_policy.nobackup.id,
   ]
 }
 
@@ -214,8 +176,8 @@ data "cloudtemple_compute_network" "foo" {
 resource "cloudtemple_compute_network_adapter" "foo" {
   virtual_machine_id = cloudtemple_compute_virtual_machine.foo.id
   network_id         = data.cloudtemple_compute_network.foo.id
-  type               = "%s"
-  mac_address        = "%s"
+  type               = "VMXNET3"
+  mac_address        = "00:50:56:86:4a:27"
 }
 `
 
@@ -255,8 +217,7 @@ data "cloudtemple_compute_network" "foo" {
 resource "cloudtemple_compute_network_adapter" "foo" {
   virtual_machine_id = cloudtemple_compute_virtual_machine.bar.id
   network_id         = data.cloudtemple_compute_network.foo.id
-  type               = "%s"
-  mac_type           = "%s"
+  type               = "VMXNET3"
 }
 `
 
@@ -280,12 +241,8 @@ data "cloudtemple_compute_datastore_cluster" "cdc" {
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
-data "cloudtemple_backup_sla_policy" "daily" {
-	name = "%s"
-}
-
-data "cloudtemple_backup_sla_policy" "weekly" {
-	name = "%s"
+data "cloudtemple_backup_sla_policy" "nobackup" {
+	name = "nobackup"
 }
 
 resource "cloudtemple_compute_virtual_machine" "bar" {
@@ -298,8 +255,7 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
   guest_operating_system_moref = "%s"
 
   backup_sla_policies = [
-	data.cloudtemple_backup_sla_policy.weekly.id,
-	data.cloudtemple_backup_sla_policy.daily.id,
+		data.cloudtemple_backup_sla_policy.nobackup.id
   ]
 
 }
@@ -312,8 +268,7 @@ resource "cloudtemple_compute_network_adapter" "foo" {
   connected          = true
   virtual_machine_id = cloudtemple_compute_virtual_machine.bar.id
   network_id         = data.cloudtemple_compute_network.foo.id
-  type               = "%s"
-  mac_type           = "%s"
+  type               = "VMXNET3"
 }
 `
 
@@ -337,12 +292,8 @@ data "cloudtemple_compute_datastore_cluster" "cdc" {
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
-data "cloudtemple_backup_sla_policy" "daily" {
-	name = "%s"
-}
-
-data "cloudtemple_backup_sla_policy" "weekly" {
-	name = "%s"
+data "cloudtemple_backup_sla_policy" "nobackup" {
+	name = "nobackup"
 }
 
 resource "cloudtemple_compute_virtual_machine" "bar" {
@@ -355,8 +306,7 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
   guest_operating_system_moref = "%s"
 
   backup_sla_policies = [
-	data.cloudtemple_backup_sla_policy.weekly.id,
-	data.cloudtemple_backup_sla_policy.daily.id,
+		data.cloudtemple_backup_sla_policy.nobackup.id
   ]
 }
 
@@ -367,8 +317,7 @@ data "cloudtemple_compute_network" "foo" {
 resource "cloudtemple_compute_network_adapter" "foo" {
   virtual_machine_id = cloudtemple_compute_virtual_machine.bar.id
   network_id         = data.cloudtemple_compute_network.foo.id
-  type               = "%s"
-  mac_type           = "%s"
+  type               = "VMXNET3"
 }
 `
 
@@ -392,12 +341,8 @@ data "cloudtemple_compute_datastore_cluster" "cdc" {
   machine_manager_id = data.cloudtemple_compute_machine_manager.vstack.id
 }
 
-data "cloudtemple_backup_sla_policy" "daily" {
-	name = "%s"
-}
-
-data "cloudtemple_backup_sla_policy" "weekly" {
-	name = "%s"
+data "cloudtemple_backup_sla_policy" "nobackup" {
+	name = "nobackup"
 }
 
 resource "cloudtemple_compute_virtual_machine" "bar" {
@@ -409,8 +354,7 @@ resource "cloudtemple_compute_virtual_machine" "bar" {
   guest_operating_system_moref = "%s"
 
   backup_sla_policies = [
-	data.cloudtemple_backup_sla_policy.weekly.id,
-	data.cloudtemple_backup_sla_policy.daily.id,
+		data.cloudtemple_backup_sla_policy.nobackup.id
   ]
 }
 
@@ -421,7 +365,6 @@ data "cloudtemple_compute_network" "foo" {
 resource "cloudtemple_compute_network_adapter" "foo" {
   virtual_machine_id = cloudtemple_compute_virtual_machine.bar.id
   network_id         = data.cloudtemple_compute_network.foo.id
-  type               = "%s"
-  mac_type           = "%s"
+  type               = "VMXNET3"
 }
 `

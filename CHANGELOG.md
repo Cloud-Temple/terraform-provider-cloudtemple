@@ -15,7 +15,7 @@ MISCELLANEOUS :
 NEW FEATURES :
 
   * Added import capability to resources:
-    - `cloudtemple_compute_openiaas_network_adapter`
+    - `cloudtemple_COMPUTE_IAAS_OPENSOURCE_network_adapter`
     - `cloudtemple_iam_personal_access_token`
   
 IMPROVEMENTS :

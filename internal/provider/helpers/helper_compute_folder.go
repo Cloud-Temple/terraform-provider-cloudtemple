@@ -9,7 +9,6 @@ func FlattenFolder(folder *client.Folder) map[string]interface{} {
 	return map[string]interface{}{
 		"id":                 folder.ID,
 		"name":               folder.Name,
-		"machine_manager_id": folder.MachineManagerID, // DEPRECATED
-		// "machine_manager_id": folder.MachineManager.ID,
+		"machine_manager_id": folder.MachineManager.ID,
 	}
 }

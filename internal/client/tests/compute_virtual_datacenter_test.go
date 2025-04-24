@@ -37,10 +37,13 @@ func TestCompute_VirtualDatacenterRead(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := &clientpkg.VirtualDatacenter{
-		ID:               os.Getenv(VirtualDatacenterId),
-		Name:             os.Getenv(VirtualDatacenterName),
-		MachineManagerID: os.Getenv(MachineManagerId),
-		TenantID:         os.Getenv(TenantId),
+		ID:       os.Getenv(VirtualDatacenterId),
+		Name:     os.Getenv(VirtualDatacenterName),
+		TenantID: os.Getenv(TenantId),
+		MachineManager: clientpkg.BaseObject{
+			ID:   os.Getenv(MachineManagerId),
+			Name: os.Getenv(MachineManagerName),
+		},
 	}
 	require.Equal(t, expected, virtualDatacenter)
 }

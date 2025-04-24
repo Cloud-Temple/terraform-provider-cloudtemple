@@ -10,21 +10,21 @@ import (
 )
 
 const (
-	OperationSystemMoref    = "COMPUTE_OPERATION_SYSTEM_MOREF"
-	OperationSystemFamily   = "COMPUTE_OPERATION_SYSTEM_FAMILY"
-	OperationSystemFullName = "COMPUTE_OPERATION_SYSTEM_FULLNAME"
+	OperatingSystemMoref    = "COMPUTE_OPERATING_SYSTEM_MOREF"
+	OperatingSystemFamily   = "COMPUTE_OPERATING_SYSTEM_FAMILY"
+	OperatingSystemFullName = "COMPUTE_OPERATING_SYSTEM_FULLNAME"
 )
 
 func TestCompute_GuestOperatingSystemList(t *testing.T) {
 	ctx := context.Background()
-	folders, err := client.Compute().GuestOperatingSystem().List(ctx, os.Getenv(MachineManagerId), "", "", "")
+	folders, err := client.Compute().GuestOperatingSystem().List(ctx, &clientpkg.GuestOperatingSystemFilter{})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(folders), 1)
 
 	var found bool
 	for _, f := range folders {
-		if f.Moref == os.Getenv(OperationSystemMoref) {
+		if f.Moref == os.Getenv(OperatingSystemMoref) {
 			found = true
 			break
 		}
@@ -34,13 +34,13 @@ func TestCompute_GuestOperatingSystemList(t *testing.T) {
 
 func TestCompute_GuestOperatingSystemRead(t *testing.T) {
 	ctx := context.Background()
-	folder, err := client.Compute().GuestOperatingSystem().Read(ctx, os.Getenv(MachineManagerId), os.Getenv(OperationSystemMoref))
+	folder, err := client.Compute().GuestOperatingSystem().Read(ctx, os.Getenv(OperatingSystemMoref), &clientpkg.GuestOperatingSystemFilter{})
 	require.NoError(t, err)
 
 	expected := &clientpkg.GuestOperatingSystem{
-		Moref:    os.Getenv(OperationSystemMoref),
-		Family:   os.Getenv(OperationSystemFamily),
-		FullName: os.Getenv(OperationSystemFullName),
+		Moref:    os.Getenv(OperatingSystemMoref),
+		Family:   os.Getenv(OperatingSystemFamily),
+		FullName: os.Getenv(OperatingSystemFullName),
 	}
 	require.Equal(t, expected, folder)
 }

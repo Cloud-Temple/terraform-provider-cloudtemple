@@ -37,6 +37,7 @@ func dataSourceVirtualSwitch() *schema.Resource {
 			"machine_manager_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
+				Computed:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
 				Description:   "The ID of the machine manager where the virtual switch is located. Used when searching by name.",

@@ -7,6 +7,7 @@ import (
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceBackupSLAPolicies() *schema.Resource {
@@ -24,16 +25,18 @@ func dataSourceBackupSLAPolicies() *schema.Resource {
 				Description: "Filter policies by name.",
 			},
 			"virtual_machine_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter policies by virtual machine ID.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter policies by virtual machine ID.",
 			},
 			"virtual_disk_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter policies by virtual disk ID.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter policies by virtual disk ID.",
 			},
 
 			// Out

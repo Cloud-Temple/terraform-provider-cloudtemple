@@ -6,6 +6,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -17,7 +18,7 @@ const (
 
 func TestCompute_HostList(t *testing.T) {
 	ctx := context.Background()
-	hosts, err := client.Compute().Host().List(ctx, "", "", "", "")
+	hosts, err := client.Compute().Host().List(ctx, &clientpkg.HostFilter{})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(hosts), 1)

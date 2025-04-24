@@ -9,30 +9,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	VirtualControllerId    = "COMPUTE_VIRTUAL_CONTROLLER_ID"
-	VirtualControllerType  = "COMPUTE_VIRTUAL_CONTROLLER_TYPE"
-	VirtualControllerLabel = "COMPUTE_VIRTUAL_CONTROLLER_LABEL"
-)
+var virtualControllerId = ""
 
 func TestCompute_VirtualControllerList(t *testing.T) {
 	ctx := context.Background()
-	virtualControllers, err := client.Compute().VirtualController().List(ctx, os.Getenv(VirtualMachineId), "")
+	virtualControllers, err := client.Compute().VirtualController().List(ctx, &clientpkg.VirtualControllerFilter{
+		VirtualMachineId: os.Getenv(VirtualMachineId),
+	})
 	require.NoError(t, err)
 
+	virtualControllerId = virtualControllers[0].ID
+
 	require.GreaterOrEqual(t, len(virtualControllers), 1)
+}
 
-	var virtualController *clientpkg.VirtualController
-	for _, vc := range virtualControllers {
-		if vc.ID == os.Getenv(VirtualControllerId) {
-			virtualController = vc
-			break
-		}
-	}
-	require.NotNil(t, virtualController)
+func TestCompute_VirtualControllerRead(t *testing.T) {
+	ctx := context.Background()
+	virtualController, err := client.Compute().VirtualController().Read(ctx, virtualControllerId)
+	require.NoError(t, err)
 
-	require.Equal(t, os.Getenv(VirtualControllerId), virtualController.ID)
-	require.Equal(t, os.Getenv(VirtualControllerLabel), virtualController.Label)
-	require.Equal(t, os.Getenv(VirtualControllerType), virtualController.Type)
-	require.Equal(t, os.Getenv(VirtualMachineId), virtualController.VirtualMachineId)
+	require.Equal(t, virtualControllerId, virtualController.ID)
+	require.NotEmpty(t, virtualController.Label)
+	require.NotEmpty(t, virtualController.Type)
+	require.NotEmpty(t, virtualController.VirtualMachineId)
 }

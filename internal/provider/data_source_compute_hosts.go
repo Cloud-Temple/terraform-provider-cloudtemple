@@ -7,6 +7,7 @@ import (
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceHosts() *schema.Resource {
@@ -24,28 +25,32 @@ func dataSourceHosts() *schema.Resource {
 				Description: "Filter hosts by name.",
 			},
 			"machine_manager_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter hosts by machine manager ID.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter hosts by machine manager ID.",
 			},
 			"datacenter_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter hosts by datacenter ID.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter hosts by datacenter ID.",
 			},
 			"datastore_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter hosts by datastore ID.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter hosts by datastore ID.",
 			},
 			"host_cluster_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter hosts by host cluster ID.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter hosts by host cluster ID.",
 			},
 
 			// Out

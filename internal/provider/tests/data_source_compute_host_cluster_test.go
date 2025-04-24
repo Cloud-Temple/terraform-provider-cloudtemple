@@ -23,15 +23,23 @@ func TestAccDataSourceHostCluster(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceHostCluster, os.Getenv(HostClusterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", os.Getenv(HostClusterId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", os.Getenv(HostClusterName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "hosts.#"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "metrics.#"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "virtual_machines_number"),
 				),
 			},
 			{
-				Config: fmt.Sprintf(testAccDataSourceHostClusterName, os.Getenv(HostClusterName), os.Getenv(MachineManagerId2)),
+				Config: fmt.Sprintf(testAccDataSourceHostClusterName, os.Getenv(HostClusterName), os.Getenv(MachineManagerId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "id", os.Getenv(HostClusterId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_host_cluster.foo", "name", os.Getenv(HostClusterName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "hosts.#"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "metrics.#"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_host_cluster.foo", "virtual_machines_number"),
 				),
 			},
 			{

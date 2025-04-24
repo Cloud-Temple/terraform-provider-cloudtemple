@@ -7,6 +7,7 @@ import (
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceResourcePools() *schema.Resource {
@@ -18,22 +19,25 @@ func dataSourceResourcePools() *schema.Resource {
 		Schema: map[string]*schema.Schema{
 			// In
 			"machine_manager_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter resource pools by the ID of the machine manager they belong to.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter resource pools by the ID of the machine manager they belong to.",
 			},
 			"datacenter_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter resource pools by the ID of the datacenter they belong to.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter resource pools by the ID of the datacenter they belong to.",
 			},
 			"host_cluster_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter resource pools by the ID of the host cluster they belong to.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter resource pools by the ID of the host cluster they belong to.",
 			},
 
 			// Out

@@ -12,7 +12,7 @@ import (
 const (
 	PolicyId     = "BACKUP_POLICY_ID"
 	PolicyName   = "BACKUP_POLICY_NAME"
-	DataCenterId = "DATACENTER_ID"
+	DatacenterId = "DATACENTER_ID"
 )
 
 func TestBackupSLAPolicyClient_List(t *testing.T) {
@@ -54,10 +54,10 @@ func TestBackupSLAPolicyClient_AssignVirtualMachine(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-assign-vm",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 

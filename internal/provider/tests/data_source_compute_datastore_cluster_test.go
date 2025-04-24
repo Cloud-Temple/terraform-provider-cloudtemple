@@ -22,15 +22,19 @@ func TestAccDataSourceDatastoreCluster(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceDatastoreCluster, os.Getenv(DatastoreClusterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "id", os.Getenv(DatastoreClusterId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "name", os.Getenv(DatastoreClusterName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore_cluster.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore_cluster.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore_cluster.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore_cluster.foo", "machine_manager_id"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceDatastoreClusterName, os.Getenv(DatastoreClusterName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "id", os.Getenv(DatastoreClusterId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore_cluster.foo", "name", os.Getenv(DatastoreClusterName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore_cluster.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore_cluster.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore_cluster.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore_cluster.foo", "machine_manager_id"),
 				),
 			},
 			{

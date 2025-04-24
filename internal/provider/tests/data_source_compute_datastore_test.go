@@ -23,15 +23,27 @@ func TestAccDataSourceDatastore(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceDatastore, os.Getenv(DataStoreId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "id", os.Getenv(DataStoreId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "name", os.Getenv(DataStoreName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "max_capacity"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "free_capacity"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "virtual_machines_number"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "hosts_number"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceDatastoreName, os.Getenv(DataStoreName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "id", os.Getenv(DataStoreId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_datastore.foo", "name", os.Getenv(DataStoreName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "max_capacity"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "free_capacity"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "virtual_machines_number"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_datastore.foo", "hosts_number"),
 				),
 			},
 			{

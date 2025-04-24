@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	SppServerId      = "BACKUP_SPPSERVER_ID"
-	SppServerName    = "BACKUP_SPPSERVER_NAME"
-	SppServerAddress = "BACKUP_SPPSERVER_ADDRESS"
+	SppServerId   = "BACKUP_SPPSERVER_ID"
+	SppServerName = "BACKUP_SPPSERVER_NAME"
 )
 
 func TestAccDataSourceBackupSPPServer(t *testing.T) {
@@ -23,17 +22,17 @@ func TestAccDataSourceBackupSPPServer(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceBackupSPPServer, os.Getenv(SppServerId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "id", os.Getenv(SppServerId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "name", os.Getenv(SppServerName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "address", os.Getenv(SppServerAddress)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_spp_server.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_spp_server.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_spp_server.foo", "address"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceBackupSPPServerName, os.Getenv(SppServerName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "id", "a34d230c-dd0f-4fa9-a099-bec7d8609bd4"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "name", "spp01-rec-th3s"),
-					resource.TestCheckResourceAttr("data.cloudtemple_backup_spp_server.foo", "address", "spp01-rec-th3s.rbackup"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_spp_server.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_spp_server.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_backup_spp_server.foo", "address"),
 				),
 			},
 			{

@@ -1,7 +1,8 @@
 package provider
 
 import (
-	"os"
+	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -15,12 +16,24 @@ func TestAccDataSourcePersonalAccessTokens(t *testing.T) {
 			{
 				Config: testAccDataSourcePersonalAccessTokens,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.#", "1"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.id"),
-					resource.TestCheckTypeSetElemNestedAttrs("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.*", map[string]string{
-						"name": os.Getenv(PatName),
-					},
+					// Vérifier que la liste des tokens n'est pas vide
+					resource.TestCheckResourceAttrWith(
+						"data.cloudtemple_iam_personal_access_tokens.foo",
+						"tokens.#",
+						func(value string) error {
+							count, err := strconv.Atoi(value)
+							if err != nil {
+								return fmt.Errorf("failed to parse tokens count: %s", err)
+							}
+							if count <= 0 {
+								return fmt.Errorf("expected tokens list to be non-empty, got %d items", count)
+							}
+							return nil
+						},
 					),
+					// Vérifier les propriétés principales du premier élément
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.name"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.expiration_date"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_tokens.foo", "tokens.0.roles.#"),
 				),

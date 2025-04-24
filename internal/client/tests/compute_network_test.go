@@ -40,5 +40,5 @@ func TestCompute_NetworkRead(t *testing.T) {
 	require.Equal(t, os.Getenv(NetworkId), network.ID)
 	require.Equal(t, os.Getenv(NetworkName), network.Name)
 	require.Equal(t, os.Getenv(NetworkMoRef), network.Moref)
-	require.Equal(t, os.Getenv(MachineManagerId2), network.MachineManagerId)
+	require.Equal(t, os.Getenv(MachineManagerId2), network.MachineManager.ID)
 }

@@ -39,6 +39,7 @@ func dataSourceContentLibrary() *schema.Resource {
 				Optional:      true,
 				Default:       "",
 				ConflictsWith: []string{"id"},
+				ValidateFunc:  validation.IsUUID,
 				Description:   "The ID of the machine manager to filter content libraries by. Only used when searching by name.",
 			},
 

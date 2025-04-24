@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,7 +19,9 @@ const (
 
 func TestIAM_Users(t *testing.T) {
 	companyID := os.Getenv(testCompanyIDEnvName)
-	users, err := client.IAM().User().List(context.Background(), companyID)
+	users, err := client.IAM().User().List(context.Background(), &clientpkg.UserFilter{
+		CompanyID: companyID,
+	})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(users), 1)

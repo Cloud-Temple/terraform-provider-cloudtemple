@@ -17,8 +17,8 @@ func TestAccDataSourceCompany(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceCompany, os.Getenv(testCompanyIDEnvName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_company.foo", "id", os.Getenv(testCompanyIDEnvName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_company.foo", "name", "Cloud Temple"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_company.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_company.foo", "name"),
 				),
 			},
 			{

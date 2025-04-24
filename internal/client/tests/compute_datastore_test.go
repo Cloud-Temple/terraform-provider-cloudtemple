@@ -28,7 +28,7 @@ func TestCompute_DatastoreList(t *testing.T) {
 
 	var found bool
 	for _, dc := range datastores {
-		if dc.ID == os.Getenv(DataStoreId) {
+		if dc.ID == os.Getenv(DatastoreId) {
 			found = true
 			break
 		}
@@ -38,13 +38,13 @@ func TestCompute_DatastoreList(t *testing.T) {
 
 func TestCompute_DatastoreRead(t *testing.T) {
 	ctx := context.Background()
-	datastore, err := client.Compute().Datastore().Read(ctx, os.Getenv(DataStoreId))
+	datastore, err := client.Compute().Datastore().Read(ctx, os.Getenv(DatastoreId))
 	require.NoError(t, err)
 
-	require.Equal(t, os.Getenv(DataStoreId), datastore.ID)
-	require.Equal(t, os.Getenv(DataStoreName), datastore.Name)
+	require.Equal(t, os.Getenv(DatastoreId), datastore.ID)
+	require.Equal(t, os.Getenv(DatastoreName), datastore.Name)
 	require.Equal(t, os.Getenv(DataStoreMoRef), datastore.Moref)
 	require.Equal(t, os.Getenv(DataStoreType), datastore.Type)
 	require.Equal(t, os.Getenv(DataStoreUniqueId), datastore.UniqueId)
-	require.Equal(t, os.Getenv(MachineManagerId), datastore.MachineManagerId)
+	require.Equal(t, os.Getenv(MachineManagerId), datastore.MachineManager.ID)
 }

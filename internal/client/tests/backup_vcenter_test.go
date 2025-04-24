@@ -5,12 +5,15 @@ import (
 	"os"
 	"testing"
 
+	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
 )
 
 func TestBackupVCenterClient_List(t *testing.T) {
 	ctx := context.Background()
-	vcenters, err := client.Backup().VCenter().List(ctx, os.Getenv(SppServerId))
+	vcenters, err := client.Backup().VCenter().List(ctx, &clientpkg.BackupVCenterFilter{
+		SppServerId: os.Getenv(SppServerId),
+	})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(vcenters), 1)

@@ -36,14 +36,5 @@ Read-Only:
 - `machine_manager_id` (String)
 - `name` (String)
 - `tenant_id` (String)
-- `vcenter` (List of Object) (see [below for nested schema](#nestedobjatt--virtual_datacenters--vcenter))
-
-<a id="nestedobjatt--virtual_datacenters--vcenter"></a>
-### Nested Schema for `virtual_datacenters.vcenter`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
 
 

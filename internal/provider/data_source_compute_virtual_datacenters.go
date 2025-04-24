@@ -39,25 +39,6 @@ func dataSourceVirtualDatacenters() *schema.Resource {
 							Computed:    true,
 							Description: "The ID of the machine manager (vCenter) where this virtual datacenter is located.",
 						},
-						"vcenter": {
-							Type:        schema.TypeList,
-							Computed:    true,
-							Description: "Information about the vCenter server where this virtual datacenter is located.",
-							Elem: &schema.Resource{
-								Schema: map[string]*schema.Schema{
-									"id": {
-										Type:        schema.TypeString,
-										Computed:    true,
-										Description: "The ID of the vCenter server.",
-									},
-									"name": {
-										Type:        schema.TypeString,
-										Computed:    true,
-										Description: "The name of the vCenter server.",
-									},
-								},
-							},
-						},
 						"tenant_id": {
 							Type:        schema.TypeString,
 							Computed:    true,

@@ -14,7 +14,7 @@ type VirtualSwitch struct {
 	ID             string
 	Name           string
 	Moref          string
-	FolderID       string
+	FolderId       string
 	MachineManager BaseObject
 }
 

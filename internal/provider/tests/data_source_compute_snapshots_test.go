@@ -3,13 +3,10 @@ package provider
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
-)
-
-const (
-	SnapShotQty = "COMPUTE_SNAPSHOT_QTY"
 )
 
 func TestAccDataSourceSnapshots(t *testing.T) {
@@ -20,7 +17,26 @@ func TestAccDataSourceSnapshots(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceSnapshots, os.Getenv(VirtualMachineId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_snapshots.foo", "snapshots.#", os.Getenv(SnapShotQty)),
+					// Vérifier que la liste des snapshots n'est pas vide
+					resource.TestCheckResourceAttrWith(
+						"data.cloudtemple_compute_snapshots.foo",
+						"snapshots.#",
+						func(value string) error {
+							count, err := strconv.Atoi(value)
+							if err != nil {
+								return fmt.Errorf("failed to parse snapshots count: %s", err)
+							}
+							if count <= 0 {
+								return fmt.Errorf("expected snapshots list to be non-empty, got %d items", count)
+							}
+							return nil
+						},
+					),
+					// Vérifier les propriétés principales du premier élément
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_snapshots.foo", "snapshots.0.id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_snapshots.foo", "snapshots.0.virtual_machine_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_snapshots.foo", "snapshots.0.name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_snapshots.foo", "snapshots.0.create_time"),
 				),
 			},
 			{

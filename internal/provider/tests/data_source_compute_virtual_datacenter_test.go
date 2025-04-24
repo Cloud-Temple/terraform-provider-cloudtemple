@@ -22,12 +22,17 @@ func TestAccDataSourceVirtualDatacenter(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceVirtualDatacenter, os.Getenv(VirtualDatacenterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_datacenter.foo", "id", os.Getenv(VirtualDatacenterId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_datacenter.foo", "name", os.Getenv(VirtualDatacenterName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_datacenter.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_datacenter.foo", "name"),
 				),
 			},
 			{
-				Config: fmt.Sprintf(testAccDataSourceVirtualDatacenterName, os.Getenv(VirtualDatacenterName)),
+				Config: fmt.Sprintf(testAccDataSourceVirtualDatacenterName, os.Getenv(VirtualDatacenterName), os.Getenv(MachineManagerId)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_datacenter.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_datacenter.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_datacenter.foo", "tenant_id"),
+				),
 			},
 			{
 				Config:      testAccDataSourceVirtualDatacenterMissing,
@@ -46,6 +51,7 @@ data "cloudtemple_compute_virtual_datacenter" "foo" {
 const testAccDataSourceVirtualDatacenterName = `
 data "cloudtemple_compute_virtual_datacenter" "foo" {
   name = "%s"
+	machine_manager_id = "%s"
 }
 `
 

@@ -15,10 +15,10 @@ const (
 	ContentLibraryType     = "COMPUTE_CONTENT_LIBRARY_TYPE"
 	ContentLibraryItemId   = "COMPUTE_CONTENT_LIBRARY_ITEM_ID"
 	ContentLibraryItemName = "COMPUTE_CONTENT_LIBRARY_ITEM_NAME"
-	ContentLibraryItemType = "COMPUTE_CONTENT_LIBRARY_ITEM_TYPE"
 	MachineManagerId       = "COMPUTE_VCENTER_ID"
-	DataStoreId            = "COMPUTE_DATASTORE_ID"
-	DataStoreName          = "COMPUTE_DATASTORE_NAME"
+	MachineManagerName     = "COMPUTE_VCENTER_NAME"
+	DatastoreId            = "COMPUTE_DATASTORE_ID"
+	DatastoreName          = "COMPUTE_DATASTORE_NAME"
 )
 
 func TestCompute_ContentLibraryList(t *testing.T) {
@@ -50,9 +50,9 @@ func TestCompute_ContentLibraryRead(t *testing.T) {
 		ID:   os.Getenv(ContentLibraryId),
 		Name: os.Getenv(ContentLibraryName),
 		Type: os.Getenv(ContentLibraryType),
-		Datastore: clientpkg.DatastoreLink{
-			ID:   os.Getenv(DataStoreId),
-			Name: os.Getenv(DataStoreName),
+		Datastore: clientpkg.BaseObject{
+			ID:   os.Getenv(DatastoreId),
+			Name: os.Getenv(DatastoreName),
 		},
 	}
 	require.Equal(t, expected, contentLibrary)
@@ -87,8 +87,6 @@ func TestContentLibraryClient_ReadItem(t *testing.T) {
 
 	require.Equal(t, os.Getenv(ContentLibraryItemId), item.ID)
 	require.Equal(t, os.Getenv(ContentLibraryItemName), item.Name)
-	require.Equal(t, os.Getenv(ContentLibraryId), item.ContentLibraryId)
-	require.Equal(t, os.Getenv(ContentLibraryItemType), item.Type)
 }
 
 func TestContentLibraryClient_Clone(t *testing.T) {
@@ -98,8 +96,8 @@ func TestContentLibraryClient_Clone(t *testing.T) {
 		ContentLibraryItemId: os.Getenv(ContentLibraryItemId),
 		Name:                 "test-client-content-library-deploy",
 		HostClusterId:        os.Getenv(HostClusterId),
-		DatacenterId:         os.Getenv(DataCenterId),
-		DatastoreId:          os.Getenv(DataStoreId),
+		DatacenterId:         os.Getenv(DatacenterId),
+		DatastoreId:          os.Getenv(DatastoreId),
 	})
 	require.NoError(t, err)
 

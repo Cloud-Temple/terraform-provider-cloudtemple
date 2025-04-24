@@ -59,7 +59,7 @@ func TestMain(m *testing.M) {
 
 	// Clean resources from previous tests run
 	ctx := context.Background()
-	vms, err := client.Compute().VirtualMachine().List(ctx, true, "", false, false, nil, nil, nil, nil, nil)
+	vms, err := client.Compute().VirtualMachine().List(ctx, &clientpkg.VirtualMachineFilter{})
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)

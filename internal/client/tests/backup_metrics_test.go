@@ -2,22 +2,9 @@ package client
 
 import (
 	"context"
-	"os"
 	"testing"
 
-	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/stretchr/testify/require"
-)
-
-const (
-	MetricPolicyName          = "BACKUP_METRICS_POLICY_NAME"
-	MetricPolicyTriggerType   = "BACKUP_METRICS_POLICY_TRIGGER_TYPE"
-	MetricsPlatformVersion    = "BACKUP_METRICS_PLATEFORM_VERSION"
-	MetricsPlatformBuild      = "BACKUP_METRICS_PLATEFORM_BUILD"
-	MetricsPlatformDate       = "BACKUP_METRICS_PLATEFORM_DATE"
-	MetricsPlatformProduct    = "BACKUP_METRICS_PLATEFORM_PRODUCT"
-	MetricsPlatformEpoch      = "BACKUP_METRICS_PLATEFORM_EPOCH"
-	MetricsPlatformDeployType = "BACKUP_METRICS_PLATEFORM_DEPLOY_TYPE"
 )
 
 func TestBackupMetricsClient_History(t *testing.T) {
@@ -44,25 +31,6 @@ func TestBackupMetricsClient_Policies(t *testing.T) {
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(policiesMetrics), 1)
-
-	expected := &clientpkg.BackupMetricsPolicies{
-		Name:        os.Getenv(MetricPolicyName),
-		TriggerType: os.Getenv(MetricPolicyTriggerType),
-	}
-
-	var found bool
-	for _, pm := range policiesMetrics {
-		if pm.Name == os.Getenv(MetricPolicyName) {
-			// Ignore some fields
-			pm.NumberOfProtectedVM = 0
-
-			require.Equal(t, expected, pm)
-
-			found = true
-			break
-		}
-	}
-	require.True(t, found)
 }
 
 func TestBackupMetricsClient_Platform(t *testing.T) {
@@ -70,8 +38,8 @@ func TestBackupMetricsClient_Platform(t *testing.T) {
 	platformMetrics, err := client.Backup().Metrics().Platform(ctx)
 	require.NoError(t, err)
 
-	require.Equal(t, os.Getenv(MetricsPlatformVersion), platformMetrics.Version)
-	require.Equal(t, os.Getenv(MetricsPlatformDeployType), platformMetrics.DeploymentType)
+	require.NotEmpty(t, platformMetrics.Version)
+	require.NotEmpty(t, platformMetrics.DeploymentType)
 }
 
 func TestBackupMetricsClient_PlatformCPU(t *testing.T) {

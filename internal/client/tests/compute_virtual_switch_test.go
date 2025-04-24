@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	VirtualSwitchId    = "COMPUTE_VIRTUAL_SWITCH_ID"
-	VirtualSwitchName  = "COMPUTE_VIRTUAL_SWITCH_NAME"
-	VirtualSwitchMoref = "COMPUTE_VIRTUAL_SWITCH_MOREF"
+	VirtualSwitchId   = "COMPUTE_VIRTUAL_SWITCH_ID"
+	VirtualSwitchName = "COMPUTE_VIRTUAL_SWITCH_NAME"
 )
 
 func TestCompute_VirtualSwitchList(t *testing.T) {
@@ -38,9 +37,8 @@ func TestCompute_VirtualSwitchRead(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := &clientpkg.VirtualSwitch{
-		ID:    os.Getenv(VirtualSwitchId),
-		Name:  os.Getenv(VirtualSwitchName),
-		Moref: os.Getenv(VirtualSwitchMoref),
+		ID:   os.Getenv(VirtualSwitchId),
+		Name: os.Getenv(VirtualSwitchName),
 	}
 	require.Equal(t, expected, virtualSwitch)
 }

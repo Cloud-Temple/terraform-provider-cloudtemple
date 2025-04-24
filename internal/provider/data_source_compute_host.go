@@ -34,17 +34,40 @@ func dataSourceHost() *schema.Resource {
 				ConflictsWith: []string{"id"},
 				Description:   "The name of the host to retrieve. Conflicts with `id`.",
 			},
+			"machine_manager_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the machine manager this host belongs to.",
+			},
+			"datacenter_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the datacenter this host belongs to.",
+			},
+			"host_cluster_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the host cluster this host belongs to.",
+			},
+			"datastore_id": {
+				Type:          schema.TypeString,
+				Optional:      true,
+				ConflictsWith: []string{"id"},
+				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the datastore this host belongs to.",
+			},
 
 			// Out
 			"moref": {
 				Type:        schema.TypeString,
 				Computed:    true,
 				Description: "The managed object reference ID of the host.",
-			},
-			"machine_manager_id": {
-				Type:        schema.TypeString,
-				Computed:    true,
-				Description: "The ID of the machine manager this host belongs to.",
 			},
 			"metrics": {
 				Type:        schema.TypeList,
@@ -181,7 +204,6 @@ func computeHostRead(ctx context.Context, d *schema.ResourceData, meta any) diag
 	name := d.Get("name").(string)
 	if name != "" {
 		hosts, err := c.Compute().Host().List(ctx, &client.HostFilter{
-			Name:             name,
 			MachineManagerID: d.Get("machine_manager_id").(string),
 			DatacenterID:     d.Get("datacenter_id").(string),
 			HostClusterID:    d.Get("host_cluster_id").(string),

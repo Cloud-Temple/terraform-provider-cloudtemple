@@ -22,20 +22,26 @@ func TestAccDataSourceNetwork(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceNetwork, os.Getenv(NetworkId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "id", os.Getenv(NetworkId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "name", os.Getenv(NetworkName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "virtual_machines_number"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "host_number"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceNetworkName, os.Getenv(NetworkName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "id", os.Getenv(NetworkId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network.foo", "name", os.Getenv(NetworkName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "virtual_machines_number"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network.foo", "host_number"),
 				),
 			},
 			{
 				Config:      testAccDataSourceNetworkMissing,
-				ExpectError: regexp.MustCompile("failed to find network with id"),
+				ExpectError: regexp.MustCompile("failed to find virtual network with id"),
 			},
 		},
 	})

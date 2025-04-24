@@ -66,7 +66,6 @@ func computeFolderRead(ctx context.Context, d *schema.ResourceData, meta any) di
 	name := d.Get("name").(string)
 	if name != "" {
 		folders, err := c.Compute().Folder().List(ctx, &client.FolderFilter{
-			Name:             name,
 			DatacenterID:     d.Get("datacenter_id").(string),
 			MachineManagerID: d.Get("machine_manager_id").(string),
 		})

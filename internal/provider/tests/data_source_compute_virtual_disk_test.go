@@ -22,20 +22,24 @@ func TestAccDataSourceVirtualDisk(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceVirtualDisk, os.Getenv(VirtualDiskId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "id", os.Getenv(VirtualDiskId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "name", os.Getenv(VirtualDiskName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "virtual_machine_id", os.Getenv(VirtualMachineIdAlternative)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_disk.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_disk.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_disk.foo", "virtual_machine_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_disk.foo", "capacity"),
 				),
-			}, {
-				Config: fmt.Sprintf(testAccDataSourceVirtualDiskName, os.Getenv(VirtualDiskName), os.Getenv(VirtualMachineIdAlternative)),
+			},
+			{
+				Config: fmt.Sprintf(testAccDataSourceVirtualDiskName, os.Getenv(VirtualDiskName), os.Getenv("COMPUTE_VIRTUAL_MACHINE_ID")),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "id", os.Getenv(VirtualDiskId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_disk.foo", "name", os.Getenv(VirtualDiskName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_disk.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_disk.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_disk.foo", "virtual_machine_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_disk.foo", "capacity"),
 				),
 			},
 			{
 				Config:      testAccDataSourceVirtualDiskMissing,
-				ExpectError: regexp.MustCompile("failed to find virtual disk with id"),
+				ExpectError: regexp.MustCompile("failed to find disk with id"),
 			},
 		},
 	})

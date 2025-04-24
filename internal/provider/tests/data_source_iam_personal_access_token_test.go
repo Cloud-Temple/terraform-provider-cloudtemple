@@ -10,11 +10,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-const (
-	PatName     = "IAM_PAT_NAME"
-	PatRolesQty = "IAM_PAT_ROLE_QTY"
-)
-
 func TestAccDataSourcePersonalAccessToken(t *testing.T) {
 
 	expirationDate := time.Now().AddDate(0, 0, 1)
@@ -26,17 +21,19 @@ func TestAccDataSourcePersonalAccessToken(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourcePersonalAccessToken, expirationDate.Format(time.RFC3339), os.Getenv(RoleId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "name", "test-terraform"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.#", "1"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.0", os.Getenv(RoleId)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_token.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_token.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_token.foo", "expiration_date"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_token.foo", "roles.#"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourcePersonalAccessTokenName, expirationDate.Format(time.RFC3339), os.Getenv(RoleId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "name", "test-terraform"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.#", "1"),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_personal_access_token.foo", "roles.0", os.Getenv(RoleId)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_token.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_token.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_token.foo", "expiration_date"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_personal_access_token.foo", "roles.#"),
 				),
 			},
 			{

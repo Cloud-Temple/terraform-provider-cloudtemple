@@ -15,13 +15,15 @@ const (
 	NetworkAdapterId               = "COMPUTE_NETWORK_ADAPTER_ID"
 	NetworkAdapterName             = "COMPUTE_NETWORK_ADAPTER_NAME"
 	NetworkAdapterType             = "COMPUTE_NETWORK_ADAPTER_TYPE"
-	NetworkAdapterMacAddress       = "COMPUTE_NETWORK_ADAPTER_MAC_ADDRESS"
 	NetworkAdapterVirtualMachineId = "COMPUTE_NETWORK_ADAPTER_VIRTUAL_MACHINE"
 )
 
 func TestCompute_NetworkAdapterList(t *testing.T) {
 	ctx := context.Background()
-	networkAdapters, err := client.Compute().NetworkAdapter().List(ctx, os.Getenv(VirtualMachineIdAlternative))
+	networkAdapters, err := client.Compute().NetworkAdapter().List(ctx, &clientpkg.NetworkAdapterFilter{
+		VirtualMachineID: os.Getenv(NetworkAdapterVirtualMachineId),
+	})
+
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(networkAdapters), 1)
 
@@ -44,17 +46,17 @@ func TestCompute_NetworkAdapterRead(t *testing.T) {
 	require.Equal(t, os.Getenv(NetworkAdapterName), networkAdapter.Name)
 	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.Type)
 	require.Equal(t, "", networkAdapter.NetworkId)
-	require.Equal(t, os.Getenv(VirtualMachineIdAlternative), networkAdapter.VirtualMachineId)
+	require.Equal(t, os.Getenv(NetworkAdapterVirtualMachineId), networkAdapter.VirtualMachineId)
 }
 
 func TestNetworkAdapterClient_Create(t *testing.T) {
 	ctx := context.Background()
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-network-adapter",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
@@ -102,7 +104,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 		VirtualMachineId: instanceId,
 		NetworkId:        os.Getenv(NetworkId),
 		Type:             os.Getenv(NetworkAdapterType),
-		MacAddress:       os.Getenv(NetworkAdapterMacAddress),
+		MacAddress:       "00:50:56:86:4a:27",
 	})
 	require.NoError(t, err)
 	activity, err = client.Activity().WaitForCompletion(ctx, activityId, nil)

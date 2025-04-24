@@ -7,6 +7,7 @@ import (
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceContentLibraries() *schema.Resource {
@@ -23,9 +24,10 @@ func dataSourceContentLibraries() *schema.Resource {
 				Description: "Filter content libraries by name.",
 			},
 			"machine_manager_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Description: "Filter content libraries by machine manager ID.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter content libraries by machine manager ID.",
 			},
 
 			// Out

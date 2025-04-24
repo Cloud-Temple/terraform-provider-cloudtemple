@@ -14,10 +14,10 @@ func TestTagClient(t *testing.T) {
 
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-tags",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 

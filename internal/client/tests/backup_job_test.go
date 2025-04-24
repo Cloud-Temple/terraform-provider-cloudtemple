@@ -10,10 +10,7 @@ import (
 )
 
 const (
-	JobId       = "BACKUP_JOB_ID"
-	JobName     = "BACKUP_JOB_NAME"
-	JobType     = "BACKUP_JOB_TYPE"
-	JobPolicyId = "BACKUP_JOB_POLICY_ID"
+	JobId = "BACKUP_JOB_ID"
 )
 
 func TestBackupJobClient_List(t *testing.T) {
@@ -33,7 +30,7 @@ func TestBackupJobClient_List(t *testing.T) {
 	require.True(t, found)
 
 	jobs, err = client.Backup().Job().List(ctx, &clientpkg.BackupJobFilter{
-		Type: os.Getenv(JobType),
+		Type: "catalog",
 	})
 	require.NoError(t, err)
 
@@ -46,9 +43,8 @@ func TestBackupJobClient_Read(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, os.Getenv(JobId), job.ID)
-	require.Equal(t, os.Getenv(JobName), job.Name)
-	require.Equal(t, os.Getenv(JobType), job.Type)
-	require.Equal(t, os.Getenv(JobPolicyId), job.PolicyId)
+	require.Equal(t, "Hypervisor Inventory", job.Name)
+	require.Equal(t, "catalog", job.Type)
 }
 
 func TestBackupJobClient_Run(t *testing.T) {

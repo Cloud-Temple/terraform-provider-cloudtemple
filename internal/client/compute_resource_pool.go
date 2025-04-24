@@ -11,13 +11,12 @@ func (c *ComputeClient) ResourcePool() *ResourcePoolClient {
 }
 
 type ResourcePool struct {
-	ID               string
-	Name             string
-	Moref            string
-	Parent           ResourcePoolParent
-	Metrics          ResourcePoolMetrics
-	MachineManagerID string // DEPRECATED
-	// MachineManager BaseObject
+	ID             string
+	Name           string
+	Moref          string
+	Parent         ResourcePoolParent
+	Metrics        ResourcePoolMetrics
+	MachineManager BaseObject
 }
 
 type ResourcePoolParent struct {

@@ -22,15 +22,19 @@ func TestAccDataSourceVirtualSwitch(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceVirtualSwitch, os.Getenv(VirtualSwitchId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "id", os.Getenv(VirtualSwitchId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "name", os.Getenv(VirtualSwitchName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_switch.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_switch.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_switch.foo", "moref"),
 				),
 			},
 			{
-				Config: fmt.Sprintf(testAccDataSourceVirtualSwitchName, os.Getenv(VirtualSwitchName)),
+				Config: fmt.Sprintf(testAccDataSourceVirtualSwitchName, os.Getenv(VirtualSwitchName), os.Getenv(MachineManagerId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "id", os.Getenv(VirtualSwitchId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_switch.foo", "name", os.Getenv(VirtualSwitchName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_switch.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_switch.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_switch.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_switch.foo", "folder_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_switch.foo", "machine_manager_id"),
 				),
 			},
 			{
@@ -50,6 +54,7 @@ data "cloudtemple_compute_virtual_switch" "foo" {
 const testAccDataSourceVirtualSwitchName = `
 data "cloudtemple_compute_virtual_switch" "foo" {
   name = "%s"
+	machine_manager_id = "%s"
 }
 `
 

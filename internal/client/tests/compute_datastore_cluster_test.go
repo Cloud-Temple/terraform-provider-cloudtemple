@@ -40,5 +40,5 @@ func TestCompute_DatastoreClusterRead(t *testing.T) {
 	require.Equal(t, os.Getenv(DatastoreClusterId), datastoreCluster.ID)
 	require.Equal(t, os.Getenv(DatastoreClusterName), datastoreCluster.Name)
 	require.Equal(t, os.Getenv(DatastoreClusterMoRef), datastoreCluster.Moref)
-	require.Equal(t, os.Getenv(MachineManagerId2), datastoreCluster.MachineManagerId)
+	require.Equal(t, os.Getenv(MachineManagerId2), datastoreCluster.MachineManager.ID)
 }

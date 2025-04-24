@@ -15,6 +15,7 @@ type VirtualDatacenter struct {
 	Name           string
 	TenantID       string
 	MachineManager BaseObject
+	VCenter        BaseObject
 }
 
 type VirtualDatacenterFilter struct {
@@ -26,7 +27,6 @@ func (v *VirtualDatacenterClient) List(
 	ctx context.Context,
 	filter *VirtualDatacenterFilter) ([]*VirtualDatacenter, error) {
 
-	// TODO: filters
 	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_datacenters")
 	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)

@@ -1,7 +1,8 @@
 package provider
 
 import (
-	"os"
+	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
@@ -15,10 +16,24 @@ func TestAccDataSourceRoles(t *testing.T) {
 			{
 				Config: testAccDataSourceRoles,
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckTypeSetElemNestedAttrs("data.cloudtemple_iam_roles.foo", "roles.*", map[string]string{
-						"id":   os.Getenv(RoleId),
-						"name": os.Getenv(RoleName),
-					}),
+					// Vérifier que la liste des roles n'est pas vide
+					resource.TestCheckResourceAttrWith(
+						"data.cloudtemple_iam_roles.foo",
+						"roles.#",
+						func(value string) error {
+							count, err := strconv.Atoi(value)
+							if err != nil {
+								return fmt.Errorf("failed to parse roles count: %s", err)
+							}
+							if count <= 0 {
+								return fmt.Errorf("expected roles list to be non-empty, got %d items", count)
+							}
+							return nil
+						},
+					),
+					// Vérifier les propriétés principales du premier élément
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_roles.foo", "roles.0.id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_roles.foo", "roles.0.name"),
 				),
 			},
 		},

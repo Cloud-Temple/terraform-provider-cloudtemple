@@ -12,8 +12,8 @@ func FlattenVirtualDisk(disk *client.VirtualDisk) map[string]interface{} {
 		"machine_manager_id":    disk.MachineManager.ID,
 		"capacity":              disk.Capacity,
 		"disk_unit_number":      disk.DiskUnitNumber,
-		"datastore_id":          disk.DatastoreID,   // USE disk.Datastore.ID AS SOON AS IT IS AVAILABLE IN API
-		"datastore_name":        disk.DatastoreName, // USE disk.Datastore.Name AS SOON AS IT IS AVAILABLE IN API
+		"datastore_id":          disk.Datastore.ID,
+		"datastore_name":        disk.Datastore.Name,
 		"instant_access":        disk.InstantAccess,
 		"native_id":             disk.NativeId,
 		"disk_path":             disk.DiskPath,

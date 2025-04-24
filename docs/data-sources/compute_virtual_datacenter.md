@@ -42,14 +42,5 @@ data "cloudtemple_compute_virtual_datacenter" "name" {
 ### Read-Only
 
 - `tenant_id` (String) The ID of the tenant that owns this virtual datacenter.
-- `vcenter` (List of Object) Information about the vCenter server where this virtual datacenter is located. (see [below for nested schema](#nestedatt--vcenter))
-
-<a id="nestedatt--vcenter"></a>
-### Nested Schema for `vcenter`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
 
 

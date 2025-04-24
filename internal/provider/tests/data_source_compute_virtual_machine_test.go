@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	VirtualMachineId            = "COMPUTE_VIRTUAL_MACHINE_ID"
-	VirtalMachineName           = "COMPUTE_VIRTUAL_MACHINE_NAME"
-	VirtualMachineIdAlternative = "COMPUTE_VIRTUAL_MACHINE_ID_ALTERNATIVE"
+	VirtualMachineId   = "COMPUTE_VIRTUAL_MACHINE_ID"
+	VirtualMachineName = "COMPUTE_VIRTUAL_MACHINE_NAME"
 )
 
 func TestAccDataSourceVirtualMachine(t *testing.T) {
@@ -23,15 +22,21 @@ func TestAccDataSourceVirtualMachine(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceVirtualMachine, os.Getenv(VirtualMachineId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", os.Getenv(VirtualMachineId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", os.Getenv(VirtalMachineName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "machine_manager_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "power_state"),
 				),
 			},
 			{
-				Config: fmt.Sprintf(testAccDataSourceVirtualMachineName, os.Getenv(VirtalMachineName)),
+				Config: fmt.Sprintf(testAccDataSourceVirtualMachineName, os.Getenv(VirtualMachineName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "id", os.Getenv(VirtualMachineId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_virtual_machine.foo", "name", os.Getenv(VirtalMachineName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "machine_manager_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_virtual_machine.foo", "power_state"),
 				),
 			},
 			{

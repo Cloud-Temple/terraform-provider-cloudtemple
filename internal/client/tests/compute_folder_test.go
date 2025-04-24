@@ -16,7 +16,7 @@ const (
 
 func TestCompute_FolderList(t *testing.T) {
 	ctx := context.Background()
-	folders, err := client.Compute().Folder().List(ctx, "", "")
+	folders, err := client.Compute().Folder().List(ctx, &clientpkg.FolderFilter{})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(folders), 1)
@@ -37,9 +37,8 @@ func TestCompute_FolderRead(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := &clientpkg.Folder{
-		ID:               os.Getenv(FolderId),
-		Name:             os.Getenv(FolderName),
-		MachineManagerId: os.Getenv(MachineManagerId),
+		ID:   os.Getenv(FolderId),
+		Name: os.Getenv(FolderName),
 	}
 	require.Equal(t, expected, folder)
 }

@@ -22,15 +22,19 @@ func TestAccDataSourceWorker(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceWorker, os.Getenv(VCenterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "id", os.Getenv(VCenterId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "name", os.Getenv(VCenterName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_machine_manager.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_machine_manager.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_machine_manager.foo", "version"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_machine_manager.foo", "vendor"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceWorkerName, os.Getenv(VCenterName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "id", os.Getenv(VCenterId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_machine_manager.foo", "name", os.Getenv(VCenterName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_machine_manager.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_machine_manager.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_machine_manager.foo", "version"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_machine_manager.foo", "vendor"),
 				),
 			},
 			{

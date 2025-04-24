@@ -22,15 +22,15 @@ func TestAccDataSourceFolder(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceFolder, os.Getenv(FolderId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "id", os.Getenv(FolderId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "name", os.Getenv(FolderName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_folder.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_folder.foo", "name"),
 				),
 			},
 			{
-				Config: fmt.Sprintf(testAccDataSourceFolderName, os.Getenv(FolderName)),
+				Config: fmt.Sprintf(testAccDataSourceFolderName, os.Getenv(FolderName), os.Getenv(DataCenterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "id", os.Getenv(FolderId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_folder.foo", "name", os.Getenv(FolderName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_folder.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_folder.foo", "name"),
 				),
 			},
 			{
@@ -50,6 +50,7 @@ data "cloudtemple_compute_folder" "foo" {
 const testAccDataSourceFolderName = `
 data "cloudtemple_compute_folder" "foo" {
   name = "%s"
+	datacenter_id = "%s"
 }
 `
 

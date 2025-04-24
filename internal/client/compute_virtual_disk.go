@@ -15,9 +15,7 @@ type VirtualDisk struct {
 	Name             string
 	VirtualMachineId string
 	MachineManager   BaseObject
-	// Datastore        BaseObject
-	DatastoreID      string // DEPRECATED, REMOVE THIS WHEN THE PROPERTY DATASORE WILL ME AVAILABLE
-	DatastoreName    string // DEPRECATED, REMOVE THIS WHEN THE PROPERTY DATASORE WILL ME AVAILABLE
+	Datastore        BaseObject
 	Capacity         int
 	DiskUnitNumber   int
 	InstantAccess    bool

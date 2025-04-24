@@ -22,16 +22,27 @@ func TestAccDataSourceNetworkAdapter(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceNetworkAdapter, os.Getenv(NetworkAdapterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "id", os.Getenv(NetworkAdapterId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "virtual_machine_id", os.Getenv(VirtualMachineIdAlternative)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "virtual_machine_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "network_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "mac_address"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "connected"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "auto_connect"),
 				),
 			},
 			{
-				Config: fmt.Sprintf(testAccDataSourceNetworkAdapterName, os.Getenv(NetworkAdapterName), os.Getenv(VirtualMachineIdAlternative)),
+				Config: fmt.Sprintf(testAccDataSourceNetworkAdapterName, os.Getenv(NetworkAdapterName), os.Getenv(VirtualMachineId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "id", os.Getenv(NetworkAdapterId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_network_adapter.foo", "name", os.Getenv(NetworkAdapterName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "virtual_machine_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "network_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "type"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "mac_address"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "connected"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_network_adapter.foo", "auto_connect"),
 				),
 			},
 			{

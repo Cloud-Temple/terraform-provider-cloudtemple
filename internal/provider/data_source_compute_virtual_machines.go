@@ -7,6 +7,7 @@ import (
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourceVirtualMachines() *schema.Resource {
@@ -24,10 +25,11 @@ func dataSourceVirtualMachines() *schema.Resource {
 				Description: "Filter virtual machines by name.",
 			},
 			"machine_manager_id": {
-				Type:        schema.TypeString,
-				Optional:    true,
-				Default:     "",
-				Description: "Filter virtual machines by machine manager (vCenter) ID.",
+				Type:         schema.TypeString,
+				Optional:     true,
+				Default:      "",
+				ValidateFunc: validation.IsUUID,
+				Description:  "Filter virtual machines by machine manager (vCenter) ID.",
 			},
 			"datacenters": {
 				Type:        schema.TypeList,

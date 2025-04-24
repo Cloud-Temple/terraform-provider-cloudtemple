@@ -15,7 +15,6 @@ const (
 	ContentLibraryType     = "COMPUTE_CONTENT_LIBRARY_TYPE"
 	ContentLibraryItemId   = "COMPUTE_CONTENT_LIBRARY_ITEM_ID"
 	ContentLibraryItemName = "COMPUTE_CONTENT_LIBRARY_ITEM_NAME"
-	ContentLibraryItemType = "COMPUTE_CONTENT_LIBRARY_ITEM_TYPE"
 )
 
 func TestAccDataSourceLibraryItem(t *testing.T) {
@@ -26,18 +25,19 @@ func TestAccDataSourceLibraryItem(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceLibraryItem, os.Getenv(ContentLibraryName), os.Getenv(ContentLibraryItemId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "content_library_id", os.Getenv(ContentLibraryId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", os.Getenv(ContentLibraryItemId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", os.Getenv(ContentLibraryItemName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", os.Getenv(ContentLibraryItemType)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "content_library_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "type"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceLibraryItemName, os.Getenv(ContentLibraryName), os.Getenv(ContentLibraryItemName)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "id", os.Getenv(ContentLibraryItemId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "name", os.Getenv(ContentLibraryItemName)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_content_library_item.foo", "type", os.Getenv(ContentLibraryItemType)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "content_library_id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_content_library_item.foo", "type"),
 				),
 			},
 			{

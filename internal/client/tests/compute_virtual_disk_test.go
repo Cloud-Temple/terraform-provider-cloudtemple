@@ -3,7 +3,6 @@ package client
 import (
 	"context"
 	"os"
-	"strconv"
 	"testing"
 
 	clientpkg "github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -11,14 +10,15 @@ import (
 )
 
 const (
-	VirtualDiskId          = "COMPUTE_VIRTUAL_DISK_ID"
-	VirtualDiskName        = "COMPUTE_VIRTUAL_DISK_NAME"
-	VirtualMachineCapacity = "COMPUTE_VIRTUAL_DISK_CAPACITY"
+	VirtualDiskId   = "COMPUTE_VIRTUAL_DISK_ID"
+	VirtualDiskName = "COMPUTE_VIRTUAL_DISK_NAME"
 )
 
 func TestCompute_VirtualDiskList(t *testing.T) {
 	ctx := context.Background()
-	virtualDisks, err := client.Compute().VirtualDisk().List(ctx, os.Getenv(VirtualMachineIdAlternative))
+	virtualDisks, err := client.Compute().VirtualDisk().List(ctx, &clientpkg.VirtualDiskFilter{
+		VirtualMachineID: os.Getenv(VirtualMachineId),
+	})
 	require.NoError(t, err)
 
 	require.GreaterOrEqual(t, len(virtualDisks), 1)
@@ -38,21 +38,19 @@ func TestCompute_VirtualDiskRead(t *testing.T) {
 	virtualDisk, err := client.Compute().VirtualDisk().Read(ctx, os.Getenv(VirtualDiskId))
 	require.NoError(t, err)
 
-	capacity, _ := strconv.Atoi(os.Getenv(VirtualMachineCapacity))
 	require.Equal(t, os.Getenv(VirtualDiskId), virtualDisk.ID)
-	require.Equal(t, os.Getenv(VirtualMachineIdAlternative), virtualDisk.VirtualMachineId)
-	require.Equal(t, os.Getenv(MachineManagerId2), virtualDisk.MachineManagerId)
-	require.Equal(t, capacity, virtualDisk.Capacity)
+	require.Equal(t, os.Getenv(VirtualMachineId), virtualDisk.VirtualMachineId)
+	require.Equal(t, os.Getenv(MachineManagerId), virtualDisk.MachineManager.ID)
 }
 
 func TestVirtualDiskClient_Create(t *testing.T) {
 	ctx := context.Background()
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-disk",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)
@@ -78,8 +76,8 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 	require.NoError(t, err)
 
 	// Ignore some fields that change often for the test
-	disk.DatastoreId = ""
-	disk.DatastoreName = ""
+	disk.Datastore.ID = ""
+	disk.Datastore.Name = ""
 	disk.DiskPath = ""
 
 	require.Equal(
@@ -87,7 +85,9 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		&clientpkg.VirtualDisk{
 			ID:               diskId,
 			VirtualMachineId: vm.ID,
-			MachineManagerId: os.Getenv(MachineManagerId2),
+			MachineManager: clientpkg.BaseObject{
+				ID: os.Getenv(MachineManagerId2),
+			},
 			Name:             os.Getenv(VirtualDiskName),
 			Capacity:         10737418240,
 			NativeId:         diskId,
@@ -111,8 +111,8 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 
 	// Ignore some fields that change often for the test
 	diskPath := disk.DiskPath
-	disk.DatastoreId = ""
-	disk.DatastoreName = ""
+	disk.Datastore.ID = ""
+	disk.Datastore.Name = ""
 	disk.DiskPath = ""
 
 	require.Equal(
@@ -120,7 +120,9 @@ func TestVirtualDiskClient_Create(t *testing.T) {
 		&clientpkg.VirtualDisk{
 			ID:               diskId,
 			VirtualMachineId: vm.ID,
-			MachineManagerId: os.Getenv(MachineManagerId2),
+			MachineManager: clientpkg.BaseObject{
+				ID: os.Getenv(MachineManagerId2),
+			},
 			Name:             os.Getenv(VirtualDiskName),
 			Capacity:         21474836480,
 			NativeId:         diskId,
@@ -151,10 +153,10 @@ func TestVirtualDiskClient_Unmount(t *testing.T) {
 	ctx := context.Background()
 	activityId, err := client.Compute().VirtualMachine().Create(ctx, &clientpkg.CreateVirtualMachineRequest{
 		Name:                      "test-client-disk-unmount",
-		DatacenterId:              os.Getenv(DataCenterId),
+		DatacenterId:              os.Getenv(DatacenterId),
 		HostClusterId:             os.Getenv(HostClusterId),
 		DatastoreClusterId:        os.Getenv(DatastoreClusterId),
-		GuestOperatingSystemMoref: os.Getenv(OperationSystemMoref),
+		GuestOperatingSystemMoref: os.Getenv(OperatingSystemMoref),
 	})
 	require.NoError(t, err)
 	activity, err := client.Activity().WaitForCompletion(ctx, activityId, nil)

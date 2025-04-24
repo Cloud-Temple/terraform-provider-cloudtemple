@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	ResourcePoolId   = "COMPTE_RESOURCE_POOL_ID"
-	ResourcePoolName = "COMPTE_RESOURCE_POOL_NAME"
+	ResourcePoolId   = "COMPUTE_RESOURCE_POOL_ID"
+	ResourcePoolName = "COMPUTE_RESOURCE_POOL_NAME"
 )
 
 func TestAccDataSourceResourcePool(t *testing.T) {
@@ -22,15 +22,21 @@ func TestAccDataSourceResourcePool(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceResourcePool, os.Getenv(ResourcePoolId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "id", os.Getenv(ResourcePoolId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "name", os.Getenv(ResourcePoolName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "parent.0.id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "parent.0.type"),
 				),
 			},
 			{
-				Config: fmt.Sprintf(testAccDataSourceResourcePoolName, os.Getenv(ResourcePoolName)),
+				Config: fmt.Sprintf(testAccDataSourceResourcePoolName, os.Getenv(ResourcePoolName), os.Getenv(MachineManagerId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "id", os.Getenv(ResourcePoolId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_resource_pool.foo", "name", os.Getenv(ResourcePoolName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "moref"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "parent.0.id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_resource_pool.foo", "parent.0.type"),
 				),
 			},
 			{
@@ -50,6 +56,7 @@ data "cloudtemple_compute_resource_pool" "foo" {
 const testAccDataSourceResourcePoolName = `
 data "cloudtemple_compute_resource_pool" "foo" {
   name = "%s"
+	machine_manager_id = "%s"
 }
 `
 

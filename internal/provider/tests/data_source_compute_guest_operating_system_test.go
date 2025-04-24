@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	OperatingSystemMoRef = "COMPUTE_OPERATION_SYSTEM_MOREF"
+	OperatingSystemMoRef = "COMPUTE_OPERATING_SYSTEM_MOREF"
 )
 
 func TestAccDataSourceGuestOperatingSystem(t *testing.T) {
@@ -19,14 +19,16 @@ func TestAccDataSourceGuestOperatingSystem(t *testing.T) {
 		ProviderFactories: providerFactories,
 		Steps: []resource.TestStep{
 			{
-				Config: fmt.Sprintf(testAccDataSourceGuestOperatingSystem, os.Getenv(OperatingSystemMoRef), os.Getenv(MachineManagerId)),
+				Config: fmt.Sprintf(testAccDataSourceGuestOperatingSystem, os.Getenv(OperatingSystemMoRef), os.Getenv(HostClusterId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_compute_guest_operating_system.foo", "id", os.Getenv(OperatingSystemMoRef)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_guest_operating_system.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_guest_operating_system.foo", "family"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_compute_guest_operating_system.foo", "full_name"),
 				),
 			},
 			{
-				Config:      fmt.Sprintf(testAccDataSourceGuestOperatingSystemMissing, os.Getenv(MachineManagerId)),
-				ExpectError: regexp.MustCompile("Forbidden."),
+				Config:      fmt.Sprintf(testAccDataSourceGuestOperatingSystemMissing),
+				ExpectError: regexp.MustCompile("Access denied: 403 Forbidden"),
 			},
 		},
 	})
@@ -35,13 +37,13 @@ func TestAccDataSourceGuestOperatingSystem(t *testing.T) {
 const testAccDataSourceGuestOperatingSystem = `
 data "cloudtemple_compute_guest_operating_system" "foo" {
   moref              = "%s"
-  machine_manager_id = "%s"
+  host_cluster_id = "%s"
 }
 `
 
 const testAccDataSourceGuestOperatingSystemMissing = `
 data "cloudtemple_compute_guest_operating_system" "foo" {
-  moref              = "%s"
-  machine_manager_id = "12345678-1234-5678-1234-567812345678"
+	moref              = "invalid-moref"
+  host_cluster_id = "f7336dc8-7a91-461f-933d-3642aa415446"
 }
 `

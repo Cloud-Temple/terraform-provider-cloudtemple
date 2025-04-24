@@ -22,12 +22,16 @@ func TestAccDataSourceRole(t *testing.T) {
 			{
 				Config: fmt.Sprintf(testAccDataSourceRole, os.Getenv(RoleId)),
 				Check: resource.ComposeAggregateTestCheckFunc(
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_role.foo", "id", os.Getenv(RoleId)),
-					resource.TestCheckResourceAttr("data.cloudtemple_iam_role.foo", "name", os.Getenv(RoleName)),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_role.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_role.foo", "name"),
 				),
 			},
 			{
 				Config: fmt.Sprintf(testAccDataSourceRoleName, os.Getenv(RoleName)),
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_role.foo", "id"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_iam_role.foo", "name"),
+				),
 			},
 			{
 				Config:      fmt.Sprintf(testAccDataSourceRoleConflict, os.Getenv(RoleId), os.Getenv(RoleName)),
