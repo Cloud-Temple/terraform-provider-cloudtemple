@@ -29,7 +29,7 @@ data "cloudtemple_compute_iaas_opensource_hosts" "hosts_filtered" {
 }
 
 output "hosts" {
-  value = data.cloudtemple_compute_iaas_opensource_hosts.hosts
+  value = data.cloudtemple_compute_iaas_opensource_hosts.hosts_filtered
 }
 ```
 
