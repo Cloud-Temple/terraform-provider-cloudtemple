@@ -11,10 +11,11 @@ func (c *BackupClient) VCenter() *BackupVCenterClient {
 }
 
 type BackupVCenter struct {
-	ID         string
-	InternalId int
-	InstanceId string
-	Name       string
+	ID          string
+	InternalId  int
+	InstanceId  string
+	SppServerId string
+	Name        string
 }
 
 type BackupVCenterFilter struct {
