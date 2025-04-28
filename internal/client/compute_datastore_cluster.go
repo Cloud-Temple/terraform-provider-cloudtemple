@@ -45,7 +45,6 @@ type DatastoreClusterMetrics struct {
 }
 
 func (d *DatastoreClusterClient) List(ctx context.Context, filter *DatastoreClusterFilter) ([]*DatastoreCluster, error) {
-	// TODO: filters
 	r := d.c.newRequest("GET", "/compute/v1/vcenters/datastore_clusters")
 	r.addFilter(filter)
 	resp, err := d.c.doRequest(ctx, r)

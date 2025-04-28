@@ -31,7 +31,6 @@ type Worker struct {
 }
 
 func (v *WorkerClient) List(ctx context.Context, name string) ([]*Worker, error) {
-	// TODO: filters
 	r := v.c.newRequest("GET", "/compute/v1/vcenters")
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {

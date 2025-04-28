@@ -47,7 +47,6 @@ func (h *HostClusterClient) List(
 	ctx context.Context,
 	filter *HostClusterFilter) ([]*HostCluster, error) {
 
-	// TODO: filters
 	r := h.c.newRequest("GET", "/compute/v1/vcenters/host_clusters")
 	r.addFilter(filter)
 	resp, err := h.c.doRequest(ctx, r)

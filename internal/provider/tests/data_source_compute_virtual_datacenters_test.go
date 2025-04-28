@@ -8,10 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-const (
-	VirtualDatacenterQty = "COMPUTE_VIRTUAL_DATACENTER_QTY"
-)
-
 func TestAccDataSourceVirtualDatacenters(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },

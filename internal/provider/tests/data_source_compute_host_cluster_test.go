@@ -10,9 +10,8 @@ import (
 )
 
 const (
-	HostClusterId     = "COMPUTE_HOST_CLUSTER_ID"
-	HostClusterName   = "COMPUTE_HOST_CLUSTER_NAME"
-	MachineManagerId2 = "COMPUTE_VCENTER_ID_2"
+	HostClusterId   = "COMPUTE_HOST_CLUSTER_ID"
+	HostClusterName = "COMPUTE_HOST_CLUSTER_NAME"
 )
 
 func TestAccDataSourceHostCluster(t *testing.T) {

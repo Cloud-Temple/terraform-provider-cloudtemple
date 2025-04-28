@@ -52,7 +52,6 @@ type OpenIaaSHost struct {
 }
 
 type OpenIaasHostFilter struct {
-	// TODO : Add filter by name
 	MachineManagerId string `filter:"machineManagerId"`
 	PoolId           string `filter:"poolId"`
 }

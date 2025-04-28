@@ -41,7 +41,6 @@ type OpenIaasTemplate struct {
 }
 
 type OpenIaaSTemplateFilter struct {
-	// TODO : Add filter by name
 	MachineManagerId string `filter:"machineManagerId"`
 	PoolId           string `filter:"poolId,omitempty"`
 }

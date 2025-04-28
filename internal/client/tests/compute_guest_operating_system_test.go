@@ -10,9 +10,7 @@ import (
 )
 
 const (
-	OperatingSystemMoref    = "COMPUTE_OPERATING_SYSTEM_MOREF"
-	OperatingSystemFamily   = "COMPUTE_OPERATING_SYSTEM_FAMILY"
-	OperatingSystemFullName = "COMPUTE_OPERATING_SYSTEM_FULLNAME"
+	OperatingSystemMoref = "COMPUTE_OPERATING_SYSTEM_MOREF"
 )
 
 func TestCompute_GuestOperatingSystemList(t *testing.T) {
@@ -38,9 +36,7 @@ func TestCompute_GuestOperatingSystemRead(t *testing.T) {
 	require.NoError(t, err)
 
 	expected := &clientpkg.GuestOperatingSystem{
-		Moref:    os.Getenv(OperatingSystemMoref),
-		Family:   os.Getenv(OperatingSystemFamily),
-		FullName: os.Getenv(OperatingSystemFullName),
+		Moref: os.Getenv(OperatingSystemMoref),
 	}
 	require.Equal(t, expected, folder)
 }

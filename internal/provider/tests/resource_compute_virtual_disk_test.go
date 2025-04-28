@@ -10,8 +10,6 @@ import (
 
 const (
 	DataCenterName = "DATACENTER_NAME"
-	DataStoreId2   = "COMPUTE_DATASTORE_ID_2"
-	DataStoreName2 = "COMPUTE_DATASTORE_NAME_2"
 )
 
 func TestAccResourceVirtualDisk(t *testing.T) {

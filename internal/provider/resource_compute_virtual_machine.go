@@ -1045,38 +1045,60 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 	vmData := helpers.FlattenVirtualMachine(vm)
 	vmData["backup_sla_policies"] = slaPoliciesIds
 
-	// Récupérer les OS disks
-	osDisks := []interface{}{}
-	for _, osDisk := range d.Get("os_disk").([]interface{}) {
-		if osDisk == nil {
-			continue
-		}
-		osDiskId := osDisk.(map[string]interface{})["id"].(string)
-		if osDiskId != "" {
-			disk, err := c.Compute().VirtualDisk().Read(ctx, osDiskId)
-			if err != nil {
-				return diag.Errorf("failed to read os disk: %s", err)
-			}
-			osDisks = append(osDisks, helpers.FlattenOSDiskData(disk))
-		}
+	// // Récupérer les OS disks
+	// osDisks := []interface{}{}
+	// for _, osDisk := range d.Get("os_disk").([]interface{}) {
+	// 	if osDisk == nil {
+	// 		continue
+	// 	}
+	// 	osDiskId := osDisk.(map[string]interface{})["id"].(string)
+	// 	if osDiskId != "" {
+	// 		disk, err := c.Compute().VirtualDisk().Read(ctx, osDiskId)
+	// 		if err != nil {
+	// 			return diag.Errorf("failed to read os disk: %s", err)
+	// 		}
+	// 		osDisks = append(osDisks, helpers.FlattenOSDiskData(disk))
+	// 	}
+	// }
+	// vmData["os_disk"] = osDisks
+
+	// // Récupérer les OS network adapters
+	// osNetworkAdapters := []interface{}{}
+	// for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+	// 	if osNetworkAdapter == nil {
+	// 		continue
+	// 	}
+	// 	osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
+	// 	if osNetworkAdapterId != "" {
+	// 		networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, osNetworkAdapterId)
+	// 		if err != nil {
+	// 			return diag.Errorf("failed to read os network adapter: %s", err)
+	// 		}
+	// 		osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOSNetworkAdapterData(networkAdapter))
+	// 	}
+	// }
+	// vmData["os_network_adapter"] = osNetworkAdapters
+
+	disks, err := c.Compute().VirtualDisk().List(ctx, &client.VirtualDiskFilter{
+		VirtualMachineID: d.Id(),
+	})
+	if err != nil {
+		return diag.Errorf("failed to retrieve OS disks: %s", err)
 	}
+
+	// Overwrite with the desired config
+	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOSDisksData(disks), "os_disk")
 	vmData["os_disk"] = osDisks
 
-	// Récupérer les OS network adapters
-	osNetworkAdapters := []interface{}{}
-	for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
-		if osNetworkAdapter == nil {
-			continue
-		}
-		osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
-		if osNetworkAdapterId != "" {
-			networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, osNetworkAdapterId)
-			if err != nil {
-				return diag.Errorf("failed to read os network adapter: %s", err)
-			}
-			osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOSNetworkAdapterData(networkAdapter))
-		}
+	networkAdapters, err := c.Compute().NetworkAdapter().List(ctx, &client.NetworkAdapterFilter{
+		VirtualMachineID: d.Id(),
+	})
+	if err != nil {
+		return diag.Errorf("failed to retrieve OS network adapters: %s", err)
 	}
+
+	// Overwrite with the desired config
+	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
 	vmData["os_network_adapter"] = osNetworkAdapters
 
 	// Récupérer les tags

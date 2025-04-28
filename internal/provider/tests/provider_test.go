@@ -212,10 +212,6 @@ func TestImport(t *testing.T) {
 	skip := map[string]struct{}{
 		// Access tokens cannot be imported because there is no way of getting the secret
 		"cloudtemple_iam_personal_access_token": {},
-
-		// TODO: we skip this ones for now
-		// "cloudtemple_compute_network_adapter": {},
-		// "cloudtemple_compute_virtual_disk":    {},
 	}
 
 	for name, resource := range provider.ResourcesMap {

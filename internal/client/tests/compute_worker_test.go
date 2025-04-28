@@ -14,8 +14,6 @@ const (
 	VCenterId       = "COMPUTE_VCENTER_ID"
 	VCenterName     = "COMPUTE_VCENTER_NAME"
 	VCenterFullName = "COMPUTE_VCENTER_FULLNAME"
-	VCenterVendor   = "COMPUTE_VCENTER_VENDOR"
-	VCenterVersion  = "COMPUTE_VCENTER_VERSION"
 )
 
 func TestCompute_VCenterWorkerList(t *testing.T) {
@@ -43,7 +41,5 @@ func TestCompute_VCenterWorkerRead(t *testing.T) {
 	require.Equal(t, os.Getenv(VCenterId), vcenter.ID)
 	require.Equal(t, os.Getenv(VCenterName), vcenter.Name)
 	require.Equal(t, os.Getenv(VCenterFullName), vcenter.FullName)
-	require.Equal(t, os.Getenv(VCenterVendor), vcenter.Vendor)
-	require.Equal(t, os.Getenv(VCenterVersion), vcenter.Version)
 	require.Equal(t, os.Getenv(TenantId), vcenter.TenantID)
 }

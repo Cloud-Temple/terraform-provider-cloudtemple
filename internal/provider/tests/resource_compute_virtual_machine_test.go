@@ -9,10 +9,7 @@ import (
 )
 
 const (
-	DataCenterId                        = "DATACENTER_ID"
-	VirtualMachineHostClusterIdRelocate = "COMPUTE_VIRTUAL_MACHINE_HOST_CLUSTER_RELOCATE"
-	VmPolicyDaily                       = "COMPUTE_VIRTUAL_MACHINE_POLICY_1"
-	VmPolicyWeekly                      = "COMPUTE_VIRTUAL_MACHINE_POLICY_2"
+	DataCenterId = "DATACENTER_ID"
 )
 
 func TestAccResourceVirtualMachine(t *testing.T) {

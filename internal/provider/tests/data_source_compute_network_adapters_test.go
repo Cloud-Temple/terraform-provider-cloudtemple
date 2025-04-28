@@ -9,10 +9,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 )
 
-const (
-	NetworkAdaptersQty = "COMPUTE_NETWORK_ADAPTER_QTY"
-)
-
 func TestAccDataSourceNetworkAdapters(t *testing.T) {
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
