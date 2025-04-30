@@ -2,12 +2,14 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
@@ -152,6 +154,69 @@ Order of the elements in the list is the boot order.`,
 					"^network_config$"},
 					"|")), `The following key is not allowed for cloud-init`),
 			},
+			"os_disk": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The operating system disk of the virtual machine.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"name": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the operating system disk.",
+						},
+						"description": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The description of the operating system disk.",
+						},
+						"size": {
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The size of the operating system disk in bytes.",
+						},
+						"storage_repository_id": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The storage repository where the operating system disk is located.",
+						},
+					},
+				},
+			},
+			"os_network_adapter": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The network adapters of the virtual machine.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"name": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The name of the network adapter.",
+						},
+						"mac_address": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The MAC address of the network adapter.",
+						},
+						"mtu": {
+							Type:        schema.TypeInt,
+							Computed:    true,
+							Description: "The maximum transmission unit (MTU) of the network adapter.",
+						},
+						"attached": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the network adapter is attached.",
+						},
+						"network_id": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The identifier of the network to which the adapter is connected.",
+						},
+					},
+				},
+			},
 
 			//Out
 			"machine_manager_id": {
@@ -230,6 +295,24 @@ Order of the elements in the list is the boot order.`,
 				Description: "The identifier of the pool to which the virtual machine belongs.",
 			},
 		},
+		CustomizeDiff: customdiff.All(
+			customdiff.ValidateChange("os_disk", func(ctx context.Context, old, new, meta any) error {
+				o := len(old.([]interface{}))
+				n := len(new.([]interface{}))
+				if n > o && o > 0 {
+					return fmt.Errorf("new os_disk blocks are not allowed if that exceeds the number of existing OS disks (%d > %d)", n, o)
+				}
+				return nil
+			}),
+			customdiff.ValidateChange("os_network_adapter", func(ctx context.Context, old, new, meta any) error {
+				o := len(old.([]interface{}))
+				n := len(new.([]interface{}))
+				if n > o && o > 0 {
+					return fmt.Errorf("new os_network_adapter blocks are not allowed if that exceeds the number of existing OS network adapters (%d > %d)", n, o)
+				}
+				return nil
+			}),
+		),
 	}
 }
 
@@ -264,6 +347,25 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 	setIdFromActivityState(d, activity)
 	if err != nil {
 		return diag.Errorf("failed to create virtual machine, %s", err)
+	}
+
+	template, err := c.Compute().OpenIaaS().Template().Read(ctx, d.Get("template_id").(string))
+	if err != nil {
+		return diag.Errorf("failed to read template, %s", err)
+	}
+	if template == nil {
+		return diag.Errorf("could not find template, %s", err)
+	}
+
+	// Overwrite with the desired config
+	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSDisksData(template.Disks), "os_disk")
+	if err := d.Set("os_disk", osDisks); err != nil {
+		return diag.FromErr(err)
+	}
+
+	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(template.NetworkAdapters), "os_network_adapter")
+	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
+		return diag.FromErr(err)
 	}
 
 	// Assign SLA policies to the virtual machine
@@ -422,6 +524,29 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForTools(ctx, d.Id(), getWaiterOptions(ctx))
 		if err != nil {
 			return diag.Errorf("failed to get tools on virtual machine after power on, %s", err)
+		}
+	}
+
+	if d.HasChange("os_disk") {
+		for i, osDisk := range d.Get("os_disk").([]interface{}) {
+			if osDisk == nil {
+				continue
+			}
+			disk := osDisk.(map[string]interface{})
+			if disk["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_disk.%d", i)) {
+				activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, &client.OpenIaaSVirtualDiskUpdateRequest{
+					ID:   disk["id"].(string),
+					Size: disk["size"].(int),
+					Name: disk["name"].(string),
+				})
+				if err != nil {
+					return diag.Errorf("failed to update virtual disk: %s", err)
+				}
+				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+				if err != nil {
+					return diag.Errorf("failed to update virtual disk, %s", err)
+				}
+			}
 		}
 	}
 

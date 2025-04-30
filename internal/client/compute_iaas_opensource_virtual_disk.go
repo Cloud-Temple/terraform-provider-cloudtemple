@@ -93,6 +93,18 @@ func (v *OpenIaaSVirtualDiskClient) List(ctx context.Context, filter *OpenIaaSVi
 	return out, nil
 }
 
+type OpenIaaSVirtualDiskUpdateRequest struct {
+	ID   string // No JSON tag, as this is the URL parameter
+	Name string `json:"name,omitempty"`
+	Size int    `json:"size,omitempty"`
+}
+
+func (v *OpenIaaSVirtualDiskClient) Update(ctx context.Context, req *OpenIaaSVirtualDiskUpdateRequest) (string, error) {
+	r := v.c.newRequest("PUT", "/compute/v1/open_iaas/virtual_disks/%s", req.ID)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
 type OpenIaaSVirtualDiskAttachRequest struct {
 	VirtualMachineID string `json:"virtualMachineId"`
 	Bootable         bool   `json:"bootable,omitempty"`

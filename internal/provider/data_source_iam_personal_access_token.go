@@ -123,9 +123,6 @@ func dataSourcePersonalAccessTokenRead(ctx context.Context, d *schema.ResourceDa
 	// Mapper les données en utilisant la fonction helper
 	tokenData := helpers.FlattenToken(token)
 
-	// Ne pas exposer le secret dans la datasource
-	delete(tokenData, "secret")
-
 	// Définir les données dans le state
 	for k, v := range tokenData {
 		if err := d.Set(k, v); err != nil {

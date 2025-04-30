@@ -50,3 +50,50 @@ func FlattenOpenIaaSVirtualMachine(vm *client.OpenIaaSVirtualMachine) map[string
 		"machine_manager_id":    vm.MachineManager.ID,
 	}
 }
+
+func FlattenOpenIaaSOSDisksData(osDisks []client.TemplateDisk) []interface{} {
+	if osDisks != nil {
+		disks := make([]interface{}, len(osDisks))
+
+		for i, osDisk := range osDisks {
+			disks[i] = FlattenOpenIaaSOSDiskData(osDisk)
+		}
+
+		return disks
+	}
+
+	return make([]interface{}, 0)
+}
+
+func FlattenOpenIaaSOSDiskData(osDisk client.TemplateDisk) interface{} {
+	return map[string]interface{}{
+		"name":                  osDisk.Name,
+		"size":                  osDisk.Size,
+		"description":           osDisk.Description,
+		"storage_repository_id": osDisk.StorageRepository.ID,
+	}
+}
+
+func FlattenOpenIaaSOSNetworkAdaptersData(osNetworkAdapters []client.TemplateNetworkAdapter) []interface{} {
+	if osNetworkAdapters != nil {
+		networkAdapters := make([]interface{}, len(osNetworkAdapters))
+
+		for i, osNetworkAdapter := range osNetworkAdapters {
+			networkAdapters[i] = FlattenOpenIaaSOSNetworkAdapterData(osNetworkAdapter)
+		}
+
+		return networkAdapters
+	}
+
+	return make([]interface{}, 0)
+}
+
+func FlattenOpenIaaSOSNetworkAdapterData(osNetworkAdapter client.TemplateNetworkAdapter) interface{} {
+	return map[string]interface{}{
+		"name":        osNetworkAdapter.Name,
+		"mac_address": osNetworkAdapter.MacAddress,
+		"mtu":         osNetworkAdapter.MTU,
+		"attached":    osNetworkAdapter.Attached,
+		"network_id":  osNetworkAdapter.Network.ID,
+	}
+}
