@@ -14,7 +14,7 @@ import (
 
 func resourceNetworkAdapter() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Create and manage network adapter of a virtual machine.",
 
 		CreateWithoutTimeout: computeNetworkAdapterCreate,
 		ReadContext:          computeNetworkAdapterRead,

@@ -3,10 +3,13 @@
 page_title: "cloudtemple_iam_personal_access_token Resource - terraform-provider-cloudtemple"
 subcategory: "IAM"
 description: |-
+  Create and manage personal access tokens for a user. Personal access tokens are used to authenticate API requests. Tokens are valid until the specified expiration date. Tokens can be created with specific roles, which define the permissions associated with the token. Tokens can be used to authenticate API requests on behalf of the user who created them. Tokens can be revoked at any time, which will invalidate them and prevent further use.
   To manage this resource you will need the iam_offline_access role.
 ---
 
 # cloudtemple_iam_personal_access_token (Resource)
+
+Create and manage personal access tokens for a user. Personal access tokens are used to authenticate API requests. Tokens are valid until the specified expiration date. Tokens can be created with specific roles, which define the permissions associated with the token. Tokens can be used to authenticate API requests on behalf of the user who created them. Tokens can be revoked at any time, which will invalidate them and prevent further use.
 
 To manage this resource you will need the `iam_offline_access` role.
 

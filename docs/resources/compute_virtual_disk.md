@@ -3,6 +3,7 @@
 page_title: "cloudtemple_compute_virtual_disk Resource - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Create and manage virtual disks of a virtual machine.
   To manage this resource you will need the following roles:
     - compute_iaas_vmware_management
     - compute_iaas_vmware_read
@@ -10,6 +11,8 @@ description: |-
 ---
 
 # cloudtemple_compute_virtual_disk (Resource)
+
+Create and manage virtual disks of a virtual machine.
 
 To manage this resource you will need the following roles:
   - `compute_iaas_vmware_management`

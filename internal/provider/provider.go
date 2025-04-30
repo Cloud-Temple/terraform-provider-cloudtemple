@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -305,159 +303,159 @@ func (sw *stateWriter) set(key string, value any) {
 
 // processFlattenedStructs parcourt l'objet à la recherche de structures avec le tag terraform_flatten
 // et définit leurs champs directement dans le schéma Terraform au niveau supérieur.
-func (sw *stateWriter) processFlattenedStructs(obj interface{}) {
-	val := reflect.ValueOf(obj)
-	if val.Kind() == reflect.Ptr {
-		val = val.Elem()
-	}
+// func (sw *stateWriter) processFlattenedStructs(obj interface{}) {
+// 	val := reflect.ValueOf(obj)
+// 	if val.Kind() == reflect.Ptr {
+// 		val = val.Elem()
+// 	}
 
-	// Ne traiter que les structures
-	if val.Kind() != reflect.Struct {
-		return
-	}
+// 	// Ne traiter que les structures
+// 	if val.Kind() != reflect.Struct {
+// 		return
+// 	}
 
-	typ := val.Type()
+// 	typ := val.Type()
 
-	// Parcourir tous les champs de la structure
-	for i := 0; i < val.NumField(); i++ {
-		field := val.Field(i)
-		fieldType := typ.Field(i)
+// 	// Parcourir tous les champs de la structure
+// 	for i := 0; i < val.NumField(); i++ {
+// 		field := val.Field(i)
+// 		fieldType := typ.Field(i)
 
-		// Vérifier si le champ est une structure
-		if field.Kind() == reflect.Struct {
-			// Vérifier si la structure a le tag terraform_flatten
-			prefix, shouldFlatten := fieldType.Tag.Lookup("terraform_flatten")
-			if shouldFlatten {
-				// Si le tag terraform_flatten est "true", utiliser le nom du champ
-				if prefix == "true" || prefix == "" {
-					prefix = strings.ToLower(fieldType.Name)
-				}
+// 		// Vérifier si le champ est une structure
+// 		if field.Kind() == reflect.Struct {
+// 			// Vérifier si la structure a le tag terraform_flatten
+// 			prefix, shouldFlatten := fieldType.Tag.Lookup("terraform_flatten")
+// 			if shouldFlatten {
+// 				// Si le tag terraform_flatten est "true", utiliser le nom du champ
+// 				if prefix == "true" || prefix == "" {
+// 					prefix = strings.ToLower(fieldType.Name)
+// 				}
 
-				// Parcourir tous les champs de la structure à aplatir
-				nestedType := field.Type()
-				for j := 0; j < field.NumField(); j++ {
-					nestedField := field.Field(j)
-					nestedFieldType := nestedType.Field(j)
+// 				// Parcourir tous les champs de la structure à aplatir
+// 				nestedType := field.Type()
+// 				for j := 0; j < field.NumField(); j++ {
+// 					nestedField := field.Field(j)
+// 					nestedFieldType := nestedType.Field(j)
 
-					// Obtenir le nom du champ dans le schéma Terraform
-					name, found := nestedFieldType.Tag.Lookup("terraform")
-					if !found || name == "-" {
-						continue
-					}
+// 					// Obtenir le nom du champ dans le schéma Terraform
+// 					name, found := nestedFieldType.Tag.Lookup("terraform")
+// 					if !found || name == "-" {
+// 						continue
+// 					}
 
-					// Construire le nom complet du champ aplati
-					flatName := prefix + "_" + name
+// 					// Construire le nom complet du champ aplati
+// 					flatName := prefix + "_" + name
 
-					// Définir le champ aplati dans le schéma Terraform
-					sw.set(flatName, nestedField.Interface())
-				}
-			}
-		}
-	}
-}
+// 					// Définir le champ aplati dans le schéma Terraform
+// 					sw.set(flatName, nestedField.Interface())
+// 				}
+// 			}
+// 		}
+// 	}
+// }
 
-func (sw *stateWriter) save(obj any, skip []string, useFlatten bool) {
-	skipFields := map[string]struct{}{}
-	for _, s := range skip {
-		skipFields[s] = struct{}{}
-	}
+// func (sw *stateWriter) save(obj any, skip []string, useFlatten bool) {
+// 	skipFields := map[string]struct{}{}
+// 	for _, s := range skip {
+// 		skipFields[s] = struct{}{}
+// 	}
 
-	typ := reflect.TypeOf(obj)
-	fields := map[string]reflect.Value{}
+// 	typ := reflect.TypeOf(obj)
+// 	fields := map[string]reflect.Value{}
 
-	switch typ.Kind() {
-	case reflect.Map:
-		for name, value := range obj.(map[string]interface{}) {
-			fields[name] = reflect.ValueOf(value)
-		}
-	case reflect.Pointer:
-		item := reflect.ValueOf(obj).Elem()
-		if item.Kind() == reflect.Interface {
-			item = item.Elem()
-		}
-		for _, field := range reflect.VisibleFields(item.Type()) {
-			// Ignorer les champs qui ont le tag terraform_flatten si useFlatten est true
-			if _, shouldFlatten := field.Tag.Lookup("terraform_flatten"); shouldFlatten && useFlatten {
-				continue
-			}
+// 	switch typ.Kind() {
+// 	case reflect.Map:
+// 		for name, value := range obj.(map[string]interface{}) {
+// 			fields[name] = reflect.ValueOf(value)
+// 		}
+// 	case reflect.Pointer:
+// 		item := reflect.ValueOf(obj).Elem()
+// 		if item.Kind() == reflect.Interface {
+// 			item = item.Elem()
+// 		}
+// 		for _, field := range reflect.VisibleFields(item.Type()) {
+// 			// Ignorer les champs qui ont le tag terraform_flatten si useFlatten est true
+// 			if _, shouldFlatten := field.Tag.Lookup("terraform_flatten"); shouldFlatten && useFlatten {
+// 				continue
+// 			}
 
-			name, found := field.Tag.Lookup("terraform")
-			if name == "-" {
-				continue
-			}
-			if !found {
-				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
-				continue
-			}
-			fields[name] = item.FieldByName(field.Name)
-		}
-	default:
-		sw.diags = append(sw.diags, diag.Errorf("unexpected type %s", typ.String())...)
-	}
+// 			name, found := field.Tag.Lookup("terraform")
+// 			if name == "-" {
+// 				continue
+// 			}
+// 			if !found {
+// 				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
+// 				continue
+// 			}
+// 			fields[name] = item.FieldByName(field.Name)
+// 		}
+// 	default:
+// 		sw.diags = append(sw.diags, diag.Errorf("unexpected type %s", typ.String())...)
+// 	}
 
-	for name, value := range fields {
-		if _, skip := skipFields[name]; skip {
-			continue
-		}
+// 	for name, value := range fields {
+// 		if _, skip := skipFields[name]; skip {
+// 			continue
+// 		}
 
-		converted := sw.convert(value, false, name, skipFields)
-		sw.set(name, converted)
-	}
+// 		converted := sw.convert(value, false, name, skipFields)
+// 		sw.set(name, converted)
+// 	}
 
-	// Traiter les structures aplaties seulement si useFlatten est true
-	if useFlatten {
-		sw.processFlattenedStructs(obj)
-	}
-}
+// 	// Traiter les structures aplaties seulement si useFlatten est true
+// 	if useFlatten {
+// 		sw.processFlattenedStructs(obj)
+// 	}
+// }
 
-func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string, skipFields map[string]struct{}) any {
-	// Convert time.Time to its string representation
-	if v.Type().String() == "time.Time" {
-		return v.Interface().(time.Time).Format(time.RFC3339)
-	}
+// func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string, skipFields map[string]struct{}) any {
+// 	// Convert time.Time to its string representation
+// 	if v.Type().String() == "time.Time" {
+// 		return v.Interface().(time.Time).Format(time.RFC3339)
+// 	}
 
-	k := v.Kind()
-	switch k {
-	case reflect.Bool, reflect.Int, reflect.String, reflect.Float64:
-		return v.Interface()
+// 	k := v.Kind()
+// 	switch k {
+// 	case reflect.Bool, reflect.Int, reflect.String, reflect.Float64:
+// 		return v.Interface()
 
-	case reflect.Slice:
-		items := []interface{}{}
-		for i := 0; i < v.Len(); i++ {
-			item := v.Index(i)
-			if item.Kind() == reflect.Ptr {
-				item = item.Elem()
-			}
-			items = append(items, sw.convert(item, true, path+".#", skipFields))
-		}
-		return items
+// 	case reflect.Slice:
+// 		items := []interface{}{}
+// 		for i := 0; i < v.Len(); i++ {
+// 			item := v.Index(i)
+// 			if item.Kind() == reflect.Ptr {
+// 				item = item.Elem()
+// 			}
+// 			items = append(items, sw.convert(item, true, path+".#", skipFields))
+// 		}
+// 		return items
 
-	case reflect.Struct:
-		body := map[string]interface{}{}
-		for _, field := range reflect.VisibleFields(v.Type()) {
-			name, found := field.Tag.Lookup("terraform")
+// 	case reflect.Struct:
+// 		body := map[string]interface{}{}
+// 		for _, field := range reflect.VisibleFields(v.Type()) {
+// 			name, found := field.Tag.Lookup("terraform")
 
-			p := path + "." + name
-			if _, skip := skipFields[p]; skip || name == "-" {
-				continue
-			}
+// 			p := path + "." + name
+// 			if _, skip := skipFields[p]; skip || name == "-" {
+// 				continue
+// 			}
 
-			if !found {
-				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
-				continue
-			}
-			body[name] = sw.convert(v.FieldByName(field.Name), false, p, skipFields)
-		}
-		if alreadyInSlice {
-			return body
-		}
-		return []interface{}{body}
+// 			if !found {
+// 				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
+// 				continue
+// 			}
+// 			body[name] = sw.convert(v.FieldByName(field.Name), false, p, skipFields)
+// 		}
+// 		if alreadyInSlice {
+// 			return body
+// 		}
+// 		return []interface{}{body}
 
-	default:
-		sw.diags = append(sw.diags, diag.Errorf("%s unknown kind %q", path, k.String())...)
-		return nil
-	}
-}
+// 	default:
+// 		sw.diags = append(sw.diags, diag.Errorf("%s unknown kind %q", path, k.String())...)
+// 		return nil
+// 	}
+// }
 
 // IsNumber is a ValidateFunc that ensures a string can be parsed as a number
 func IsNumber(i interface{}, k string) (warnings []string, errors []error) {
