@@ -11,25 +11,25 @@ func (c *BackupClient) Storage() *BackupStorageClient {
 }
 
 type BackupStorage struct {
-	ID               string                `terraform:"id"`
-	ResourceType     string                `terraform:"resource_type"`
-	Type             string                `terraform:"type"`
-	Site             string                `terraform:"site"`
-	Name             string                `terraform:"name"`
-	StorageId        string                `terraform:"storage_id"`
-	HostAddress      string                `terraform:"host_address"`
-	PortNumber       int                   `terraform:"port_number"`
-	SSLConnection    bool                  `terraform:"ssl_connection"`
-	InitializeStatus string                `terraform:"initialize_status"`
-	Version          string                `terraform:"version"`
-	IsReady          bool                  `terraform:"is_ready"`
-	Capacity         BackupStorageCapacity `terraform:"capacity"`
+	ID               string
+	ResourceType     string
+	Type             string
+	Site             string
+	Name             string
+	StorageId        string
+	HostAddress      string
+	PortNumber       int
+	SSLConnection    bool
+	InitializeStatus string
+	Version          string
+	IsReady          bool
+	Capacity         BackupStorageCapacity
 }
 
 type BackupStorageCapacity struct {
-	Free       int `terraform:"free"`
-	Total      int `terraform:"total"`
-	UpdateTime int `terraform:"update_time"`
+	Free       int
+	Total      int
+	UpdateTime int
 }
 
 func (c *BackupStorageClient) List(ctx context.Context) ([]*BackupStorage, error) {

@@ -16,11 +16,11 @@ func (i *IAM) PAT() *PATClient {
 }
 
 type Token struct {
-	ID             string   `terraform:"id"`
-	Name           string   `terraform:"name"`
-	Secret         string   `terraform:"secret"`
-	Roles          []string `terraform:"roles"`
-	ExpirationDate string   `terraform:"expiration_date"`
+	ID             string
+	Name           string
+	Secret         string
+	Roles          []string
+	ExpirationDate string
 }
 
 func (p *PATClient) List(ctx context.Context, userId string, tenantId string) ([]*Token, error) {

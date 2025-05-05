@@ -11,16 +11,20 @@ func (c *BackupClient) VCenter() *BackupVCenterClient {
 }
 
 type BackupVCenter struct {
-	ID          string `terraform:"id"`
-	InternalId  int    `terraform:"internal_id"`
-	InstanceId  string `terraform:"instance_id"`
-	SppServerId string `terraform:"spp_server_id"`
-	Name        string `terraform:"name"`
+	ID          string
+	InternalId  int
+	InstanceId  string
+	SppServerId string
+	Name        string
 }
 
-func (c *BackupVCenterClient) List(ctx context.Context, sppServerId string) ([]*BackupVCenter, error) {
+type BackupVCenterFilter struct {
+	SppServerId string `filter:"sppServerId"`
+}
+
+func (c *BackupVCenterClient) List(ctx context.Context, filter *BackupVCenterFilter) ([]*BackupVCenter, error) {
 	r := c.c.newRequest("GET", "/backup/v1/spp/vcenters")
-	r.params.Add("sppServerId", sppServerId)
+	r.addFilter(filter)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

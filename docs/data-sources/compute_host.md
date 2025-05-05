@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_host Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific host.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_host (Data Source)
+
+Used to retrieve a specific host.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -27,15 +30,18 @@ data "cloudtemple_compute_host" "name" {
 
 ### Optional
 
-- `name` (String)
+- `datacenter_id` (String) The ID of the datacenter this host belongs to.
+- `datastore_id` (String) The ID of the datastore this host belongs to.
+- `host_cluster_id` (String) The ID of the host cluster this host belongs to.
+- `id` (String) The ID of the host to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager this host belongs to.
+- `name` (String) The name of the host to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `machine_manager_id` (String)
-- `metrics` (List of Object) (see [below for nested schema](#nestedatt--metrics))
-- `moref` (String)
-- `virtual_machines` (List of Object) (see [below for nested schema](#nestedatt--virtual_machines))
+- `metrics` (List of Object) Resource metrics for the host. (see [below for nested schema](#nestedatt--metrics))
+- `moref` (String) The managed object reference ID of the host.
+- `virtual_machines` (List of Object) List of virtual machines running on this host. (see [below for nested schema](#nestedatt--virtual_machines))
 
 <a id="nestedatt--metrics"></a>
 ### Nested Schema for `metrics`

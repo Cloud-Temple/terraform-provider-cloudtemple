@@ -11,12 +11,13 @@ func (c *ComputeClient) DatastoreCluster() *DatastoreClusterClient {
 }
 
 type DatastoreCluster struct {
-	ID               string                  `terraform:"id"`
-	Name             string                  `terraform:"name"`
-	Moref            string                  `terraform:"moref"`
-	MachineManagerId string                  `terraform:"machine_manager_id"`
-	Datastores       []string                `terraform:"datastores"`
-	Metrics          DatastoreClusterMetrics `terraform:"metrics"`
+	ID             string
+	Name           string
+	Moref          string
+	Datastores     []string
+	Metrics        DatastoreClusterMetrics
+	MachineManager BaseObject
+	Datacenter     BaseObject
 }
 
 type DatastoreClusterFilter struct {
@@ -28,23 +29,22 @@ type DatastoreClusterFilter struct {
 }
 
 type DatastoreClusterMetrics struct {
-	FreeCapacity                  int    `terraform:"free_capacity"`
-	MaxCapacity                   int    `terraform:"max_capacity"`
-	Enabled                       bool   `terraform:"enabled"`
-	DefaultVmBehavior             string `terraform:"default_vm_behavior"`
-	LoadBalanceInterval           int    `terraform:"load_balance_interval"`
-	SpaceThresholdMode            string `terraform:"space_threshold_mode"`
-	SpaceUtilizationThreshold     int    `terraform:"space_utilization_threshold"`
-	MinSpaceUtilizationDifference int    `terraform:"min_space_utilization_difference"`
-	ReservablePercentThreshold    int    `terraform:"reservable_percent_threshold"`
-	ReservableThresholdMode       string `terraform:"reservable_threshold_mode"`
-	IoLatencyThreshold            int    `terraform:"io_latency_threshold"`
-	IoLoadImbalanceThreshold      int    `terraform:"io_load_imbalance_threshold"`
-	IoLoadBalanceEnabled          bool   `terraform:"io_load_balance_enabled"`
+	FreeCapacity                  int
+	MaxCapacity                   int
+	Enabled                       bool
+	DefaultVmBehavior             string
+	LoadBalanceInterval           int
+	SpaceThresholdMode            string
+	SpaceUtilizationThreshold     int
+	MinSpaceUtilizationDifference int
+	ReservablePercentThreshold    int
+	ReservableThresholdMode       string
+	IoLatencyThreshold            int
+	IoLoadImbalanceThreshold      int
+	IoLoadBalanceEnabled          bool
 }
 
 func (d *DatastoreClusterClient) List(ctx context.Context, filter *DatastoreClusterFilter) ([]*DatastoreCluster, error) {
-	// TODO: filters
 	r := d.c.newRequest("GET", "/compute/v1/vcenters/datastore_clusters")
 	r.addFilter(filter)
 	resp, err := d.c.doRequest(ctx, r)

@@ -23,13 +23,13 @@ type NetworkFilter struct {
 }
 
 type Network struct {
-	ID                    string   `terraform:"id"`
-	Name                  string   `terraform:"name"`
-	Moref                 string   `terraform:"moref"`
-	MachineManagerId      string   `terraform:"machine_manager_id"`
-	VirtualMachinesNumber int      `terraform:"virtual_machines_number"`
-	HostNumber            int      `terraform:"host_number"`
-	HostNames             []string `terraform:"host_names"`
+	ID                    string
+	Name                  string
+	Moref                 string
+	MachineManager        BaseObject
+	VirtualMachinesNumber int
+	HostNumber            int
+	HostNames             []string
 }
 
 func (n *NetworkClient) List(

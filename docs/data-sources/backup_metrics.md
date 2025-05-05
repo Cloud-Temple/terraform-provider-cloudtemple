@@ -3,10 +3,13 @@
 page_title: "cloudtemple_backup_metrics Data Source - terraform-provider-cloudtemple"
 subcategory: "Backup"
 description: |-
+  Provides metrics and statistics about the backup system.
   To query this datasource you will need the backup_iaas_spp_read role.
 ---
 
 # cloudtemple_backup_metrics (Data Source)
+
+Provides metrics and statistics about the backup system.
 
 To query this datasource you will need the `backup_iaas_spp_read` role.
 
@@ -21,17 +24,17 @@ data "cloudtemple_backup_metrics" "foo" {}
 
 ### Optional
 
-- `range` (Number)
+- `range` (Number) The time range in days for which to retrieve metrics. Defaults to 4 days.
 
 ### Read-Only
 
-- `coverage` (List of Object) (see [below for nested schema](#nestedatt--coverage))
-- `history` (List of Object) (see [below for nested schema](#nestedatt--history))
+- `coverage` (List of Object) Statistics about resource protection coverage. (see [below for nested schema](#nestedatt--coverage))
+- `history` (List of Object) Historical statistics about backup job runs. (see [below for nested schema](#nestedatt--history))
 - `id` (String) The ID of this resource.
-- `platform` (List of Object) (see [below for nested schema](#nestedatt--platform))
-- `platform_cpu` (List of Object) (see [below for nested schema](#nestedatt--platform_cpu))
-- `policies` (List of Object) (see [below for nested schema](#nestedatt--policies))
-- `virtual_machines` (List of Object) (see [below for nested schema](#nestedatt--virtual_machines))
+- `platform` (List of Object) Information about the backup platform. (see [below for nested schema](#nestedatt--platform))
+- `platform_cpu` (List of Object) CPU utilization metrics for the backup platform. (see [below for nested schema](#nestedatt--platform_cpu))
+- `policies` (List of Object) Information about backup policies in the system. (see [below for nested schema](#nestedatt--policies))
+- `virtual_machines` (List of Object) Statistics about virtual machines in the backup system. (see [below for nested schema](#nestedatt--virtual_machines))
 
 <a id="nestedatt--coverage"></a>
 ### Nested Schema for `coverage`

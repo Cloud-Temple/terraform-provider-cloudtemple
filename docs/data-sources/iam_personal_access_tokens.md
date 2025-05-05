@@ -3,10 +3,13 @@
 page_title: "cloudtemple_iam_personal_access_tokens Data Source - terraform-provider-cloudtemple"
 subcategory: "IAM"
 description: |-
+  Used to retrieve all personal access tokens for a user in a tenant.
   To query this datasource you will need the iam_read role.
 ---
 
 # cloudtemple_iam_personal_access_tokens (Data Source)
+
+Used to retrieve all personal access tokens for a user in a tenant.
 
 To query this datasource you will need the `iam_read` role.
 
@@ -21,13 +24,13 @@ data "cloudtemple_iam_personal_access_tokens" "foo" {}
 
 ### Optional
 
-- `tenant_id` (String)
-- `user_id` (String)
+- `tenant_id` (String) The ID of the tenant to retrieve tokens for.
+- `user_id` (String) The ID of the user to retrieve tokens for.
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `tokens` (List of Object) (see [below for nested schema](#nestedatt--tokens))
+- `tokens` (List of Object) The list of personal access tokens. (see [below for nested schema](#nestedatt--tokens))
 
 <a id="nestedatt--tokens"></a>
 ### Nested Schema for `tokens`

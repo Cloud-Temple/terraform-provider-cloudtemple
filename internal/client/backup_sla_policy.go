@@ -11,41 +11,40 @@ func (c *BackupClient) SLAPolicy() *BackupSLAPolicyClient {
 }
 
 type BackupSLAPolicy struct {
-	ID          string                `terraform:"id"`
-	Name        string                `terraform:"name"`
-	SubPolicies []*BackupSLASubPolicy `terraform:"sub_policies"`
+	ID          string
+	Name        string
+	SubPolicies []*BackupSLASubPolicy
 }
 
 type BackupSLASubPolicy struct {
-	Type          string                   `terraform:"type"`
-	UseEncryption bool                     `terraform:"use_encryption"`
-	Software      bool                     `terraform:"software"`
-	Site          string                   `terraform:"site"`
-	Retention     BackupSLAPolicyRetention `terraform:"retention"`
-	Trigger       BackupSLAPolicyTrigger   `terraform:"trigger"`
-	Target        BackupSLAPolicyTarget    `terraform:"target"`
+	Type          string
+	UseEncryption bool
+	Software      bool
+	Site          string
+	Retention     BackupSLAPolicyRetention
+	Trigger       BackupSLAPolicyTrigger
+	Target        BackupSLAPolicyTarget
 }
 
 type BackupSLAPolicyTarget struct {
-	ID           string `terraform:"id"`
-	Href         string `terraform:"href"`
-	ResourceType string `terraform:"resource_type"`
+	ID           string
+	Href         string
+	ResourceType string
 }
 
 type BackupSLAPolicyRetention struct {
-	Age int `terraform:"age"`
+	Age int
 }
 
 type BackupSLAPolicyTrigger struct {
-	Frequency    int    `terraform:"frequency"`
-	Type         string `terraform:"type"`
-	ActivateDate int    `terraform:"activate_date"`
+	Frequency    int
+	Type         string
+	ActivateDate int
 }
 
 type BackupSLAPolicyFilter struct {
 	VirtualMachineId string `filter:"virtualMachineId"`
 	VirtualDiskId    string `filter:"virtualDiskId"`
-	Assignable       *bool  `filter:"assignable"`
 }
 
 func (c *BackupSLAPolicyClient) List(ctx context.Context, filter *BackupSLAPolicyFilter) ([]*BackupSLAPolicy, error) {

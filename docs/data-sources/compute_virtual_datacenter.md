@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_virtual_datacenter Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific virtual datacenter from a vCenter infrastructure.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_virtual_datacenter (Data Source)
+
+Used to retrieve a specific virtual datacenter from a vCenter infrastructure.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -32,12 +35,12 @@ data "cloudtemple_compute_virtual_datacenter" "name" {
 
 ### Optional
 
-- `machine_manager_id` (String)
-- `name` (String)
+- `id` (String) The ID of the virtual datacenter to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager (vCenter) where the virtual datacenter is located. Required when using `name`.
+- `name` (String) The name of the virtual datacenter to retrieve. Conflicts with `id`. Requires `machine_manager_id`.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `tenant_id` (String)
+- `tenant_id` (String) The ID of the tenant that owns this virtual datacenter.
 
 

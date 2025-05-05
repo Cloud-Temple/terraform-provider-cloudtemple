@@ -3,10 +3,13 @@
 page_title: "cloudtemple_iam_user Data Source - terraform-provider-cloudtemple"
 subcategory: "IAM"
 description: |-
+  Used to retrieve information about a specific user.
   To query this datasource you will need the iam_read role.
 ---
 
 # cloudtemple_iam_user (Data Source)
+
+Used to retrieve information about a specific user.
 
 To query this datasource you will need the `iam_read` role.
 
@@ -35,16 +38,16 @@ data "cloudtemple_iam_user" "email" {
 
 ### Optional
 
-- `email` (String)
-- `internal_id` (String)
-- `name` (String)
+- `email` (String) The email of the user.
+- `id` (String) The ID of the user.
+- `internal_id` (String) The internal ID of the user.
+- `name` (String) The name of the user.
 
 ### Read-Only
 
-- `email_verified` (Boolean)
-- `id` (String) The ID of this resource.
-- `source` (List of String)
-- `source_id` (String)
-- `type` (String)
+- `email_verified` (Boolean) Whether the user's email is verified.
+- `source` (List of String) The source of the user.
+- `source_id` (String) The source ID of the user.
+- `type` (String) The type of the user.
 
 

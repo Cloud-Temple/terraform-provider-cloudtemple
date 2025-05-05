@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_folders Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a list of all folders.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_folders (Data Source)
+
+Used to retrieve a list of all folders.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -21,7 +24,7 @@ data "cloudtemple_compute_folders" "foo" {}
 
 ### Read-Only
 
-- `folders` (List of Object) (see [below for nested schema](#nestedatt--folders))
+- `folders` (List of Object) List of all folders. (see [below for nested schema](#nestedatt--folders))
 - `id` (String) The ID of this resource.
 
 <a id="nestedatt--folders"></a>

@@ -3,10 +3,13 @@
 page_title: "cloudtemple_backup_job_sessions Data Source - terraform-provider-cloudtemple"
 subcategory: "Backup"
 description: |-
+  Provides information about backup job sessions.
   To query this datasource you will need the backup_iaas_spp_read role.
 ---
 
 # cloudtemple_backup_job_sessions (Data Source)
+
+Provides information about backup job sessions.
 
 To query this datasource you will need the `backup_iaas_spp_read` role.
 
@@ -22,7 +25,7 @@ data "cloudtemple_backup_job_sessions" "foo" {}
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `job_sessions` (List of Object) (see [below for nested schema](#nestedatt--job_sessions))
+- `job_sessions` (List of Object) List of backup job sessions. (see [below for nested schema](#nestedatt--job_sessions))
 
 <a id="nestedatt--job_sessions"></a>
 ### Nested Schema for `job_sessions`

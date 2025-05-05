@@ -81,8 +81,9 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
 ### Required
 
 - `cpu` (Number) The number of virtual CPUs. Note: Changing this value for a running VM will cause it to be powered off and back on.
-- `memory` (Number) The amount of memory in MB. Note: Changing this value for a running VM will cause it to be powered off and back on.
+- `memory` (Number) The amount of memory in Bytes. Note: Changing this value for a running VM will cause it to be powered off and back on.
 - `name` (String) The name of the virtual machine.
+- `power_state` (String) The desired power state of the virtual machine. Available values are 'on' and 'off'.
 - `template_id` (String) The template identifier.
 
 ### Optional
@@ -109,21 +110,19 @@ Order of the elements in the list is the boot order.
 - `host_id` (String) The host identifier.
 - `mount_iso` (String) An ISO disk to mount to on the virtual machine DVD Drive.
 - `num_cores_per_socket` (Number) The number of cores per socket. Note: Changing this value for a running VM will cause it to be powered off and back on.
-- `power_state` (String) The desired power state of the virtual machine. Available values are 'on' and 'off'.
 - `secure_boot` (Boolean) Whether to enable secure boot. Only available with UEFI boot firmware.
 - `tags` (Map of String) The tags to attach to the virtual machine.
 
 ### Read-Only
 
-- `addresses` (List of Object) (see [below for nested schema](#nestedatt--addresses))
-- `dvd_drive` (List of Object) (see [below for nested schema](#nestedatt--dvd_drive))
-- `host` (List of Object) (see [below for nested schema](#nestedatt--host))
+- `addresses` (List of Object) The addresses of the virtual machine. (see [below for nested schema](#nestedatt--addresses))
+- `dvd_drive` (List of Object) The DVD drive of the virtual machine. (see [below for nested schema](#nestedatt--dvd_drive))
 - `id` (String) The ID of this resource.
-- `internal_id` (String)
-- `machine_manager` (List of Object) (see [below for nested schema](#nestedatt--machine_manager))
-- `operating_system_name` (String)
-- `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
-- `tools` (List of Object) (see [below for nested schema](#nestedatt--tools))
+- `internal_id` (String) The internal identifier of the virtual machine.
+- `machine_manager_id` (String) The identifier of the machine manager (availability zone).
+- `operating_system_name` (String) The name of the operating system installed on the virtual machine.
+- `pool_id` (String) The identifier of the pool to which the virtual machine belongs.
+- `tools` (List of Object) The tools installed on the virtual machine. Please note that the tools are only available when the virtual machine is powered on. (see [below for nested schema](#nestedatt--tools))
 
 <a id="nestedatt--addresses"></a>
 ### Nested Schema for `addresses`
@@ -140,34 +139,6 @@ Read-Only:
 Read-Only:
 
 - `attached` (Boolean)
-- `name` (String)
-
-
-<a id="nestedatt--host"></a>
-### Nested Schema for `host`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
-
-
-<a id="nestedatt--machine_manager"></a>
-### Nested Schema for `machine_manager`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
-- `type` (String)
-
-
-<a id="nestedatt--pool"></a>
-### Nested Schema for `pool`
-
-Read-Only:
-
-- `id` (String)
 - `name` (String)
 
 

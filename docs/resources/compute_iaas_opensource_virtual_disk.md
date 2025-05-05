@@ -60,7 +60,30 @@ resource "cloudtemple_compute_iaas_opensource_virtual_disk" "openiaas-disk-02" {
 ### Read-Only
 
 - `id` (String) The ID of the virtual disk.
+- `internal_id` (String) The internal ID of the virtual disk.
+- `is_snapshot` (Boolean) Whether the virtual disk is a snapshot.
+- `templates` (List of Object) The templates to which the virtual disk is attached. (see [below for nested schema](#nestedatt--templates))
 - `usage` (Number) The usage of the virtual disk.
+- `virtual_machines` (List of Object) The virtual machines to which the virtual disk is attached. (see [below for nested schema](#nestedatt--virtual_machines))
+
+<a id="nestedatt--templates"></a>
+### Nested Schema for `templates`
+
+Read-Only:
+
+- `id` (String)
+- `name` (String)
+- `read_only` (Boolean)
+
+
+<a id="nestedatt--virtual_machines"></a>
+### Nested Schema for `virtual_machines`
+
+Read-Only:
+
+- `id` (String)
+- `name` (String)
+- `read_only` (Boolean)
 
 ## Import
 

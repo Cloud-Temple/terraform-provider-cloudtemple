@@ -49,13 +49,15 @@ output "host-2" {
 
 ### Optional
 
-- `machine_manager_id` (String)
-- `name` (String)
+- `id` (String) The ID of the host to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager this host belongs to.
+- `name` (String) The name of the host to retrieve. Conflicts with `id`.
+- `pool_id` (String) The ID of the pool this host belongs to.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
 - `internal_id` (String)
+- `master` (Boolean)
 - `metrics` (List of Object) (see [below for nested schema](#nestedatt--metrics))
 - `pool` (List of Object) (see [below for nested schema](#nestedatt--pool))
 - `power_state` (String)

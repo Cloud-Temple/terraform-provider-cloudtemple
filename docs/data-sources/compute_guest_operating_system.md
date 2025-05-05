@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_guest_operating_system Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific guest operating system by its managed object reference ID.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_guest_operating_system (Data Source)
+
+Used to retrieve a specific guest operating system by its managed object reference ID.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -24,13 +27,17 @@ data "cloudtemple_compute_guest_operating_system" "foo" {
 
 ### Required
 
-- `machine_manager_id` (String)
-- `moref` (String)
+- `moref` (String) The managed object reference ID of the guest operating system to retrieve.
+
+### Optional
+
+- `host_cluster_id` (String) The ID of the host cluster to filter guest operating systems by. Conflicts with `host_id`.
+- `host_id` (String) The ID of the host to filter guest operating systems by. Conflicts with `host_cluster_id`.
 
 ### Read-Only
 
-- `family` (String)
-- `full_name` (String)
+- `family` (String) The family of the guest operating system (e.g., Windows, Linux).
+- `full_name` (String) The full name of the guest operating system.
 - `id` (String) The ID of this resource.
 
 

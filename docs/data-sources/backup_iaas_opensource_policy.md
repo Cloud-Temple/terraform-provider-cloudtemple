@@ -48,26 +48,18 @@ output "policy-2" {
 
 ### Optional
 
-- `machine_manager_id` (String)
-- `name` (String)
+- `id` (String) The ID of the backup policy to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter policies by. Required when using `name`.
+- `name` (String) The name of the backup policy to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `id` (String) The ID of this resource.
-- `internal_id` (String)
-- `machine_manager` (List of Object) (see [below for nested schema](#nestedatt--machine_manager))
-- `mode` (String)
-- `running` (Boolean)
-- `schedulers` (List of Object) (see [below for nested schema](#nestedatt--schedulers))
-
-<a id="nestedatt--machine_manager"></a>
-### Nested Schema for `machine_manager`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
-
+- `internal_id` (String) The internal identifier of the policy in the Open IaaS system.
+- `machine_manager_name` (String) The name of the machine manager associated with this policy.
+- `mode` (String) The backup mode of the policy (e.g., full, incremental).
+- `running` (Boolean) Indicates whether the policy is currently running.
+- `schedulers` (List of Object) List of schedulers configured for this backup policy. (see [below for nested schema](#nestedatt--schedulers))
+- `virtual_machines` (List of String) List of virtual machines associated with this backup policy.
 
 <a id="nestedatt--schedulers"></a>
 ### Nested Schema for `schedulers`

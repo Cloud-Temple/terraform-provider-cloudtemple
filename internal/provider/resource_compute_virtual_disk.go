@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -11,7 +12,7 @@ import (
 
 func resourceVirtualDisk() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Create and manage virtual disks of a virtual machine.",
 
 		CreateWithoutTimeout: computeVirtualDiskCreate,
 		ReadContext:          computeVirtualDiskRead,
@@ -37,21 +38,23 @@ func resourceVirtualDisk() *schema.Resource {
 				ValidateFunc: validation.IsUUID,
 			},
 			"provisioning_type": {
-				Type:     schema.TypeString,
-				Required: true,
-				ForceNew: true,
+				Type:        schema.TypeString,
+				Required:    true,
+				ForceNew:    true,
+				Description: "The provisioning type of the virtual disk. Possible values are: `dynamic`, `staticImmediate`, `staticDiffered`.",
 			},
 			"disk_mode": {
 				Type:     schema.TypeString,
 				Required: true,
-				Description: `disk_mode can have multiple different values :
+				Description: `disk_mode can have multiple different values (persistent, independent_nonpersistent, independent_persistent) :
 					- Persistent: Changes are immediately and permanently written to the virtual disk.
 					- Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots.
 					- Independent persistent: Changes are immediately and permanently written to the virtual disk. Not affected by snapshots.`,
 			},
 			"capacity": {
-				Type:     schema.TypeInt,
-				Required: true,
+				Type:        schema.TypeInt,
+				Required:    true,
+				Description: "The size of the disk in bytes. The size must be greater than or equal to the size of the virtual machine's operating system disk.",
 			},
 			"datastore_id": {
 				Type:          schema.TypeString,
@@ -85,40 +88,54 @@ func resourceVirtualDisk() *schema.Resource {
 
 			// Out
 			"name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the virtual disk.",
 			},
 			"machine_manager_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The ID of the machine manager of the network adapter.",
 			},
 			"disk_unit_number": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The disk unit number of the virtual disk.",
 			},
 			"controller_bus_number": {
-				Type:     schema.TypeInt,
-				Computed: true,
+				Type:        schema.TypeInt,
+				Computed:    true,
+				Description: "The bus number of the controller to which the virtual disk is attached.",
+			},
+			"controller_type": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "Virtual controller type.",
 			},
 			"datastore_name": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the datastore where the virtual disk is stored.",
 			},
 			"instant_access": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Flag that indicates if the disk is in instant access mode.",
 			},
 			"native_id": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "Virtual disk vSphere identifier.",
 			},
 			"disk_path": {
-				Type:     schema.TypeString,
-				Computed: true,
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The path to the disk file in the datastore.",
 			},
 			"editable": {
-				Type:     schema.TypeBool,
-				Computed: true,
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether the virtual disk is editable.",
 			},
 		},
 	}
@@ -200,34 +217,45 @@ func computeVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta 
 }
 
 func computeVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	reader := readFullResource(func(ctx context.Context, c *client.Client, d *schema.ResourceData, sw *stateWriter) (interface{}, error) {
-		disk, err := c.Compute().VirtualDisk().Read(ctx, d.Id())
-		if err != nil {
-			return nil, err
-		}
-		if disk == nil {
-			return nil, nil
-		}
+	c := getClient(meta)
+	var diags diag.Diagnostics
 
-		// Normalize the backup_sla_policies
-		slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
-			VirtualDiskId: d.Id(),
-		})
-		if err != nil {
-			return nil, err
-		}
+	// Récupérer le disque par son ID
+	id := d.Id()
+	disk, err := c.Compute().VirtualDisk().Read(ctx, id)
+	if err != nil {
+		return diag.Errorf("the virtual machine could not be read: %s", err)
+	}
+	if disk == nil {
+		d.SetId("") // Le disque n'existe plus, marquer la ressource comme supprimée
+		return nil
+	}
 
-		slaPoliciesIds := []string{}
-		for _, slaPolicy := range slaPolicies {
-			slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
-		}
-
-		sw.set("backup_sla_policies", slaPoliciesIds)
-
-		return disk, nil
+	// Normalize the backup_sla_policies
+	slaPolicies, err := c.Backup().SLAPolicy().List(ctx, &client.BackupSLAPolicyFilter{
+		VirtualDiskId: d.Id(),
 	})
+	if err != nil {
+		return diag.Errorf("failed to get sla policies: %s", err)
+	}
 
-	return reader(ctx, d, meta)
+	slaPoliciesIds := []string{}
+	for _, slaPolicy := range slaPolicies {
+		slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
+	}
+
+	// Mapper les données en utilisant la fonction helper
+	diskData := helpers.FlattenVirtualDisk(disk)
+	diskData["backup_sla_policies"] = slaPoliciesIds
+
+	// Définir les données dans le state
+	for k, v := range diskData {
+		if err := d.Set(k, v); err != nil {
+			return diag.FromErr(err)
+		}
+	}
+
+	return diags
 }
 
 func computeVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {

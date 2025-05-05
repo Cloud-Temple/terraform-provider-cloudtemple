@@ -49,17 +49,17 @@ output "pool-2" {
 
 ### Optional
 
-- `machine_manager_id` (String)
-- `name` (String)
+- `id` (String) The ID of the pool to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter pools by. Required when searching by `name`.
+- `name` (String) The name of the pool to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `cpu` (List of Object) (see [below for nested schema](#nestedatt--cpu))
-- `high_availability_enabled` (Boolean)
-- `hosts` (List of String)
-- `id` (String) The ID of this resource.
-- `internal_id` (String)
-- `type` (List of Object) (see [below for nested schema](#nestedatt--type))
+- `cpu` (List of Object) CPU information for the pool. (see [below for nested schema](#nestedatt--cpu))
+- `high_availability_enabled` (Boolean) Whether high availability is enabled for this pool.
+- `hosts` (List of String) List of host IDs in this pool.
+- `internal_id` (String) The internal identifier of the pool in the Open IaaS system.
+- `type` (List of Object) Information about the pool type. (see [below for nested schema](#nestedatt--type))
 
 <a id="nestedatt--cpu"></a>
 ### Nested Schema for `cpu`

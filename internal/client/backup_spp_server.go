@@ -11,14 +11,18 @@ func (c *BackupClient) SPPServer() *BackupSPPServerClient {
 }
 
 type BackupSPPServer struct {
-	ID      string `terraform:"id"`
-	Name    string `terraform:"name"`
-	Address string `terraform:"address"`
+	ID      string
+	Name    string
+	Address string
 }
 
-func (c *BackupSPPServerClient) List(ctx context.Context, tenantId string) ([]*BackupSPPServer, error) {
+type BackupSPPServerFilter struct {
+	TenantId string `filter:"tenantId"`
+}
+
+func (c *BackupSPPServerClient) List(ctx context.Context, filter *BackupSPPServerFilter) ([]*BackupSPPServer, error) {
 	r := c.c.newRequest("GET", "/backup/v1/spp/servers")
-	r.params.Add("tenantId", tenantId)
+	r.addFilter(filter)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

@@ -49,25 +49,17 @@ output "network_adapter-2" {
 
 ### Optional
 
-- `name` (String)
-- `virtual_machine_id` (String)
+- `id` (String) The ID of the network adapter to retrieve. Conflicts with `name`.
+- `name` (String) The name of the network adapter to retrieve. Conflicts with `id`.
+- `virtual_machine_id` (String) The ID of the virtual machine the network adapter is attached to. Required when searching by `name`.
 
 ### Read-Only
 
-- `attached` (Boolean)
-- `id` (String) The ID of this resource.
-- `internal_id` (String)
-- `mac_address` (String)
-- `machine_manager_id` (String)
-- `mtu` (Number)
-- `network` (List of Object) (see [below for nested schema](#nestedatt--network))
-
-<a id="nestedatt--network"></a>
-### Nested Schema for `network`
-
-Read-Only:
-
-- `id` (String)
-- `name` (String)
+- `attached` (Boolean) Whether the network adapter is attached to a virtual machine.
+- `internal_id` (String) The internal identifier of the network adapter in the Open IaaS system.
+- `mac_address` (String) The MAC address of the network adapter.
+- `machine_manager_id` (String) The ID of the machine manager this network adapter belongs to.
+- `mtu` (Number) The Maximum Transmission Unit (MTU) size in bytes.
+- `network_id` (String) The ID of the network this adapter is connected to.
 
 

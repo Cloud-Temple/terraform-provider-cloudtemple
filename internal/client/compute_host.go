@@ -11,55 +11,57 @@ func (c *ComputeClient) Host() *HostClient {
 }
 
 type Host struct {
-	ID               string                    `terraform:"id"`
-	Name             string                    `terraform:"name"`
-	Moref            string                    `terraform:"moref"`
-	MachineManagerID string                    `terraform:"machine_manager_id"`
-	Metrics          HostMetrics               `terraform:"metrics"`
-	VirtualMachines  []HostVirtualMachinesStub `terraform:"virtual_machines"`
+	ID              string
+	Name            string
+	Moref           string
+	MachineManager  BaseObject
+	Metrics         HostMetrics
+	VirtualMachines []HostVirtualMachinesStub
 }
 
 type HostMetrics struct {
-	ESX               HostMetricsESXStub    `terraform:"esx"`
-	CPU               HostMetricsCPUStub    `terraform:"cpu"`
-	Memory            HostMetricsMemoryStub `terraform:"memory"`
-	MaintenanceStatus bool                  `terraform:"maintenance_status"`
-	Uptime            int                   `terraform:"uptime"`
-	Connected         bool                  `terraform:"connected"`
+	ESX               HostMetricsESXStub
+	CPU               HostMetricsCPUStub
+	Memory            HostMetricsMemoryStub
+	MaintenanceStatus bool
+	Uptime            int
+	Connected         bool
 }
 
 type HostMetricsESXStub struct {
-	Version  string `terraform:"version"`
-	Build    int    `terraform:"build"`
-	FullName string `terraform:"full_name"`
+	Version  string
+	Build    int
+	FullName string
 }
 
 type HostMetricsCPUStub struct {
-	OverallCPUUsage int `terraform:"overall_cpu_usage"`
-	CPUMhz          int `terraform:"cpu_mhz"`
-	CPUCores        int `terraform:"cpu_cores"`
-	CPUThreads      int `terraform:"cpu_threads"`
+	OverallCPUUsage int
+	CPUMhz          int
+	CPUCores        int
+	CPUThreads      int
 }
 
 type HostMetricsMemoryStub struct {
-	MemorySize  int `terraform:"memory_size"`
-	MemoryUsage int `terraform:"memory_usage"`
+	MemorySize  int
+	MemoryUsage int
 }
 
 type HostVirtualMachinesStub struct {
-	ID   string `terraform:"id"`
-	Type string `terraform:"type"`
+	ID   string
+	Type string
 }
 
-func (h *HostClient) List(
-	ctx context.Context,
-	machineManagerID string,
-	DatacenterID string,
-	hostClusterID string,
-	datastoreID string) ([]*Host, error) {
+type HostFilter struct {
+	Name             string `filter:"name"`
+	MachineManagerID string `filter:"machineManagerId"`
+	DatacenterID     string `filter:"datacenterId"`
+	HostClusterID    string `filter:"hostClusterId"`
+	DatastoreID      string `filter:"datastoreId"`
+}
 
-	// TODO: filters
+func (h *HostClient) List(ctx context.Context, filter *HostFilter) ([]*Host, error) {
 	r := h.c.newRequest("GET", "/compute/v1/vcenters/hosts")
+	r.addFilter(filter)
 	resp, err := h.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

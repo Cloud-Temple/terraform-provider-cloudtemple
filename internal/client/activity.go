@@ -18,14 +18,14 @@ func (c *Client) Activity() *ActivityClient {
 }
 
 type Activity struct {
-	ID             string                   `terraform:"id"`
-	TenantId       string                   `terraform:"tenant_id"`
-	Description    string                   `terraform:"description"`
-	Type           string                   `terraform:"type"`
-	Tags           []string                 `terraform:"tags"`
-	CreationDate   time.Time                `terraform:"creation_date"`
-	ConcernedItems []ActivityConcernedItem  `terraform:"concerned_items"`
-	State          map[string]ActivityState `terraform:"-"`
+	ID             string
+	TenantId       string
+	Description    string
+	Type           string
+	Tags           []string
+	CreationDate   time.Time
+	ConcernedItems []ActivityConcernedItem
+	State          map[string]ActivityState
 }
 
 type ActivityState struct {
@@ -37,8 +37,8 @@ type ActivityState struct {
 }
 
 type ActivityConcernedItem struct {
-	ID   string `terraform:"id"`
-	Type string `terraform:"type"`
+	ID   string
+	Type string
 }
 
 func (c *ActivityClient) List(ctx context.Context, filter *struct{}) ([]*Activity, error) {

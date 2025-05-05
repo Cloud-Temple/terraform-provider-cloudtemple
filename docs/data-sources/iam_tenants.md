@@ -3,10 +3,13 @@
 page_title: "cloudtemple_iam_tenants Data Source - terraform-provider-cloudtemple"
 subcategory: "IAM"
 description: |-
+  Used to retrieve all tenants in the platform.
   To query this datasource you will need the iam_read role.
 ---
 
 # cloudtemple_iam_tenants (Data Source)
+
+Used to retrieve all tenants in the platform.
 
 To query this datasource you will need the `iam_read` role.
 
@@ -22,7 +25,7 @@ data "cloudtemple_iam_tenants" "foo" {}
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `tenants` (List of Object) (see [below for nested schema](#nestedatt--tenants))
+- `tenants` (List of Object) The list of tenants. (see [below for nested schema](#nestedatt--tenants))
 
 <a id="nestedatt--tenants"></a>
 ### Nested Schema for `tenants`

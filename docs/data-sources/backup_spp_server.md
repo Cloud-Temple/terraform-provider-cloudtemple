@@ -3,10 +3,13 @@
 page_title: "cloudtemple_backup_spp_server Data Source - terraform-provider-cloudtemple"
 subcategory: "Backup"
 description: |-
+  Used to retrieve a specific backup SPP server.
   To query this datasource you will need the backup_iaas_spp_read role.
 ---
 
 # cloudtemple_backup_spp_server (Data Source)
+
+Used to retrieve a specific backup SPP server.
 
 To query this datasource you will need the `backup_iaas_spp_read` role.
 
@@ -29,12 +32,12 @@ data "cloudtemple_backup_spp_server" "name" {
 
 ### Optional
 
-- `name` (String)
-- `tenant_id` (String)
+- `id` (String) The ID of the SPP server to retrieve. Conflicts with `name`.
+- `name` (String) The name of the SPP server to retrieve. Conflicts with `id`.
+- `tenant_id` (String) The tenant ID to filter SPP servers by. Only used when searching by name.
 
 ### Read-Only
 
-- `address` (String)
-- `id` (String) The ID of this resource.
+- `address` (String) The network address of the SPP server.
 
 

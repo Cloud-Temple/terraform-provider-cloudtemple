@@ -42,7 +42,7 @@ type Config struct {
 
 	// this parameter will only be used during the tests and not exposed to
 	// clients
-	errorOnUnexpectedActivity bool
+	ErrorOnUnexpectedActivity bool
 }
 
 func DefaultConfig() *Config {
@@ -72,13 +72,13 @@ func DefaultConfig() *Config {
 }
 
 type BaseObject struct {
-	ID   string `terraform:"id"`
-	Name string `terraform:"name"`
+	ID   string
+	Name string
 }
 
 type Client struct {
 	lock       sync.Mutex
-	savedToken *jwt.Token
+	SavedToken *jwt.Token
 
 	config Config
 
@@ -169,7 +169,7 @@ func (r *request) addFilter(filter any) {
 		case "[]string":
 			stringSlice := field.Interface().([]string)
 			for _, s := range stringSlice {
-				r.params.Add(name, s)
+				r.params.Add(name+"[]", s)
 			}
 		default:
 			panic(fmt.Sprintf("unknown type: %q", typ))
@@ -213,16 +213,16 @@ func (r *request) toHTTP(ctx context.Context, token, userAgent string) (*http.Re
 	return req, nil
 }
 
-func (c *Client) token(ctx context.Context) (*jwt.Token, error) {
+func (c *Client) JWT(ctx context.Context) (*jwt.Token, error) {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 
-	if c.savedToken != nil {
-		expireAt := c.savedToken.Claims.(jwt.MapClaims)["exp"].(float64)
+	if c.SavedToken != nil {
+		expireAt := c.SavedToken.Claims.(jwt.MapClaims)["exp"].(float64)
 		tm := time.Unix(int64(expireAt), 0)
 
 		if time.Until(tm) > 5*time.Minute {
-			return c.savedToken, nil
+			return c.SavedToken, nil
 		}
 	}
 
@@ -246,7 +246,7 @@ func (c *Client) token(ctx context.Context) (*jwt.Token, error) {
 	}
 
 	token, _, err := new(jwt.Parser).ParseUnverified(string(bytes), jwt.MapClaims{})
-	c.savedToken = token
+	c.SavedToken = token
 
 	return token, err
 }
@@ -269,7 +269,7 @@ func (l *LoginToken) CompanyID() string {
 }
 
 func (c *Client) Token(ctx context.Context) (*LoginToken, error) {
-	token, err := c.token(ctx)
+	token, err := c.JWT(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -281,7 +281,7 @@ func (c *Client) Token(ctx context.Context) (*LoginToken, error) {
 }
 
 func (c *Client) doRequest(ctx context.Context, r *request) (*http.Response, error) {
-	token, err := c.token(ctx)
+	token, err := c.JWT(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +290,7 @@ func (c *Client) doRequest(ctx context.Context, r *request) (*http.Response, err
 		return nil, err
 	}
 
-	if c.config.errorOnUnexpectedActivity && resp.Header.Get("Location") != "" {
+	if c.config.ErrorOnUnexpectedActivity && resp.Header.Get("Location") != "" {
 		return nil, fmt.Errorf("an unexpected Location header has been found")
 	}
 
@@ -298,7 +298,7 @@ func (c *Client) doRequest(ctx context.Context, r *request) (*http.Response, err
 }
 
 func (c *Client) doRequestAndReturnActivity(ctx context.Context, r *request) (string, error) {
-	token, err := c.token(ctx)
+	token, err := c.JWT(ctx)
 	if err != nil {
 		return "", err
 	}

@@ -11,15 +11,19 @@ func (c *ComputeClient) Snapshot() *SnapshotClient {
 }
 
 type Snapshot struct {
-	ID               string `terraform:"id"`
-	VirtualMachineId string `terraform:"virtual_machine_id"`
-	Name             string `terraform:"name"`
-	CreateTime       int    `terraform:"create_time"`
+	ID               string
+	VirtualMachineId string
+	Name             string
+	CreateTime       int
 }
 
-func (s *SnapshotClient) List(ctx context.Context, virtualMachineId string) ([]*Snapshot, error) {
+type SnapshotFilter struct {
+	VirtualMachineID string `filter:"virtualMachineId"`
+}
+
+func (s *SnapshotClient) List(ctx context.Context, filter *SnapshotFilter) ([]*Snapshot, error) {
 	r := s.c.newRequest("GET", "/compute/v1/vcenters/snapshots")
-	r.params.Add("virtualMachineId", virtualMachineId)
+	r.addFilter(filter)
 	resp, err := s.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

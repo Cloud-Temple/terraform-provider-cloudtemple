@@ -11,27 +11,34 @@ func (c *ComputeClient) VirtualDisk() *VirtualDiskClient {
 }
 
 type VirtualDisk struct {
-	ID                  string `terraform:"id"`
-	VirtualMachineId    string `terraform:"virtual_machine_id"`
-	MachineManagerId    string `terraform:"machine_manager_id"`
-	Name                string `terraform:"name"`
-	Capacity            int    `terraform:"capacity"`
-	DiskUnitNumber      int    `terraform:"disk_unit_number"`
-	ControllerBusNumber int    `terraform:"controller_bus_number"`
-	ControllerId        string `terraform:"controller_id"`
-	DatastoreId         string `terraform:"datastore_id"`
-	DatastoreName       string `terraform:"datastore_name"`
-	InstantAccess       bool   `terraform:"instant_access"`
-	NativeId            string `terraform:"native_id"`
-	DiskPath            string `terraform:"disk_path"`
-	ProvisioningType    string `terraform:"provisioning_type"`
-	DiskMode            string `terraform:"disk_mode"`
-	Editable            bool   `terraform:"editable"`
+	ID               string
+	Name             string
+	VirtualMachineId string
+	MachineManager   BaseObject
+	Datastore        BaseObject
+	Capacity         int
+	DiskUnitNumber   int
+	InstantAccess    bool
+	NativeId         string
+	DiskPath         string
+	ProvisioningType string
+	DiskMode         string
+	Editable         bool
+	Controller       struct {
+		ID        string
+		BusNumber int
+		Type      string
+	}
 }
 
-func (v *VirtualDiskClient) List(ctx context.Context, virtualMachineId string) ([]*VirtualDisk, error) {
+type VirtualDiskFilter struct {
+	Name             string `filter:"name"`
+	VirtualMachineID string `filter:"virtualMachineId"`
+}
+
+func (v *VirtualDiskClient) List(ctx context.Context, filter *VirtualDiskFilter) ([]*VirtualDisk, error) {
 	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_disks")
-	r.params.Add("virtualMachineId", virtualMachineId)
+	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

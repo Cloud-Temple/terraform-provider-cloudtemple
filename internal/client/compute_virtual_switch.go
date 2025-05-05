@@ -11,11 +11,11 @@ func (c *ComputeClient) VirtualSwitch() *VirtualSwitchClient {
 }
 
 type VirtualSwitch struct {
-	ID               string `terraform:"id"`
-	Name             string `terraform:"name"`
-	Moref            string `terraform:"moref"`
-	FolderID         string `terraform:"folder_id"`
-	MachineManagerID string `terraform:"machine_manager_id"`
+	ID             string
+	Name           string
+	Moref          string
+	FolderId       string
+	MachineManager BaseObject
 }
 
 type VirtualSwitchFilter struct {
@@ -29,7 +29,6 @@ func (v *VirtualSwitchClient) List(
 	ctx context.Context,
 	filter *VirtualSwitchFilter) ([]*VirtualSwitch, error) {
 
-	// TODO: filters
 	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_switchs")
 	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)

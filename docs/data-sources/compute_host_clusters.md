@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_host_clusters Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a list of host clusters.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_host_clusters (Data Source)
+
+Used to retrieve a list of host clusters.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -21,14 +24,15 @@ data "cloudtemple_compute_host_clusters" "foo" {}
 
 ### Optional
 
-- `datacenter_id` (String)
-- `datastore_id` (String)
-- `machine_manager_id` (String)
-- `name` (String)
+- `datacenter_id` (String) Filter host clusters by datacenter ID.
+- `datastore_cluster_id` (String) Filter host clusters by datastore cluster ID.
+- `datastore_id` (String) Filter host clusters by datastore ID.
+- `machine_manager_id` (String) Filter host clusters by machine manager ID.
+- `name` (String) Filter host clusters by name.
 
 ### Read-Only
 
-- `host_clusters` (List of Object) (see [below for nested schema](#nestedatt--host_clusters))
+- `host_clusters` (List of Object) List of host clusters matching the filter criteria. (see [below for nested schema](#nestedatt--host_clusters))
 - `id` (String) The ID of this resource.
 
 <a id="nestedatt--host_clusters"></a>
@@ -36,6 +40,7 @@ data "cloudtemple_compute_host_clusters" "foo" {}
 
 Read-Only:
 
+- `datacenter_id` (String)
 - `hosts` (List of Object) (see [below for nested schema](#nestedobjatt--host_clusters--hosts))
 - `id` (String)
 - `machine_manager_id` (String)

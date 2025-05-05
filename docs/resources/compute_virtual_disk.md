@@ -3,6 +3,7 @@
 page_title: "cloudtemple_compute_virtual_disk Resource - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Create and manage virtual disks of a virtual machine.
   To manage this resource you will need the following roles:
     - compute_iaas_vmware_management
     - compute_iaas_vmware_read
@@ -10,6 +11,8 @@ description: |-
 ---
 
 # cloudtemple_compute_virtual_disk (Resource)
+
+Create and manage virtual disks of a virtual machine.
 
 To manage this resource you will need the following roles:
   - `compute_iaas_vmware_management`
@@ -67,12 +70,12 @@ resource "cloudtemple_compute_virtual_disk" "foo" {
 
 ### Required
 
-- `capacity` (Number)
-- `disk_mode` (String) disk_mode can have multiple different values :
+- `capacity` (Number) The size of the disk in bytes. The size must be greater than or equal to the size of the virtual machine's operating system disk.
+- `disk_mode` (String) disk_mode can have multiple different values (persistent, independent_nonpersistent, independent_persistent) :
 					- Persistent: Changes are immediately and permanently written to the virtual disk.
 					- Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots.
 					- Independent persistent: Changes are immediately and permanently written to the virtual disk. Not affected by snapshots.
-- `provisioning_type` (String)
+- `provisioning_type` (String) The provisioning type of the virtual disk. Possible values are: `dynamic`, `staticImmediate`, `staticDiffered`.
 - `virtual_machine_id` (String)
 
 ### Optional
@@ -84,16 +87,17 @@ resource "cloudtemple_compute_virtual_disk" "foo" {
 
 ### Read-Only
 
-- `controller_bus_number` (Number)
-- `datastore_name` (String)
-- `disk_path` (String)
-- `disk_unit_number` (Number)
-- `editable` (Boolean)
+- `controller_bus_number` (Number) The bus number of the controller to which the virtual disk is attached.
+- `controller_type` (String) Virtual controller type.
+- `datastore_name` (String) The name of the datastore where the virtual disk is stored.
+- `disk_path` (String) The path to the disk file in the datastore.
+- `disk_unit_number` (Number) The disk unit number of the virtual disk.
+- `editable` (Boolean) Whether the virtual disk is editable.
 - `id` (String) The ID of this resource.
-- `instant_access` (Boolean)
-- `machine_manager_id` (String)
-- `name` (String)
-- `native_id` (String)
+- `instant_access` (Boolean) Flag that indicates if the disk is in instant access mode.
+- `machine_manager_id` (String) The ID of the machine manager of the network adapter.
+- `name` (String) The name of the virtual disk.
+- `native_id` (String) Virtual disk vSphere identifier.
 
 ## Import
 

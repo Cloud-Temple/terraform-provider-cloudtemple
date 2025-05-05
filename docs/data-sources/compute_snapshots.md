@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_snapshots Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve all snapshots for a specific virtual machine.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_snapshots (Data Source)
+
+Used to retrieve all snapshots for a specific virtual machine.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -23,12 +26,12 @@ data "cloudtemple_compute_snapshots" "foo" {
 
 ### Required
 
-- `virtual_machine_id` (String)
+- `virtual_machine_id` (String) The ID of the virtual machine to retrieve snapshots for.
 
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `snapshots` (List of Object) (see [below for nested schema](#nestedatt--snapshots))
+- `snapshots` (List of Object) List of snapshots for the specified virtual machine. (see [below for nested schema](#nestedatt--snapshots))
 
 <a id="nestedatt--snapshots"></a>
 ### Nested Schema for `snapshots`

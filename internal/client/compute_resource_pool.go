@@ -11,43 +11,44 @@ func (c *ComputeClient) ResourcePool() *ResourcePoolClient {
 }
 
 type ResourcePool struct {
-	ID               string              `terraform:"id"`
-	Name             string              `terraform:"name"`
-	MachineManagerID string              `terraform:"machine_manager_id"`
-	Moref            string              `terraform:"moref"`
-	Parent           ResourcePoolParent  `terraform:"parent"`
-	Metrics          ResourcePoolMetrics `terraform:"metrics"`
+	ID             string
+	Name           string
+	Moref          string
+	Parent         ResourcePoolParent
+	Metrics        ResourcePoolMetrics
+	MachineManager BaseObject
 }
 
 type ResourcePoolParent struct {
-	ID   string `terraform:"id"`
-	Type string `terraform:"type"`
+	ID   string
+	Type string
 }
 
 type ResourcePoolMetrics struct {
-	CPU    ResourcePoolCPUMetrics    `terraform:"cpu"`
-	Memory ResourcePoolMemoryMetrics `terraform:"memory"`
+	CPU    ResourcePoolCPUMetrics
+	Memory ResourcePoolMemoryMetrics
 }
 
 type ResourcePoolCPUMetrics struct {
-	MaxUsage        int `terraform:"max_usage"`
-	ReservationUsed int `terraform:"reservation_used"`
+	MaxUsage        int
+	ReservationUsed int
 }
 
 type ResourcePoolMemoryMetrics struct {
-	MaxUsage        int `terraform:"max_usage"`
-	ReservationUsed int `terraform:"reservation_used"`
-	BalloonedMemory int `terraform:"ballooned_memory"`
+	MaxUsage        int
+	ReservationUsed int
+	BalloonedMemory int
 }
 
-func (rp *ResourcePoolClient) List(
-	ctx context.Context,
-	machineManagerID string,
-	DatacenterID string,
-	hostClusterID string) ([]*ResourcePool, error) {
+type ResourcePoolFilter struct {
+	MachineManagerID string `filter:"machineManagerId"`
+	DatacenterID     string `filter:"datacenterId"`
+	HostClusterID    string `filter:"hostClusterId"`
+}
 
-	// TODO: filters
+func (rp *ResourcePoolClient) List(ctx context.Context, filter *ResourcePoolFilter) ([]*ResourcePool, error) {
 	r := rp.c.newRequest("GET", "/compute/v1/vcenters/resource_pools")
+	r.addFilter(filter)
 	resp, err := rp.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

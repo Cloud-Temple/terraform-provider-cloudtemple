@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_content_library Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific content library.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_content_library (Data Source)
+
+Used to retrieve a specific content library.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -29,14 +32,14 @@ data "cloudtemple_compute_content_library" "name" {
 
 ### Optional
 
-- `machine_manager_id` (String)
-- `name` (String)
+- `id` (String) The ID of the content library to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) The ID of the machine manager to filter content libraries by. Only used when searching by name.
+- `name` (String) The name of the content library to retrieve. Conflicts with `id`.
 
 ### Read-Only
 
-- `datastore` (List of Object) (see [below for nested schema](#nestedatt--datastore))
-- `id` (String) The ID of this resource.
-- `type` (String)
+- `datastore` (List of Object) Information about the datastore associated with this content library. (see [below for nested schema](#nestedatt--datastore))
+- `type` (String) The type of the content library.
 
 <a id="nestedatt--datastore"></a>
 ### Nested Schema for `datastore`

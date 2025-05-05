@@ -11,14 +11,14 @@ func (i *IAM) User() *UserClient {
 }
 
 type User struct {
-	ID            string   `terraform:"id"`
-	InternalID    string   `terraform:"internal_id"`
-	Name          string   `terraform:"name"`
-	Type          string   `terraform:"type"`
-	Source        []string `terraform:"source"`
-	SourceID      string   `terraform:"source_id"`
-	EmailVerified bool     `terraform:"email_verified"`
-	Email         string   `terraform:"email"`
+	ID            string
+	InternalID    string
+	Name          string
+	Type          string
+	Source        []string
+	SourceID      string
+	EmailVerified bool
+	Email         string
 }
 
 func (t *UserClient) Read(ctx context.Context, userID string) (*User, error) {
@@ -41,9 +41,13 @@ func (t *UserClient) Read(ctx context.Context, userID string) (*User, error) {
 	return &out, nil
 }
 
-func (t *UserClient) List(ctx context.Context, companyID string) ([]*User, error) {
+type UserFilter struct {
+	CompanyID string `filter:"companyId"`
+}
+
+func (t *UserClient) List(ctx context.Context, filter *UserFilter) ([]*User, error) {
 	r := t.c.newRequest("GET", "/iam/v2/users")
-	r.params.Add("companyId", companyID)
+	r.addFilter(filter)
 	resp, err := t.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

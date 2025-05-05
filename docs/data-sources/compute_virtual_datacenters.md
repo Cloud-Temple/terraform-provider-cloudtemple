@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_virtual_datacenters Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve all virtual datacenters from a vCenter infrastructure.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_virtual_datacenters (Data Source)
+
+Used to retrieve all virtual datacenters from a vCenter infrastructure.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -22,7 +25,7 @@ data "cloudtemple_compute_virtual_datacenters" "foo" {}
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `virtual_datacenters` (List of Object) (see [below for nested schema](#nestedatt--virtual_datacenters))
+- `virtual_datacenters` (List of Object) List of all virtual datacenters in the vCenter infrastructure. (see [below for nested schema](#nestedatt--virtual_datacenters))
 
 <a id="nestedatt--virtual_datacenters"></a>
 ### Nested Schema for `virtual_datacenters`

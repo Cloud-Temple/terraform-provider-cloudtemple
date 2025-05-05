@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_machine_managers Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve all workers (vCenters) from the infrastructure.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_machine_managers (Data Source)
+
+Used to retrieve all workers (vCenters) from the infrastructure.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -18,7 +21,7 @@ To query this datasource you will need the `compute_iaas_vmware_read` role.
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `machine_managers` (List of Object) (see [below for nested schema](#nestedatt--machine_managers))
+- `machine_managers` (List of Object) List of all workers (vCenters) in the infrastructure. (see [below for nested schema](#nestedatt--machine_managers))
 
 <a id="nestedatt--machine_managers"></a>
 ### Nested Schema for `machine_managers`

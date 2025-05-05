@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_network Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific network in a virtual infrastructure.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_network (Data Source)
+
+Used to retrieve a specific network in a virtual infrastructure.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -27,22 +30,22 @@ data "cloudtemple_compute_network" "name" {
 
 ### Optional
 
-- `datacenter_id` (String)
-- `folder_id` (String)
-- `host_cluster_id` (String)
-- `host_id` (String)
-- `machine_manager_id` (String)
-- `name` (String)
-- `type` (String)
-- `virtual_machine_id` (String)
-- `virtual_switch_id` (String)
+- `datacenter_id` (String) Filter networks by the ID of the datacenter they belong to. Only used when searching by `name`.
+- `folder_id` (String) Filter networks by the ID of the folder they belong to. Only used when searching by `name`.
+- `host_cluster_id` (String) Filter networks by the ID of the host cluster they are connected to. Only used when searching by `name`.
+- `host_id` (String) Filter networks by the ID of a host they are connected to. Only used when searching by `name`.
+- `id` (String) The ID of the network to retrieve. Conflicts with `name`.
+- `machine_manager_id` (String) Filter networks by the ID of the machine manager they belong to. Only used when searching by `name`.
+- `name` (String) The name of the network to retrieve. Conflicts with `id`.
+- `type` (String) Filter networks by type (Network or DistributedVirtualPortgroup). Only used when searching by `name`.
+- `virtual_machine_id` (String) Filter networks by the ID of a virtual machine connected to them. Only used when searching by `name`.
+- `virtual_switch_id` (String) Filter networks by the ID of the virtual switch they are connected to. Only used when searching by `name`.
 
 ### Read-Only
 
-- `host_names` (List of String)
-- `host_number` (Number)
-- `id` (String) The ID of this resource.
-- `moref` (String)
-- `virtual_machines_number` (Number)
+- `host_names` (List of String) The list of host names connected to this network.
+- `host_number` (Number) The number of hosts connected to this network.
+- `moref` (String) The managed object reference ID of the network in the hypervisor.
+- `virtual_machines_number` (Number) The number of virtual machines connected to this network.
 
 

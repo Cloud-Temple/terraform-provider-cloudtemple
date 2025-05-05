@@ -14,16 +14,11 @@ func (c *ComputeClient) ContentLibrary() *ContentLibraryClient {
 }
 
 type ContentLibrary struct {
-	ID               string        `terraform:"id"`
-	Name             string        `terraform:"name"`
-	MachineManagerID string        `terraform:"machine_manager_id"`
-	Type             string        `terraform:"type"`
-	Datastore        DatastoreLink `terraform:"datastore"`
-}
-
-type DatastoreLink struct {
-	ID   string `terraform:"id"`
-	Name string `terraform:"name"`
+	ID             string
+	Name           string
+	Type           string
+	MachineManager BaseObject
+	Datastore      BaseObject
 }
 
 type ContentLibraryFilter struct {
@@ -72,21 +67,20 @@ func (c *ContentLibraryClient) Read(ctx context.Context, id string) (*ContentLib
 }
 
 type ContentLibraryItem struct {
-	ID               string    `terraform:"id"`
-	ContentLibraryId string    `terraform:"content_library_id"`
-	Name             string    `terraform:"name"`
-	Description      string    `terraform:"description"`
-	Type             string    `terraform:"type"`
-	CreationTime     time.Time `terraform:"creation_time"`
-	Size             int       `terraform:"size"`
-	Stored           bool      `terraform:"stored"`
-	LastModifiedTime string    `terraform:"last_modified_time"`
-	OvfProperties    []string  `terraform:"ovf_properties"`
+	ID               string
+	Name             string
+	Description      string
+	Type             string
+	CreationTime     time.Time
+	Size             int
+	Stored           bool
+	LastModifiedTime string
+	OvfProperties    []string
 }
 
 type ContentLibraryItemFilter struct {
 	Name             string `filter:"name"`
-	ContentLibraryId string `terraform:"content_library_id"`
+	ContentLibraryId string
 }
 
 func (c *ContentLibraryClient) ListItems(ctx context.Context, filter *ContentLibraryItemFilter) ([]*ContentLibraryItem, error) {

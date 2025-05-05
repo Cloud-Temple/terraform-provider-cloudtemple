@@ -337,19 +337,20 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 - `content_library_id` (String) The ID of the content library to clone from. Conflict with `clone_virtual_machine_id`.
 - `content_library_item_id` (String) The ID of the content library item to clone. Conflict with `clone_virtual_machine_id`.
 - `cpu` (Number) The number of CPUs to start the virtual machine with.
-- `cpu_hot_add_enabled` (Boolean)
-- `cpu_hot_remove_enabled` (Boolean)
+- `cpu_hot_add_enabled` (Boolean) Flag that indicate if hot add of CPU is enabled or not.
+- `cpu_hot_remove_enabled` (Boolean) Flag that indicate if hot remove of CPU is enabled or not.
 - `customize` (Block List, Max: 1) Customizes a virtual machine's guest operating system. (VMWare Tools has to be installed) (see [below for nested schema](#nestedblock--customize))
 - `datastore_cluster_id` (String)
 - `datastore_id` (String)
 - `deploy_options` (Map of String)
-- `disks_provisioning_type` (String) Overrides the provisioning type for the os_disks of an OVF.
+- `disks_provisioning_type` (String) Overrides the provisioning type for the os_disks of an OVF. Possible values are: `dynamic`, `staticImmediate`, `staticDiffered`.
 - `expose_hardware_virtualization` (Boolean) Enable nested hardware virtualization on the virtual machine, facilitating nested virtualization in the guest operating system (Default: false)
 - `guest_operating_system_moref` (String) The operating system to launch the virtual machine with.
 - `host_id` (String) The host to start the virtual machine on.
-- `memory` (Number) The quantity of memory to start the virtual machine with.
-- `memory_hot_add_enabled` (Boolean)
-- `num_cores_per_socket` (Number)
+- `memory` (Number) In bytes. The quantity of memory to start the virtual machine with.
+- `memory_hot_add_enabled` (Boolean) Flag that indicate if hot add of memory is enabled or not.
+- `memory_reservation` (Number) In bytes. Amount of resource that is guaranteed available to the virtual machine. Reserved resources are not wasted if they are not used. If the utilization is less than the reservation, the resources can be utilized by other running virtual machines.
+- `num_cores_per_socket` (Number) Number of cores per socket.
 - `os_disk` (Block List) OS disks created from content lib item deployment or virtual machine clone. (see [below for nested schema](#nestedblock--os_disk))
 - `os_network_adapter` (Block List) OS network adapters created from content lib item deployment or virtual machine clone. (see [below for nested schema](#nestedblock--os_network_adapter))
 - `power_state` (String) Whether to start the virtual machine.
@@ -357,24 +358,39 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 
 ### Read-Only
 
-- `consolidation_needed` (Boolean)
+- `consolidation_needed` (Boolean) The most typical causes for VMs to shows ‘Virtual Machine disks consolidation is needed’ Alert:
+
+-Snapshots cannot be deleted/consolidated after completing backups.
+
+-There is not enough space on the Datastore to perform consolidation. VM disk/disks would be residing on the datastore which has less than 1 GB available space.
+
+-Third-party backup application (Veeam, Unitrends, Dataprotect) has locked snapshot files, and failed to remove the snapshot after completing backups or failed to initiate backups. vCenter server and the ESXi host connectivity issues.
+
+-When there are more than the VMware recommended number of snapshots, consolidation may fail. (VMware recommends only 32 as the maximum number of snapshots under best practices).
+
+-When large snapshots are undergoing consolidation, VM may show unresponsive/frozen but the alert continues to show up.
 - `cpu_usage` (Number)
+- `datacenter_name` (String)
+- `datastore_cluster_name` (String)
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
 - `extra_config` (List of Object) (see [below for nested schema](#nestedatt--extra_config))
 - `hardware_version` (String)
+- `host_cluster_name` (String)
 - `id` (String) The ID of this resource.
 - `machine_manager_id` (String)
 - `machine_manager_name` (String)
 - `machine_manager_type` (String)
 - `memory_usage` (Number)
-- `moref` (String)
+- `moref` (String) Virtual machine vSphere identifier.
 - `operating_system_name` (String)
 - `replication_config` (List of Object) (see [below for nested schema](#nestedatt--replication_config))
 - `snapshoted` (Boolean)
-- `spp_mode` (String)
+- `spp_mode` (String) Clone mode creates copies of virtual machines for use cases that require permanent or long-running copies for data mining or duplication of a test environment in a fenced network. Virtual machines created in clone mode are also given unique names and identifiers to avoid conflicts within your production environment. With clone mode, you must be sensitive to resource consumption because clone mode creates permanent or long-term virtual machines.
+
+Test mode creates temporary virtual machines for development or testing, snapshot verification, and disaster recovery verification on a scheduled, repeatable basis without affecting production environments. Test machines are kept running as long as needed to complete testing and verification and are then cleaned up. Through fenced networking, you can establish a safe environment to test your jobs without interfering with virtual machines used for production. Virtual machines that are created in test mode are also given unique names and identifiers to avoid conflicts within your production environment.
 - `storage` (List of Object) (see [below for nested schema](#nestedatt--storage))
-- `template` (Boolean)
+- `template` (Boolean) Flag that indicate whether the VM is a template or not.
 - `tools` (String)
 - `tools_version` (Number)
 - `triggered_alarms` (List of Object) (see [below for nested schema](#nestedatt--triggered_alarms))
@@ -466,23 +482,26 @@ Optional:
 
 Optional:
 
-- `capacity` (Number)
-- `disk_mode` (String)
+- `capacity` (Number) The size of the disk in bytes. The size must be greater than or equal to the size of the virtual machine's operating system disk.
+- `disk_mode` (String) Possible values are: persistent, independent_nonpersistent, independent_persistent.
+Persistent: Changes are immediately and permanently written to the virtual disk
+Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots
+Independent persistent: Changes are immediately and permanently written to the virtual disk. Not affected by snapshots
 
 Read-Only:
 
-- `controller_bus_number` (Number)
-- `datastore_id` (String)
-- `datastore_name` (String)
-- `disk_path` (String)
-- `disk_unit_number` (Number)
-- `editable` (Boolean)
-- `id` (String) The ID of this resource.
-- `instant_access` (Boolean)
-- `machine_manager_id` (String)
-- `name` (String)
-- `native_id` (String)
-- `provisioning_type` (String)
+- `controller_bus_number` (Number) The bus number of the controller to which the virtual disk is attached.
+- `datastore_id` (String) The ID of the datastore where the virtual disk is stored.
+- `datastore_name` (String) The name of the datastore where the virtual disk is stored.
+- `disk_path` (String) The path to the disk file in the datastore.
+- `disk_unit_number` (Number) The disk unit number of the virtual disk.
+- `editable` (Boolean) Whether the virtual disk is editable.
+- `id` (String) The unique identifier of the virtual disk.
+- `instant_access` (Boolean) Whether the disk is an instant access disk.
+- `machine_manager_id` (String) The ID of the machine manager that manages the virtual disk.
+- `name` (String) The name of the virtual disk.
+- `native_id` (String) The native ID of the disk in the hypervisor.
+- `provisioning_type` (String) The provisioning type of the virtual disk. Possible values are: `dynamic`, `staticImmediate`, `staticDiffered`.
 
 
 <a id="nestedblock--os_network_adapter"></a>
@@ -490,17 +509,17 @@ Read-Only:
 
 Optional:
 
-- `auto_connect` (Boolean)
-- `connected` (Boolean)
-- `mac_address` (String)
-- `mac_type` (String)
-- `network_id` (String)
+- `auto_connect` (Boolean) Whether the network adapter should be automatically connected when the virtual machine is powered on.
+- `connected` (Boolean) Whether the network adapter is connected to the network.
+- `mac_address` (String) The MAC address of the network adapter. If not specified, a random MAC address will be generated.
+- `network_id` (String) The ID of the network to which the virtual machine is connected.
 
 Read-Only:
 
-- `id` (String) The ID of this resource.
-- `name` (String)
-- `type` (String)
+- `id` (String) The unique identifier of the network adapter.
+- `mac_type` (String) The type of MAC address assignment (e.g., MANUAL, GENERATED).
+- `name` (String) The name of the network adapter.
+- `type` (String) The type of the network adapter (e.g., VMXNET3, E1000).
 
 
 <a id="nestedatt--extra_config"></a>

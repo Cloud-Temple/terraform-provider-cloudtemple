@@ -3,10 +3,13 @@
 page_title: "cloudtemple_compute_network_adapter Data Source - terraform-provider-cloudtemple"
 subcategory: "Compute"
 description: |-
+  Used to retrieve a specific network adapter attached to a virtual machine.
   To query this datasource you will need the compute_iaas_vmware_read role.
 ---
 
 # cloudtemple_compute_network_adapter (Data Source)
+
+Used to retrieve a specific network adapter attached to a virtual machine.
 
 To query this datasource you will need the `compute_iaas_vmware_read` role.
 
@@ -28,17 +31,17 @@ data "cloudtemple_compute_network_adapter" "name" {
 
 ### Optional
 
-- `name` (String)
-- `virtual_machine_id` (String)
+- `id` (String) The ID of the network adapter to retrieve. Conflicts with `name`.
+- `name` (String) The name of the network adapter to retrieve. Requires `virtual_machine_id`. Conflicts with `id`.
+- `virtual_machine_id` (String) The ID of the virtual machine the network adapter is attached to. Required when searching by `name`.
 
 ### Read-Only
 
-- `auto_connect` (Boolean)
-- `connected` (Boolean)
-- `id` (String) The ID of this resource.
-- `mac_address` (String)
-- `mac_type` (String)
-- `network_id` (String)
-- `type` (String)
+- `auto_connect` (Boolean) Whether the network adapter is configured to connect automatically when the virtual machine powers on.
+- `connected` (Boolean) Whether the network adapter is currently connected.
+- `mac_address` (String) The MAC address of the network adapter.
+- `mac_type` (String) The type of MAC address assignment (e.g., MANUAL, GENERATED).
+- `network_id` (String) The ID of the network this adapter is connected to.
+- `type` (String) The type of the network adapter (e.g., VMXNET3, E1000).
 
 

@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -123,21 +121,32 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_compute_machine_managers":        documentDatasource(dataSourceWorkers(), "compute_iaas_vmware_read"),
 
 				// Backup - Open IaaS
-				"cloudtemple_backup_iaas_opensource_policy":  documentDatasource(dataSourceOpenIaasBackupPolicy(), "backup_iaas_opensource_read"),
-				"cloudtemple_backup_iaas_opensource_backup":  documentDatasource(dataSourceOpenIaasBackup(), "backup_iaas_opensource_read"),
-				"cloudtemple_backup_iaas_opensource_backups": documentDatasource(dataSourceOpenIaasBackups(), "backup_iaas_opensource_read"),
+				"cloudtemple_backup_iaas_opensource_policy":   documentDatasource(dataSourceOpenIaasBackupPolicy(), "backup_iaas_opensource_read"),
+				"cloudtemple_backup_iaas_opensource_policies": documentDatasource(dataSourceOpenIaasBackupPolicies(), "backup_iaas_opensource_read"),
+				"cloudtemple_backup_iaas_opensource_backup":   documentDatasource(dataSourceOpenIaasBackup(), "backup_iaas_opensource_read"),
+				"cloudtemple_backup_iaas_opensource_backups":  documentDatasource(dataSourceOpenIaasBackups(), "backup_iaas_opensource_read"),
 
 				// Compute - Open IaaS
-				"cloudtemple_compute_iaas_opensource_host":               documentDatasource(dataSourceOpenIaasHost(), "compute_iaas_opensource_infrastructure_read"),
-				"cloudtemple_compute_iaas_opensource_storage_repository": documentDatasource(dataSourceOpenIaasStorageRepository(), "compute_iaas_opensource_infrastructure_read"),
-				"cloudtemple_compute_iaas_opensource_pool":               documentDatasource(dataSourceOpenIaasPool(), "compute_iaas_opensource_infrastructure_read"),
-				"cloudtemple_compute_iaas_opensource_template":           documentDatasource(dataSourceOpenIaasTemplate(), "compute_iaas_opensource_read"),
-				"cloudtemple_compute_iaas_opensource_network":            documentDatasource(dataSourceOpenIaasNetwork(), "compute_iaas_opensource_read"),
-				"cloudtemple_compute_iaas_opensource_virtual_machine":    documentDatasource(dataSourceOpenIaasVirtualMachine(), "compute_iaas_opensource_read"),
-				"cloudtemple_compute_iaas_opensource_virtual_disk":       documentDatasource(dataSourceOpenIaasVirtualDisk(), "compute_iaas_opensource_read"),
-				"cloudtemple_compute_iaas_opensource_network_adapter":    documentDatasource(dataSourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_read"),
-				"cloudtemple_compute_iaas_opensource_snapshot":           documentDatasource(dataSourceOpenIaasSnapshot(), "compute_iaas_opensource_read"),
-				"cloudtemple_compute_iaas_opensource_availability_zone":  documentDatasource(dataSourceOpenIaasMachineManager(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_host":                 documentDatasource(dataSourceOpenIaasHost(), "compute_iaas_opensource_infrastructure_read"),
+				"cloudtemple_compute_iaas_opensource_hosts":                documentDatasource(dataSourceOpenIaasHosts(), "compute_iaas_opensource_infrastructure_read"),
+				"cloudtemple_compute_iaas_opensource_storage_repository":   documentDatasource(dataSourceOpenIaasStorageRepository(), "compute_iaas_opensource_infrastructure_read"),
+				"cloudtemple_compute_iaas_opensource_storage_repositories": documentDatasource(dataSourceOpenIaasStorageRepositories(), "compute_iaas_opensource_infrastructure_read"),
+				"cloudtemple_compute_iaas_opensource_pool":                 documentDatasource(dataSourceOpenIaasPool(), "compute_iaas_opensource_infrastructure_read"),
+				"cloudtemple_compute_iaas_opensource_pools":                documentDatasource(dataSourceOpenIaasPools(), "compute_iaas_opensource_infrastructure_read"),
+				"cloudtemple_compute_iaas_opensource_template":             documentDatasource(dataSourceOpenIaasTemplate(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_templates":            documentDatasource(dataSourceOpenIaasTemplates(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_network":              documentDatasource(dataSourceOpenIaasNetwork(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_networks":             documentDatasource(dataSourceOpenIaasNetworks(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_virtual_machine":      documentDatasource(dataSourceOpenIaasVirtualMachine(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_virtual_machines":     documentDatasource(dataSourceOpenIaasVirtualMachines(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_virtual_disk":         documentDatasource(dataSourceOpenIaasVirtualDisk(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_virtual_disks":        documentDatasource(dataSourceOpenIaasVirtualDisks(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_network_adapter":      documentDatasource(dataSourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_network_adapters":     documentDatasource(dataSourceOpenIaasNetworkAdapters(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_snapshot":             documentDatasource(dataSourceOpenIaasSnapshot(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_snapshots":            documentDatasource(dataSourceOpenIaasSnapshots(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_availability_zone":    documentDatasource(dataSourceOpenIaasMachineManager(), "compute_iaas_opensource_read"),
+				"cloudtemple_compute_iaas_opensource_availability_zones":   documentDatasource(dataSourceOpenIaasMachineManagers(), "compute_iaas_opensource_read"),
 
 				// IAM
 				"cloudtemple_iam_company":                documentDatasource(dataSourceCompany(), "iam_read"),
@@ -151,9 +160,6 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_iam_users":                  documentDatasource(dataSourceUsers(), "iam_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
-				// Backup - IaaS VMWare
-				"cloudtemple_backup_sla_policy_assignment": documentResource(resourceBackupSLAPolicyAssignment(), "backup_iaas_spp_read", "backup_iaas_spp_write", "activity_read"),
-
 				// Compute - IaaS VMWare
 				"cloudtemple_compute_network_adapter":    documentResource(resourceNetworkAdapter(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
 				"cloudtemple_compute_virtual_controller": documentResource(resourceVirtualController(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
@@ -295,98 +301,161 @@ func (sw *stateWriter) set(key string, value any) {
 	}
 }
 
-func (sw *stateWriter) save(obj any, skip []string) {
-	skipFields := map[string]struct{}{}
-	for _, s := range skip {
-		skipFields[s] = struct{}{}
-	}
+// processFlattenedStructs parcourt l'objet à la recherche de structures avec le tag terraform_flatten
+// et définit leurs champs directement dans le schéma Terraform au niveau supérieur.
+// func (sw *stateWriter) processFlattenedStructs(obj interface{}) {
+// 	val := reflect.ValueOf(obj)
+// 	if val.Kind() == reflect.Ptr {
+// 		val = val.Elem()
+// 	}
 
-	typ := reflect.TypeOf(obj)
-	fields := map[string]reflect.Value{}
+// 	// Ne traiter que les structures
+// 	if val.Kind() != reflect.Struct {
+// 		return
+// 	}
 
-	switch typ.Kind() {
-	case reflect.Map:
-		for name, value := range obj.(map[string]interface{}) {
-			fields[name] = reflect.ValueOf(value)
-		}
-	case reflect.Pointer:
-		item := reflect.ValueOf(obj).Elem()
-		if item.Kind() == reflect.Interface {
-			item = item.Elem()
-		}
-		for _, field := range reflect.VisibleFields(item.Type()) {
-			name, found := field.Tag.Lookup("terraform")
-			if name == "-" {
-				continue
-			}
-			if !found {
-				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
-				continue
-			}
-			fields[name] = item.FieldByName(field.Name)
-		}
-	default:
-		sw.diags = append(sw.diags, diag.Errorf("unexpected type %s", typ.String())...)
-	}
+// 	typ := val.Type()
 
-	for name, value := range fields {
-		if _, skip := skipFields[name]; skip {
-			continue
-		}
+// 	// Parcourir tous les champs de la structure
+// 	for i := 0; i < val.NumField(); i++ {
+// 		field := val.Field(i)
+// 		fieldType := typ.Field(i)
 
-		converted := sw.convert(value, false, name, skipFields)
-		sw.set(name, converted)
-	}
-}
+// 		// Vérifier si le champ est une structure
+// 		if field.Kind() == reflect.Struct {
+// 			// Vérifier si la structure a le tag terraform_flatten
+// 			prefix, shouldFlatten := fieldType.Tag.Lookup("terraform_flatten")
+// 			if shouldFlatten {
+// 				// Si le tag terraform_flatten est "true", utiliser le nom du champ
+// 				if prefix == "true" || prefix == "" {
+// 					prefix = strings.ToLower(fieldType.Name)
+// 				}
 
-func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string, skipFields map[string]struct{}) any {
-	// Convert time.Time to its string representation
-	if v.Type().String() == "time.Time" {
-		return v.Interface().(time.Time).Format(time.RFC3339)
-	}
+// 				// Parcourir tous les champs de la structure à aplatir
+// 				nestedType := field.Type()
+// 				for j := 0; j < field.NumField(); j++ {
+// 					nestedField := field.Field(j)
+// 					nestedFieldType := nestedType.Field(j)
 
-	k := v.Kind()
-	switch k {
-	case reflect.Bool, reflect.Int, reflect.String, reflect.Float64:
-		return v.Interface()
+// 					// Obtenir le nom du champ dans le schéma Terraform
+// 					name, found := nestedFieldType.Tag.Lookup("terraform")
+// 					if !found || name == "-" {
+// 						continue
+// 					}
 
-	case reflect.Slice:
-		items := []interface{}{}
-		for i := 0; i < v.Len(); i++ {
-			item := v.Index(i)
-			if item.Kind() == reflect.Ptr {
-				item = item.Elem()
-			}
-			items = append(items, sw.convert(item, true, path+".#", skipFields))
-		}
-		return items
+// 					// Construire le nom complet du champ aplati
+// 					flatName := prefix + "_" + name
 
-	case reflect.Struct:
-		body := map[string]interface{}{}
-		for _, field := range reflect.VisibleFields(v.Type()) {
-			name, found := field.Tag.Lookup("terraform")
+// 					// Définir le champ aplati dans le schéma Terraform
+// 					sw.set(flatName, nestedField.Interface())
+// 				}
+// 			}
+// 		}
+// 	}
+// }
 
-			p := path + "." + name
-			if _, skip := skipFields[p]; skip || name == "-" {
-				continue
-			}
+// func (sw *stateWriter) save(obj any, skip []string, useFlatten bool) {
+// 	skipFields := map[string]struct{}{}
+// 	for _, s := range skip {
+// 		skipFields[s] = struct{}{}
+// 	}
 
-			if !found {
-				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
-				continue
-			}
-			body[name] = sw.convert(v.FieldByName(field.Name), false, p, skipFields)
-		}
-		if alreadyInSlice {
-			return body
-		}
-		return []interface{}{body}
+// 	typ := reflect.TypeOf(obj)
+// 	fields := map[string]reflect.Value{}
 
-	default:
-		sw.diags = append(sw.diags, diag.Errorf("%s unknown kind %q", path, k.String())...)
-		return nil
-	}
-}
+// 	switch typ.Kind() {
+// 	case reflect.Map:
+// 		for name, value := range obj.(map[string]interface{}) {
+// 			fields[name] = reflect.ValueOf(value)
+// 		}
+// 	case reflect.Pointer:
+// 		item := reflect.ValueOf(obj).Elem()
+// 		if item.Kind() == reflect.Interface {
+// 			item = item.Elem()
+// 		}
+// 		for _, field := range reflect.VisibleFields(item.Type()) {
+// 			// Ignorer les champs qui ont le tag terraform_flatten si useFlatten est true
+// 			if _, shouldFlatten := field.Tag.Lookup("terraform_flatten"); shouldFlatten && useFlatten {
+// 				continue
+// 			}
+
+// 			name, found := field.Tag.Lookup("terraform")
+// 			if name == "-" {
+// 				continue
+// 			}
+// 			if !found {
+// 				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
+// 				continue
+// 			}
+// 			fields[name] = item.FieldByName(field.Name)
+// 		}
+// 	default:
+// 		sw.diags = append(sw.diags, diag.Errorf("unexpected type %s", typ.String())...)
+// 	}
+
+// 	for name, value := range fields {
+// 		if _, skip := skipFields[name]; skip {
+// 			continue
+// 		}
+
+// 		converted := sw.convert(value, false, name, skipFields)
+// 		sw.set(name, converted)
+// 	}
+
+// 	// Traiter les structures aplaties seulement si useFlatten est true
+// 	if useFlatten {
+// 		sw.processFlattenedStructs(obj)
+// 	}
+// }
+
+// func (sw *stateWriter) convert(v reflect.Value, alreadyInSlice bool, path string, skipFields map[string]struct{}) any {
+// 	// Convert time.Time to its string representation
+// 	if v.Type().String() == "time.Time" {
+// 		return v.Interface().(time.Time).Format(time.RFC3339)
+// 	}
+
+// 	k := v.Kind()
+// 	switch k {
+// 	case reflect.Bool, reflect.Int, reflect.String, reflect.Float64:
+// 		return v.Interface()
+
+// 	case reflect.Slice:
+// 		items := []interface{}{}
+// 		for i := 0; i < v.Len(); i++ {
+// 			item := v.Index(i)
+// 			if item.Kind() == reflect.Ptr {
+// 				item = item.Elem()
+// 			}
+// 			items = append(items, sw.convert(item, true, path+".#", skipFields))
+// 		}
+// 		return items
+
+// 	case reflect.Struct:
+// 		body := map[string]interface{}{}
+// 		for _, field := range reflect.VisibleFields(v.Type()) {
+// 			name, found := field.Tag.Lookup("terraform")
+
+// 			p := path + "." + name
+// 			if _, skip := skipFields[p]; skip || name == "-" {
+// 				continue
+// 			}
+
+// 			if !found {
+// 				sw.diags = append(sw.diags, diag.Errorf("no terraform tag found for %q", field.Name)...)
+// 				continue
+// 			}
+// 			body[name] = sw.convert(v.FieldByName(field.Name), false, p, skipFields)
+// 		}
+// 		if alreadyInSlice {
+// 			return body
+// 		}
+// 		return []interface{}{body}
+
+// 	default:
+// 		sw.diags = append(sw.diags, diag.Errorf("%s unknown kind %q", path, k.String())...)
+// 		return nil
+// 	}
+// }
 
 // IsNumber is a ValidateFunc that ensures a string can be parsed as a number
 func IsNumber(i interface{}, k string) (warnings []string, errors []error) {
