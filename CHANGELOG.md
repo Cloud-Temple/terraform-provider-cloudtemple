@@ -1,4 +1,6 @@
-## 1.0.0-rc.1 (NOT RELEASED YET)
+***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
+
+## 1.0.0-rc.1 (May 5th, 2025)
 
 IMPROVEMENTS:
 

@@ -46,11 +46,6 @@ func dataSourceOpenIaasMachineManager() *schema.Resource {
 				Computed:    true,
 				Description: "The operating system name of the machine manager.",
 			},
-			"xoa_version": {
-				Type:        schema.TypeString,
-				Computed:    true,
-				Description: "The XOA version of the machine manager.",
-			},
 		},
 	}
 }

@@ -21,7 +21,7 @@ func dataSourceUsers() *schema.Resource {
 			"company_id": {
 				Description:  "The ID of the company to retrieve users for.",
 				Type:         schema.TypeString,
-				Optional:     true,
+				Required:     true,
 				ValidateFunc: validation.IsUUID,
 			},
 

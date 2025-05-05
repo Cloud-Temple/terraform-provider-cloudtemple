@@ -11,13 +11,14 @@ func (c *BackupOpenIaasClient) Policy() *BackupOpenIaasPolicyClient {
 }
 
 type BackupOpenIaasPolicy struct {
-	ID             string
-	Name           string
-	InternalID     string
-	Running        bool
-	Mode           string
-	MachineManager BaseObject
-	Schedulers     []struct {
+	ID              string
+	Name            string
+	InternalID      string
+	Running         bool
+	Mode            string
+	MachineManager  BaseObject
+	VirtualMachines []string
+	Schedulers      []struct {
 		TemporarilyDisabled bool
 		Retention           int
 		Cron                string

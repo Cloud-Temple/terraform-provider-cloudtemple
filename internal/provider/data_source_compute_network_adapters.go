@@ -99,7 +99,7 @@ func computeNetworkAdaptersRead(ctx context.Context, d *schema.ResourceData, met
 	}
 
 	// Définir l'ID de la datasource
-	d.SetId("network_adapters")
+	d.SetId("network_adapters" + d.Get("virtual_machine_id").(string))
 
 	// Mapper manuellement les données en utilisant la fonction helper
 	tfNetworkAdapters := make([]map[string]interface{}, len(networkAdapters))

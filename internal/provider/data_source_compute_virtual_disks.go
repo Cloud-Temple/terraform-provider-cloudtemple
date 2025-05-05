@@ -140,7 +140,7 @@ func dataSourceVirtualDisksRead(ctx context.Context, d *schema.ResourceData, met
 	}
 
 	// Définir l'ID de la datasource
-	d.SetId("virtual_disks")
+	d.SetId("virtual_disks" + virtualMachineId)
 
 	// Mapper manuellement les données en utilisant la fonction helper
 	tfDisks := make([]map[string]interface{}, len(disks))

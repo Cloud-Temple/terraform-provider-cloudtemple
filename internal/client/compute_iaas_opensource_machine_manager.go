@@ -11,11 +11,10 @@ func (c *ComputeOpenIaaSClient) MachineManager() *OpenIaaSMachineManagerClient {
 }
 
 type OpenIaaSMachineManager struct {
-	ID         string
-	Name       string
-	OSVersion  string
-	OSName     string
-	XOAVersion string
+	ID        string
+	Name      string
+	OSVersion string
+	OSName    string
 }
 
 func (v *OpenIaaSMachineManagerClient) Read(ctx context.Context, id string) (*OpenIaaSMachineManager, error) {

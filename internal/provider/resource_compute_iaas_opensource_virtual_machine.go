@@ -58,7 +58,7 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 			"power_state": {
 				Type:         schema.TypeString,
 				Description:  "The desired power state of the virtual machine. Available values are 'on' and 'off'.",
-				Optional:     true,
+				Required:     true,
 				ValidateFunc: validation.StringInSlice([]string{"on", "off"}, false),
 			},
 			"host_id": {
