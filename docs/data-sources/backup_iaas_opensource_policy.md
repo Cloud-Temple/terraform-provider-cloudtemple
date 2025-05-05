@@ -59,6 +59,7 @@ output "policy-2" {
 - `mode` (String) The backup mode of the policy (e.g., full, incremental).
 - `running` (Boolean) Indicates whether the policy is currently running.
 - `schedulers` (List of Object) List of schedulers configured for this backup policy. (see [below for nested schema](#nestedatt--schedulers))
+- `virtual_machines` (List of String) List of virtual machines associated with this backup policy.
 
 <a id="nestedatt--schedulers"></a>
 ### Nested Schema for `schedulers`

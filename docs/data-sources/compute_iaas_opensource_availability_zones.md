@@ -44,6 +44,5 @@ Read-Only:
 - `name` (String)
 - `os_name` (String)
 - `os_version` (String)
-- `xoa_version` (String)
 
 

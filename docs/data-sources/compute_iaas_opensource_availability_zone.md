@@ -50,6 +50,5 @@ output "availability_zone-2" {
 
 - `os_name` (String) The operating system name of the machine manager.
 - `os_version` (String) The operating system version of the machine manager.
-- `xoa_version` (String) The XOA version of the machine manager.
 
 
