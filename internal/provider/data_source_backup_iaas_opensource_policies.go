@@ -85,7 +85,9 @@ func dataSourceOpenIaasBackupPolicies() *schema.Resource {
 							Type:        schema.TypeList,
 							Computed:    true,
 							Description: "List of virtual machines associated with this backup policy.",
-							Elem:        schema.TypeString,
+							Elem: &schema.Schema{
+								Type: schema.TypeString,
+							},
 						},
 						"schedulers": {
 							Type:        schema.TypeList,
