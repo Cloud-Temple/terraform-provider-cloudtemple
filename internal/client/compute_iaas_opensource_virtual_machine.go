@@ -57,12 +57,18 @@ type CloudInit struct {
 	NetworkConfig string `json:"networkConfig,omitempty"`
 }
 
+type OSNetworkAdapter struct {
+	NetworkID string `json:"networkId"`
+	MAC       string `json:"macAddress"`
+}
+
 type CreateOpenIaasVirtualMachineRequest struct {
-	Name       string    `json:"name"`
-	TemplateID string    `json:"templateId"`
-	CPU        int       `json:"cpu"`
-	Memory     int       `json:"memory"`
-	CloudInit  CloudInit `json:"cloudInit,omitempty"`
+	Name            string             `json:"name"`
+	TemplateID      string             `json:"templateId"`
+	CPU             int                `json:"cpu"`
+	Memory          int                `json:"memory"`
+	CloudInit       CloudInit          `json:"cloudInit,omitempty"`
+	NetworkAdapters []OSNetworkAdapter `json:"networkAdapters,omitempty"`
 }
 
 func (c *OpenIaaSVirtualMachineClient) Create(ctx context.Context, req *CreateOpenIaasVirtualMachineRequest) (string, error) {

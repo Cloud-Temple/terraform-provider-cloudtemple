@@ -51,12 +51,12 @@ func FlattenOpenIaaSVirtualMachine(vm *client.OpenIaaSVirtualMachine) map[string
 	}
 }
 
-func FlattenOpenIaaSOSDisksData(osDisks []client.TemplateDisk) []interface{} {
+func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMachineId string) []interface{} {
 	if osDisks != nil {
 		disks := make([]interface{}, len(osDisks))
 
 		for i, osDisk := range osDisks {
-			disks[i] = FlattenOpenIaaSOSDiskData(osDisk)
+			disks[i] = FlattenOpenIaaSOSDiskData(osDisk, virtualMachineId)
 		}
 
 		return disks
@@ -65,16 +65,22 @@ func FlattenOpenIaaSOSDisksData(osDisks []client.TemplateDisk) []interface{} {
 	return make([]interface{}, 0)
 }
 
-func FlattenOpenIaaSOSDiskData(osDisk client.TemplateDisk) interface{} {
+func FlattenOpenIaaSOSDiskData(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) interface{} {
+	vbd := Find(osDisk.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
+		return virtualMachine.ID == virtualMachineId
+	})
+
 	return map[string]interface{}{
+		"id":                    osDisk.ID,
 		"name":                  osDisk.Name,
 		"size":                  osDisk.Size,
 		"description":           osDisk.Description,
 		"storage_repository_id": osDisk.StorageRepository.ID,
+		"connected":             vbd.Connected,
 	}
 }
 
-func FlattenOpenIaaSOSNetworkAdaptersData(osNetworkAdapters []client.TemplateNetworkAdapter) []interface{} {
+func FlattenOpenIaaSOSNetworkAdaptersData(osNetworkAdapters []*client.OpenIaaSNetworkAdapter) []interface{} {
 	if osNetworkAdapters != nil {
 		networkAdapters := make([]interface{}, len(osNetworkAdapters))
 
@@ -88,8 +94,9 @@ func FlattenOpenIaaSOSNetworkAdaptersData(osNetworkAdapters []client.TemplateNet
 	return make([]interface{}, 0)
 }
 
-func FlattenOpenIaaSOSNetworkAdapterData(osNetworkAdapter client.TemplateNetworkAdapter) interface{} {
+func FlattenOpenIaaSOSNetworkAdapterData(osNetworkAdapter *client.OpenIaaSNetworkAdapter) interface{} {
 	return map[string]interface{}{
+		"id":          osNetworkAdapter.ID,
 		"name":        osNetworkAdapter.Name,
 		"mac_address": osNetworkAdapter.MacAddress,
 		"mtu":         osNetworkAdapter.MTU,

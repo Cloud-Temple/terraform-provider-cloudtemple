@@ -1,10 +1,10 @@
-package provider
+package helpers
 
 import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func exists[T any](data []T, f func(T) bool) bool {
+func Exists[T any](data []T, f func(T) bool) bool {
 	for _, v := range data {
 		if f(v) {
 			return true
@@ -12,6 +12,18 @@ func exists[T any](data []T, f func(T) bool) bool {
 	}
 
 	return false
+}
+
+type Predicate[T any] func(T) bool
+
+func Find[T any](slice []T, predicate Predicate[T]) *T {
+	for _, element := range slice {
+		if predicate(element) {
+			return &element
+		}
+	}
+	var zero T
+	return &zero
 }
 
 func GetStringList(d *schema.ResourceData, key string) []string {

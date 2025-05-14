@@ -55,7 +55,7 @@ func (v *OpenIaaSNetworkAdapterClient) Read(ctx context.Context, id string) (*Op
 }
 
 type OpenIaaSNetworkAdapterFilter struct {
-	VirtualMachineId string `filter:"virtualMachineId"`
+	VirtualMachineID string `filter:"virtualMachineId"`
 }
 
 func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaaSNetworkAdapterFilter) ([]*OpenIaaSNetworkAdapter, error) {
@@ -81,7 +81,7 @@ func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaa
 
 type UpdateOpenIaasNetworkAdapterRequest struct {
 	NetworkID string `json:"networkId"`
-	MAC       string `json:"mac,omitempty"`
+	MAC       string `json:"mac"`
 	Attached  bool   `json:"attached,omitempty"`
 }
 

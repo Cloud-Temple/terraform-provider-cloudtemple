@@ -425,11 +425,11 @@ func dataSourceVirtualMachinesRead(ctx context.Context, d *schema.ResourceData, 
 	virtualMachines, err := c.Compute().VirtualMachine().List(ctx, &client.VirtualMachineFilter{
 		Name:             d.Get("name").(string),
 		MachineManagerID: d.Get("machine_manager_id").(string),
-		Datacenters:      GetStringList(d, "datacenters"),
-		Networks:         GetStringList(d, "networks"),
-		Datastores:       GetStringList(d, "datastores"),
-		Hosts:            GetStringList(d, "hosts"),
-		HostClusters:     GetStringList(d, "host_clusters"),
+		Datacenters:      helpers.GetStringList(d, "datacenters"),
+		Networks:         helpers.GetStringList(d, "networks"),
+		Datastores:       helpers.GetStringList(d, "datastores"),
+		Hosts:            helpers.GetStringList(d, "hosts"),
+		HostClusters:     helpers.GetStringList(d, "host_clusters"),
 		AllOptions:       true,
 	})
 	if err != nil {

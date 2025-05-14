@@ -110,7 +110,7 @@ func computeVirtualControllersRead(ctx context.Context, d *schema.ResourceData, 
 	virtualMachineId := d.Get("virtual_machine_id").(string)
 	controllers, err := c.Compute().VirtualController().List(ctx, &client.VirtualControllerFilter{
 		VirtualMachineId: virtualMachineId,
-		Types:            GetStringList(d, "types"),
+		Types:            helpers.GetStringList(d, "types"),
 	})
 	if err != nil {
 		return diag.FromErr(err)

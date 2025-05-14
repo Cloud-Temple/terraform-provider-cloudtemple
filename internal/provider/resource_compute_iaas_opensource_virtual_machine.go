@@ -156,63 +156,91 @@ Order of the elements in the list is the boot order.`,
 			},
 			"os_disk": {
 				Type:        schema.TypeList,
+				Optional:    true,
 				Computed:    true,
 				Description: "The operating system disk of the virtual machine.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"name": {
 							Type:        schema.TypeString,
+							Optional:    true,
 							Computed:    true,
-							Description: "The name of the operating system disk.",
+							Description: "The name of the operating system disk. (Updating this property implies a disk disconnect-reconnect)",
+						},
+						"size": {
+							Type:        schema.TypeInt,
+							Optional:    true,
+							Computed:    true,
+							Description: "The size of the operating system disk in bytes. (Updating this property implies a disk disconnect-reconnect)",
+						},
+						"connected": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Computed:    true,
+							Description: "Whether the disk is connected or not.",
+						},
+						"storage_repository_id": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Computed:    true,
+							Description: "The storage repository where the operating system disk is located.",
+						},
+
+						// Out
+						"id": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the virtual disk.",
 						},
 						"description": {
 							Type:        schema.TypeString,
 							Computed:    true,
 							Description: "The description of the operating system disk.",
 						},
-						"size": {
-							Type:        schema.TypeInt,
-							Computed:    true,
-							Description: "The size of the operating system disk in bytes.",
-						},
-						"storage_repository_id": {
-							Type:        schema.TypeString,
-							Computed:    true,
-							Description: "The storage repository where the operating system disk is located.",
-						},
 					},
 				},
 			},
 			"os_network_adapter": {
 				Type:        schema.TypeList,
+				Optional:    true,
 				Computed:    true,
 				Description: "The network adapters of the virtual machine.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
+						"mac_address": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Computed:    true,
+							Description: "The MAC address of the network adapter. If not provided, the MAC address will be sourced from the template used.",
+						},
+						"network_id": {
+							Type:        schema.TypeString,
+							Optional:    true,
+							Computed:    true,
+							Description: "The identifier of the network to which the adapter is connected.  If not provided, the network will be sourced from the template used.",
+						},
+						"attached": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Computed:    true,
+							Description: "Whether the network adapter is attached.",
+						},
+
+						// Out
+						"id": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The unique identifier of the network adapter.",
+						},
 						"name": {
 							Type:        schema.TypeString,
 							Computed:    true,
 							Description: "The name of the network adapter.",
 						},
-						"mac_address": {
-							Type:        schema.TypeString,
-							Computed:    true,
-							Description: "The MAC address of the network adapter.",
-						},
 						"mtu": {
 							Type:        schema.TypeInt,
 							Computed:    true,
 							Description: "The maximum transmission unit (MTU) of the network adapter.",
-						},
-						"attached": {
-							Type:        schema.TypeBool,
-							Computed:    true,
-							Description: "Whether the network adapter is attached.",
-						},
-						"network_id": {
-							Type:        schema.TypeString,
-							Computed:    true,
-							Description: "The identifier of the network to which the adapter is connected.",
 						},
 					},
 				},
@@ -332,13 +360,31 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 			cloudInit.NetworkConfig = networkConfig
 		}
 	}
+
+	template, err := c.Compute().OpenIaaS().Template().Read(ctx, d.Get("template_id").(string))
+	if err != nil {
+		return diag.Errorf("Could not read the template : %s", err)
+	}
+	if template == nil {
+		return diag.Errorf("Could not find template with id : %s", d.Get("template_id").(string))
+	}
+
+	templateNetworkAdapters := make([]client.OSNetworkAdapter, len(template.NetworkAdapters))
+	for i, networkAdapter := range template.NetworkAdapters {
+		templateNetworkAdapters[i] = client.OSNetworkAdapter{
+			NetworkID: networkAdapter.Network.ID,
+			MAC:       networkAdapter.MacAddress,
+		}
+	}
+
 	// Create virtual machine itself
 	activityId, err := c.Compute().OpenIaaS().VirtualMachine().Create(ctx, &client.CreateOpenIaasVirtualMachineRequest{
-		Name:       d.Get("name").(string),
-		TemplateID: d.Get("template_id").(string),
-		CPU:        d.Get("cpu").(int),
-		Memory:     d.Get("memory").(int),
-		CloudInit:  cloudInit,
+		Name:            d.Get("name").(string),
+		TemplateID:      d.Get("template_id").(string),
+		CPU:             d.Get("cpu").(int),
+		Memory:          d.Get("memory").(int),
+		CloudInit:       cloudInit,
+		NetworkAdapters: templateNetworkAdapters,
 	})
 	if err != nil {
 		return diag.Errorf("the virtual machine could not be created: %s", err)
@@ -349,21 +395,32 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		return diag.Errorf("failed to create virtual machine, %s", err)
 	}
 
-	template, err := c.Compute().OpenIaaS().Template().Read(ctx, d.Get("template_id").(string))
+	disks, err := c.Compute().OpenIaaS().VirtualDisk().List(ctx, &client.OpenIaaSVirtualDiskFilter{
+		VirtualMachineID: d.Id(),
+	})
 	if err != nil {
-		return diag.Errorf("failed to read template, %s", err)
+		return diag.Errorf("failed to read os_disks, %s", err)
 	}
-	if template == nil {
-		return diag.Errorf("could not find template, %s", err)
+	if disks == nil {
+		return diag.Errorf("could not list disks of virtual machine, %s", err)
 	}
 
-	// Overwrite with the desired config
-	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSDisksData(template.Disks), "os_disk")
+	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSDisksData(disks, d.Id()), "os_disk")
 	if err := d.Set("os_disk", osDisks); err != nil {
 		return diag.FromErr(err)
 	}
 
-	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(template.NetworkAdapters), "os_network_adapter")
+	networkAdapters, err := c.Compute().OpenIaaS().NetworkAdapter().List(ctx, &client.OpenIaaSNetworkAdapterFilter{
+		VirtualMachineID: d.Id(),
+	})
+	if err != nil {
+		return diag.Errorf("failed to read os_network_adapters, %s", err)
+	}
+	if networkAdapters == nil {
+		return diag.Errorf("could not list network adapters of virtual machine, %s", err)
+	}
+
+	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
 	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
 		return diag.FromErr(err)
 	}
@@ -413,6 +470,37 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		vm.PowerState = "off"
 	default:
 		return diag.Errorf("unknown power state %q", vm.PowerState)
+	}
+
+	disks, err := c.Compute().OpenIaaS().VirtualDisk().List(ctx, &client.OpenIaaSVirtualDiskFilter{
+		VirtualMachineID: d.Id(),
+	})
+	if err != nil {
+		return diag.Errorf("failed to read os_disks, %s", err)
+	}
+	if disks == nil {
+		return diag.Errorf("could not list disks of virtual machine, %s", err)
+	}
+
+	// Overwrite with the desired config
+	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSDisksData(disks, d.Id()), "os_disk")
+	if err := d.Set("os_disk", osDisks); err != nil {
+		return diag.FromErr(err)
+	}
+
+	networkAdapters, err := c.Compute().OpenIaaS().NetworkAdapter().List(ctx, &client.OpenIaaSNetworkAdapterFilter{
+		VirtualMachineID: d.Id(),
+	})
+	if err != nil {
+		return diag.Errorf("failed to read os_network_adapters, %s", err)
+	}
+	if networkAdapters == nil {
+		return diag.Errorf("could not list network adapters of virtual machine, %s", err)
+	}
+
+	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
+	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
+		return diag.FromErr(err)
 	}
 
 	tags, err := c.Tag().Resource().Read(ctx, d.Id())
@@ -527,25 +615,93 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
+	// if d.HasChange("os_disk") {
+	// 	for i, osDisk := range d.Get("os_disk").([]interface{}) {
+	// 		if osDisk == nil {
+	// 			continue
+	// 		}
+	// 		disk := osDisk.(map[string]interface{})
+	// 		if d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i)) {
+	// 			// TODO : Disconnect disk before updating (and specify it in documentation)
+	// 			diskState, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, disk["id"].(string))
+	// 			if err != nil {
+	// 				return diag.Errorf("failed to read virtual disk state: %s", err)
+	// 			}
+
+	// 			vbd := Find(diskState.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
+	// 				return virtualMachine.ID == d.Id()
+	// 			})
+	// 			if vbd.Connected {
+	// 				// wasConnected := true
+	// 				activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
+	// 					ID:               disk["id"].(string),
+	// 					VirtualMachineID: d.Id(),
+	// 				})
+	// 				if err != nil {
+	// 					return diag.Errorf("failed to disconnect os disk: %s", err)
+	// 				}
+	// 				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	// 				if err != nil {
+	// 					return diag.Errorf("failed to disconnect os disk: %s", err)
+	// 				}
+	// 			}
+
+	// 			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, &client.OpenIaaSVirtualDiskUpdateRequest{
+	// 				ID:   disk["id"].(string),
+	// 				Size: disk["size"].(int),
+	// 				Name: disk["name"].(string),
+	// 			})
+	// 			if err != nil {
+	// 				return diag.Errorf("failed to update virtual disk: %s", err)
+	// 			}
+	// 			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	// 			if err != nil {
+	// 				return diag.Errorf("failed to update virtual disk, %s", err)
+	// 			}
+	// 		}
+
+	// 		if d.HasChange(fmt.Sprintf("os_disk.%d.storage_repository_id", i)) {
+	// 			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Relocate(ctx, &client.OpenIaaSVirtualDiskRelocateRequest{
+	// 				ID:                  disk["id"].(string),
+	// 				StorageRepositoryID: disk["storage_repository_id"].(string),
+	// 			})
+	// 			if err != nil {
+	// 				return diag.Errorf("failed to update virtual disk: %s", err)
+	// 			}
+	// 			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	// 			if err != nil {
+	// 				return diag.Errorf("failed to update virtual disk, %s", err)
+	// 			}
+	// 		}
+
+	// 		// if d.HasChange(fmt.Sprintf("os_disk.%d.connected", i)) {
+
+	// 		// }
+	// 	}
+	// }
+
 	if d.HasChange("os_disk") {
 		for i, osDisk := range d.Get("os_disk").([]interface{}) {
 			if osDisk == nil {
 				continue
 			}
 			disk := osDisk.(map[string]interface{})
-			if disk["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_disk.%d", i)) {
-				activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, &client.OpenIaaSVirtualDiskUpdateRequest{
-					ID:   disk["id"].(string),
-					Size: disk["size"].(int),
-					Name: disk["name"].(string),
-				})
-				if err != nil {
-					return diag.Errorf("failed to update virtual disk: %s", err)
-				}
-				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-				if err != nil {
-					return diag.Errorf("failed to update virtual disk, %s", err)
-				}
+
+			if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
+				return diags
+			}
+		}
+	}
+
+	if d.HasChange("os_network_adapter") {
+		for i, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+			if osNetworkAdapter == nil {
+				continue
+			}
+			disk := osNetworkAdapter.(map[string]interface{})
+
+			if diags := osNetworkAdapterUpdate(ctx, c, d, i, disk); diags != nil {
+				return diags
 			}
 		}
 	}
@@ -637,5 +793,181 @@ func openIaasVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, m
 	if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
 		return diag.Errorf("failed to delete virtual machine, %s", err)
 	}
+	return nil
+}
+
+// handleOSDiskUpdate gère la mise à jour d'un disque OS, y compris la reconnexion si nécessaire
+func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, i int, disk map[string]interface{}) diag.Diagnostics {
+	// Vérifier si on doit modifier la taille ou le nom
+	needsDisconnect := d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i))
+
+	// Vérifier l'état actuel du disque
+	diskState, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, disk["id"].(string))
+	if err != nil {
+		return diag.Errorf("failed to read virtual disk state: %s", err)
+	}
+
+	// Trouver la connexion pour cette VM
+	vbd := helpers.Find(diskState.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
+		return virtualMachine.ID == d.Id()
+	})
+
+	// Sauvegarder l'état de connexion initial
+	wasConnected := vbd.Connected
+
+	// Vérifier si l'utilisateur a modifié la propriété "connected"
+	userChangedConnected := d.HasChange(fmt.Sprintf("os_disk.%d.connected", i))
+
+	// Déconnecter si nécessaire pour la mise à jour
+	if needsDisconnect && vbd.Connected {
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
+			ID:               disk["id"].(string),
+			VirtualMachineID: d.Id(),
+		})
+		if err != nil {
+			return diag.Errorf("failed to disconnect os disk: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to disconnect os disk: %s", err)
+		}
+	}
+
+	// Mettre à jour le disque si nécessaire
+	if needsDisconnect {
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, &client.OpenIaaSVirtualDiskUpdateRequest{
+			ID:   disk["id"].(string),
+			Size: disk["size"].(int),
+			Name: disk["name"].(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to update virtual disk: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update virtual disk, %s", err)
+		}
+	}
+
+	// Gérer le déplacement du disque si nécessaire
+	if d.HasChange(fmt.Sprintf("os_disk.%d.storage_repository_id", i)) {
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Relocate(ctx, &client.OpenIaaSVirtualDiskRelocateRequest{
+			ID:                  disk["id"].(string),
+			StorageRepositoryID: disk["storage_repository_id"].(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to relocate virtual disk: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to relocate virtual disk, %s", err)
+		}
+	}
+
+	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to read virtual machine : %s", err)
+	}
+	if vm == nil {
+		return diag.Errorf("failed to find virtual machine : %s", d.Id())
+	}
+
+	// Gérer l'état de connexion seulement si la VM est allumée (sinon, risque d'erreur)
+	if userChangedConnected && vm.PowerState == "Running" {
+		// Utiliser la valeur définie par l'utilisateur
+		wantConnected := disk["connected"].(bool)
+
+		// Si l'état actuel ne correspond pas à l'état souhaité
+		if wantConnected && !vbd.Connected {
+			// Connecter le disque
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
+				ID:               disk["id"].(string),
+				VirtualMachineID: d.Id(),
+			})
+			if err != nil {
+				return diag.Errorf("failed to connect os disk: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to connect os disk: %s", err)
+			}
+		} else if !wantConnected && vbd.Connected {
+			// Déconnecter le disque
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
+				ID:               disk["id"].(string),
+				VirtualMachineID: d.Id(),
+			})
+			if err != nil {
+				return diag.Errorf("failed to disconnect os disk: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to disconnect os disk: %s", err)
+			}
+		}
+	} else if needsDisconnect && wasConnected {
+		// Si l'utilisateur n'a pas modifié l'état de connexion et que le disque était connecté avant
+		// et qu'on l'a déconnecté pour la mise à jour, on le reconnecte
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
+			ID:               disk["id"].(string),
+			VirtualMachineID: d.Id(),
+		})
+		if err != nil {
+			return diag.Errorf("failed to reconnect os disk: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to reconnect os disk: %s", err)
+		}
+	}
+
+	return nil
+}
+
+func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, i int, networkAdapter map[string]interface{}) diag.Diagnostics {
+	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to read virtual machine : %s", err)
+	}
+	if vm == nil {
+		return diag.Errorf("failed to find virtual machine : %s", d.Id())
+	}
+
+	if d.HasChange(fmt.Sprintf("os_network_adapter.%d.attached", i)) && vm.PowerState == "Running" {
+		if networkAdapter["attached"].(bool) {
+			activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Connect(ctx, networkAdapter["id"].(string))
+			if err != nil {
+				return diag.Errorf("failed to connect os network adapter: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to connect os network adapter: %s", err)
+			}
+		} else {
+			activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Disconnect(ctx, networkAdapter["id"].(string))
+			if err != nil {
+				return diag.Errorf("failed to disconnect os network adapter: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to disconnect os network adapter: %s", err)
+			}
+		}
+	}
+
+	if d.HasChange(fmt.Sprintf("os_network_adapter.%d.mac_address", i)) || d.HasChange(fmt.Sprintf("os_network_adapter.%d.network_id", i)) {
+		activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), &client.UpdateOpenIaasNetworkAdapterRequest{
+			NetworkID: networkAdapter["network_id"].(string),
+			MAC:       networkAdapter["mac_address"].(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to update os network adapter: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update os network adapter: %s", err)
+		}
+	}
+
 	return nil
 }

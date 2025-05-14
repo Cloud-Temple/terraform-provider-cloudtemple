@@ -93,7 +93,7 @@ func computeOpenIaaSNetworkAdaptersRead(ctx context.Context, d *schema.ResourceD
 	// Récupérer les adaptateurs réseau OpenIaaS
 	virtualMachineId := d.Get("virtual_machine_id").(string)
 	networkAdapters, err := c.Compute().OpenIaaS().NetworkAdapter().List(ctx, &client.OpenIaaSNetworkAdapterFilter{
-		VirtualMachineId: virtualMachineId,
+		VirtualMachineID: virtualMachineId,
 	})
 	if err != nil {
 		return diag.FromErr(err)
