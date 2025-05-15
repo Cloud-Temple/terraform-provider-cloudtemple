@@ -1,5 +1,17 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+## 1.0.0-rc.3 (May 15th, 2025)
+
+  BUG FIXES:
+
+    * Fixed a bug causing resources `cloudtemple_compute_virtual_disk` to be imported as `os_disk` in the state of the attached `cloudtemple_compute_virtual_machine`.
+
+## 1.0.0-rc.2 (May 6th, 2025)
+
+  BUG FIXES:
+
+    * Fixed a bug in the datasources `cloudtemple_compute_iaas_opensource_backup_policy` and `cloudtemple_compute_iaas_opensource_backup_policies`.
+
 ## 1.0.0-rc.1 (May 5th, 2025)
 
 IMPROVEMENTS:
