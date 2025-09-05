@@ -1,27 +1,21 @@
-# Exemple d'utilisation des extra_config pour une machine virtuelle
-# avec les configurations spécifiques pour Ignition et CoreOS
-
+# Example: Virtual Machine with Extra Config for CoreOS/Ignition
 resource "cloudtemple_compute_virtual_machine" "coreos_vm" {
-  name                = "coreos-ignition-vm"
-  datacenter_id       = var.datacenter_id
-  host_cluster_id     = var.host_cluster_id
-  datastore_id        = var.datastore_id
-  
-  # Configuration de base
-  memory = 2147483648  # 2GB en bytes
+  name = "coreos-ignition-vm"
+
+  # Basic VM configuration
+  datacenter_id   = var.datacenter_id
+  host_cluster_id = var.host_cluster_id
+  datastore_id    = var.datastore_id
+
+  memory = 2147483648 # 2GB
   cpu    = 2
-  
-  # Système d'exploitation
+
   guest_operating_system_moref = var.coreos_guest_os_moref
-  
-  # État d'alimentation
-  power_state = "on"
-  
-  # Configurations supplémentaires (extra_config)
-  # Toutes les configurations disponibles pour les machines virtuelles
+  power_state                  = "on"
+
+  # Extra configuration parameters for advanced VM settings
   extra_config = {
-    # === Configuration Ignition (CoreOS) ===
-    # Configuration Ignition (données encodées en base64)
+    # Ignition configuration for CoreOS
     "guestinfo.ignition.config.data" = base64encode(jsonencode({
       ignition = {
         version = "3.3.0"
@@ -36,75 +30,51 @@ resource "cloudtemple_compute_virtual_machine" "coreos_vm" {
       }
       systemd = {
         units = [{
-          name = "docker.service"
+          name    = "docker.service"
           enabled = true
         }]
       }
     }))
-    
-    # Encodage de la configuration Ignition (seule valeur supportée : "base64")
-    "guestinfo.ignition.config.data.encoding" = "base64"
-    
-    # Configuration réseau pour Afterburn (CoreOS)
+
+    "guestinfo.ignition.config.data.encoding"  = "base64"
     "guestinfo.afterburn.initrd.network-kargs" = "ip=dhcp"
-    
-    # === Configuration Performance ===
-    # Activation du steal clock pour les environnements virtualisés
-    "stealclock.enable" = "true"
-    
-    # === Configuration Disque ===
-    # Activation des UUID pour les disques (recommandé pour la plupart des OS)
-    "disk.enableUUID" = "true"
-    
-    # === Configuration PCI Passthrough ===
-    # Activation du MMIO 64-bit pour PCI Passthrough
-    "pciPassthru.use64BitMMIO" = "true"
-    
-    # Taille du MMIO 64-bit en GB (ajuster selon les besoins)
+
+    # Performance optimization for virtualized environments
+    "stealclock.enable" = "TRUE"
+
+    # Disk configuration
+    "disk.enableUUID" = "TRUE"
+
+    # PCI Passthrough configuration (if needed)
+    "pciPassthru.use64BitMMIO"    = "TRUE"
     "pciPassthru.64bitMMioSizeGB" = "64"
   }
-  
-  # Tags pour l'organisation
+
   tags = {
-    Environment = "production"
-    OS          = "CoreOS"
-    Purpose     = "container-host"
+    environment = "production"
+    os_type     = "coreos"
+    created_by  = "terraform"
   }
 }
 
-# Variables nécessaires
+# Variables
 variable "datacenter_id" {
-  description = "ID du datacenter"
+  description = "The ID of the datacenter"
   type        = string
 }
 
 variable "host_cluster_id" {
-  description = "ID du cluster d'hôtes"
+  description = "The ID of the host cluster"
   type        = string
 }
 
 variable "datastore_id" {
-  description = "ID du datastore"
+  description = "The ID of the datastore"
   type        = string
 }
 
 variable "coreos_guest_os_moref" {
-  description = "Moref du système d'exploitation CoreOS"
+  description = "The guest OS moref for CoreOS"
   type        = string
-}
-
-# Outputs pour référence
-output "vm_id" {
-  description = "ID de la machine virtuelle créée"
-  value       = cloudtemple_compute_virtual_machine.coreos_vm.id
-}
-
-output "vm_moref" {
-  description = "Moref de la machine virtuelle"
-  value       = cloudtemple_compute_virtual_machine.coreos_vm.moref
-}
-
-output "extra_config_applied" {
-  description = "Configurations supplémentaires appliquées"
-  value       = cloudtemple_compute_virtual_machine.coreos_vm.extra_config
+  default     = "coreos64Guest"
 }
