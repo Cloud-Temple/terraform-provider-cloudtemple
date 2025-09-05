@@ -45,12 +45,9 @@ func FlattenVirtualMachine(vm *client.VirtualMachine) map[string]interface{} {
 	}
 
 	// Aplatir la configuration supplémentaire
-	extraConfig := make([]map[string]interface{}, len(vm.ExtraConfig))
-	for i, config := range vm.ExtraConfig {
-		extraConfig[i] = map[string]interface{}{
-			"key":   config.Key,
-			"value": config.Value,
-		}
+	extraConfigMap := make(map[string]string)
+	for _, config := range vm.ExtraConfig {
+		extraConfigMap[config.Key] = config.Value
 	}
 
 	// Aplatir le stockage
@@ -106,7 +103,7 @@ func FlattenVirtualMachine(vm *client.VirtualMachine) map[string]interface{} {
 		"snapshoted":                         vm.Snapshoted,
 		"triggered_alarms":                   triggeredAlarms,
 		"replication_config":                 replicationConfig,
-		"extra_config":                       extraConfig,
+		"extra_config":                       extraConfigMap,
 		"storage":                            storage,
 		"boot_options":                       bootOptions,
 		"expose_hardware_virtualization":     vm.ExposeHardwareVirtualization,
@@ -273,4 +270,20 @@ func FlattenOSNetworkAdapterData(osNetworkAdapter *client.NetworkAdapter) interf
 	networkAdapter["auto_connect"] = osNetworkAdapter.AutoConnect
 
 	return networkAdapter
+}
+
+// ExpandExtraConfig convertit une map Terraform en slice de structures pour l'API
+func ExpandExtraConfig(extraConfigMap map[string]interface{}) []client.VirtualMachineExtraConfig {
+	if extraConfigMap == nil {
+		return nil
+	}
+
+	extraConfig := make([]client.VirtualMachineExtraConfig, 0, len(extraConfigMap))
+	for key, value := range extraConfigMap {
+		extraConfig = append(extraConfig, client.VirtualMachineExtraConfig{
+			Key:   key,
+			Value: value.(string),
+		})
+	}
+	return extraConfig
 }

@@ -753,20 +753,20 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 				},
 			},
 			"extra_config": {
-				Type:     schema.TypeList,
+				Type:     schema.TypeMap,
+				Optional: true,
 				Computed: true,
+				Description: `Extra configuration parameters for the virtual machine. These are advanced VMware vSphere settings that can be used to configure specialized operating systems like CoreOS with Ignition.
 
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"key": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"value": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
+Supported configurations include:
+- Ignition for CoreOS: 'guestinfo.ignition.config.data', 'guestinfo.ignition.config.data.encoding', 'guestinfo.afterburn.initrd.network-kargs'
+- Performance optimization: 'stealclock.enable'
+- Disk configuration: 'disk.enableUUID'
+- PCI Passthrough: 'pciPassthru.use64BitMMIO', 'pciPassthru.64bitMMioSizeGB'
+
+Note: Changes to extra_config may require a virtual machine restart to take effect.`,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
 				},
 			},
 			"storage": {
@@ -1370,6 +1370,21 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 					}
 				}
 			}
+		}
+	}
+
+	if d.HasChange("extra_config") {
+		extraConfig := helpers.ExpandExtraConfig(d.Get("extra_config").(map[string]interface{}))
+
+		activityId, err := c.Compute().VirtualMachine().UpdateExtraConfig(ctx, d.Id(), &client.UpdateExtraConfigRequest{
+			ExtraConfig: extraConfig,
+		})
+		if err != nil {
+			return diag.Errorf("failed to update extra config: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update extra config: %s", err)
 		}
 	}
 
