@@ -1,5 +1,11 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+## 1.1.0-rc.1 (September 5th, 2025)
+
+  NEW FEATURES :
+
+    * Added update extra config to ressource `cloudtemple_compute_virtual_machine`.
+
 ## 1.0.0-rc.3 (May 15th, 2025)
 
   BUG FIXES:

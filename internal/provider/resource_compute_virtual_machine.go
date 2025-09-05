@@ -1373,6 +1373,21 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 	}
 
+	if d.HasChange("extra_config") {
+		extraConfig := helpers.ExpandExtraConfig(d.Get("extra_config").(map[string]interface{}))
+
+		activityId, err := c.Compute().VirtualMachine().UpdateExtraConfig(ctx, d.Id(), &client.UpdateExtraConfigRequest{
+			ExtraConfig: extraConfig,
+		})
+		if err != nil {
+			return diag.Errorf("failed to update extra config: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update extra config: %s", err)
+		}
+	}
+
 	if updatePower {
 		powerState := d.Get("power_state").(string)
 
