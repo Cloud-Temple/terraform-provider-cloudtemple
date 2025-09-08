@@ -1,5 +1,11 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+## 1.0.1 (September 8th, 2025)
+
+  BUG FIXES:
+
+    * Fixed a bug causing fails while deploying from the content library, when `power_on` parameter is set to `true`.
+
 ## 1.0.0 (September 5th, 2025)
 
   BUG FIXES:
