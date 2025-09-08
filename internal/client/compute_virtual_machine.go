@@ -249,7 +249,7 @@ func (v *VirtualMachineClient) Rename(ctx context.Context, id string, name strin
 type CloneVirtualMachineRequest struct {
 	Name              string `json:"name"`
 	VirtualMachineId  string `json:"-"`
-	PowerOn           bool   `json:"powerOn"`
+	PowerOn           bool   `json:"powerOn,omitempty"`
 	DatacenterId      string `json:"datacenterId,omitempty"`
 	HostClusterId     string `json:"hostClusterId,omitempty"`
 	HostId            string `json:"hostId,omitempty"`
