@@ -338,3 +338,9 @@ func (v *VirtualMachineClient) Recommendation(ctx context.Context, filter *Virtu
 
 	return out, nil
 }
+
+func (v *VirtualMachineClient) UpdateExtraConfig(ctx context.Context, id string, req map[string]interface{}) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/vcenters/virtual_machines/%s/extra_config", id)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
