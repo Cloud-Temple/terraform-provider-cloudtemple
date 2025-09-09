@@ -16,6 +16,12 @@
     * Added update extra config to ressource `cloudtemple_compute_virtual_machine`.
       - Supported keys: `guestinfo.ignition.config.data`, `guestinfo.ignition.config.data.encoding`, `guestinfo.afterburn.initrd.network-kargs`, `stealclock.enable`, `disk.enableUUID`, `pciPassthru.use64BitMMIO`, `pciPassthru.64bitMMioSizeGB`
 
+## 1.0.1 (September 8th, 2025)
+
+  BUG FIXES:
+
+    * Fixed a bug causing fails while deploying from the content library, when `power_on` parameter is set to `true`.
+
 ## 1.0.0 (September 5th, 2025)
 
   BUG FIXES:

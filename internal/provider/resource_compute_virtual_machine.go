@@ -829,9 +829,8 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 
 	if cloneVirtualMachineId != "" {
 		activityId, err = c.Compute().VirtualMachine().Clone(ctx, &client.CloneVirtualMachineRequest{
-			Name:             name,
-			VirtualMachineId: cloneVirtualMachineId,
-			// PowerOn:           d.Get("power_state").(string) == "on",
+			Name:              name,
+			VirtualMachineId:  cloneVirtualMachineId,
 			DatacenterId:      d.Get("datacenter_id").(string),
 			HostClusterId:     d.Get("host_cluster_id").(string),
 			HostId:            d.Get("host_id").(string),
@@ -881,7 +880,6 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			HostId:                d.Get("host_id").(string),
 			DatastoreId:           d.Get("datastore_id").(string),
 			DatacenterId:          d.Get("datacenter_id").(string),
-			PowerOn:               d.Get("power_state").(string) == "on",
 			DisksProvisioningType: d.Get("disks_provisioning_type").(string),
 			DeployOptions:         deployOptions,
 		})
@@ -1336,6 +1334,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 				continue
 			}
 			networkAdapter := osNetworkAdapter.(map[string]interface{})
+			// Check si le fichier tf a un macAddress ou pas
 			if networkAdapter["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_network_adapter.%d", i)) {
 				activityId, err := c.Compute().NetworkAdapter().Update(ctx, &client.UpdateNetworkAdapterRequest{
 					ID:           networkAdapter["id"].(string),

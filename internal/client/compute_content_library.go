@@ -132,7 +132,7 @@ type ComputeContentLibraryItemDeployRequest struct {
 	HostId                string          `json:"hostId,omitempty"`
 	DatastoreId           string          `json:"datastoreId,"`
 	DatacenterId          string          `json:"datacenterId,omitempty"`
-	PowerOn               bool            `json:"powerOn"`
+	PowerOn               bool            `json:"powerOn,omitempty"`
 	DisksProvisioningType string          `json:"disksProvisioningType,omitempty"`
 	DeployOptions         []*DeployOption `json:"deployOptions,omitempty"`
 	NetworkData           []*NetworkData  `json:"networkData,omitempty"`
