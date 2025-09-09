@@ -339,16 +339,6 @@ func (v *VirtualMachineClient) Recommendation(ctx context.Context, filter *Virtu
 	return out, nil
 }
 
-// type UpdateExtraConfigRequest struct {
-// 	DiskEnableUUID                       map[string]string `json:"disk.enableUUID,omitempty"`
-// 	PCIPassthruUse64BitMMIO              map[string]string `json:"pciPassthru.use64BitMMIO,omitempty"`
-// 	PCIPassthru64bitMMioSizeGB           map[string]string `json:"pciPassthru.64bitMMioSizeGB,omitempty"`
-// 	GuestinfoIgnitionConfigData          map[string]string `json:"guestinfo.ignition.config.data,omitempty"`
-// 	GuestinfoIgnitionConfigDataEncoding  map[string]string `json:"guestinfo.ignition.config.data.encoding,omitempty"`
-// 	GuestinfoAfterburnInitrdNetworkKargs map[string]string `json:"guestinfo.afterburn.initrd.network-kargs,omitempty"`
-// 	StealclockEnable                     map[string]string `json:"stealclock.enable,omitempty"`
-// }
-
 func (v *VirtualMachineClient) UpdateExtraConfig(ctx context.Context, id string, req map[string]interface{}) (string, error) {
 	r := v.c.newRequest("PATCH", "/compute/v1/vcenters/virtual_machines/%s/extra_config", id)
 	r.obj = req
