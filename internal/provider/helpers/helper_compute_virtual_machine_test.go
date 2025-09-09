@@ -7,107 +7,79 @@ import (
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 )
 
-func TestExpandExtraConfig(t *testing.T) {
+func TestConvertExtraConfigValue(t *testing.T) {
 	tests := []struct {
-		name     string
-		input    map[string]interface{}
-		expected []client.VirtualMachineExtraConfig
+		name        string
+		key         string
+		value       string
+		expected    interface{}
+		expectError bool
 	}{
+		// Tests pour les clés booléennes
 		{
-			name:     "nil input",
-			input:    nil,
-			expected: nil,
+			name:     "boolean TRUE",
+			key:      "disk.enableUUID",
+			value:    "TRUE",
+			expected: true,
 		},
 		{
-			name:     "empty map",
-			input:    map[string]interface{}{},
-			expected: []client.VirtualMachineExtraConfig{},
+			name:     "boolean FALSE",
+			key:      "stealclock.enable",
+			value:    "FALSE",
+			expected: false,
 		},
 		{
-			name: "single config",
-			input: map[string]interface{}{
-				"stealclock.enable": "TRUE",
-			},
-			expected: []client.VirtualMachineExtraConfig{
-				{
-					Key:   "stealclock.enable",
-					Value: "TRUE",
-				},
-			},
+			name:        "boolean invalid value",
+			key:         "disk.enableUUID",
+			value:       "yes",
+			expectError: true,
+		},
+		// Tests pour les clés numériques
+		{
+			name:     "integer valid",
+			key:      "pciPassthru.64bitMMioSizeGB",
+			value:    "64",
+			expected: 64,
 		},
 		{
-			name: "multiple configs",
-			input: map[string]interface{}{
-				"guestinfo.ignition.config.data":           "base64_encoded_data",
-				"guestinfo.ignition.config.data.encoding":  "base64",
-				"guestinfo.afterburn.initrd.network-kargs": "ip=dhcp",
-				"stealclock.enable":                        "TRUE",
-				"disk.enableUUID":                          "TRUE",
-				"pciPassthru.use64BitMMIO":                 "TRUE",
-				"pciPassthru.64bitMMioSizeGB":              "64",
-			},
-			expected: []client.VirtualMachineExtraConfig{
-				{
-					Key:   "guestinfo.ignition.config.data",
-					Value: "base64_encoded_data",
-				},
-				{
-					Key:   "guestinfo.ignition.config.data.encoding",
-					Value: "base64",
-				},
-				{
-					Key:   "guestinfo.afterburn.initrd.network-kargs",
-					Value: "ip=dhcp",
-				},
-				{
-					Key:   "stealclock.enable",
-					Value: "TRUE",
-				},
-				{
-					Key:   "disk.enableUUID",
-					Value: "TRUE",
-				},
-				{
-					Key:   "pciPassthru.use64BitMMIO",
-					Value: "TRUE",
-				},
-				{
-					Key:   "pciPassthru.64bitMMioSizeGB",
-					Value: "64",
-				},
-			},
+			name:        "integer invalid",
+			key:         "pciPassthru.64bitMMioSizeGB",
+			value:       "not_a_number",
+			expectError: true,
+		},
+		// Tests pour les clés string (non gérées)
+		{
+			name:     "string unmanaged key",
+			key:      "svga.present",
+			value:    "TRUE",
+			expected: "TRUE",
+		},
+		{
+			name:     "string ignition data",
+			key:      "guestinfo.ignition.config.data",
+			value:    "base64_data",
+			expected: "base64_data",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ExpandExtraConfig(tt.input)
+			result, err := ConvertExtraConfigValue(tt.key, tt.value)
 
-			if tt.expected == nil {
-				if result != nil {
-					t.Errorf("Expected nil, got %v", result)
+			if tt.expectError {
+				if err == nil {
+					t.Errorf("Expected error but got none")
 				}
 				return
 			}
 
-			if len(result) != len(tt.expected) {
-				t.Errorf("Expected %d items, got %d", len(tt.expected), len(result))
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
 				return
 			}
 
-			// Convert to maps for easier comparison since order might vary
-			resultMap := make(map[string]string)
-			for _, item := range result {
-				resultMap[item.Key] = item.Value
-			}
-
-			expectedMap := make(map[string]string)
-			for _, item := range tt.expected {
-				expectedMap[item.Key] = item.Value
-			}
-
-			if !reflect.DeepEqual(resultMap, expectedMap) {
-				t.Errorf("Expected %v, got %v", expectedMap, resultMap)
+			if !reflect.DeepEqual(result, tt.expected) {
+				t.Errorf("Expected %v (%T), got %v (%T)", tt.expected, tt.expected, result, result)
 			}
 		})
 	}

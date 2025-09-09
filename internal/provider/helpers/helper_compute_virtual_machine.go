@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -272,18 +273,30 @@ func FlattenOSNetworkAdapterData(osNetworkAdapter *client.NetworkAdapter) interf
 	return networkAdapter
 }
 
-// ExpandExtraConfig convertit une map Terraform en slice de structures pour l'API
-func ExpandExtraConfig(extraConfigMap map[string]interface{}) []client.VirtualMachineExtraConfig {
-	if extraConfigMap == nil {
-		return nil
-	}
+// convertExtraConfigValue convertit une valeur string vers le type approprié selon la clé
+func ConvertExtraConfigValue(key, value string) (interface{}, error) {
+	switch key {
+	// Clés booléennes VMware (strictes)
+	case "disk.enableUUID", "stealclock.enable", "pciPassthru.use64BitMMIO":
+		switch value {
+		case "TRUE", "true":
+			return true, nil
+		case "FALSE", "false":
+			return false, nil
+		default:
+			return nil, fmt.Errorf("invalid boolean value '%s' for key '%s', expected 'TRUE' or 'FALSE'", value, key)
+		}
 
-	extraConfig := make([]client.VirtualMachineExtraConfig, 0, len(extraConfigMap))
-	for key, value := range extraConfigMap {
-		extraConfig = append(extraConfig, client.VirtualMachineExtraConfig{
-			Key:   key,
-			Value: value.(string),
-		})
+	// Clés numériques
+	case "pciPassthru.64bitMMioSizeGB":
+		if i, err := strconv.Atoi(value); err != nil {
+			return nil, fmt.Errorf("invalid integer value '%s' for key '%s': %v", value, key, err)
+		} else {
+			return i, nil
+		}
+
+	// Clés string (par défaut - toutes les non gérées)
+	default:
+		return value, nil
 	}
-	return extraConfig
 }

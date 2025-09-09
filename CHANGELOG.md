@@ -1,10 +1,20 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-## 1.0.1-rc.1 (September 5th, 2025)
+## 1.1.0-rc.1 (September 9th, 2025)
+
+  IMPROVEMENTS :
+
+    * Added automatic state migration for `extra_config` in resource `cloudtemple_compute_virtual_machine`.
+      - The `extra_config` parameter format has been changed from array of objects to a map for better usability
+      - Existing Terraform states with the old format will be automatically migrated to the new format
+      - Old format: `[{"key": "svga.present", "value": "TRUE"}]`
+      - New format: `{"svga.present": "TRUE"}`
+      - This migration is transparent and requires no user action
 
   NEW FEATURES :
 
     * Added update extra config to ressource `cloudtemple_compute_virtual_machine`.
+      - Supported keys: `guestinfo.ignition.config.data`, `guestinfo.ignition.config.data.encoding`, `guestinfo.afterburn.initrd.network-kargs`, `stealclock.enable`, `disk.enableUUID`, `pciPassthru.use64BitMMIO`, `pciPassthru.64bitMMioSizeGB`
 
 ## 1.0.0 (September 5th, 2025)
 
