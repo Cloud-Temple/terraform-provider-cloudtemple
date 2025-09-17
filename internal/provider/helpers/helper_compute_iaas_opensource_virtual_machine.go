@@ -37,6 +37,7 @@ func FlattenOpenIaaSVirtualMachine(vm *client.OpenIaaSVirtualMachine) map[string
 		"secure_boot":           vm.SecureBoot,
 		"boot_firmware":         vm.BootFirmware,
 		"auto_power_on":         vm.AutoPowerOn,
+		"high_availability":     vm.HighAvailability,
 		"dvd_drive":             dvdDrive,
 		"boot_order":            vm.BootOrder,
 		"operating_system_name": vm.OperatingSystemName,

@@ -14,7 +14,7 @@ func resourceOpenIaasVirtualDisk() *schema.Resource {
 	return &schema.Resource{
 		CreateContext: openIaasVirtualDiskCreate,
 		ReadContext:   openIaasVirtualDiskRead,
-		//UpdateContext: openIaasVirtualDiskUpdate,
+		UpdateContext: openIaasVirtualDiskUpdate,
 		DeleteContext: openIaasVirtualDiskDelete,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
@@ -26,41 +26,35 @@ func resourceOpenIaasVirtualDisk() *schema.Resource {
 				Type:        schema.TypeString,
 				Description: "The name of the virtual disk.",
 				Required:    true,
-				ForceNew:    true,
 			},
 			"size": {
 				Type:        schema.TypeInt,
 				Description: "The size of the virtual disk in bytes.",
 				Required:    true,
-				ForceNew:    true,
 			},
 			"mode": {
 				Type:         schema.TypeString,
 				Description:  "The mode of the virtual disk. Available values are RW (Read/Write) and RO (Read-Only).",
 				ValidateFunc: validation.StringInSlice([]string{"RW", "RO"}, false),
 				Required:     true,
-				ForceNew:     true,
 			},
 			"storage_repository_id": {
 				Type:         schema.TypeString,
 				Description:  "The ID of the storage repository where the virtual disk is stored.",
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
-				ForceNew:     true,
 			},
 			"virtual_machine_id": {
 				Type:         schema.TypeString,
 				Description:  "The ID of the virtual machine to which the virtual disk is attached.",
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
-				ForceNew:     true,
 			},
 			"bootable": {
 				Type:        schema.TypeBool,
 				Description: "Whether the virtual disk is bootable.",
 				Optional:    true,
 				Default:     false,
-				ForceNew:    true,
 			},
 
 			// Out
@@ -104,6 +98,11 @@ func resourceOpenIaasVirtualDisk() *schema.Resource {
 							Type:        schema.TypeBool,
 							Computed:    true,
 							Description: "Whether the virtual disk is attached in read-only mode.",
+						},
+						"connected": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the virtual disk is currently connected to the virtual machine.",
 						},
 					},
 				},
@@ -156,7 +155,7 @@ func openIaasVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta
 		return diag.Errorf("the virtual disk could not be created: %s", err)
 	}
 
-	return openIaasVirtualDiskRead(ctx, d, meta) // DevNote : Call update instead when it will be implemented
+	return openIaasVirtualDiskUpdate(ctx, d, meta)
 }
 
 func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -186,22 +185,114 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 }
 
 func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
-	// TODO : Implement Detach on API to be able to change a virtual disk VM attachment
+	c := getClient(meta)
 
-	// TODO : Implement this on Compute API
-	// // Update the virtual disk properties if they have changed
-	// if d.HasChange("name") || d.HasChange("size") || d.HasChange("mode") || d.HasChange("storage_repository_id") || d.HasChange("bootable") {
-	// 	_, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, d.Id(), &client.OpenIaaSVirtualDiskUpdateRequest{
-	// 		Name:                d.Get("name").(string),
-	// 		Size:                d.Get("size").(int),
-	// 		Mode:                d.Get("mode").(string),
-	// 		StorageRepositoryID: d.Get("storage_repository_id").(string),
-	// 		Bootable:            d.Get("bootable").(bool),
-	// 	})
-	// 	if err != nil {
-	// 		return diag.Errorf("failed to update virtual disk: %s", err)
-	// 	}
-	// }
+	disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to read virtual disk state before update: %s", err)
+	}
+
+	// Virtual disk attachment cycle management
+	if d.HasChange("virtual_machine_id") || d.HasChange("bootable") || d.HasChange("mode") {
+		old, new := d.GetChange("virtual_machine_id")
+
+		// Check if the disk is already attached to the new VM to avoid errors
+		alreadyAttached := false
+		for _, vm := range disk.VirtualMachines {
+			if vm.ID == new {
+				alreadyAttached = true
+			}
+		}
+
+		if old != "" && len(disk.VirtualMachines) > 0 {
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Detach(ctx, d.Id(), &client.OpenIaaSVirtualDiskDetachRequest{
+				VirtualMachineID: old.(string),
+			})
+			if err != nil {
+				return diag.Errorf("failed to detach virtual disk: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to detach virtual disk: %s", err)
+			}
+		}
+
+		if new != "" && !alreadyAttached {
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Attach(ctx, d.Id(), &client.OpenIaaSVirtualDiskAttachRequest{
+				VirtualMachineID: d.Get("virtual_machine_id").(string),
+				Bootable:         d.Get("bootable").(bool),
+				Mode:             d.Get("mode").(string),
+			})
+			if err != nil {
+				return diag.Errorf("failed to attach virtual disk: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to attach virtual disk: %s", err)
+			}
+		}
+	}
+
+	if d.HasChange("name") || d.HasChange("size") {
+		var connectedVMs []string
+		for _, vm := range disk.VirtualMachines {
+			if vm.Connected {
+				connectedVMs = append(connectedVMs, vm.ID)
+
+				// Disconnect disk from VM before resizing
+				activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, d.Id(), &client.OpenIaaSVirtualDiskDisconnectRequest{
+					VirtualMachineID: vm.ID,
+				})
+				if err != nil {
+					return diag.Errorf("failed to disconnect virtual disk from VM %s before update: %s", vm.ID, err)
+				}
+				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+				if err != nil {
+					return diag.Errorf("failed to disconnect virtual disk from VM %s before update: %s", vm.ID, err)
+				}
+			}
+		}
+
+		// Update the disk (e.g., resize)
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, d.Id(), &client.OpenIaaSVirtualDiskUpdateRequest{
+			Name: d.Get("name").(string),
+			Size: d.Get("size").(int),
+		})
+		if err != nil {
+			return diag.Errorf("failed to update virtual disk: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update virtual disk: %s", err)
+		}
+
+		// Reconnect the disk to previously connected VMs
+		for _, vmID := range connectedVMs {
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, d.Id(), &client.OpenIaaSVirtualDiskConnectRequest{
+				VirtualMachineID: vmID,
+			})
+			if err != nil {
+				return diag.Errorf("failed to reconnect virtual disk to VM %s after update: %s", vmID, err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to reconnect virtual disk to VM %s after update: %s", vmID, err)
+			}
+		}
+	}
+
+	if d.HasChange("storage_repository_id") {
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Relocate(ctx, d.Id(), &client.OpenIaaSVirtualDiskRelocateRequest{
+			StorageRepositoryID: d.Get("storage_repository_id").(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to relocate virtual disk: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to relocate virtual disk: %s", err)
+		}
+	}
 
 	return openIaasVirtualDiskRead(ctx, d, meta)
 }

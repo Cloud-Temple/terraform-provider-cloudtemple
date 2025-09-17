@@ -15,9 +15,15 @@ type OpenIaasPool struct {
 	MachineManager          BaseObject
 	InternalID              string
 	Name                    string
+	Label                   string
 	HighAvailabilityEnabled bool
+	Master                  string
 	Hosts                   []string
-	Cpu                     struct {
+	Memory                  struct {
+		Usage int
+		Size  int
+	}
+	Cpu struct {
 		Cores   int
 		Sockets int
 	}

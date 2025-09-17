@@ -22,6 +22,7 @@ type OpenIaaSVirtualMachine struct {
 	InternalID          string
 	PowerState          string
 	SecureBoot          bool
+	HighAvailability    string
 	BootFirmware        string
 	AutoPowerOn         bool
 	DvdDrive            DvdDrive
