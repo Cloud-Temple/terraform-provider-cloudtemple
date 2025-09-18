@@ -67,7 +67,7 @@ output "storage_repository-2" {
 - `description` (String) The description of the storage repository.
 - `free_capacity` (Number) The available free space in the storage repository in bytes.
 - `internal_id` (String) The internal identifier of the storage repository in the Open IaaS system.
-- `maintenance_status` (Boolean) Whether the storage repository is in maintenance mode.
+- `maintenance_mode` (Boolean) Whether the storage repository is in maintenance mode.
 - `max_capacity` (Number) The maximum capacity of the storage repository in bytes.
 - `virtual_disks` (List of String) List of virtual disk IDs stored in this repository.
 

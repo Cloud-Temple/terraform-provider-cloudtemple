@@ -11,7 +11,7 @@ func FlattenOpenIaaSStorageRepository(repository *client.OpenIaaSStorageReposito
 		"name":               repository.Name,
 		"internal_id":        repository.InternalId,
 		"description":        repository.Description,
-		"maintenance_status": repository.MaintenanceStatus,
+		"maintenance_mode":   repository.MaintenanceMode,
 		"max_capacity":       repository.MaxCapacity,
 		"free_capacity":      repository.FreeCapacity,
 		"type":               repository.StorageType,

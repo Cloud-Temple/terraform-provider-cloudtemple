@@ -13,6 +13,7 @@ func FlattenOpenIaaSVirtualDisk(disk *client.OpenIaaSVirtualDisk) map[string]int
 			"id":        vm.ID,
 			"name":      vm.Name,
 			"read_only": vm.ReadOnly,
+			"connected": vm.Connected,
 		}
 	}
 

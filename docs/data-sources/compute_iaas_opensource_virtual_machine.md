@@ -61,6 +61,7 @@ output "virtual_machine-2" {
 - `boot_order` (List of String) The boot order of the virtual machine, listing devices in the order they will be tried during boot.
 - `cpu` (Number) The number of virtual CPUs allocated to the virtual machine.
 - `dvd_drive` (List of Object) Information about the virtual machine's DVD drive. (see [below for nested schema](#nestedatt--dvd_drive))
+- `high_availability` (String) High Availability configuration for the virtual machine. Possible values are: 'disabled', 'restart' and 'best-effort'. For more information, refer to the documentation : https://docs.cloud-temple.com/iaas_opensource/concepts#haute-disponibilit%C3%A9
 - `host_id` (String) The ID of the host the virtual machine is running on.
 - `internal_id` (String) The internal identifier of the virtual machine in the Open IaaS system.
 - `memory` (Number) The amount of memory allocated to the virtual machine in Bytes.

@@ -69,6 +69,11 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 				Computed:    true,
 				Description: "Whether the virtual machine is configured to automatically power on when the host starts.",
 			},
+			"high_availability": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "High Availability configuration for the virtual machine. Possible values are: 'disabled', 'restart' and 'best-effort'. For more information, refer to the documentation : https://docs.cloud-temple.com/iaas_opensource/concepts#haute-disponibilit%C3%A9",
+			},
 			"dvd_drive": {
 				Type:        schema.TypeList,
 				Computed:    true,
