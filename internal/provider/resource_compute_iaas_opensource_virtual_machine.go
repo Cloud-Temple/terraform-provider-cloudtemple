@@ -33,11 +33,31 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 				Required:    true,
 			},
 			"template_id": {
-				Type:         schema.TypeString,
-				Description:  "The template identifier.",
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: validation.IsUUID,
+				Type:          schema.TypeString,
+				Description:   "The template identifier.",
+				Optional:      true,
+				ForceNew:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"marketplace_item_id"},
+				AtLeastOneOf:  []string{"template_id", "marketplace_item_id"},
+			},
+			"marketplace_item_id": {
+				Type:          schema.TypeString,
+				Description:   "The marketplace item identifier to deploy the virtual machine from.",
+				Optional:      true,
+				ForceNew:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"template_id"},
+				AtLeastOneOf:  []string{"template_id", "marketplace_item_id"},
+			},
+			"storage_repository_id": {
+				Type:          schema.TypeString,
+				Description:   "The storage repository identifier where the virtual machine will be created. Required when `marketplace_item_id` is set.",
+				Optional:      true,
+				ForceNew:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"template_id"},
+				RequiredWith:  []string{"marketplace_item_id"},
 			},
 			"cpu": {
 				Type:        schema.TypeInt,
@@ -249,21 +269,39 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 			cloudInit.NetworkConfig = networkConfig
 		}
 	}
-	// Create virtual machine itself
-	activityId, err := c.Compute().OpenIaaS().VirtualMachine().Create(ctx, &client.CreateOpenIaasVirtualMachineRequest{
-		Name:       d.Get("name").(string),
-		TemplateID: d.Get("template_id").(string),
-		CPU:        d.Get("cpu").(int),
-		Memory:     d.Get("memory").(int),
-		CloudInit:  cloudInit,
-	})
-	if err != nil {
-		return diag.Errorf("the virtual machine could not be created: %s", err)
-	}
-	activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	setIdFromActivityState(d, activity)
-	if err != nil {
-		return diag.Errorf("failed to create virtual machine, %s", err)
+
+	// Deploy from template
+	if d.Get("template_id").(string) != "" {
+		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Create(ctx, &client.CreateOpenIaasVirtualMachineRequest{
+			Name:       d.Get("name").(string),
+			TemplateID: d.Get("template_id").(string),
+			CPU:        d.Get("cpu").(int),
+			Memory:     d.Get("memory").(int),
+			CloudInit:  cloudInit,
+		})
+		if err != nil {
+			return diag.Errorf("the virtual machine could not be created: %s", err)
+		}
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		setIdFromActivityState(d, activity)
+		if err != nil {
+			return diag.Errorf("failed to create virtual machine, %s", err)
+		}
+	} else if d.Get("marketplace_item_id").(string) != "" {
+		// Deploy from marketplace item
+		activityId, err := c.Compute().OpenIaaS().VirtualMachine().DeployFromMarketplace(ctx, &client.DeployOpenIaasVirtualMachineFromMarketplaceRequest{
+			ID:                  d.Get("marketplace_item_id").(string),
+			Name:                d.Get("name").(string),
+			StorageRepositoryID: d.Get("storage_repository_id").(string),
+		})
+		if err != nil {
+			return diag.Errorf("the virtual machine could not be created from marketplace item: %s", err)
+		}
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		setIdFromActivityState(d, activity)
+		if err != nil {
+			return diag.Errorf("failed to create virtual machine from marketplace item, %s", err)
+		}
 	}
 
 	// Assign SLA policies to the virtual machine
@@ -271,7 +309,7 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 	for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
 		slaPolicies = append(slaPolicies, policy.(string))
 	}
-	activityId, err = c.Backup().OpenIaaS().Policy().Assign(ctx, &client.BackupOpenIaasAssignPolicyRequest{
+	activityId, err := c.Backup().OpenIaaS().Policy().Assign(ctx, &client.BackupOpenIaasAssignPolicyRequest{
 		VirtualMachineId: d.Id(),
 		PolicyIds:        slaPolicies,
 	})
