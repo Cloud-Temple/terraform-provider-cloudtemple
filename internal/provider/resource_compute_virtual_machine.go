@@ -596,10 +596,24 @@ Supported configurations include:
 - Performance optimization: 'stealclock.enable'
 - Disk configuration: 'disk.enableUUID'
 - PCI Passthrough: 'pciPassthru.use64BitMMIO', 'pciPassthru.64bitMMioSizeGB'
+- Guest info for cloud-init: 'guestinfo.userdata', 'guestinfo.userdata.encoding', 'guestinfo.metadata', 'guestinfo.metadata.encoding'
 
 Note: Changes to extra_config may require a virtual machine restart to take effect.`,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
+					ValidateFunc: validation.StringInSlice([]string{
+						"guestinfo.ignition.config.data",
+						"guestinfo.ignition.config.data.encoding",
+						"guestinfo.afterburn.initrd.network-kargs",
+						"stealclock.enable",
+						"disk.enableUUID",
+						"pciPassthru.use64BitMMIO",
+						"pciPassthru.64bitMMioSizeGB",
+						"guestinfo.userdata",
+						"guestinfo.userdata.encoding",
+						"guestinfo.metadata",
+						"guestinfo.metadata.encoding",
+					}, false),
 				},
 			},
 
@@ -1535,6 +1549,10 @@ func suppressUnmanagedExtraConfigDiff(k, old, new string, d *schema.ResourceData
 		"disk.enableUUID":                          true,
 		"pciPassthru.use64BitMMIO":                 true,
 		"pciPassthru.64bitMMioSizeGB":              true,
+		"guestinfo.userdata":                       true,
+		"guestinfo.userdata.encoding":              true,
+		"guestinfo.metadata":                       true,
+		"guestinfo.metadata.encoding":              true,
 	}
 
 	// Extract the key name from the path (e.g., "extra_config.svga.present" -> "svga.present")
