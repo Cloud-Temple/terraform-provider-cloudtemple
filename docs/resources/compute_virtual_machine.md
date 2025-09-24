@@ -352,6 +352,7 @@ Supported configurations include:
 - Performance optimization: 'stealclock.enable'
 - Disk configuration: 'disk.enableUUID'
 - PCI Passthrough: 'pciPassthru.use64BitMMIO', 'pciPassthru.64bitMMioSizeGB'
+- Guest info for cloud-init: 'guestinfo.userdata', 'guestinfo.userdata.encoding', 'guestinfo.metadata', 'guestinfo.metadata.encoding'
 
 Note: Changes to extra_config may require a virtual machine restart to take effect.
 - `guest_operating_system_moref` (String) The operating system to launch the virtual machine with.

@@ -601,20 +601,20 @@ Supported configurations include:
 Note: Changes to extra_config may require a virtual machine restart to take effect.`,
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
-					ValidateFunc: validation.StringInSlice([]string{
-						"guestinfo.ignition.config.data",
-						"guestinfo.ignition.config.data.encoding",
-						"guestinfo.afterburn.initrd.network-kargs",
-						"stealclock.enable",
-						"disk.enableUUID",
-						"pciPassthru.use64BitMMIO",
-						"pciPassthru.64bitMMioSizeGB",
-						"guestinfo.userdata",
-						"guestinfo.userdata.encoding",
-						"guestinfo.metadata",
-						"guestinfo.metadata.encoding",
-					}, false),
 				},
+				ValidateDiagFunc: validation.MapKeyMatch(regexp.MustCompile(strings.Join([]string{
+					"^guestinfo\\.ignition\\.config\\.data$",
+					"^guestinfo\\.ignition\\.config\\.data\\.encoding$",
+					"^guestinfo\\.afterburn\\.initrd\\.network-kargs$",
+					"^stealclock\\.enable$",
+					"^disk\\.enableUUID$",
+					"^pciPassthru\\.use64BitMMIO$",
+					"^pciPassthru\\.64bitMMioSizeGB$",
+					"^guestinfo\\.userdata$",
+					"^guestinfo\\.userdata\\.encoding$",
+					"^guestinfo\\.metadata$",
+					"^guestinfo\\.metadata\\.encoding$",
+				}, "|")), "The following key is not allowed for extra_config"),
 			},
 
 			// Out
