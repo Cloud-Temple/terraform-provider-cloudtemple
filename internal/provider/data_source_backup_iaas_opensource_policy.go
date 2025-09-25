@@ -65,6 +65,14 @@ func dataSourceOpenIaasBackupPolicy() *schema.Resource {
 				Computed:    true,
 				Description: "The backup mode of the policy (e.g., full, incremental).",
 			},
+			"virtual_machines": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "List of virtual machines associated with this backup policy.",
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+			},
 			"schedulers": {
 				Type:        schema.TypeList,
 				Computed:    true,

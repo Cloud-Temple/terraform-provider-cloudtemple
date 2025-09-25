@@ -345,6 +345,16 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 - `deploy_options` (Map of String)
 - `disks_provisioning_type` (String) Overrides the provisioning type for the os_disks of an OVF. Possible values are: `dynamic`, `staticImmediate`, `staticDiffered`.
 - `expose_hardware_virtualization` (Boolean) Enable nested hardware virtualization on the virtual machine, facilitating nested virtualization in the guest operating system (Default: false)
+- `extra_config` (Map of String) Extra configuration parameters for the virtual machine. These are advanced VMware vSphere settings that can be used to configure specialized operating systems like CoreOS with Ignition.
+
+Supported configurations include:
+- Ignition for CoreOS: 'guestinfo.ignition.config.data', 'guestinfo.ignition.config.data.encoding', 'guestinfo.afterburn.initrd.network-kargs'
+- Performance optimization: 'stealclock.enable'
+- Disk configuration: 'disk.enableUUID'
+- PCI Passthrough: 'pciPassthru.use64BitMMIO', 'pciPassthru.64bitMMioSizeGB'
+- Guest info for cloud-init: 'guestinfo.userdata', 'guestinfo.userdata.encoding', 'guestinfo.metadata', 'guestinfo.metadata.encoding'
+
+Note: Changes to extra_config may require a virtual machine restart to take effect.
 - `guest_operating_system_moref` (String) The operating system to launch the virtual machine with.
 - `host_id` (String) The host to start the virtual machine on.
 - `memory` (Number) In bytes. The quantity of memory to start the virtual machine with.
@@ -374,7 +384,6 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 - `datastore_cluster_name` (String)
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
-- `extra_config` (List of Object) (see [below for nested schema](#nestedatt--extra_config))
 - `hardware_version` (String)
 - `host_cluster_name` (String)
 - `id` (String) The ID of this resource.
@@ -520,15 +529,6 @@ Read-Only:
 - `mac_type` (String) The type of MAC address assignment (e.g., MANUAL, GENERATED).
 - `name` (String) The name of the network adapter.
 - `type` (String) The type of the network adapter (e.g., VMXNET3, E1000).
-
-
-<a id="nestedatt--extra_config"></a>
-### Nested Schema for `extra_config`
-
-Read-Only:
-
-- `key` (String)
-- `value` (String)
 
 
 <a id="nestedatt--replication_config"></a>

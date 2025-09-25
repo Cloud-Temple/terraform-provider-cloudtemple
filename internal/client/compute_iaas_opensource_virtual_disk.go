@@ -97,41 +97,38 @@ func (v *OpenIaaSVirtualDiskClient) List(ctx context.Context, filter *OpenIaaSVi
 }
 
 type OpenIaaSVirtualDiskUpdateRequest struct {
-	ID   string // No JSON tag, as this is the URL parameter
 	Name string `json:"name,omitempty"`
 	Size int    `json:"size,omitempty"`
 }
 
-func (v *OpenIaaSVirtualDiskClient) Update(ctx context.Context, req *OpenIaaSVirtualDiskUpdateRequest) (string, error) {
-	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s", req.ID)
+func (v *OpenIaaSVirtualDiskClient) Update(ctx context.Context, id string, req *OpenIaaSVirtualDiskUpdateRequest) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s", id)
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
 type OpenIaaSVirtualDiskRelocateRequest struct {
-	ID                  string // No JSON tag, as this is the URL parameter
 	StorageRepositoryID string `json:"storageRepositoryId"`
 }
 
-func (v *OpenIaaSVirtualDiskClient) Relocate(ctx context.Context, req *OpenIaaSVirtualDiskRelocateRequest) (string, error) {
-	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s/relocate", req.ID)
+func (v *OpenIaaSVirtualDiskClient) Relocate(ctx context.Context, id string, req *OpenIaaSVirtualDiskRelocateRequest) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s/relocate", id)
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
 type OpenIaaSVirtualDiskConnectionRequest struct {
-	ID               string // No JSON tag, as this is the URL parameter
 	VirtualMachineID string `json:"virtualMachineId"`
 }
 
-func (v *OpenIaaSVirtualDiskClient) Connect(ctx context.Context, req *OpenIaaSVirtualDiskConnectionRequest) (string, error) {
-	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s/connect", req.ID)
+func (v *OpenIaaSVirtualDiskClient) Connect(ctx context.Context, id string, req *OpenIaaSVirtualDiskConnectionRequest) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s/connect", id)
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
-func (v *OpenIaaSVirtualDiskClient) Disconnect(ctx context.Context, req *OpenIaaSVirtualDiskConnectionRequest) (string, error) {
-	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s/disconnect", req.ID)
+func (v *OpenIaaSVirtualDiskClient) Disconnect(ctx context.Context, id string, req *OpenIaaSVirtualDiskConnectionRequest) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s/disconnect", id)
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
@@ -144,7 +141,17 @@ type OpenIaaSVirtualDiskAttachRequest struct {
 }
 
 func (v *OpenIaaSVirtualDiskClient) Attach(ctx context.Context, id string, req *OpenIaaSVirtualDiskAttachRequest) (string, error) {
-	r := v.c.newRequest("POST", "/compute/v1/open_iaas/virtual_disks/%s/attach", id)
+	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s/attach", id)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
+type OpenIaaSVirtualDiskDetachRequest struct {
+	VirtualMachineID string `json:"virtualMachineId"`
+}
+
+func (v *OpenIaaSVirtualDiskClient) Detach(ctx context.Context, id string, req *OpenIaaSVirtualDiskDetachRequest) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/open_iaas/virtual_disks/%s/detach", id)
 	r.obj = req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }

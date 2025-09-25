@@ -75,7 +75,7 @@ func computeSnapshotsRead(ctx context.Context, d *schema.ResourceData, meta any)
 	}
 
 	// Définir l'ID de la datasource
-	d.SetId("snapshots")
+	d.SetId("snapshots" + virtualMachineId)
 
 	// Mapper manuellement les données en utilisant la fonction helper
 	tfSnapshots := make([]map[string]interface{}, len(snapshots))

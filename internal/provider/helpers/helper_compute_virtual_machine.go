@@ -3,6 +3,7 @@ package helpers
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -45,12 +46,9 @@ func FlattenVirtualMachine(vm *client.VirtualMachine) map[string]interface{} {
 	}
 
 	// Aplatir la configuration supplémentaire
-	extraConfig := make([]map[string]interface{}, len(vm.ExtraConfig))
-	for i, config := range vm.ExtraConfig {
-		extraConfig[i] = map[string]interface{}{
-			"key":   config.Key,
-			"value": config.Value,
-		}
+	extraConfigMap := make(map[string]string)
+	for _, config := range vm.ExtraConfig {
+		extraConfigMap[config.Key] = config.Value
 	}
 
 	// Aplatir le stockage
@@ -106,7 +104,7 @@ func FlattenVirtualMachine(vm *client.VirtualMachine) map[string]interface{} {
 		"snapshoted":                         vm.Snapshoted,
 		"triggered_alarms":                   triggeredAlarms,
 		"replication_config":                 replicationConfig,
-		"extra_config":                       extraConfig,
+		"extra_config":                       extraConfigMap,
 		"storage":                            storage,
 		"boot_options":                       bootOptions,
 		"expose_hardware_virtualization":     vm.ExposeHardwareVirtualization,
@@ -273,4 +271,32 @@ func FlattenOSNetworkAdapterData(osNetworkAdapter *client.NetworkAdapter) interf
 	networkAdapter["auto_connect"] = osNetworkAdapter.AutoConnect
 
 	return networkAdapter
+}
+
+// convertExtraConfigValue convertit une valeur string vers le type approprié selon la clé
+func ConvertExtraConfigValue(key, value string) (interface{}, error) {
+	switch key {
+	// Clés booléennes VMware (strictes)
+	case "disk.enableUUID", "stealclock.enable", "pciPassthru.use64BitMMIO":
+		switch value {
+		case "TRUE", "true":
+			return true, nil
+		case "FALSE", "false":
+			return false, nil
+		default:
+			return nil, fmt.Errorf("invalid boolean value '%s' for key '%s', expected 'TRUE' or 'FALSE'", value, key)
+		}
+
+	// Clés numériques
+	case "pciPassthru.64bitMMioSizeGB":
+		if i, err := strconv.Atoi(value); err != nil {
+			return nil, fmt.Errorf("invalid integer value '%s' for key '%s': %v", value, key, err)
+		} else {
+			return i, nil
+		}
+
+	// Clés string (par défaut - toutes les non gérées)
+	default:
+		return value, nil
+	}
 }

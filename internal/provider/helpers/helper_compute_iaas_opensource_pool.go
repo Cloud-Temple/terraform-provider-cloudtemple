@@ -14,6 +14,14 @@ func FlattenOpenIaaSPool(pool *client.OpenIaasPool) map[string]interface{} {
 		},
 	}
 
+	// Mapper la memory
+	memory := []map[string]interface{}{
+		{
+			"usage": pool.Memory.Usage,
+			"size":  pool.Memory.Size,
+		},
+	}
+
 	// Mapper le type
 	poolType := []map[string]interface{}{
 		{
@@ -25,10 +33,13 @@ func FlattenOpenIaaSPool(pool *client.OpenIaasPool) map[string]interface{} {
 	return map[string]interface{}{
 		"id":                        pool.ID,
 		"name":                      pool.Name,
+		"label":                     pool.Label,
 		"internal_id":               pool.InternalID,
 		"machine_manager_id":        pool.MachineManager.ID,
 		"high_availability_enabled": pool.HighAvailabilityEnabled,
+		"master":                    pool.Master,
 		"hosts":                     pool.Hosts,
+		"memory":                    memory,
 		"cpu":                       cpu,
 		"type":                      poolType,
 	}

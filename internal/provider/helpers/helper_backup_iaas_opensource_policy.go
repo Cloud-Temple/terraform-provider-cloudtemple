@@ -25,6 +25,7 @@ func FlattenBackupOpenIaasPolicy(policy *client.BackupOpenIaasPolicy) map[string
 		"mode":                 policy.Mode,
 		"machine_manager_id":   policy.MachineManager.ID,
 		"machine_manager_name": policy.MachineManager.Name,
+		"virtual_machines":     policy.VirtualMachines,
 		"schedulers":           schedulers,
 	}
 }

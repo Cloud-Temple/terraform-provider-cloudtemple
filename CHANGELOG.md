@@ -1,4 +1,99 @@
-## 1.0.0-rc.1 (NOT RELEASED YET)
+***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
+
+## 1.1.0-rc.1 (September 9th, 2025)
+
+  IMPROVEMENTS :
+
+    * Added automatic state migration for `extra_config` in resource `cloudtemple_compute_virtual_machine`.
+      - The `extra_config` parameter format has been changed from array of objects to a map for better usability
+      - Existing Terraform states with the old format will be automatically migrated to the new format
+      - Old format: `[{"key": "svga.present", "value": "TRUE"}]`
+      - New format: `{"svga.present": "TRUE"}`
+      - This migration is transparent and requires no user action
+
+  NEW FEATURES :
+
+    * Added update extra config to ressource `cloudtemple_compute_virtual_machine`.
+      - Supported keys: `guestinfo.ignition.config.data`, `guestinfo.ignition.config.data.encoding`, `guestinfo.afterburn.initrd.network-kargs`, `stealclock.enable`, `disk.enableUUID`, `pciPassthru.use64BitMMIO`, `pciPassthru.64bitMMioSizeGB`
+
+## 1.0.1 (September 8th, 2025)
+
+  BUG FIXES:
+
+    * Fixed a bug causing fails while deploying from the content library, when `power_on` parameter is set to `true`.
+
+## 1.0.0 (September 5th, 2025)
+
+  BUG FIXES:
+
+    * Fixed a bug causing resources `cloudtemple_compute_virtual_disk` to be imported as `os_disk` in the state of the attached `cloudtemple_compute_virtual_machine`.
+    * Fixed a bug in the datasources `cloudtemple_compute_iaas_opensource_backup_policy` and `cloudtemple_compute_iaas_opensource_backup_policies`.
+
+  IMPROVEMENTS:
+
+    * Added memoryReservation feature for virtual machines
+    * Configuration parameters `os_disk` and `os_network_adapter` are now imported with the resource `cloudtemple_compute_virtual_machine` (Experimentation)
+    * Standardized state management code across all datasources and resources [#155]
+      - Implemented consistent data mapping patterns for all components
+      - Added standardized error handling and state management
+      - Unified the way data is processed and stored across resources
+      - Improved error handling in API client
+    * Improved provider documentation
+      - Added detailed examples for all data sources and resources
+      - Enhanced documentation clarity and completeness
+      - Updated all resource and data source documentation with consistent formatting
+      - Added new examples for iaas_opensource components
+    * Refactored acceptance tests for better reliability and maintainability
+      - Moved all test files to dedicated test directories
+      - Standardized test patterns across all components
+      - Added test coverage for iaas_opensource features
+    * Added new helper functions for each resource type to improve code reusability
+      - Created 40+ new helper files for better code organization
+      - Implemented shared functionality for common operations
+      - Reduced code duplication across similar resources
+
+  BREAKING CHANGES:
+
+    * Removed property `mac_type` from resource `cloudtemple_compute_network_adapter`. 
+      - MAC addresses are now generated whenever the `mac_address` property is not explicitly provided by the user.
+      - Same behavior is now applied to the `os_network_adapter` block of the resource `cloudtemple_compute_virtual_machine`.
+
+  CODE ORGANIZATION:
+
+    * Major structural improvements:
+      - Moved all test files into dedicated test folders:
+        * internal/client/tests/ for client tests
+        * internal/provider/tests/ for provider tests
+      - Created separate helper files for each resource type in internal/provider/helpers/
+      - Standardized file organization across the codebase
+    * New helper files added:
+      - Added helper files for backup components
+      - Added helper files for compute components
+      - Added helper files for IAM components
+    * Improved code modularity:
+      - Separated data mapping logic into dedicated helper files
+      - Centralized common functionality in helper packages
+      - Standardized resource and data source implementations
+      - Improved API client organization
+    * Standardized data mapping patterns across all components:
+      - All singular datasources now follow consistent patterns
+      - Implemented standardized data mapping for iaas_opensource components
+      - Added flatten pattern for nested properties
+      - Unified error handling and state management across all resources
+
+## 1.0.0-rc.3 (May 15th, 2025)
+
+  BUG FIXES:
+
+    * Fixed a bug causing resources `cloudtemple_compute_virtual_disk` to be imported as `os_disk` in the state of the attached `cloudtemple_compute_virtual_machine`.
+
+## 1.0.0-rc.2 (May 6th, 2025)
+
+  BUG FIXES:
+
+    * Fixed a bug in the datasources `cloudtemple_compute_iaas_opensource_backup_policy` and `cloudtemple_compute_iaas_opensource_backup_policies`.
+
+## 1.0.0-rc.1 (May 5th, 2025)
 
 IMPROVEMENTS:
 

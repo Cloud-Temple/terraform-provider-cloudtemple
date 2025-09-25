@@ -12,7 +12,7 @@ import (
 
 func resourceVirtualDisk() *schema.Resource {
 	return &schema.Resource{
-		Description: "",
+		Description: "Create and manage virtual disks of a virtual machine.",
 
 		CreateWithoutTimeout: computeVirtualDiskCreate,
 		ReadContext:          computeVirtualDiskRead,

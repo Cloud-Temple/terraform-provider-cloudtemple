@@ -25,12 +25,14 @@ func dataSourceOpenIaasHost() *schema.Resource {
 				ConflictsWith: []string{"name"},
 				AtLeastOneOf:  []string{"id", "name"},
 				ValidateFunc:  validation.IsUUID,
+				Description:   "The ID of the host to retrieve. Conflicts with `name`.",
 			},
 			"name": {
 				Type:          schema.TypeString,
 				Optional:      true,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The name of the host to retrieve. Conflicts with `id`.",
 			},
 			"machine_manager_id": {
 				Type:          schema.TypeString,
@@ -38,6 +40,7 @@ func dataSourceOpenIaasHost() *schema.Resource {
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The ID of the machine manager this host belongs to.",
 			},
 			"pool_id": {
 				Type:          schema.TypeString,
@@ -46,6 +49,7 @@ func dataSourceOpenIaasHost() *schema.Resource {
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
 				AtLeastOneOf:  []string{"id", "name"},
+				Description:   "The ID of the pool this host belongs to.",
 			},
 
 			// Out

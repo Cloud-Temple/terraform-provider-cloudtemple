@@ -60,7 +60,7 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 			"power_state": {
 				Type:         schema.TypeString,
 				Description:  "The desired power state of the virtual machine. Available values are 'on' and 'off'.",
-				Optional:     true,
+				Required:     true,
 				ValidateFunc: validation.StringInSlice([]string{"on", "off"}, false),
 			},
 			"host_id": {
@@ -820,8 +820,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 
 	// Déconnecter si nécessaire pour la mise à jour
 	if needsDisconnect && vbd.Connected {
-		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
-			ID:               disk["id"].(string),
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskConnectionRequest{
 			VirtualMachineID: d.Id(),
 		})
 		if err != nil {
@@ -835,8 +834,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 
 	// Mettre à jour le disque si nécessaire
 	if needsDisconnect {
-		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, &client.OpenIaaSVirtualDiskUpdateRequest{
-			ID:   disk["id"].(string),
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskUpdateRequest{
 			Size: disk["size"].(int),
 			Name: disk["name"].(string),
 		})
@@ -851,8 +849,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 
 	// Gérer le déplacement du disque si nécessaire
 	if d.HasChange(fmt.Sprintf("os_disk.%d.storage_repository_id", i)) {
-		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Relocate(ctx, &client.OpenIaaSVirtualDiskRelocateRequest{
-			ID:                  disk["id"].(string),
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Relocate(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskRelocateRequest{
 			StorageRepositoryID: disk["storage_repository_id"].(string),
 		})
 		if err != nil {
@@ -880,8 +877,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 		// Si l'état actuel ne correspond pas à l'état souhaité
 		if wantConnected && !vbd.Connected {
 			// Connecter le disque
-			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
-				ID:               disk["id"].(string),
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskConnectionRequest{
 				VirtualMachineID: d.Id(),
 			})
 			if err != nil {
@@ -893,8 +889,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 			}
 		} else if !wantConnected && vbd.Connected {
 			// Déconnecter le disque
-			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
-				ID:               disk["id"].(string),
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskConnectionRequest{
 				VirtualMachineID: d.Id(),
 			})
 			if err != nil {
@@ -908,8 +903,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 	} else if needsDisconnect && wasConnected {
 		// Si l'utilisateur n'a pas modifié l'état de connexion et que le disque était connecté avant
 		// et qu'on l'a déconnecté pour la mise à jour, on le reconnecte
-		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
-			ID:               disk["id"].(string),
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskConnectionRequest{
 			VirtualMachineID: d.Id(),
 		})
 		if err != nil {

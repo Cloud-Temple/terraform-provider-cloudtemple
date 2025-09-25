@@ -249,7 +249,7 @@ func (v *VirtualMachineClient) Rename(ctx context.Context, id string, name strin
 type CloneVirtualMachineRequest struct {
 	Name              string `json:"name"`
 	VirtualMachineId  string `json:"-"`
-	PowerOn           bool   `json:"powerOn"`
+	PowerOn           bool   `json:"powerOn,omitempty"`
 	DatacenterId      string `json:"datacenterId,omitempty"`
 	HostClusterId     string `json:"hostClusterId,omitempty"`
 	HostId            string `json:"hostId,omitempty"`
@@ -337,4 +337,10 @@ func (v *VirtualMachineClient) Recommendation(ctx context.Context, filter *Virtu
 	}
 
 	return out, nil
+}
+
+func (v *VirtualMachineClient) UpdateExtraConfig(ctx context.Context, id string, req map[string]interface{}) (string, error) {
+	r := v.c.newRequest("PATCH", "/compute/v1/vcenters/virtual_machines/%s/extra_config", id)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
 }

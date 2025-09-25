@@ -59,6 +59,9 @@ output "pool-2" {
 - `high_availability_enabled` (Boolean) Whether high availability is enabled for this pool.
 - `hosts` (List of String) List of host IDs in this pool.
 - `internal_id` (String) The internal identifier of the pool in the Open IaaS system.
+- `label` (String) The label of the pool.
+- `master` (String) The ID of the master host in this pool.
+- `memory` (List of Object) Memory information for the pool. (see [below for nested schema](#nestedatt--memory))
 - `type` (List of Object) Information about the pool type. (see [below for nested schema](#nestedatt--type))
 
 <a id="nestedatt--cpu"></a>
@@ -68,6 +71,15 @@ Read-Only:
 
 - `cores` (Number)
 - `sockets` (Number)
+
+
+<a id="nestedatt--memory"></a>
+### Nested Schema for `memory`
+
+Read-Only:
+
+- `size` (Number)
+- `usage` (Number)
 
 
 <a id="nestedatt--type"></a>

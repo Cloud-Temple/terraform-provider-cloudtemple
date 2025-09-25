@@ -92,6 +92,7 @@ Read-Only:
 - `name` (String)
 - `running` (Boolean)
 - `schedulers` (List of Object) (see [below for nested schema](#nestedobjatt--policies--schedulers))
+- `virtual_machines` (List of String)
 
 <a id="nestedobjatt--policies--schedulers"></a>
 ### Nested Schema for `policies.schedulers`

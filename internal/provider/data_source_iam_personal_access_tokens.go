@@ -97,8 +97,6 @@ func dataSourcePersonalAccessTokensRead(ctx context.Context, d *schema.ResourceD
 	tfTokens := make([]map[string]interface{}, len(tokens))
 	for i, token := range tokens {
 		tokenData := helpers.FlattenToken(token)
-		// Ne pas exposer le secret dans la datasource
-		delete(tokenData, "secret")
 		tfTokens[i] = tokenData
 	}
 

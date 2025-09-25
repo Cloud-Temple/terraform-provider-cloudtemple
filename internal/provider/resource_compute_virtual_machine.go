@@ -35,6 +35,15 @@ func resourceVirtualMachine() *schema.Resource {
 			StateContext: schema.ImportStatePassthroughContext,
 		},
 
+		SchemaVersion: 1,
+		StateUpgraders: []schema.StateUpgrader{
+			{
+				Type:    resourceVirtualMachineResourceV0().CoreConfigSchema().ImpliedType(),
+				Upgrade: migrateVirtualMachineStateV0toV1,
+				Version: 0,
+			},
+		},
+
 		Schema: map[string]*schema.Schema{
 			// In
 			"name": {
@@ -575,6 +584,38 @@ Independent persistent: Changes are immediately and permanently written to the v
 					},
 				},
 			},
+			"extra_config": {
+				Type:             schema.TypeMap,
+				Optional:         true,
+				Computed:         true,
+				DiffSuppressFunc: suppressUnmanagedExtraConfigDiff,
+				Description: `Extra configuration parameters for the virtual machine. These are advanced VMware vSphere settings that can be used to configure specialized operating systems like CoreOS with Ignition.
+
+Supported configurations include:
+- Ignition for CoreOS: 'guestinfo.ignition.config.data', 'guestinfo.ignition.config.data.encoding', 'guestinfo.afterburn.initrd.network-kargs'
+- Performance optimization: 'stealclock.enable'
+- Disk configuration: 'disk.enableUUID'
+- PCI Passthrough: 'pciPassthru.use64BitMMIO', 'pciPassthru.64bitMMioSizeGB'
+- Guest info for cloud-init: 'guestinfo.userdata', 'guestinfo.userdata.encoding', 'guestinfo.metadata', 'guestinfo.metadata.encoding'
+
+Note: Changes to extra_config may require a virtual machine restart to take effect.`,
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
+				},
+				ValidateDiagFunc: validation.MapKeyMatch(regexp.MustCompile(strings.Join([]string{
+					"^guestinfo\\.ignition\\.config\\.data$",
+					"^guestinfo\\.ignition\\.config\\.data\\.encoding$",
+					"^guestinfo\\.afterburn\\.initrd\\.network-kargs$",
+					"^stealclock\\.enable$",
+					"^disk\\.enableUUID$",
+					"^pciPassthru\\.use64BitMMIO$",
+					"^pciPassthru\\.64bitMMioSizeGB$",
+					"^guestinfo\\.userdata$",
+					"^guestinfo\\.userdata\\.encoding$",
+					"^guestinfo\\.metadata$",
+					"^guestinfo\\.metadata\\.encoding$",
+				}, "|")), "The following key is not allowed for extra_config"),
+			},
 
 			// Out
 			"moref": {
@@ -752,23 +793,6 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 					},
 				},
 			},
-			"extra_config": {
-				Type:     schema.TypeList,
-				Computed: true,
-
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"key": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-						"value": {
-							Type:     schema.TypeString,
-							Computed: true,
-						},
-					},
-				},
-			},
 			"storage": {
 				Type:     schema.TypeList,
 				Computed: true,
@@ -819,9 +843,8 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 
 	if cloneVirtualMachineId != "" {
 		activityId, err = c.Compute().VirtualMachine().Clone(ctx, &client.CloneVirtualMachineRequest{
-			Name:             name,
-			VirtualMachineId: cloneVirtualMachineId,
-			// PowerOn:           d.Get("power_state").(string) == "on",
+			Name:              name,
+			VirtualMachineId:  cloneVirtualMachineId,
 			DatacenterId:      d.Get("datacenter_id").(string),
 			HostClusterId:     d.Get("host_cluster_id").(string),
 			HostId:            d.Get("host_id").(string),
@@ -871,7 +894,6 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			HostId:                d.Get("host_id").(string),
 			DatastoreId:           d.Get("datastore_id").(string),
 			DatacenterId:          d.Get("datacenter_id").(string),
-			PowerOn:               d.Get("power_state").(string) == "on",
 			DisksProvisioningType: d.Get("disks_provisioning_type").(string),
 			DeployOptions:         deployOptions,
 		})
@@ -1045,60 +1067,38 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 	vmData := helpers.FlattenVirtualMachine(vm)
 	vmData["backup_sla_policies"] = slaPoliciesIds
 
-	// // Récupérer les OS disks
-	// osDisks := []interface{}{}
-	// for _, osDisk := range d.Get("os_disk").([]interface{}) {
-	// 	if osDisk == nil {
-	// 		continue
-	// 	}
-	// 	osDiskId := osDisk.(map[string]interface{})["id"].(string)
-	// 	if osDiskId != "" {
-	// 		disk, err := c.Compute().VirtualDisk().Read(ctx, osDiskId)
-	// 		if err != nil {
-	// 			return diag.Errorf("failed to read os disk: %s", err)
-	// 		}
-	// 		osDisks = append(osDisks, helpers.FlattenOSDiskData(disk))
-	// 	}
-	// }
-	// vmData["os_disk"] = osDisks
-
-	// // Récupérer les OS network adapters
-	// osNetworkAdapters := []interface{}{}
-	// for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
-	// 	if osNetworkAdapter == nil {
-	// 		continue
-	// 	}
-	// 	osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
-	// 	if osNetworkAdapterId != "" {
-	// 		networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, osNetworkAdapterId)
-	// 		if err != nil {
-	// 			return diag.Errorf("failed to read os network adapter: %s", err)
-	// 		}
-	// 		osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOSNetworkAdapterData(networkAdapter))
-	// 	}
-	// }
-	// vmData["os_network_adapter"] = osNetworkAdapters
-
-	disks, err := c.Compute().VirtualDisk().List(ctx, &client.VirtualDiskFilter{
-		VirtualMachineID: d.Id(),
-	})
-	if err != nil {
-		return diag.Errorf("failed to retrieve OS disks: %s", err)
+	// Récupérer les OS disks
+	osDisks := []interface{}{}
+	for _, osDisk := range d.Get("os_disk").([]interface{}) {
+		if osDisk == nil {
+			continue
+		}
+		osDiskId := osDisk.(map[string]interface{})["id"].(string)
+		if osDiskId != "" {
+			disk, err := c.Compute().VirtualDisk().Read(ctx, osDiskId)
+			if err != nil {
+				return diag.Errorf("failed to read os disk: %s", err)
+			}
+			osDisks = append(osDisks, helpers.FlattenOSDiskData(disk))
+		}
 	}
-
-	// Overwrite with the desired config
-	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOSDisksData(disks), "os_disk")
 	vmData["os_disk"] = osDisks
 
-	networkAdapters, err := c.Compute().NetworkAdapter().List(ctx, &client.NetworkAdapterFilter{
-		VirtualMachineID: d.Id(),
-	})
-	if err != nil {
-		return diag.Errorf("failed to retrieve OS network adapters: %s", err)
+	// Récupérer les OS network adapters
+	osNetworkAdapters := []interface{}{}
+	for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+		if osNetworkAdapter == nil {
+			continue
+		}
+		osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
+		if osNetworkAdapterId != "" {
+			networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, osNetworkAdapterId)
+			if err != nil {
+				return diag.Errorf("failed to read os network adapter: %s", err)
+			}
+			osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOSNetworkAdapterData(networkAdapter))
+		}
 	}
-
-	// Overwrite with the desired config
-	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
 	vmData["os_network_adapter"] = osNetworkAdapters
 
 	// Récupérer les tags
@@ -1348,6 +1348,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 				continue
 			}
 			networkAdapter := osNetworkAdapter.(map[string]interface{})
+			// Check si le fichier tf a un macAddress ou pas
 			if networkAdapter["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_network_adapter.%d", i)) {
 				activityId, err := c.Compute().NetworkAdapter().Update(ctx, &client.UpdateNetworkAdapterRequest{
 					ID:           networkAdapter["id"].(string),
@@ -1392,6 +1393,27 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 					}
 				}
 			}
+		}
+	}
+
+	if d.HasChange("extra_config") {
+		// Convert map[string]interface{} to map[string]interface{} with proper types
+		extraConfigMap := make(map[string]interface{})
+		for key, value := range d.Get("extra_config").(map[string]interface{}) {
+			convertedValue, err := helpers.ConvertExtraConfigValue(key, value.(string))
+			if err != nil {
+				return diag.Errorf("failed to convert extra_config value: %s", err)
+			}
+			extraConfigMap[key] = convertedValue
+		}
+
+		activityId, err := c.Compute().VirtualMachine().UpdateExtraConfig(ctx, d.Id(), extraConfigMap)
+		if err != nil {
+			return diag.Errorf("failed to update extra config: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update extra config: %s", err)
 		}
 	}
 
@@ -1457,4 +1479,95 @@ func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, me
 		return diag.Errorf("failed to delete virtual machine, %s", err)
 	}
 	return nil
+}
+
+// resourceVirtualMachineResourceV0 returns the V0 schema for state migration
+func resourceVirtualMachineResourceV0() *schema.Resource {
+	return &schema.Resource{
+		Schema: map[string]*schema.Schema{
+			"extra_config": {
+				Type:     schema.TypeList,
+				Optional: true,
+				Computed: true,
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"key": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+						"value": {
+							Type:     schema.TypeString,
+							Required: true,
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
+// migrateVirtualMachineStateV0toV1 migrates the state from V0 to V1
+func migrateVirtualMachineStateV0toV1(ctx context.Context, rawState map[string]interface{}, meta interface{}) (map[string]interface{}, error) {
+	// Check if extra_config exists and is in the old format (array)
+	if extraConfigRaw, exists := rawState["extra_config"]; exists && extraConfigRaw != nil {
+		// Check if it's a slice (old format)
+		if extraConfigSlice, ok := extraConfigRaw.([]interface{}); ok {
+			// Convert from array format to map format
+			extraConfigMap := make(map[string]interface{})
+
+			for _, item := range extraConfigSlice {
+				if itemMap, ok := item.(map[string]interface{}); ok {
+					if key, keyExists := itemMap["key"]; keyExists {
+						if value, valueExists := itemMap["value"]; valueExists {
+							if keyStr, keyOk := key.(string); keyOk {
+								if valueStr, valueOk := value.(string); valueOk {
+									extraConfigMap[keyStr] = valueStr
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// Replace the old array format with the new map format
+			rawState["extra_config"] = extraConfigMap
+		}
+		// If it's already a map or empty, leave it as is
+	}
+
+	return rawState, nil
+}
+
+// suppressUnmanagedExtraConfigDiff suppresses diff for extra_config keys that are not managed by the user
+func suppressUnmanagedExtraConfigDiff(k, old, new string, d *schema.ResourceData) bool {
+	// List of supported/manageable extra_config keys
+	supportedKeys := map[string]bool{
+		"guestinfo.ignition.config.data":           true,
+		"guestinfo.ignition.config.data.encoding":  true,
+		"guestinfo.afterburn.initrd.network-kargs": true,
+		"stealclock.enable":                        true,
+		"disk.enableUUID":                          true,
+		"pciPassthru.use64BitMMIO":                 true,
+		"pciPassthru.64bitMMioSizeGB":              true,
+		"guestinfo.userdata":                       true,
+		"guestinfo.userdata.encoding":              true,
+		"guestinfo.metadata":                       true,
+		"guestinfo.metadata.encoding":              true,
+	}
+
+	// Extract the key name from the path (e.g., "extra_config.svga.present" -> "svga.present")
+	keyName := strings.TrimPrefix(k, "extra_config.")
+
+	// If this is not a supported key and the new value is empty (indicating removal),
+	// suppress this diff to prevent Terraform from trying to remove unmanaged keys
+	if !supportedKeys[keyName] && new == "" {
+		return true // Suppress this diff
+	}
+
+	// Suppress case-insensitive differences for all keys
+	if strings.EqualFold(old, new) {
+		return true // Suppress case differences
+	}
+
+	return false // Keep all other diffs
 }
