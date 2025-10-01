@@ -1,5 +1,11 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+## 1.2.0-rc.1 (October 1st, 2025)
+
+  IMPROVEMENTS :
+
+    * Added `os_disk` and `os_network_adapter` configuration blocks on resource `cloudtemple_compute_iaas_opensource_virtual_machine`. (Use those to reference the disks and network adapters that are emedded in the template used)
+
 ## 1.1.0-rc.1 (September 9th, 2025)
 
   IMPROVEMENTS :

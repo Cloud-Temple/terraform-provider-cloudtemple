@@ -876,7 +876,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 		}
 
 		for k, v := range d.Get("cloud_init").(map[string]interface{}) {
-			if !exists(deployOptions, func(i *client.DeployOption) bool {
+			if !helpers.Exists(deployOptions, func(i *client.DeployOption) bool {
 				return i.ID == k
 			}) {
 				deployOptions = append(deployOptions, &client.DeployOption{

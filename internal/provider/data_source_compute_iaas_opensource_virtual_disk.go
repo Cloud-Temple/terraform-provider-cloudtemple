@@ -37,7 +37,7 @@ func dataSourceOpenIaasVirtualDisk() *schema.Resource {
 			"virtual_machine_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
-				ConflictsWith: []string{"id"},
+				ConflictsWith: []string{"id", "template_id"},
 				ValidateFunc:  validation.IsUUID,
 				Description:   "Filter virtual disks by the ID of the virtual machine they are attached to.",
 			},
@@ -51,7 +51,7 @@ func dataSourceOpenIaasVirtualDisk() *schema.Resource {
 			"template_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
-				ConflictsWith: []string{"id"},
+				ConflictsWith: []string{"id", "virtual_machine_id"},
 				ValidateFunc:  validation.IsUUID,
 				Description:   "Filter virtual disks by the ID of the template they are attached to.",
 			},

@@ -61,5 +61,6 @@ output "network_adapter-2" {
 - `machine_manager_id` (String) The ID of the machine manager this network adapter belongs to.
 - `mtu` (Number) The Maximum Transmission Unit (MTU) size in bytes.
 - `network_id` (String) The ID of the network this adapter is connected to.
+- `tx_checksumming` (Boolean) Whether TX checksumming is enabled on the network adapter.
 
 

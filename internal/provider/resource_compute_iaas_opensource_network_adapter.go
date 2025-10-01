@@ -47,6 +47,12 @@ func resourceOpenIaasNetworkAdapter() *schema.Resource {
 				Optional:    true,
 				Default:     true,
 			},
+			"tx_checksumming": {
+				Type:        schema.TypeBool,
+				Description: "Whether TX checksumming is enabled on the network adapter.",
+				Optional:    true,
+				Computed:    true,
+			},
 
 			// Out
 			"id": {
@@ -138,10 +144,11 @@ func openIaasNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, met
 func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
 
-	if d.HasChange("network_id") || d.HasChange("mac_address") {
+	if d.HasChange("network_id") || d.HasChange("mac_address") || d.HasChange("tx_checksumming") {
 		activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, d.Id(), &client.UpdateOpenIaasNetworkAdapterRequest{
-			MAC:       d.Get("mac_address").(string),
-			NetworkID: d.Get("network_id").(string),
+			MAC:            d.Get("mac_address").(string),
+			NetworkID:      d.Get("network_id").(string),
+			TxChecksumming: d.Get("tx_checksumming").(bool),
 		})
 		if err != nil {
 			return diag.Errorf("the network adapter could not be updated: %s", err)
