@@ -54,6 +54,7 @@ Read-Only:
 - `mtu` (Number)
 - `name` (String)
 - `network_id` (String)
+- `tx_checksumming` (Boolean)
 - `virtual_machine_id` (String)
 
 

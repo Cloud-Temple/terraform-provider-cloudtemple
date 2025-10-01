@@ -15,17 +15,17 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
 
   # Define an os_network_adapter block for each network adapter in the template 
   os_network_adapter {
-    network_id = data.cloudtemple_compute_iaas_opensource_network.p-vlan-01.id
-    mac_address = "c2:db:4f:15:41:3e"
+    network_id      = data.cloudtemple_compute_iaas_opensource_network.p-vlan-01.id
+    mac_address     = "c2:db:4f:15:41:3e"
     tx_checksumming = true
-    attached = true
+    attached        = true
   }
 
   # Define an os_disk block for each virtual disk in the template
   os_disk {
-    name = "data-disk-01"
-    connected = true
-    size = 14 * 1024 * 1024 * 1024
+    name                  = "data-disk-01"
+    connected             = true
+    size                  = 14 * 1024 * 1024 * 1024
     storage_repository_id = data.cloudtemple_compute_iaas_opensource_storage_repository.sr011-clu001-t0001-az05-r-flh1-data13.id
   }
 

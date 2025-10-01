@@ -32,7 +32,7 @@ To manage this resource you will need the following roles:
 ## Example Usage
 
 ```terraform
-resource "cloudtemple_compute_iaas_opensource_virtual_machine" "vm-openiaas-01" {
+resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01" {
   name = "OPENIAAS-TERRAFORM-01"
 
   power_state = "on"
@@ -43,25 +43,23 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "vm-openiaas-01" 
   cpu                  = 4
   num_cores_per_socket = 2
 
-  boot_firmware     = "bios"
   secure_boot       = false
-
   auto_power_on     = true
   high_availability = "best-effort"
 
   # Define an os_network_adapter block for each network adapter in the template 
   os_network_adapter {
-    network_id = data.cloudtemple_compute_iaas_opensource_network.p-vlan-01.id
-    mac_address = "c2:db:4f:15:41:3e"
+    network_id      = data.cloudtemple_compute_iaas_opensource_network.p-vlan-01.id
+    mac_address     = "c2:db:4f:15:41:3e"
     tx_checksumming = true
-    attached = false
+    attached        = true
   }
 
   # Define an os_disk block for each virtual disk in the template
   os_disk {
-    name = "data-disk-01"
-    connected = true
-    size = 14 * 1024 * 1024 * 1024
+    name                  = "data-disk-01"
+    connected             = true
+    size                  = 14 * 1024 * 1024 * 1024
     storage_repository_id = data.cloudtemple_compute_iaas_opensource_storage_repository.sr011-clu001-t0001-az05-r-flh1-data13.id
   }
 
@@ -87,8 +85,8 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "vm-openiaas-01" 
 
   # Add cloud_init settings to the virtual machine.
   cloud_init = {
-    cloud_config   = file("./cloud-init/cloud-config.yml")
-    network_config = file("./cloud-init/network-config.yml")
+    cloud_config   = filebase64("./cloud-init/cloud-config.yml")
+    network_config = filebase64("./cloud-init/network-config.yml")
   }
 }
 ```
