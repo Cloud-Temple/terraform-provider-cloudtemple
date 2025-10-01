@@ -18,6 +18,7 @@ type OpenIaaSNetworkAdapter struct {
 	MacAddress       string
 	MTU              int
 	Attached         bool
+	TxChecksumming   bool
 	Network          BaseObject
 	MachineManager   BaseObject
 }
@@ -80,9 +81,10 @@ func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaa
 }
 
 type UpdateOpenIaasNetworkAdapterRequest struct {
-	NetworkID string `json:"networkId"`
-	MAC       string `json:"mac"`
-	Attached  bool   `json:"attached,omitempty"`
+	NetworkID      string `json:"networkId"`
+	MAC            string `json:"mac"`
+	Attached       bool   `json:"attached"`
+	TxChecksumming bool   `json:"txChecksumming"`
 }
 
 func (v *OpenIaaSNetworkAdapterClient) Update(ctx context.Context, id string, req *UpdateOpenIaasNetworkAdapterRequest) (string, error) {

@@ -97,11 +97,12 @@ func FlattenOpenIaaSOSNetworkAdaptersData(osNetworkAdapters []*client.OpenIaaSNe
 
 func FlattenOpenIaaSOSNetworkAdapterData(osNetworkAdapter *client.OpenIaaSNetworkAdapter) interface{} {
 	return map[string]interface{}{
-		"id":          osNetworkAdapter.ID,
-		"name":        osNetworkAdapter.Name,
-		"mac_address": osNetworkAdapter.MacAddress,
-		"mtu":         osNetworkAdapter.MTU,
-		"attached":    osNetworkAdapter.Attached,
-		"network_id":  osNetworkAdapter.Network.ID,
+		"id":              osNetworkAdapter.ID,
+		"name":            osNetworkAdapter.Name,
+		"mac_address":     osNetworkAdapter.MacAddress,
+		"mtu":             osNetworkAdapter.MTU,
+		"attached":        osNetworkAdapter.Attached,
+		"tx_checksumming": osNetworkAdapter.TxChecksumming,
+		"network_id":      osNetworkAdapter.Network.ID,
 	}
 }

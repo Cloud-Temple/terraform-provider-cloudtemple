@@ -126,9 +126,9 @@ type UpdateOpenIaasVirtualMachineRequest struct {
 	CPU               int    `json:"cpu,omitempty"`
 	NumCoresPerSocket int    `json:"numCoresPerSocket,omitempty"`
 	Memory            int    `json:"memory,omitempty"`
-	SecureBoot        bool   `json:"secureBoot,omitempty"`
+	SecureBoot        bool   `json:"secureBoot"`
 	BootFirmware      string `json:"bootFirmware,omitempty"`
-	AutoPowerOn       bool   `json:"autoPowerOn,omitempty"`
+	AutoPowerOn       bool   `json:"autoPowerOn"`
 	HighAvailability  string `json:"highAvailability,omitempty"`
 }
 

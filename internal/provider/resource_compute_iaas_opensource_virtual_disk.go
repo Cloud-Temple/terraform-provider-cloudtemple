@@ -240,7 +240,7 @@ func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta
 				connectedVMs = append(connectedVMs, vm.ID)
 
 				// Disconnect disk from VM before resizing
-				activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, d.Id(), &client.OpenIaaSVirtualDiskDisconnectRequest{
+				activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, d.Id(), &client.OpenIaaSVirtualDiskConnectionRequest{
 					VirtualMachineID: vm.ID,
 				})
 				if err != nil {
@@ -268,7 +268,7 @@ func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta
 
 		// Reconnect the disk to previously connected VMs
 		for _, vmID := range connectedVMs {
-			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, d.Id(), &client.OpenIaaSVirtualDiskConnectRequest{
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, d.Id(), &client.OpenIaaSVirtualDiskConnectionRequest{
 				VirtualMachineID: vmID,
 			})
 			if err != nil {

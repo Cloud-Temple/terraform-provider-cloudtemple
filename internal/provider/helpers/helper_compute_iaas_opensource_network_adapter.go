@@ -13,6 +13,7 @@ func FlattenOpenIaaSNetworkAdapter(adapter *client.OpenIaaSNetworkAdapter) map[s
 		"mac_address":        adapter.MacAddress,
 		"mtu":                adapter.MTU,
 		"attached":           adapter.Attached,
+		"tx_checksumming":    adapter.TxChecksumming,
 		"network_id":         adapter.Network.ID,
 		"machine_manager_id": adapter.MachineManager.ID,
 	}

@@ -69,6 +69,11 @@ func dataSourceOpenIaasNetworkAdapter() *schema.Resource {
 				Computed:    true,
 				Description: "The Maximum Transmission Unit (MTU) size in bytes.",
 			},
+			"tx_checksumming": {
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether TX checksumming is enabled on the network adapter.",
+			},
 			"attached": {
 				Type:        schema.TypeBool,
 				Computed:    true,

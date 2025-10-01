@@ -225,6 +225,12 @@ Order of the elements in the list is the boot order.`,
 							Computed:    true,
 							Description: "Whether the network adapter is attached.",
 						},
+						"tx_checksumming": {
+							Type:        schema.TypeBool,
+							Optional:    true,
+							Computed:    true,
+							Description: "Whether TX checksumming is enabled on the network adapter.",
+						},
 
 						// Out
 						"id": {
@@ -483,7 +489,8 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 	}
 
 	// Overwrite with the desired config
-	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSDisksData(disks, d.Id()), "os_disk")
+	// osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSDisksData(disks, d.Id()), "os_disk")
+	osDisks := helpers.FlattenOpenIaaSOSDisksData(disks, d.Id())
 	if err := d.Set("os_disk", osDisks); err != nil {
 		return diag.FromErr(err)
 	}
@@ -498,7 +505,8 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		return diag.Errorf("could not list network adapters of virtual machine, %s", err)
 	}
 
-	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
+	// osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
+	osNetworkAdapters := helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters)
 	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
 		return diag.FromErr(err)
 	}
@@ -615,71 +623,9 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	// if d.HasChange("os_disk") {
-	// 	for i, osDisk := range d.Get("os_disk").([]interface{}) {
-	// 		if osDisk == nil {
-	// 			continue
-	// 		}
-	// 		disk := osDisk.(map[string]interface{})
-	// 		if d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i)) {
-	// 			// TODO : Disconnect disk before updating (and specify it in documentation)
-	// 			diskState, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, disk["id"].(string))
-	// 			if err != nil {
-	// 				return diag.Errorf("failed to read virtual disk state: %s", err)
-	// 			}
-
-	// 			vbd := Find(diskState.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
-	// 				return virtualMachine.ID == d.Id()
-	// 			})
-	// 			if vbd.Connected {
-	// 				// wasConnected := true
-	// 				activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, &client.OpenIaaSVirtualDiskConnectionRequest{
-	// 					ID:               disk["id"].(string),
-	// 					VirtualMachineID: d.Id(),
-	// 				})
-	// 				if err != nil {
-	// 					return diag.Errorf("failed to disconnect os disk: %s", err)
-	// 				}
-	// 				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	// 				if err != nil {
-	// 					return diag.Errorf("failed to disconnect os disk: %s", err)
-	// 				}
-	// 			}
-
-	// 			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, &client.OpenIaaSVirtualDiskUpdateRequest{
-	// 				ID:   disk["id"].(string),
-	// 				Size: disk["size"].(int),
-	// 				Name: disk["name"].(string),
-	// 			})
-	// 			if err != nil {
-	// 				return diag.Errorf("failed to update virtual disk: %s", err)
-	// 			}
-	// 			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	// 			if err != nil {
-	// 				return diag.Errorf("failed to update virtual disk, %s", err)
-	// 			}
-	// 		}
-
-	// 		if d.HasChange(fmt.Sprintf("os_disk.%d.storage_repository_id", i)) {
-	// 			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Relocate(ctx, &client.OpenIaaSVirtualDiskRelocateRequest{
-	// 				ID:                  disk["id"].(string),
-	// 				StorageRepositoryID: disk["storage_repository_id"].(string),
-	// 			})
-	// 			if err != nil {
-	// 				return diag.Errorf("failed to update virtual disk: %s", err)
-	// 			}
-	// 			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	// 			if err != nil {
-	// 				return diag.Errorf("failed to update virtual disk, %s", err)
-	// 			}
-	// 		}
-
-	// 		// if d.HasChange(fmt.Sprintf("os_disk.%d.connected", i)) {
-
-	// 		// }
-	// 	}
-	// }
-
+	// Handle os_disk updates (name, size, connected, storage_repository_id)
+	// We don't handle adding/removing disks here, only updating existing ones
+	// New disks should be added via a separate resource
 	if d.HasChange("os_disk") {
 		for i, osDisk := range d.Get("os_disk").([]interface{}) {
 			if osDisk == nil {
@@ -887,7 +833,8 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 			if err != nil {
 				return diag.Errorf("failed to connect os disk: %s", err)
 			}
-		} else if !wantConnected && vbd.Connected {
+			// Ne pas déconnecter si il déjà été déconnecté pour la mise à jour du nom ou de la taille (!needsDisconnect)
+		} else if !wantConnected && vbd.Connected && !needsDisconnect {
 			// Déconnecter le disque
 			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskConnectionRequest{
 				VirtualMachineID: d.Id(),
@@ -949,10 +896,11 @@ func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, d *schema.Res
 		}
 	}
 
-	if d.HasChange(fmt.Sprintf("os_network_adapter.%d.mac_address", i)) || d.HasChange(fmt.Sprintf("os_network_adapter.%d.network_id", i)) {
+	if d.HasChange(fmt.Sprintf("os_network_adapter.%d.mac_address", i)) || d.HasChange(fmt.Sprintf("os_network_adapter.%d.network_id", i)) || d.HasChange(fmt.Sprintf("os_network_adapter.%d.tx_checksumming", i)) {
 		activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), &client.UpdateOpenIaasNetworkAdapterRequest{
-			NetworkID: networkAdapter["network_id"].(string),
-			MAC:       networkAdapter["mac_address"].(string),
+			NetworkID:      networkAdapter["network_id"].(string),
+			MAC:            networkAdapter["mac_address"].(string),
+			TxChecksumming: networkAdapter["tx_checksumming"].(bool),
 		})
 		if err != nil {
 			return diag.Errorf("failed to update os network adapter: %s", err)
