@@ -1,5 +1,14 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+## 1.2.0-rc.1 (October 2nd, 2025)
+
+  IMPROVEMENTS :
+
+    * Added `os_disk` and `os_network_adapter` configuration blocks on resource `cloudtemple_compute_iaas_opensource_virtual_machine`. (Use those to reference the disks and network adapters that are emedded in the template used).
+    * Improved resource `cloudtemple_compute_iaas_opensource_virtual_disk` so that it can be update in-place rather than being recreated. It can now be updated, resized, relocated, attached and detached.
+    * Added properties `guestinfo.userdata`, `guestinfo.userdata.encoding`, `guestinfo.metadata`, `guestinfo.metadata.encoding` to the available extra_config keys in the resource `cloudtemple_compute_virtual_machine` resource.
+    * Added property `tx_checksumming` to the resource `cloudtemple_compute_iaas_opensource_network_adapter`.
+
 ## 1.1.0-rc.1 (September 9th, 2025)
 
   IMPROVEMENTS :

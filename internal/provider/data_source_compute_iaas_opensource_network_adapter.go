@@ -69,6 +69,11 @@ func dataSourceOpenIaasNetworkAdapter() *schema.Resource {
 				Computed:    true,
 				Description: "The Maximum Transmission Unit (MTU) size in bytes.",
 			},
+			"tx_checksumming": {
+				Type:        schema.TypeBool,
+				Computed:    true,
+				Description: "Whether TX checksumming is enabled on the network adapter.",
+			},
 			"attached": {
 				Type:        schema.TypeBool,
 				Computed:    true,
@@ -94,7 +99,7 @@ func computeOpenIaaSNetworkAdapterRead(ctx context.Context, d *schema.ResourceDa
 		}
 
 		adapters, err := c.Compute().OpenIaaS().NetworkAdapter().List(ctx, &client.OpenIaaSNetworkAdapterFilter{
-			VirtualMachineId: virtualMachineId,
+			VirtualMachineID: virtualMachineId,
 		})
 		if err != nil {
 			return diag.FromErr(fmt.Errorf("failed to find network adapter named %q: %s", name, err))

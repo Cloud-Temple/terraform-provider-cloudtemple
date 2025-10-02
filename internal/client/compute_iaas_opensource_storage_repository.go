@@ -11,20 +11,20 @@ func (c *ComputeOpenIaaSClient) StorageRepository() *OpenIaaSStorageRepositoryCl
 }
 
 type OpenIaaSStorageRepository struct {
-	ID                string
-	InternalId        string
-	Name              string
-	Description       string
-	MaintenanceStatus bool
-	MaxCapacity       int
-	FreeCapacity      int
-	StorageType       string
-	VirtualDisks      []string
-	Shared            bool
-	Accessible        int
-	Host              BaseObject
-	Pool              BaseObject
-	MachineManager    BaseObject
+	ID              string
+	InternalId      string
+	Name            string
+	Description     string
+	MaintenanceMode bool
+	MaxCapacity     int
+	FreeCapacity    int
+	StorageType     string
+	VirtualDisks    []string
+	Shared          bool
+	Accessible      int
+	Host            BaseObject
+	Pool            BaseObject
+	MachineManager  BaseObject
 }
 
 type StorageRepositoryFilter struct {

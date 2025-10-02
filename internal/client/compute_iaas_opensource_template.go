@@ -11,6 +11,7 @@ func (c *ComputeOpenIaaSClient) Template() *OpenIaasTemplateClient {
 }
 
 type TemplateDisk struct {
+	ID                string
 	Name              string
 	Description       string
 	Size              int
