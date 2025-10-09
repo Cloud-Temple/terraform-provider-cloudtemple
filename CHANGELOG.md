@@ -1,5 +1,14 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+## 1.3.0-rc.1 (October 9th, 2025)
+
+  IMPROVMENTS :
+
+    * Added new resource `cloudtemple_compute_iaas_opensource_replication_policy`.
+    * Added new datasource `cloudtemple_compute_iaas_opensource_replication_policy`.
+    * Added new datasource `cloudtemple_compute_iaas_opensource_replication_policies`.
+    * Added new property `replication_policy_id` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
+
 ## 1.2.0-rc.1 (October 2nd, 2025)
 
   IMPROVEMENTS :
