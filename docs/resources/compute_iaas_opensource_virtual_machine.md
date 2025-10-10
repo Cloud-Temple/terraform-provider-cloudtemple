@@ -47,6 +47,22 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
   auto_power_on     = true
   high_availability = "best-effort"
 
+  # Define an os_network_adapter block for each network adapter in the template 
+  os_network_adapter {
+    network_id      = data.cloudtemple_compute_iaas_opensource_network.p-vlan-01.id
+    mac_address     = "c2:db:4f:15:41:3e"
+    tx_checksumming = true
+    attached        = true
+  }
+
+  # Define an os_disk block for each virtual disk in the template
+  os_disk {
+    name                  = "data-disk-01"
+    connected             = true
+    size                  = 14 * 1024 * 1024 * 1024
+    storage_repository_id = data.cloudtemple_compute_iaas_opensource_storage_repository.sr011-clu001-t0001-az05-r-flh1-data13.id
+  }
+
   # Set a list of backup policies to apply to the virtual machine. Defining at least one backup policy is mandatory to power on the VM.
   backup_sla_policies = [
     data.cloudtemple_backup_iaas_opensource_policy.nobackup.id
@@ -69,8 +85,8 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
 
   # Add cloud_init settings to the virtual machine.
   cloud_init = {
-    cloud_config   = file("./cloud-init/cloud-config.yml")
-    network_config = file("./cloud-init/network-config.yml")
+    cloud_config   = filebase64("./cloud-init/cloud-config.yml")
+    network_config = filebase64("./cloud-init/network-config.yml")
   }
 }
 ```
@@ -110,6 +126,8 @@ Order of the elements in the list is the boot order.
 - `host_id` (String) The host identifier.
 - `mount_iso` (String) An ISO disk to mount to on the virtual machine DVD Drive.
 - `num_cores_per_socket` (Number) The number of cores per socket. Note: Changing this value for a running VM will cause it to be powered off and back on.
+- `os_disk` (Block List) The operating system disk of the virtual machine. (see [below for nested schema](#nestedblock--os_disk))
+- `os_network_adapter` (Block List) The network adapters of the virtual machine. (see [below for nested schema](#nestedblock--os_network_adapter))
 - `secure_boot` (Boolean) Whether to enable secure boot. Only available with UEFI boot firmware.
 - `tags` (Map of String) The tags to attach to the virtual machine.
 
@@ -123,6 +141,39 @@ Order of the elements in the list is the boot order.
 - `operating_system_name` (String) The name of the operating system installed on the virtual machine.
 - `pool_id` (String) The identifier of the pool to which the virtual machine belongs.
 - `tools` (List of Object) The tools installed on the virtual machine. Please note that the tools are only available when the virtual machine is powered on. (see [below for nested schema](#nestedatt--tools))
+
+<a id="nestedblock--os_disk"></a>
+### Nested Schema for `os_disk`
+
+Optional:
+
+- `connected` (Boolean) Whether the disk is connected or not.
+- `name` (String) The name of the operating system disk. (Updating this property implies a disk disconnect-reconnect)
+- `size` (Number) The size of the operating system disk in bytes. (Updating this property implies a disk disconnect-reconnect)
+- `storage_repository_id` (String) The storage repository where the operating system disk is located.
+
+Read-Only:
+
+- `description` (String) The description of the operating system disk.
+- `id` (String) The unique identifier of the virtual disk.
+
+
+<a id="nestedblock--os_network_adapter"></a>
+### Nested Schema for `os_network_adapter`
+
+Optional:
+
+- `attached` (Boolean) Whether the network adapter is attached.
+- `mac_address` (String) The MAC address of the network adapter. If not provided, the MAC address will be sourced from the template used.
+- `network_id` (String) The identifier of the network to which the adapter is connected.  If not provided, the network will be sourced from the template used.
+- `tx_checksumming` (Boolean) Whether TX checksumming is enabled on the network adapter.
+
+Read-Only:
+
+- `id` (String) The unique identifier of the network adapter.
+- `mtu` (Number) The maximum transmission unit (MTU) of the network adapter.
+- `name` (String) The name of the network adapter.
+
 
 <a id="nestedatt--addresses"></a>
 ### Nested Schema for `addresses`
