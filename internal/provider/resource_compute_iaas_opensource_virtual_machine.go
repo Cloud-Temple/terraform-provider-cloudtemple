@@ -131,6 +131,13 @@ Order of the elements in the list is the boot order.`,
 				Optional:     true,
 				ValidateFunc: validation.StringInSlice([]string{"best-effort", "restart"}, false),
 			},
+			"replication_policy_id": {
+				Type:         schema.TypeString,
+				Description:  "The ID of the replication policy to associate with the virtual machine.",
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validation.IsUUID,
+			},
 			"backup_sla_policies": {
 				Type:        schema.TypeSet,
 				Optional:    true,
@@ -597,9 +604,20 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
 	}
 
+	// Récupérer les informations de réplication
+	replicationPolicyId := ""
+	replicationPolicy, err := c.Compute().OpenIaaS().Replication().Policy().VirtualMachine().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to get replication policy for virtual machine: %s", err)
+	}
+	if replicationPolicy != nil {
+		replicationPolicyId = replicationPolicy.ID
+	}
+
 	// Mapper les données en utilisant la fonction helper
 	vmData := helpers.FlattenOpenIaaSVirtualMachine(vm)
 	vmData["backup_sla_policies"] = slaPoliciesIds
+	vmData["replication_policy_id"] = replicationPolicyId
 
 	// Définir les données dans le state
 	for k, v := range vmData {
@@ -613,6 +631,37 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 
 func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
+
+	// Associate a replication policy if provided
+	if d.HasChange("replication_policy_id") {
+		oldPolicyId, newPolicyId := d.GetChange("replication_policy_id")
+
+		// Dissociate old policy if it exists
+		if oldPolicyId.(string) != "" {
+			activityId, err := c.Compute().OpenIaaS().Replication().Policy().VirtualMachine().Dissociate(ctx, d.Id())
+			if err != nil {
+				return diag.Errorf("failed to dissociate replication policy from virtual machine: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to dissociate replication policy from virtual machine: %s", err)
+			}
+		}
+
+		// Associate new policy if provided
+		if newPolicyId.(string) != "" {
+			activityId, err := c.Compute().OpenIaaS().Replication().Policy().VirtualMachine().Associate(ctx, d.Id(), &client.AssociateReplicationPolicyToVirtualMachineRequest{
+				ConfigurationID: newPolicyId.(string),
+			})
+			if err != nil {
+				return diag.Errorf("failed to associate replication policy to virtual machine: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to associate replication policy to virtual machine: %s", err)
+			}
+		}
+	}
 
 	// Check if hardware-related properties have changed
 	needsReboot := d.HasChange("cpu") || d.HasChange("memory") || d.HasChange("num_cores_per_socket")
