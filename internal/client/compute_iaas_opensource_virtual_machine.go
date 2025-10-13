@@ -78,18 +78,6 @@ func (c *OpenIaaSVirtualMachineClient) Create(ctx context.Context, req *CreateOp
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
 
-type DeployOpenIaasVirtualMachineFromMarketplaceRequest struct {
-	ID                  string `json:"id"`
-	Name                string `json:"name"`
-	StorageRepositoryID string `json:"storageRepositoryId"`
-}
-
-func (c *OpenIaaSVirtualMachineClient) DeployFromMarketplace(ctx context.Context, req *DeployOpenIaasVirtualMachineFromMarketplaceRequest) (string, error) {
-	r := c.c.newRequest("POST", "/marketplace/v1/items/open_iaas/deploy")
-	r.obj = req
-	return c.c.doRequestAndReturnActivity(ctx, r)
-}
-
 func (v *OpenIaaSVirtualMachineClient) List(
 	ctx context.Context,
 	filter *OpenIaaSVirtualMachineFilter) ([]*OpenIaaSVirtualMachine, error) {

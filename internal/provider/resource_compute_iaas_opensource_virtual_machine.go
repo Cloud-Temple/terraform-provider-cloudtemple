@@ -421,12 +421,37 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		if err != nil {
 			return diag.Errorf("failed to create virtual machine, %s", err)
 		}
-	} else if d.Get("marketplace_item_id").(string) != "" {
+
 		// Deploy from marketplace item
-		activityId, err := c.Compute().OpenIaaS().VirtualMachine().DeployFromMarketplace(ctx, &client.DeployOpenIaasVirtualMachineFromMarketplaceRequest{
+	} else if d.Get("marketplace_item_id").(string) != "" {
+		openIaasItemInfo, _, err := c.Marketplace().Item().ReadInfo(ctx, d.Get("marketplace_item_id").(string), "open_iaas")
+		if err != nil {
+			return diag.Errorf("Could not read the marketplace item : %s", err)
+		}
+		if openIaasItemInfo == nil {
+			return diag.Errorf("Could not find marketplace item info with id : %s", d.Get("marketplace_item_id").(string))
+		}
+
+		osNetworkAdapters := d.Get("os_network_adapter").([]interface{})
+		if osNetworkAdapters != nil && len(osNetworkAdapters) != len(openIaasItemInfo.NetworkAdapters) {
+			return diag.Errorf("the number of os_network_adapter (%d) must match the number of network adapters in the marketplace item (%d)", len(osNetworkAdapters), len(openIaasItemInfo.NetworkAdapters))
+		}
+
+		networkData := []client.OpenIaaSNetworkDataMapping{}
+		for i, networkAdapter := range openIaasItemInfo.NetworkAdapters {
+			osNetworkAdapter := osNetworkAdapters[i].(map[string]interface{})
+			networkData = append(networkData, client.OpenIaaSNetworkDataMapping{
+				SourceNetworkName:    networkAdapter.NetworkName,
+				DestinationNetworkId: osNetworkAdapter["network_id"].(string),
+			})
+		}
+
+		activityId, err := c.Marketplace().Item().DeployOpenIaasItem(ctx, &client.MarketplaceOpenIaasDeployementRequest{
 			ID:                  d.Get("marketplace_item_id").(string),
 			Name:                d.Get("name").(string),
 			StorageRepositoryID: d.Get("storage_repository_id").(string),
+			NetworkData:         networkData,
+			CloudInit:           cloudInit,
 		})
 		if err != nil {
 			return diag.Errorf("the virtual machine could not be created from marketplace item: %s", err)
