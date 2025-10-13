@@ -128,6 +128,7 @@ Order of the elements in the list is the boot order.
 - `num_cores_per_socket` (Number) The number of cores per socket. Note: Changing this value for a running VM will cause it to be powered off and back on.
 - `os_disk` (Block List) The operating system disk of the virtual machine. (see [below for nested schema](#nestedblock--os_disk))
 - `os_network_adapter` (Block List) The network adapters of the virtual machine. (see [below for nested schema](#nestedblock--os_network_adapter))
+- `replication_policy_id` (String) The ID of the replication policy to associate with the virtual machine.
 - `secure_boot` (Boolean) Whether to enable secure boot. Only available with UEFI boot firmware.
 - `tags` (Map of String) The tags to attach to the virtual machine.
 
