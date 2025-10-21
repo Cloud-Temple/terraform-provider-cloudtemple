@@ -32,6 +32,7 @@ To manage this resource you will need the following roles:
 ## Example Usage
 
 ```terraform
+# Deploy and configure a virtual machine using a template.
 resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01" {
   name = "OPENIAAS-TERRAFORM-01"
 
@@ -87,6 +88,55 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
   cloud_init = {
     cloud_config   = filebase64("./cloud-init/cloud-config.yml")
     network_config = filebase64("./cloud-init/network-config.yml")
+  }
+}
+
+# Deploy and configure a virtual machine from a marketplace item
+resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01" {
+  name        = "terraform-marketplace-openiaas-01"
+  power_state = "on"
+
+  marketplace_item_id   = data.cloudtemple_marketplace_item.ubuntu-2404.id
+  storage_repository_id = data.cloudtemple_compute_iaas_opensource_storage_repository.sr011-clu001-t0001-az05-r-flh1-data13.id
+
+  memory               = 6 * 1024 * 1024 * 1024
+  cpu                  = 4
+  num_cores_per_socket = 4
+  boot_firmware        = "uefi"
+  secure_boot          = false
+
+  auto_power_on     = true
+  high_availability = "best-effort"
+
+  # Number of network adapters will depend on the marketplace item selected
+  os_network_adapter {
+    network_id      = data.cloudtemple_compute_iaas_opensource_network.PBT-VLAN-01.id
+    tx_checksumming = true
+    attached        = true
+  }
+
+  os_disk {
+    connected             = true
+    storage_repository_id = data.cloudtemple_compute_iaas_opensource_storage_repository.sr011-clu001-t0001-az05-r-flh1-data13.id
+  }
+
+  backup_sla_policies = [
+    data.cloudtemple_backup_iaas_opensource_policy.nobackup.id
+  ]
+
+  cloud_init = {
+    cloud_config   = file("../cloud-init/cloud-config.yml")
+    network_config = file("../cloud-init/network-config.yml")
+  }
+
+  boot_order = [
+    "Hard-Drive",
+    "DVD-Drive",
+  ]
+
+  tags = {
+    created_by  = "pbt"
+    environment = "development"
   }
 }
 ```

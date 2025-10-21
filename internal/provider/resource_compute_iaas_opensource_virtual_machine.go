@@ -444,10 +444,10 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 			return diag.Errorf("the number of os_network_adapter (%d) must match the number of network adapters in the marketplace item (%d)", len(osNetworkAdapters), len(openIaasItemInfo.NetworkAdapters))
 		}
 
-		networkData := []client.OpenIaaSNetworkDataMapping{}
+		networkData := []client.NetworkDataMapping{}
 		for i, networkAdapter := range openIaasItemInfo.NetworkAdapters {
 			osNetworkAdapter := osNetworkAdapters[i].(map[string]interface{})
-			networkData = append(networkData, client.OpenIaaSNetworkDataMapping{
+			networkData = append(networkData, client.NetworkDataMapping{
 				SourceNetworkName:    networkAdapter.NetworkName,
 				DestinationNetworkId: osNetworkAdapter["network_id"].(string),
 			})

@@ -81,7 +81,39 @@ type MarketplaceOpenIaasItemInfo struct {
 }
 
 type MarketplaceVMWareItemInfo struct {
-	// TODO: add fields
+	Name string
+	CPU  struct {
+		Count             int
+		NumCoresPerSocket int
+	}
+	Memory          int
+	OperatingSystem struct {
+		ID   string
+		Name string
+	}
+	HardwareVersion string
+	NetworkAdapters []struct {
+		Name        string
+		NetworkName string
+		Type        string
+	}
+	Controllers []struct {
+		ID      string
+		Name    string
+		Type    string
+		SubType string
+	}
+	Disks []struct {
+		Name          string
+		Capacity      int
+		ControllerId  string
+		PopulatedSize int
+	}
+	ExtraConfig []struct {
+		Key      string
+		Value    string
+		Required bool
+	}
 }
 
 func (v *MarketplaceItemClient) Read(ctx context.Context, id string) (*MarketplaceItem, error) {
@@ -152,17 +184,17 @@ func (v *MarketplaceItemClient) List(ctx context.Context) ([]*MarketplaceItem, e
 	return out, nil
 }
 
-type OpenIaaSNetworkDataMapping struct {
+type NetworkDataMapping struct {
 	SourceNetworkName    string `json:"sourceNetworkName"`
 	DestinationNetworkId string `json:"destinationNetworkId"`
 }
 
 type MarketplaceOpenIaasDeployementRequest struct {
-	ID                  string                       `json:"id"`
-	Name                string                       `json:"name"`
-	StorageRepositoryID string                       `json:"storageRepositoryId"`
-	NetworkData         []OpenIaaSNetworkDataMapping `json:"networkData,omitempty"`
-	CloudInit           CloudInit                    `json:"cloudInit,omitempty"`
+	ID                  string               `json:"id"`
+	Name                string               `json:"name"`
+	StorageRepositoryID string               `json:"storageRepositoryId"`
+	NetworkData         []NetworkDataMapping `json:"networkData,omitempty"`
+	CloudInit           CloudInit            `json:"cloudInit,omitempty"`
 }
 
 func (c *MarketplaceItemClient) DeployOpenIaasItem(ctx context.Context, req *MarketplaceOpenIaasDeployementRequest) (string, error) {
@@ -171,7 +203,18 @@ func (c *MarketplaceItemClient) DeployOpenIaasItem(ctx context.Context, req *Mar
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
 
-func (c *MarketplaceItemClient) DeployVMWareItem(ctx context.Context, req *MarketplaceOpenIaasDeployementRequest) (string, error) {
+type MarketplaceVMWareDeployementRequest struct {
+	ID            string               `json:"id"`
+	Name          string               `json:"name"`
+	DatacenterID  string               `json:"datacenterId"`
+	HostClusterID string               `json:"hostClusterId,omitempty"`
+	HostID        string               `json:"hostId,omitempty"`
+	DatastoreID   string               `json:"datastoreId"`
+	NetworkData   []NetworkDataMapping `json:"networkData,omitempty"`
+	DeployOptions []*DeployOption      `json:"deployOptions,omitempty"`
+}
+
+func (c *MarketplaceItemClient) DeployVMWareItem(ctx context.Context, req *MarketplaceVMWareDeployementRequest) (string, error) {
 	r := c.c.newRequest("POST", "/marketplace/v1/items/vmware/deploy")
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)

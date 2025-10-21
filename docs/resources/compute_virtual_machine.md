@@ -147,6 +147,40 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
   }
 }
 
+# Deploy a virtual machine from a marketplace item and configure it with cloud-init
+data "cloudtemple_marketplace_item" "ubuntu-2404" {
+  name = "Ubuntu 24.04 LTS"
+}
+
+resource "cloudtemple_compute_virtual_machine" "ubuntu-cloud-init" {
+  name = "ubuntu-cloud-init"
+
+  memory                 = 8 * 1024 * 1024 * 1024
+  cpu                    = 2
+  num_cores_per_socket   = 1
+  cpu_hot_add_enabled    = true
+  cpu_hot_remove_enabled = true
+  memory_hot_add_enabled = true
+
+  datacenter_id   = data.cloudtemple_compute_virtual_datacenter.TH3S.id
+  host_cluster_id = data.cloudtemple_compute_host_cluster.CLU001.id
+  datastore_id    = data.cloudtemple_compute_datastore.DS003.id
+
+  marketplace_item_id = data.cloudtemple_marketplace_item.ubuntu-2404.id
+
+  power_state = "on"
+
+  backup_sla_policies = [
+    data.cloudtemple_backup_sla_policy.sla001-daily-par7s.id,
+    data.cloudtemple_backup_sla_policy.sla001-weekly-par7s.id,
+  ]
+
+  cloud_init = {
+    network-config = filebase64("./cloud-init/network-config.yml")
+    user-data      = filebase64("./cloud-init/user-data.yml")
+  }
+}
+
 # Deploy an OVF from the content library and configure it with cloud-init
 data "cloudtemple_compute_machine_manager" "vstack-001" {
   name = "vc-vstack-001-t0001"
@@ -341,7 +375,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 - `cpu_hot_remove_enabled` (Boolean) Flag that indicate if hot remove of CPU is enabled or not.
 - `customize` (Block List, Max: 1) Customizes a virtual machine's guest operating system. (VMWare Tools has to be installed) (see [below for nested schema](#nestedblock--customize))
 - `datastore_cluster_id` (String)
-- `datastore_id` (String)
+- `datastore_id` (String) The datastore to store the virtual machine data on. (Required when using `marketplace_item_id`)
 - `deploy_options` (Map of String)
 - `disks_provisioning_type` (String) Overrides the provisioning type for the os_disks of an OVF. Possible values are: `dynamic`, `staticImmediate`, `staticDiffered`.
 - `expose_hardware_virtualization` (Boolean) Enable nested hardware virtualization on the virtual machine, facilitating nested virtualization in the guest operating system (Default: false)
@@ -357,6 +391,7 @@ Supported configurations include:
 Note: Changes to extra_config may require a virtual machine restart to take effect.
 - `guest_operating_system_moref` (String) The operating system to launch the virtual machine with.
 - `host_id` (String) The host to start the virtual machine on.
+- `marketplace_item_id` (String) The ID of the marketplace item to deploy. Conflict with `clone_virtual_machine_id` and `content_library_item_id`.
 - `memory` (Number) In bytes. The quantity of memory to start the virtual machine with.
 - `memory_hot_add_enabled` (Boolean) Flag that indicate if hot add of memory is enabled or not.
 - `memory_reservation` (Number) In bytes. Amount of resource that is guaranteed available to the virtual machine. Reserved resources are not wasted if they are not used. If the utilization is less than the reservation, the resources can be utilized by other running virtual machines.
