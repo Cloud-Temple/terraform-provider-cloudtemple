@@ -352,7 +352,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 
 - `backup_sla_policies` (Set of String) The IDs of the SLA policies to assign to the virtual machine.
 - `boot_options` (Block List, Max: 1) (see [below for nested schema](#nestedblock--boot_options))
-- `clone_virtual_machine_id` (String) The ID of the virtual machine to clone. Conflict with `content_library_item_id`.
+- `clone_virtual_machine_id` (String) The ID of the virtual machine to clone. Conflict with `content_library_item_id`, `marketplace_item_id` and `guest_operating_system_moref`.
 - `cloud_init` (Map of String) A set of cloud-init compatible key/value used to configure the virtual machine.
 					
 	List of cloud-init compatible keys :

@@ -280,7 +280,7 @@ func resourceVirtualMachine() *schema.Resource {
 			},
 			"clone_virtual_machine_id": {
 				Type:          schema.TypeString,
-				Description:   "The ID of the virtual machine to clone. Conflict with `content_library_item_id`.",
+				Description:   "The ID of the virtual machine to clone. Conflict with `content_library_item_id`, `marketplace_item_id` and `guest_operating_system_moref`.",
 				Optional:      true,
 				ForceNew:      true,
 				ConflictsWith: []string{"content_library_item_id", "marketplace_item_id"},
