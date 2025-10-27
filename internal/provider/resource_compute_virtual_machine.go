@@ -56,7 +56,7 @@ func resourceVirtualMachine() *schema.Resource {
 				Optional:      true,
 				ForceNew:      true,
 				RequiredWith:  []string{"content_library_item_id"},
-				ConflictsWith: []string{"clone_virtual_machine_id"},
+				ConflictsWith: []string{"clone_virtual_machine_id", "marketplace_item_id"},
 				ValidateFunc:  validation.IsUUID,
 			},
 			"content_library_item_id": {
@@ -65,9 +65,17 @@ func resourceVirtualMachine() *schema.Resource {
 				Optional:      true,
 				ForceNew:      true,
 				RequiredWith:  []string{"content_library_id"},
-				ConflictsWith: []string{"clone_virtual_machine_id"},
-				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
+				ConflictsWith: []string{"clone_virtual_machine_id", "marketplace_item_id"},
+				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id", "marketplace_item_id"},
 				ValidateFunc:  validation.IsUUID,
+			},
+			"marketplace_item_id": {
+				Type:          schema.TypeString,
+				Description:   "The ID of the marketplace item to deploy. Conflict with `clone_virtual_machine_id` and `content_library_item_id`.",
+				Optional:      true,
+				ForceNew:      true,
+				ConflictsWith: []string{"clone_virtual_machine_id", "content_library_item_id"},
+				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id", "marketplace_item_id"},
 			},
 			"deploy_options": {
 				Type:          schema.TypeMap,
@@ -272,11 +280,11 @@ func resourceVirtualMachine() *schema.Resource {
 			},
 			"clone_virtual_machine_id": {
 				Type:          schema.TypeString,
-				Description:   "The ID of the virtual machine to clone. Conflict with `content_library_item_id`.",
+				Description:   "The ID of the virtual machine to clone. Conflict with `content_library_item_id`, `marketplace_item_id` and `guest_operating_system_moref`.",
 				Optional:      true,
 				ForceNew:      true,
-				ConflictsWith: []string{"content_library_item_id"},
-				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
+				ConflictsWith: []string{"content_library_item_id", "marketplace_item_id"},
+				AtLeastOneOf:  []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id", "marketplace_item_id"},
 				ValidateFunc:  validation.IsUUID,
 			},
 			"guest_operating_system_moref": {
@@ -284,7 +292,7 @@ func resourceVirtualMachine() *schema.Resource {
 				Description:  "The operating system to launch the virtual machine with.",
 				Optional:     true,
 				Computed:     true,
-				AtLeastOneOf: []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id"},
+				AtLeastOneOf: []string{"clone_virtual_machine_id", "guest_operating_system_moref", "content_library_item_id", "marketplace_item_id"},
 			},
 			"datacenter_id": {
 				Type:         schema.TypeString,
@@ -306,6 +314,7 @@ func resourceVirtualMachine() *schema.Resource {
 			},
 			"datastore_id": {
 				Type:         schema.TypeString,
+				Description:  "The datastore to store the virtual machine data on. (Required when using " + "`marketplace_item_id`)",
 				Optional:     true,
 				Computed:     true,
 				ValidateFunc: validation.IsUUID,
@@ -828,6 +837,15 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 				}
 				return nil
 			}),
+			// Ensure that datastore_id is set when marketplace_item_id is used
+			func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
+				datastoreId := d.Get("datastore_id").(string)
+				marketplaceItemId := d.Get("marketplace_item_id").(string)
+				if marketplaceItemId != "" && datastoreId == "" {
+					return fmt.Errorf("'datastore_id' is required when 'marketplace_item_id' is used")
+				}
+				return nil
+			},
 		),
 	}
 }
@@ -840,6 +858,26 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 	var err error
 	cloneVirtualMachineId := d.Get("clone_virtual_machine_id").(string)
 	contentLibraryItemId := d.Get("content_library_item_id").(string)
+	marketplaceItemId := d.Get("marketplace_item_id").(string)
+
+	var deployOptions []*client.DeployOption
+	for k, v := range d.Get("deploy_options").(map[string]interface{}) {
+		deployOptions = append(deployOptions, &client.DeployOption{
+			ID:    k,
+			Value: v.(string),
+		})
+	}
+
+	for k, v := range d.Get("cloud_init").(map[string]interface{}) {
+		if !helpers.Exists(deployOptions, func(i *client.DeployOption) bool {
+			return i.ID == k
+		}) {
+			deployOptions = append(deployOptions, &client.DeployOption{
+				ID:    k,
+				Value: v.(string),
+			})
+		}
+	}
 
 	if cloneVirtualMachineId != "" {
 		activityId, err = c.Compute().VirtualMachine().Clone(ctx, &client.CloneVirtualMachineRequest{
@@ -867,25 +905,6 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			return diag.Errorf("'datastore_id' is required when 'content_library_item_id' is used.")
 		}
 
-		var deployOptions []*client.DeployOption
-		for k, v := range d.Get("deploy_options").(map[string]interface{}) {
-			deployOptions = append(deployOptions, &client.DeployOption{
-				ID:    k,
-				Value: v.(string),
-			})
-		}
-
-		for k, v := range d.Get("cloud_init").(map[string]interface{}) {
-			if !helpers.Exists(deployOptions, func(i *client.DeployOption) bool {
-				return i.ID == k
-			}) {
-				deployOptions = append(deployOptions, &client.DeployOption{
-					ID:    k,
-					Value: v.(string),
-				})
-			}
-		}
-
 		activityId, err = c.Compute().ContentLibrary().Deploy(ctx, &client.ComputeContentLibraryItemDeployRequest{
 			Name:                  name,
 			ContentLibraryId:      d.Get("content_library_id").(string),
@@ -907,6 +926,48 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			return diag.Errorf("failed to deploy content library item: %s", err)
 		}
 
+	} else if marketplaceItemId != "" {
+		_, vmwareItemInfo, err := c.Marketplace().Item().ReadInfo(ctx, d.Get("marketplace_item_id").(string), "vmware")
+		if err != nil {
+			return diag.Errorf("Could not read the marketplace item : %s", err)
+		}
+		if vmwareItemInfo == nil {
+			return diag.Errorf("Could not find marketplace item info with id : %s", d.Get("marketplace_item_id").(string))
+		}
+
+		osNetworkAdapters := d.Get("os_network_adapter").([]interface{})
+		if osNetworkAdapters != nil && len(osNetworkAdapters) != len(vmwareItemInfo.NetworkAdapters) {
+			return diag.Errorf("the number of os_network_adapter (%d) must match the number of network adapters in the marketplace item (%d)", len(osNetworkAdapters), len(vmwareItemInfo.NetworkAdapters))
+		}
+
+		networkData := []client.NetworkDataMapping{}
+		for i, networkAdapter := range vmwareItemInfo.NetworkAdapters {
+			osNetworkAdapter := osNetworkAdapters[i].(map[string]interface{})
+			networkData = append(networkData, client.NetworkDataMapping{
+				SourceNetworkName:    networkAdapter.NetworkName,
+				DestinationNetworkId: osNetworkAdapter["network_id"].(string),
+			})
+		}
+
+		activityId, err = c.Marketplace().Item().DeployVMWareItem(ctx, &client.MarketplaceVMWareDeployementRequest{
+			Name:          name,
+			ID:            d.Get("marketplace_item_id").(string),
+			DatacenterID:  d.Get("datacenter_id").(string),
+			HostClusterID: d.Get("host_cluster_id").(string),
+			HostID:        d.Get("host_id").(string),
+			DatastoreID:   d.Get("datastore_id").(string),
+			NetworkData:   networkData,
+			DeployOptions: deployOptions,
+		})
+		if err != nil {
+			return diag.Errorf("failed to deploy marketplace item: %s", err)
+		}
+
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		setIdFromActivityState(d, activity)
+		if err != nil {
+			return diag.Errorf("failed to deploy marketplace item: %s", err)
+		}
 	} else {
 		activityId, err = c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
 			Name:                      name,

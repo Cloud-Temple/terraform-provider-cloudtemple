@@ -160,6 +160,10 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_iam_tenants":                documentDatasource(dataSourceTenants(), "iam_read"),
 				"cloudtemple_iam_user":                   documentDatasource(dataSourceUser(), "iam_read"),
 				"cloudtemple_iam_users":                  documentDatasource(dataSourceUsers(), "iam_read"),
+
+				// Marketplace
+				"cloudtemple_marketplace_item":  documentDatasource(dataSourceMarketplaceItem(), ""),
+				"cloudtemple_marketplace_items": documentDatasource(dataSourceMarketplaceItems(), ""),
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				// Compute - IaaS VMWare
