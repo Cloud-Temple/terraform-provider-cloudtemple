@@ -1,6 +1,6 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-## 1.3.0 (October 9th, 2025)
+## 1.3.0 (October 30th, 2025)
 <img id="stable" src="https://badgen.net/badge/channel/stable/green" alt="Channel: stable" />
 
   INFORMATIONS :
