@@ -1,5 +1,13 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+## 1.4.0 (October 30th, 2025)
+<img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+  NEW FEATURES :
+    * Added datasource `cloudtemple_marketplace_item` used to retreive Virtual Machine Images (VMI) from the new console's marketplace.
+    * Added property `marketplace_item_id` in resource `cloudtemple_compute_virtual_machine` used to deploy a virtual machine from a VMI of the Marketplace.
+    * Added property `marketplace_item_id` in resource `cloudtemple_compute_iaas_opensource_virtual_machine` used to deploy a virtual machine from a VMI of the Marketplace.
+
 ## 1.3.0 (October 30th, 2025)
 <img id="stable" src="https://badgen.net/badge/channel/stable/green" alt="Channel: stable" />
 
