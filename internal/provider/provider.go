@@ -151,7 +151,8 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_compute_iaas_opensource_replication_policies": documentDatasource(dataSourceOpenIaasReplicationPolicies(), "compute_iaas_opensource_read"),
 
 				// Object Storage
-				"cloudtemple_object_storage_bucket": documentDatasource(dataSourceBucket(), "object-storage_read"),
+				"cloudtemple_object_storage_bucket":  documentDatasource(dataSourceBucket(), "object-storage_read"),
+				"cloudtemple_object_storage_buckets": documentDatasource(dataSourceBuckets(), "object-storage_read"),
 
 				// IAM
 				"cloudtemple_iam_company":                documentDatasource(dataSourceCompany(), "iam_read"),
