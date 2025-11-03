@@ -66,3 +66,41 @@ func (c *BucketClient) Read(ctx context.Context, name string) (*Bucket, error) {
 
 	return &out, nil
 }
+
+type CreateBucketRequest struct {
+	Name       string   `json:"name"`
+	AccessType string   `json:"accessType"`
+	Whitelist  []string `json:"whitelist,omitempty"`
+}
+
+func (c *BucketClient) Create(ctx context.Context, req *CreateBucketRequest) (string, error) {
+	r := c.c.newRequest("POST", "/object-storage/v1/buckets")
+	r.obj = req
+	return c.c.doRequestAndReturnActivity(ctx, r)
+}
+
+func (c *BucketClient) Delete(ctx context.Context, name string) (string, error) {
+	r := c.c.newRequest("DELETE", "/object-storage/v1/buckets/%s", name)
+	return c.c.doRequestAndReturnActivity(ctx, r)
+}
+
+type UpdateWhitelistRequest struct {
+	AccessType string   `json:"accessType"`
+	Whitelist  []string `json:"whitelist,omitempty"`
+}
+
+func (c *BucketClient) UpdateWhitelist(ctx context.Context, name string, req *UpdateWhitelistRequest) (string, error) {
+	r := c.c.newRequest("PUT", "/object-storage/v1/buckets/%s/whitelist", name)
+	r.obj = req
+	return c.c.doRequestAndReturnActivity(ctx, r)
+}
+
+type UpdateVersioningRequest struct {
+	Status string `json:"status"`
+}
+
+func (c *BucketClient) UpdateVersioning(ctx context.Context, name string, req *UpdateVersioningRequest) (string, error) {
+	r := c.c.newRequest("PUT", "/object-storage/v1/buckets/%s/versioning", name)
+	r.obj = req
+	return c.c.doRequestAndReturnActivity(ctx, r)
+}
