@@ -157,6 +157,8 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_object_storage_storage_account":  documentDatasource(dataSourceStorageAccount(), "object-storage_iam_management"),
 				"cloudtemple_object_storage_storage_accounts": documentDatasource(dataSourceStorageAccounts(), "object-storage_iam_management"),
 				"cloudtemple_object_storage_acl":              documentDatasource(dataSourceACL(), "object-storage_iam_management"),
+				"cloudtemple_object_storage_role":             documentDatasource(dataSourceObjectStorageRole(), "object-storage_read"),
+				"cloudtemple_object_storage_roles":            documentDatasource(dataSourceObjectStorageRoles(), "object-storage_read"),
 
 				// IAM
 				"cloudtemple_iam_company":                documentDatasource(dataSourceCompany(), "iam_read"),
