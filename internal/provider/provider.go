@@ -153,6 +153,7 @@ func New(version string) func() *schema.Provider {
 				// Object Storage
 				"cloudtemple_object_storage_bucket":           documentDatasource(dataSourceBucket(), "object-storage_read"),
 				"cloudtemple_object_storage_buckets":          documentDatasource(dataSourceBuckets(), "object-storage_read"),
+				"cloudtemple_object_storage_bucket_files":     documentDatasource(dataSourceBucketFiles(), "object-storage_read"),
 				"cloudtemple_object_storage_storage_account":  documentDatasource(dataSourceStorageAccount(), "object-storage_iam_management"),
 				"cloudtemple_object_storage_storage_accounts": documentDatasource(dataSourceStorageAccounts(), "object-storage_iam_management"),
 				"cloudtemple_object_storage_acl":              documentDatasource(dataSourceACL(), "object-storage_iam_management"),
@@ -181,6 +182,9 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_compute_iaas_opensource_virtual_disk":       documentResource(resourceOpenIaasVirtualDisk(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
 				"cloudtemple_compute_iaas_opensource_network_adapter":    documentResource(resourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
 				"cloudtemple_compute_iaas_opensource_replication_policy": documentResource(resourceOpenIaasReplicationPolicy(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
+
+				// Object Storage
+				"cloudtemple_object_storage_bucket": documentResource(resourceBucket(), "object-storage_write", "object-storage_read"),
 			},
 		}
 
