@@ -7,6 +7,7 @@ description: |-
   To manage this resource you will need the following roles:
     - object-storage_write
     - object-storage_read
+    - object-storage_iam_management
 ---
 
 # cloudtemple_object_storage_bucket (Resource)
@@ -16,6 +17,7 @@ Create and manage object storage buckets.
 To manage this resource you will need the following roles:
   - `object-storage_write`
   - `object-storage_read`
+  - `object-storage_iam_management`
 
 ## Example Usage
 

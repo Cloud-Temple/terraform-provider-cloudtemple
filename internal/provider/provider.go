@@ -186,9 +186,10 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_compute_iaas_opensource_replication_policy": documentResource(resourceOpenIaasReplicationPolicy(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
 
 				// Object Storage
-				"cloudtemple_object_storage_bucket":          documentResource(resourceBucket(), "object-storage_write", "object-storage_read"),
-				"cloudtemple_object_storage_storage_account": documentResource(resourceStorageAccount(), "object-storage_iam_management"),
-				"cloudtemple_object_storage_acl_entry":       documentResource(resourceACLEntry(), "object-storage_iam_management"),
+				"cloudtemple_object_storage_bucket":            documentResource(resourceBucket(), "object-storage_write", "object-storage_read", "object-storage_iam_management"),
+				"cloudtemple_object_storage_storage_account":   documentResource(resourceStorageAccount(), "object-storage_iam_management"),
+				"cloudtemple_object_storage_acl_entry":         documentResource(resourceACLEntry(), "object-storage_iam_management"),
+				"cloudtemple_object_storage_global_access_key": documentResource(resourceGlobalAccessKey(), "object-storage_iam_management"),
 			},
 		}
 
