@@ -104,3 +104,28 @@ func (c *BucketClient) UpdateVersioning(ctx context.Context, name string, req *U
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
+
+type BucketACLEntry struct {
+	ID   string
+	Name string
+	Role string
+}
+
+func (c *BucketClient) ListACLEntries(ctx context.Context, bucket string) ([]*BucketACLEntry, error) {
+	r := c.c.newRequest("GET", "/object-storage/v1/buckets/%s/storage_accounts", bucket)
+	resp, err := c.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireOK(resp); err != nil {
+		return nil, err
+	}
+
+	var out []*BucketACLEntry
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}

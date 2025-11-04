@@ -95,3 +95,28 @@ func (c *StorageAccountClient) Delete(ctx context.Context, name string) (string,
 	r := c.c.newRequest("DELETE", "/object-storage/v1/storage_accounts/%s", name)
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
+
+type StorageAccountACLEntry struct {
+	ID   string
+	Name string
+	Role string
+}
+
+func (c *StorageAccountClient) ListACLEntries(ctx context.Context, storageAccount string) ([]*StorageAccountACLEntry, error) {
+	r := c.c.newRequest("GET", "/object-storage/v1/storage_accounts/%s/buckets", storageAccount)
+	resp, err := c.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireOK(resp); err != nil {
+		return nil, err
+	}
+
+	var out []*StorageAccountACLEntry
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}

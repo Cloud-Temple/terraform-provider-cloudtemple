@@ -35,3 +35,35 @@ output "bucket_endpoint" {
 output "bucket_id" {
   value = cloudtemple_object_storage_bucket.private.id
 }
+
+# Create a bucket with acl entries
+data "cloudtemple_object_storage_storage_account" "storage_account_1" {
+  name = "storage-account-1"
+}
+
+data "cloudtemple_object_storage_storage_account" "storage_account_1" {
+  name = "storage-account-2"
+}
+
+data "cloudtemple_object_storage_role" "read" {
+  name = "READ"
+}
+
+data "cloudtemple_object_storage_role" "write" {
+  name = "WRITE"
+}
+
+resource "cloudtemple_object_storage_bucket" "with_acl" {
+  name        = "my-bucket-with-acl"
+  access_type = "private"
+
+  acl_entry {
+    storage_account = data.cloudtemple_object_storage_storage_account.storage_account_1.name
+    role            = data.cloudtemple_object_storage_role.read.name
+  }
+
+  acl_entry {
+    storage_account = data.cloudtemple_object_storage_storage_account.storage_account_2.name
+    role            = data.cloudtemple_object_storage_role.write.name
+  }
+}
