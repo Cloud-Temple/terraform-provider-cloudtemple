@@ -15,7 +15,6 @@ func resourceStorageAccount() *schema.Resource {
 
 		CreateContext: objectStorageStorageAccountCreate,
 		ReadContext:   objectStorageStorageAccountRead,
-		UpdateContext: objectStorageStorageAccountUpdate,
 		DeleteContext: objectStorageStorageAccountDelete,
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
@@ -28,25 +27,6 @@ func resourceStorageAccount() *schema.Resource {
 				Required:    true,
 				ForceNew:    true,
 				Description: "The name of the storage account.",
-			},
-			"acl_entry": {
-				Type:        schema.TypeSet,
-				Optional:    true,
-				Description: "ACL entries granting permissions on buckets to this storage account.",
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"bucket": {
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "The name of the bucket.",
-						},
-						"role": {
-							Type:        schema.TypeString,
-							Required:    true,
-							Description: "The role to grant (e.g., 'READ', 'WRITE', 'FULL_CONTROL').",
-						},
-					},
-				},
 			},
 
 			// Out
@@ -119,24 +99,6 @@ func objectStorageStorageAccountCreate(ctx context.Context, d *schema.ResourceDa
 	d.Set("access_key_id", createResp.AccessKeyID)
 	d.Set("access_secret_key", createResp.SecretAccessKey)
 
-	// Grant ACL entries if specified
-	if aclEntries, ok := d.GetOk("acl_entry"); ok {
-		storageAccountName := d.Get("name").(string)
-		for _, entry := range aclEntries.(*schema.Set).List() {
-			entryMap := entry.(map[string]interface{})
-			bucket := entryMap["bucket"].(string)
-			role := entryMap["role"].(string)
-
-			activityId, err := c.ObjectStorage().ACLEntry().Grant(ctx, bucket, role, storageAccountName)
-			if err != nil {
-				return diag.Errorf("failed to grant ACL entry: %s", err)
-			}
-			if _, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
-				return diag.Errorf("failed to grant ACL entry: %s", err)
-			}
-		}
-	}
-
 	return objectStorageStorageAccountRead(ctx, d, meta)
 }
 
@@ -173,77 +135,7 @@ func objectStorageStorageAccountRead(ctx context.Context, d *schema.ResourceData
 		}
 	}
 
-	// Read ACL entries
-	aclEntries, err := c.ObjectStorage().StorageAccount().ListACLEntries(ctx, d.Id())
-	if err != nil {
-		return diag.Errorf("failed to read ACL entries: %s", err)
-	}
-
-	aclSet := schema.NewSet(schema.HashResource(&schema.Resource{
-		Schema: map[string]*schema.Schema{
-			"bucket": {Type: schema.TypeString},
-			"role":   {Type: schema.TypeString},
-		},
-	}), []interface{}{})
-
-	for _, entry := range aclEntries {
-		aclSet.Add(map[string]interface{}{
-			"bucket": entry.Name,
-			"role":   entry.Role,
-		})
-	}
-
-	if err := d.Set("acl_entry", aclSet); err != nil {
-		return diag.FromErr(err)
-	}
-
 	return diags
-}
-
-func objectStorageStorageAccountUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
-	c := getClient(meta)
-
-	// Update ACL entries
-	if d.HasChange("acl_entry") {
-		storageAccountName := d.Id()
-		old, new := d.GetChange("acl_entry")
-		oldSet := old.(*schema.Set)
-		newSet := new.(*schema.Set)
-
-		// Revoke removed entries
-		toRevoke := oldSet.Difference(newSet)
-		for _, entry := range toRevoke.List() {
-			entryMap := entry.(map[string]interface{})
-			bucket := entryMap["bucket"].(string)
-			role := entryMap["role"].(string)
-
-			activityId, err := c.ObjectStorage().ACLEntry().Revoke(ctx, bucket, role, storageAccountName)
-			if err != nil {
-				return diag.Errorf("failed to revoke ACL entry: %s", err)
-			}
-			if _, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
-				return diag.Errorf("failed to revoke ACL entry: %s", err)
-			}
-		}
-
-		// Grant new entries
-		toGrant := newSet.Difference(oldSet)
-		for _, entry := range toGrant.List() {
-			entryMap := entry.(map[string]interface{})
-			bucket := entryMap["bucket"].(string)
-			role := entryMap["role"].(string)
-
-			activityId, err := c.ObjectStorage().ACLEntry().Grant(ctx, bucket, role, storageAccountName)
-			if err != nil {
-				return diag.Errorf("failed to grant ACL entry: %s", err)
-			}
-			if _, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
-				return diag.Errorf("failed to grant ACL entry: %s", err)
-			}
-		}
-	}
-
-	return objectStorageStorageAccountRead(ctx, d, meta)
 }
 
 func objectStorageStorageAccountDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
