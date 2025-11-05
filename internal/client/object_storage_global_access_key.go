@@ -16,7 +16,7 @@ type RenewAccessKeyResponse struct {
 }
 
 func (c *GlobalAccessKeyClient) Renew(ctx context.Context) (*RenewAccessKeyResponse, error) {
-	r := c.c.newRequest("POST", "/object-storage/v1/namespaces/access_key/renew")
+	r := c.c.newRequest("POST", "/storage/object/v1/namespaces/access_key/renew")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

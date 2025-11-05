@@ -18,7 +18,7 @@ type ACL struct {
 
 // ListByBucket récupère tous les storage accounts qui ont accès à un bucket spécifique
 func (c *ACLClient) ListByBucket(ctx context.Context, bucketName string) ([]*ACL, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/buckets/%s/storage_accounts", bucketName)
+	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s/storage_accounts", bucketName)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -38,7 +38,7 @@ func (c *ACLClient) ListByBucket(ctx context.Context, bucketName string) ([]*ACL
 
 // ListByStorageAccount récupère tous les buckets auxquels un storage account a accès
 func (c *ACLClient) ListByStorageAccount(ctx context.Context, storageAccountName string) ([]*ACL, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/storage_accounts/%s/buckets", storageAccountName)
+	r := c.c.newRequest("GET", "/storage/object/v1/storage_accounts/%s/buckets", storageAccountName)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

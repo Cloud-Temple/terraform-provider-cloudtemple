@@ -29,7 +29,7 @@ type Bucket struct {
 }
 
 func (c *BucketClient) List(ctx context.Context) ([]*Bucket, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/buckets")
+	r := c.c.newRequest("GET", "/storage/object/v1/buckets")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -48,7 +48,7 @@ func (c *BucketClient) List(ctx context.Context) ([]*Bucket, error) {
 }
 
 func (c *BucketClient) Read(ctx context.Context, name string) (*Bucket, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/buckets/%s", name)
+	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s", name)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -74,13 +74,13 @@ type CreateBucketRequest struct {
 }
 
 func (c *BucketClient) Create(ctx context.Context, req *CreateBucketRequest) (string, error) {
-	r := c.c.newRequest("POST", "/object-storage/v1/buckets")
+	r := c.c.newRequest("POST", "/storage/object/v1/buckets")
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
 
 func (c *BucketClient) Delete(ctx context.Context, name string) (string, error) {
-	r := c.c.newRequest("DELETE", "/object-storage/v1/buckets/%s", name)
+	r := c.c.newRequest("DELETE", "/storage/object/v1/buckets/%s", name)
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
 
@@ -90,7 +90,7 @@ type UpdateWhitelistRequest struct {
 }
 
 func (c *BucketClient) UpdateWhitelist(ctx context.Context, name string, req *UpdateWhitelistRequest) (string, error) {
-	r := c.c.newRequest("PUT", "/object-storage/v1/buckets/%s/whitelist", name)
+	r := c.c.newRequest("PUT", "/storage/object/v1/buckets/%s/whitelist", name)
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
@@ -100,7 +100,7 @@ type UpdateVersioningRequest struct {
 }
 
 func (c *BucketClient) UpdateVersioning(ctx context.Context, name string, req *UpdateVersioningRequest) (string, error) {
-	r := c.c.newRequest("PUT", "/object-storage/v1/buckets/%s/versioning", name)
+	r := c.c.newRequest("PUT", "/storage/object/v1/buckets/%s/versioning", name)
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
@@ -112,7 +112,7 @@ type BucketACLEntry struct {
 }
 
 func (c *BucketClient) ListACLEntries(ctx context.Context, bucket string) ([]*BucketACLEntry, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/buckets/%s/storage_accounts", bucket)
+	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s/storage_accounts", bucket)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

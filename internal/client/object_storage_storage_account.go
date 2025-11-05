@@ -24,7 +24,7 @@ type StorageAccount struct {
 }
 
 func (c *StorageAccountClient) List(ctx context.Context) ([]*StorageAccount, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/storage_accounts")
+	r := c.c.newRequest("GET", "/storage/object/v1/storage_accounts")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -43,7 +43,7 @@ func (c *StorageAccountClient) List(ctx context.Context) ([]*StorageAccount, err
 }
 
 func (c *StorageAccountClient) Read(ctx context.Context, name string) (*StorageAccount, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/storage_accounts/%s", name)
+	r := c.c.newRequest("GET", "/storage/object/v1/storage_accounts/%s", name)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -72,7 +72,7 @@ type CreateStorageAccountResponse struct {
 }
 
 func (c *StorageAccountClient) Create(ctx context.Context, req *CreateStorageAccountRequest) (*CreateStorageAccountResponse, error) {
-	r := c.c.newRequest("POST", "/object-storage/v1/storage_accounts")
+	r := c.c.newRequest("POST", "/storage/object/v1/storage_accounts")
 	r.obj = req
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
@@ -92,7 +92,7 @@ func (c *StorageAccountClient) Create(ctx context.Context, req *CreateStorageAcc
 }
 
 func (c *StorageAccountClient) Delete(ctx context.Context, name string) (string, error) {
-	r := c.c.newRequest("DELETE", "/object-storage/v1/storage_accounts/%s", name)
+	r := c.c.newRequest("DELETE", "/storage/object/v1/storage_accounts/%s", name)
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
 
@@ -103,7 +103,7 @@ type StorageAccountACLEntry struct {
 }
 
 func (c *StorageAccountClient) ListACLEntries(ctx context.Context, storageAccount string) ([]*StorageAccountACLEntry, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/storage_accounts/%s/buckets", storageAccount)
+	r := c.c.newRequest("GET", "/storage/object/v1/storage_accounts/%s/buckets", storageAccount)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

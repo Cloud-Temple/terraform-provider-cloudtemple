@@ -18,7 +18,7 @@ type ObjectStorageRole struct {
 }
 
 func (c *ObjectStorageRoleClient) List(ctx context.Context) ([]*ObjectStorageRole, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/roles")
+	r := c.c.newRequest("GET", "/storage/object/v1/roles")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

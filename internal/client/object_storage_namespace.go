@@ -18,7 +18,7 @@ type Namespace struct {
 }
 
 func (c *NamespaceClient) Read(ctx context.Context) (*Namespace, error) {
-	r := c.c.newRequest("GET", "/object-storage/v1/namespaces")
+	r := c.c.newRequest("GET", "/storage/object/v1/namespaces")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
