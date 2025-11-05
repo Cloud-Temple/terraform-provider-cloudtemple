@@ -35,11 +35,31 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 				Required:    true,
 			},
 			"template_id": {
-				Type:         schema.TypeString,
-				Description:  "The template identifier.",
-				Required:     true,
-				ForceNew:     true,
-				ValidateFunc: validation.IsUUID,
+				Type:          schema.TypeString,
+				Description:   "The template identifier.",
+				Optional:      true,
+				ForceNew:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"marketplace_item_id"},
+				AtLeastOneOf:  []string{"template_id", "marketplace_item_id"},
+			},
+			"marketplace_item_id": {
+				Type:          schema.TypeString,
+				Description:   "The marketplace item identifier to deploy the virtual machine from.",
+				Optional:      true,
+				ForceNew:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"template_id"},
+				AtLeastOneOf:  []string{"template_id", "marketplace_item_id"},
+			},
+			"storage_repository_id": {
+				Type:          schema.TypeString,
+				Description:   "The storage repository identifier where the virtual machine will be created. Required when `marketplace_item_id` is set.",
+				Optional:      true,
+				ForceNew:      true,
+				ValidateFunc:  validation.IsUUID,
+				ConflictsWith: []string{"template_id"},
+				RequiredWith:  []string{"marketplace_item_id"},
 			},
 			"cpu": {
 				Type:        schema.TypeInt,
@@ -374,38 +394,80 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	template, err := c.Compute().OpenIaaS().Template().Read(ctx, d.Get("template_id").(string))
-	if err != nil {
-		return diag.Errorf("Could not read the template : %s", err)
-	}
-	if template == nil {
-		return diag.Errorf("Could not find template with id : %s", d.Get("template_id").(string))
-	}
-
-	templateNetworkAdapters := make([]client.OSNetworkAdapter, len(template.NetworkAdapters))
-	for i, networkAdapter := range template.NetworkAdapters {
-		templateNetworkAdapters[i] = client.OSNetworkAdapter{
-			NetworkID: networkAdapter.Network.ID,
-			MAC:       networkAdapter.MacAddress,
+	// Deploy from template
+	if d.Get("template_id").(string) != "" {
+		template, err := c.Compute().OpenIaaS().Template().Read(ctx, d.Get("template_id").(string))
+		if err != nil {
+			return diag.Errorf("Could not read the template : %s", err)
 		}
-	}
+		if template == nil {
+			return diag.Errorf("Could not find template with id : %s", d.Get("template_id").(string))
+		}
 
-	// Create virtual machine itself
-	activityId, err := c.Compute().OpenIaaS().VirtualMachine().Create(ctx, &client.CreateOpenIaasVirtualMachineRequest{
-		Name:            d.Get("name").(string),
-		TemplateID:      d.Get("template_id").(string),
-		CPU:             d.Get("cpu").(int),
-		Memory:          d.Get("memory").(int),
-		CloudInit:       cloudInit,
-		NetworkAdapters: templateNetworkAdapters,
-	})
-	if err != nil {
-		return diag.Errorf("the virtual machine could not be created: %s", err)
-	}
-	activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	setIdFromActivityState(d, activity)
-	if err != nil {
-		return diag.Errorf("failed to create virtual machine, %s", err)
+		templateNetworkAdapters := make([]client.OSNetworkAdapter, len(template.NetworkAdapters))
+		for i, networkAdapter := range template.NetworkAdapters {
+			templateNetworkAdapters[i] = client.OSNetworkAdapter{
+				NetworkID: networkAdapter.Network.ID,
+				MAC:       networkAdapter.MacAddress,
+			}
+		}
+
+		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Create(ctx, &client.CreateOpenIaasVirtualMachineRequest{
+			Name:            d.Get("name").(string),
+			TemplateID:      d.Get("template_id").(string),
+			CPU:             d.Get("cpu").(int),
+			Memory:          d.Get("memory").(int),
+			CloudInit:       cloudInit,
+			NetworkAdapters: templateNetworkAdapters,
+		})
+		if err != nil {
+			return diag.Errorf("the virtual machine could not be created: %s", err)
+		}
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		setIdFromActivityState(d, activity)
+		if err != nil {
+			return diag.Errorf("failed to create virtual machine, %s", err)
+		}
+
+		// Deploy from marketplace item
+	} else if d.Get("marketplace_item_id").(string) != "" {
+		openIaasItemInfo, _, err := c.Marketplace().Item().ReadInfo(ctx, d.Get("marketplace_item_id").(string), "open_iaas")
+		if err != nil {
+			return diag.Errorf("Could not read the marketplace item : %s", err)
+		}
+		if openIaasItemInfo == nil {
+			return diag.Errorf("Could not find marketplace item info with id : %s", d.Get("marketplace_item_id").(string))
+		}
+
+		osNetworkAdapters := d.Get("os_network_adapter").([]interface{})
+		if osNetworkAdapters != nil && len(osNetworkAdapters) != len(openIaasItemInfo.NetworkAdapters) {
+			return diag.Errorf("the number of os_network_adapter (%d) must match the number of network adapters in the marketplace item (%d)", len(osNetworkAdapters), len(openIaasItemInfo.NetworkAdapters))
+		}
+
+		networkData := []client.NetworkDataMapping{}
+		for i, networkAdapter := range openIaasItemInfo.NetworkAdapters {
+			osNetworkAdapter := osNetworkAdapters[i].(map[string]interface{})
+			networkData = append(networkData, client.NetworkDataMapping{
+				SourceNetworkName:    networkAdapter.NetworkName,
+				DestinationNetworkId: osNetworkAdapter["network_id"].(string),
+			})
+		}
+
+		activityId, err := c.Marketplace().Item().DeployOpenIaasItem(ctx, &client.MarketplaceOpenIaasDeployementRequest{
+			ID:                  d.Get("marketplace_item_id").(string),
+			Name:                d.Get("name").(string),
+			StorageRepositoryID: d.Get("storage_repository_id").(string),
+			NetworkData:         networkData,
+			CloudInit:           cloudInit,
+		})
+		if err != nil {
+			return diag.Errorf("the virtual machine could not be created from marketplace item: %s", err)
+		}
+		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		setIdFromActivityState(d, activity)
+		if err != nil {
+			return diag.Errorf("failed to create virtual machine from marketplace item, %s", err)
+		}
 	}
 
 	disks, err := c.Compute().OpenIaaS().VirtualDisk().List(ctx, &client.OpenIaaSVirtualDiskFilter{
@@ -443,7 +505,7 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 	for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
 		slaPolicies = append(slaPolicies, policy.(string))
 	}
-	activityId, err = c.Backup().OpenIaaS().Policy().Assign(ctx, &client.BackupOpenIaasAssignPolicyRequest{
+	activityId, err := c.Backup().OpenIaaS().Policy().Assign(ctx, &client.BackupOpenIaasAssignPolicyRequest{
 		VirtualMachineId: d.Id(),
 		PolicyIds:        slaPolicies,
 	})
