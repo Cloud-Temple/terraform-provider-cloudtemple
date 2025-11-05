@@ -1,7 +1,23 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-## 1.4.0 (October 30th, 2025)
+## 1.5.0 (Not released yet.)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+NEW FEATURES :
+  * Added resource `cloudtemple_object_storage_bucket`.
+  * Added resource `cloudtemple_object_storage_storage_account`.
+  * Added resource `cloudtemple_object_storage_global_access_key`.
+  * Added resource `cloudtemple_object_storage_acl_entry`.
+  * Added datasource `cloudtemple_object_storage_bucket`.
+  * Added datasource `cloudtemple_object_storage_buckets`.
+  * Added datasource `cloudtemple_object_storage_bucket_files`.
+  * Added datasource `cloudtemple_object_storage_storage_account`.
+  * Added datasource `cloudtemple_object_storage_storage_accounts`.
+  * Added datasource `cloudtemple_object_storage_role`.
+  * Added datasource `cloudtemple_object_storage_roles`.
+  * Added datasource `cloudtemple_object_storage_acl`.
+
+## 1.4.0 (October 30th, 2025)
 
 NEW FEATURES :
   * Added datasource `cloudtemple_marketplace_item` used to retreive Virtual Machine Images (VMI) from the new console's marketplace.
@@ -24,7 +40,7 @@ IMPROVMENTS :
   * Added new datasource `cloudtemple_compute_iaas_opensource_replication_policies`.
   * Added new property `replication_policy_id` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
 
-## 1.2.0-rc.1 (October 2nd, 2025)
+## 1.2.0-rc.1 (October 2nd, 2025)  
 
 IMPROVEMENTS :
 
