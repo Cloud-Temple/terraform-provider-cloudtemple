@@ -37,7 +37,7 @@ type BucketFilesFilter struct {
 }
 
 func (c *BucketFilesClient) List(ctx context.Context, bucketName string, filter *BucketFilesFilter) ([]*BucketFile, error) {
-	r := c.c.newRequest("GET", "/storage/object/v1/buckets/"+url.PathEscape(bucketName)+"/files")
+	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s/files", url.PathEscape(bucketName))
 	r.addFilter(filter)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
