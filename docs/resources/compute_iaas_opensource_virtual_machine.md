@@ -171,7 +171,7 @@ Order of the elements in the list is the boot order.
 
 	NB : The cloud-init configuration is only triggered at virtual machine first startup and requires a cloud-init compatible NoCloud.
 	For exemple, you can use this [Ubuntu Cloud Image](https://cloud-images.ubuntu.com/) and convert it to an NoCloud.
-- `high_availability` (String) High Availability configuration for the virtual machine. Possible values are: 'disabled', 'restart' and 'best-effort'. For more informations, refer to the documentation : https://docs.cloud-temple.com/iaas_opensource/concepts#haute-disponibilit%C3%A9
+- `high_availability` (String) High Availability configuration for the virtual machine (Default: disabled). Possible values are: 'disabled', 'restart' and 'best-effort'. For more informations, refer to the documentation : https://docs.cloud-temple.com/iaas_opensource/concepts#haute-disponibilit%C3%A9
 - `host_id` (String) The host identifier.
 - `marketplace_item_id` (String) The marketplace item identifier to deploy the virtual machine from.
 - `mount_iso` (String) An ISO disk to mount to on the virtual machine DVD Drive.

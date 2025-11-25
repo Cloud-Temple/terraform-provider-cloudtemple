@@ -72,7 +72,7 @@ func dataSourceOpenIaasVirtualMachine() *schema.Resource {
 			"high_availability": {
 				Type:        schema.TypeString,
 				Computed:    true,
-				Description: "High Availability configuration for the virtual machine. Possible values are: 'disabled', 'restart' and 'best-effort'. For more informations, refer to the documentation : https://docs.cloud-temple.com/iaas_opensource/concepts#haute-disponibilit%C3%A9",
+				Description: "High Availability configuration for the virtual machine (Default: disabled). Possible values are: 'disabled', 'restart' and 'best-effort'. For more informations, refer to the documentation : https://docs.cloud-temple.com/iaas_opensource/concepts#haute-disponibilit%C3%A9",
 			},
 			"dvd_drive": {
 				Type:        schema.TypeList,

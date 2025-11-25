@@ -127,9 +127,10 @@ Order of the elements in the list is the boot order.`,
 			},
 			"high_availability": {
 				Type:         schema.TypeString,
-				Description:  "High Availability configuration for the virtual machine. Possible values are: 'disabled', 'restart' and 'best-effort'. For more informations, refer to the documentation : https://docs.cloud-temple.com/iaas_opensource/concepts#haute-disponibilit%C3%A9",
+				Description:  "High Availability configuration for the virtual machine (Default: disabled). Possible values are: 'disabled', 'restart' and 'best-effort'. For more informations, refer to the documentation : https://docs.cloud-temple.com/iaas_opensource/concepts#haute-disponibilit%C3%A9",
 				Optional:     true,
 				ValidateFunc: validation.StringInSlice([]string{"disabled", "best-effort", "restart"}, false),
+				Default:      "disabled",
 			},
 			"replication_policy_id": {
 				Type:         schema.TypeString,
