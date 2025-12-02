@@ -1,7 +1,13 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-## 1.5.1 (Not released yet.)
+## 1.5.2 (Not released yet.)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+BUG FIXES :
+
+  * Fixed a bug causing `cloudtemple_compute_iaas_opensource_network_adapter` creation to fail with "Must be a MAC address" error when MAC address is not explicitly specified.
+
+## 1.5.1 (November 25th, 2025)
 
 BUG FIXES :
 
