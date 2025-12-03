@@ -1,6 +1,6 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-## 1.5.2 (Not released yet.)
+## 1.5.2 (December 3rd, 2025)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 BUG FIXES :
