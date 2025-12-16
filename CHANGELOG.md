@@ -1,7 +1,13 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-## 1.5.2 (December 3rd, 2025)
+# 1.5.3 (December 16th, 2025)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+BUG FIXES :
+
+  * Fixed a bug causing resources `cloudtemple_compute_iaas_opensource_virtual_disk` and `cloudtemple_compute_iaas_opensource_network_adapter` to be detected as `os_disk` and `os_network_adapter`.
+
+## 1.5.2 (December 3rd, 2025)
 
 BUG FIXES :
 
