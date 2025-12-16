@@ -548,38 +548,42 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		return diag.Errorf("unknown power state %q", vm.PowerState)
 	}
 
-	disks, err := c.Compute().OpenIaaS().VirtualDisk().List(ctx, &client.OpenIaaSVirtualDiskFilter{
-		VirtualMachineID: d.Id(),
-	})
-	if err != nil {
-		return diag.Errorf("failed to read os_disks, %s", err)
-	}
-	if disks == nil {
-		return diag.Errorf("could not list disks of virtual machine, %s", err)
-	}
+	// Mapper les données en utilisant la fonction helper
+	vmData := helpers.FlattenOpenIaaSVirtualMachine(vm)
 
-	// Overwrite with the desired config
-	// osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSDisksData(disks, d.Id()), "os_disk")
-	osDisks := helpers.FlattenOpenIaaSOSDisksData(disks, d.Id())
-	if err := d.Set("os_disk", osDisks); err != nil {
-		return diag.FromErr(err)
+	// Récupérer les OS disks
+	osDisks := []interface{}{}
+	for _, osDisk := range d.Get("os_disk").([]interface{}) {
+		if osDisk == nil {
+			continue
+		}
+		osDiskId := osDisk.(map[string]interface{})["id"].(string)
+		if osDiskId != "" {
+			disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, osDiskId)
+			if err != nil {
+				return diag.Errorf("failed to read os disk: %s", err)
+			}
+			osDisks = append(osDisks, helpers.FlattenOpenIaaSOSDiskData(disk, d.Id()))
+		}
 	}
+	vmData["os_disk"] = osDisks
 
-	networkAdapters, err := c.Compute().OpenIaaS().NetworkAdapter().List(ctx, &client.OpenIaaSNetworkAdapterFilter{
-		VirtualMachineID: d.Id(),
-	})
-	if err != nil {
-		return diag.Errorf("failed to read os_network_adapters, %s", err)
+	// Récupérer les OS network adapters
+	osNetworkAdapters := []interface{}{}
+	for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+		if osNetworkAdapter == nil {
+			continue
+		}
+		osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
+		if osNetworkAdapterId != "" {
+			networkAdapter, err := c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, osNetworkAdapterId)
+			if err != nil {
+				return diag.Errorf("failed to read os network adapter: %s", err)
+			}
+			osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOpenIaaSOSNetworkAdapterData(networkAdapter))
+		}
 	}
-	if networkAdapters == nil {
-		return diag.Errorf("could not list network adapters of virtual machine, %s", err)
-	}
-
-	// osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
-	osNetworkAdapters := helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters)
-	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
-		return diag.FromErr(err)
-	}
+	vmData["os_network_adapter"] = osNetworkAdapters
 
 	tags, err := c.Tag().Resource().Read(ctx, d.Id())
 	if err != nil {
@@ -615,8 +619,6 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		replicationPolicyId = replicationPolicy.ID
 	}
 
-	// Mapper les données en utilisant la fonction helper
-	vmData := helpers.FlattenOpenIaaSVirtualMachine(vm)
 	vmData["backup_sla_policies"] = slaPoliciesIds
 	vmData["replication_policy_id"] = replicationPolicyId
 

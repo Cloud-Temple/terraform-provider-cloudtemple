@@ -82,7 +82,7 @@ func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaa
 
 type UpdateOpenIaasNetworkAdapterRequest struct {
 	NetworkID      string `json:"networkId"`
-	MAC            string `json:"mac"`
+	MAC            string `json:"mac,omitempty"`
 	Attached       bool   `json:"attached"`
 	TxChecksumming bool   `json:"txChecksumming"`
 }
