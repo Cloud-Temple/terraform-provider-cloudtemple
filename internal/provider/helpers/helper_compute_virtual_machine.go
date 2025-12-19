@@ -263,7 +263,7 @@ func FlattenOSNetworkAdapterData(osNetworkAdapter *client.NetworkAdapter) interf
 
 	networkAdapter["id"] = osNetworkAdapter.ID
 	networkAdapter["name"] = osNetworkAdapter.Name
-	networkAdapter["network_id"] = osNetworkAdapter.NetworkId
+	networkAdapter["network_id"] = osNetworkAdapter.Network.ID
 	networkAdapter["type"] = osNetworkAdapter.Type
 	networkAdapter["mac_type"] = osNetworkAdapter.MacType
 	networkAdapter["mac_address"] = osNetworkAdapter.MacAddress

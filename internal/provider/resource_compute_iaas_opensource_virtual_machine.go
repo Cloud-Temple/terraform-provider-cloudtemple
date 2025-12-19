@@ -737,35 +737,6 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	// Handle os_disk updates (name, size, connected, storage_repository_id)
-	// We don't handle adding/removing disks here, only updating existing ones
-	// New disks should be added via a separate resource
-	if d.HasChange("os_disk") {
-		for i, osDisk := range d.Get("os_disk").([]interface{}) {
-			if osDisk == nil {
-				continue
-			}
-			disk := osDisk.(map[string]interface{})
-
-			if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
-				return diags
-			}
-		}
-	}
-
-	if d.HasChange("os_network_adapter") {
-		for i, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
-			if osNetworkAdapter == nil {
-				continue
-			}
-			disk := osNetworkAdapter.(map[string]interface{})
-
-			if diags := osNetworkAdapterUpdate(ctx, c, d, i, disk); diags != nil {
-				return diags
-			}
-		}
-	}
-
 	if d.HasChange("mount_iso") {
 		old, new := d.GetChange("mount_iso")
 
@@ -832,6 +803,35 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 			_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForTools(ctx, d.Id(), getWaiterOptions(ctx))
 			if err != nil {
 				return diag.Errorf("failed to get tools on virtual machine, %s", err)
+			}
+		}
+	}
+
+	// Handle os_disk updates (name, size, connected, storage_repository_id)
+	// We don't handle adding/removing disks here, only updating existing ones
+	// New disks should be added via a separate resource
+	if d.HasChange("os_disk") {
+		for i, osDisk := range d.Get("os_disk").([]interface{}) {
+			if osDisk == nil {
+				continue
+			}
+			disk := osDisk.(map[string]interface{})
+
+			if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
+				return diags
+			}
+		}
+	}
+
+	if d.HasChange("os_network_adapter") {
+		for i, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+			if osNetworkAdapter == nil {
+				continue
+			}
+			disk := osNetworkAdapter.(map[string]interface{})
+
+			if diags := osNetworkAdapterUpdate(ctx, c, d, i, disk); diags != nil {
+				return diags
 			}
 		}
 	}

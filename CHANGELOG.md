@@ -1,7 +1,18 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.5.3 (December 16th, 2025)
+# NEXT_VERSION (Not released yet.)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+BUG FIXES :
+
+  * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_network_adapter` to be created disconnected by default when `attached` property was not set.
+
+MISCELLANEOUS :
+
+  * Moved `os_disk` and `os_network_adapter` handle process in the `cloudtemple_compute_iaas_opensource_virtual_machine` resource to improve it's lifecycle.
+  * Minor changes.
+
+# 1.5.3 (December 16th, 2025)
 
 BUG FIXES :
 
