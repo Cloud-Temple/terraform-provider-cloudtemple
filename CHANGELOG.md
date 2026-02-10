@@ -1,7 +1,41 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.5.3 (December 16th, 2025)
+# 1.5.4 (February 10th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+BUG FIXES :
+
+  * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_network_adapter` to be created disconnected by default when `attached` property was not set.
+
+IMPROVEMENTS :
+
+  * API field name change: `maintenance_status` has been renamed to `maintenance_mode` in the Cloud Temple Console API. For backward compatibility, both fields are available and return the same value during the transition period.
+    - The `maintenance_status` field will be removed in a future version.
+    - Affected datasources:
+      * `cloudtemple_compute_datastore`
+      * `cloudtemple_compute_datastores`
+      * `cloudtemple_compute_host`
+      * `cloudtemple_compute_hosts`
+      * `cloudtemple_compute_iaas_opensource_storage_repositories`
+
+  * Other deprecated fields have been removed from the following datasources :
+      * `cloudtemple_compute_content_library`
+        - `type` property removed.
+      * `cloudtemple_compute_content_libraries`
+        - `type` property removed.
+      * `cloudtemple_compute_content_library_item`
+        - `stored` property removed.
+      * `cloudtemple_compute_content_library_items`
+        - `stored` property removed.
+      * `cloudtemple_compute_iaas_opensource_virtual_machine`
+        - `tools` property removed, replaced by `pv_drivers` and `management_agent`.
+
+MISCELLANEOUS :
+
+  * Moved `os_disk` and `os_network_adapter` handle process in the `cloudtemple_compute_iaas_opensource_virtual_machine` resource to improve it's lifecycle.
+  * Minor changes.
+
+# 1.5.3 (December 16th, 2025)
 
 BUG FIXES :
 

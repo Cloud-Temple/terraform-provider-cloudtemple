@@ -48,6 +48,7 @@ Read-Only:
 - `hosts_number` (Number)
 - `id` (String)
 - `machine_manager_id` (String)
+- `maintenance_mode` (Boolean)
 - `maintenance_status` (Boolean)
 - `max_capacity` (Number)
 - `moref` (String)

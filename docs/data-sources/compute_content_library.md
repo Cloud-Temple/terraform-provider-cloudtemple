@@ -39,7 +39,6 @@ data "cloudtemple_compute_content_library" "name" {
 ### Read-Only
 
 - `datastore` (List of Object) Information about the datastore associated with this content library. (see [below for nested schema](#nestedatt--datastore))
-- `type` (String) The type of the content library.
 
 <a id="nestedatt--datastore"></a>
 ### Nested Schema for `datastore`

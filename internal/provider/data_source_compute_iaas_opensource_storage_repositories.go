@@ -103,7 +103,7 @@ func dataSourceOpenIaasStorageRepositories() *schema.Resource {
 							Computed:    true,
 							Description: "The description of the storage repository.",
 						},
-						"maintenance_status": {
+						"maintenance_mode": {
 							Type:        schema.TypeBool,
 							Computed:    true,
 							Description: "Whether the storage repository is in maintenance mode.",

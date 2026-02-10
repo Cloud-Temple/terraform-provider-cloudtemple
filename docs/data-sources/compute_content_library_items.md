@@ -53,7 +53,6 @@ Read-Only:
 - `name` (String)
 - `ovf_properties` (List of String)
 - `size` (Number)
-- `stored` (Boolean)
 - `type` (String)
 
 

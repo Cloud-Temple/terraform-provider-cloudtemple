@@ -310,6 +310,7 @@ Order of the elements in the list is the boot order.`,
 					},
 				},
 			},
+			// Deprecated: Use pv_drivers and management_agent instead. This field will be removed in a future version.
 			"tools": {
 				Type:        schema.TypeList,
 				Computed:    true,
@@ -325,6 +326,44 @@ Order of the elements in the list is the boot order.`,
 							Type:        schema.TypeString,
 							Computed:    true,
 							Description: "The version of the tools.",
+						},
+					},
+				},
+			},
+			"pv_drivers": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The paravirtual (PV) drivers installed on the virtual machine.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"detected": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the PV drivers are detected.",
+						},
+						"version": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The version of the PV drivers.",
+						},
+						"are_up_to_date": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the PV drivers are up to date.",
+						},
+					},
+				},
+			},
+			"management_agent": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The management agent installed on the virtual machine.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"detected": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the management agent is detected.",
 						},
 					},
 				},
@@ -737,35 +776,6 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	// Handle os_disk updates (name, size, connected, storage_repository_id)
-	// We don't handle adding/removing disks here, only updating existing ones
-	// New disks should be added via a separate resource
-	if d.HasChange("os_disk") {
-		for i, osDisk := range d.Get("os_disk").([]interface{}) {
-			if osDisk == nil {
-				continue
-			}
-			disk := osDisk.(map[string]interface{})
-
-			if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
-				return diags
-			}
-		}
-	}
-
-	if d.HasChange("os_network_adapter") {
-		for i, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
-			if osNetworkAdapter == nil {
-				continue
-			}
-			disk := osNetworkAdapter.(map[string]interface{})
-
-			if diags := osNetworkAdapterUpdate(ctx, c, d, i, disk); diags != nil {
-				return diags
-			}
-		}
-	}
-
 	if d.HasChange("mount_iso") {
 		old, new := d.GetChange("mount_iso")
 
@@ -832,6 +842,35 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 			_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForTools(ctx, d.Id(), getWaiterOptions(ctx))
 			if err != nil {
 				return diag.Errorf("failed to get tools on virtual machine, %s", err)
+			}
+		}
+	}
+
+	// Handle os_disk updates (name, size, connected, storage_repository_id)
+	// We don't handle adding/removing disks here, only updating existing ones
+	// New disks should be added via a separate resource
+	if d.HasChange("os_disk") {
+		for i, osDisk := range d.Get("os_disk").([]interface{}) {
+			if osDisk == nil {
+				continue
+			}
+			disk := osDisk.(map[string]interface{})
+
+			if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
+				return diags
+			}
+		}
+	}
+
+	if d.HasChange("os_network_adapter") {
+		for i, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+			if osNetworkAdapter == nil {
+				continue
+			}
+			disk := osNetworkAdapter.(map[string]interface{})
+
+			if diags := osNetworkAdapterUpdate(ctx, c, d, i, disk); diags != nil {
+				return diags
 			}
 		}
 	}

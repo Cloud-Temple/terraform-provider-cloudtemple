@@ -52,7 +52,8 @@ data "cloudtemple_compute_datastore" "name" {
 - `free_capacity` (Number) The free capacity of the datastore in bytes.
 - `hosts_names` (List of String) List of host names that have access to this datastore.
 - `hosts_number` (Number) The number of hosts that have access to this datastore.
-- `maintenance_status` (Boolean) Indicates whether the datastore is in maintenance mode.
+- `maintenance_mode` (Boolean) Indicates whether the datastore is in maintenance mode.
+- `maintenance_status` (Boolean, Deprecated) Indicates whether the datastore is in maintenance mode. Deprecated: use maintenance_mode instead.
 - `max_capacity` (Number) The maximum capacity of the datastore in bytes.
 - `moref` (String) The managed object reference ID of the datastore.
 - `type` (String) The type of the datastore (e.g., VMFS, NFS).

@@ -45,7 +45,7 @@ func TestCompute_NetworkAdapterRead(t *testing.T) {
 	require.Equal(t, os.Getenv(NetworkAdapterId), networkAdapter.ID)
 	require.Equal(t, os.Getenv(NetworkAdapterName), networkAdapter.Name)
 	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.Type)
-	require.Equal(t, "", networkAdapter.NetworkId)
+	require.Equal(t, "", networkAdapter.Network.ID)
 	require.Equal(t, os.Getenv(NetworkAdapterVirtualMachineId), networkAdapter.VirtualMachineId)
 }
 
@@ -119,7 +119,7 @@ func TestNetworkAdapterClient_Create(t *testing.T) {
 	require.Equal(t, networkAdapterId, networkAdapter.ID)
 	require.Equal(t, os.Getenv(NetworkAdapterName), networkAdapter.Name)
 	require.Equal(t, os.Getenv(NetworkAdapterType), networkAdapter.Type)
-	require.Equal(t, os.Getenv(NetworkId), networkAdapter.NetworkId)
+	require.Equal(t, os.Getenv(NetworkId), networkAdapter.Network.ID)
 
 	activityId, err = client.Compute().VirtualMachine().Power(ctx, &clientpkg.PowerRequest{
 		ID:             vm.ID,

@@ -41,7 +41,6 @@ Read-Only:
 - `id` (String)
 - `machine_manager_id` (String)
 - `name` (String)
-- `type` (String)
 
 <a id="nestedobjatt--content_libraries--datastore"></a>
 ### Nested Schema for `content_libraries.datastore`

@@ -191,8 +191,10 @@ Order of the elements in the list is the boot order.
 - `id` (String) The ID of this resource.
 - `internal_id` (String) The internal identifier of the virtual machine.
 - `machine_manager_id` (String) The identifier of the machine manager (availability zone).
+- `management_agent` (List of Object) The management agent installed on the virtual machine. (see [below for nested schema](#nestedatt--management_agent))
 - `operating_system_name` (String) The name of the operating system installed on the virtual machine.
 - `pool_id` (String) The identifier of the pool to which the virtual machine belongs.
+- `pv_drivers` (List of Object) The paravirtual (PV) drivers installed on the virtual machine. (see [below for nested schema](#nestedatt--pv_drivers))
 - `tools` (List of Object) The tools installed on the virtual machine. Please note that the tools are only available when the virtual machine is powered on. (see [below for nested schema](#nestedatt--tools))
 
 <a id="nestedblock--os_disk"></a>
@@ -244,6 +246,24 @@ Read-Only:
 
 - `attached` (Boolean)
 - `name` (String)
+
+
+<a id="nestedatt--management_agent"></a>
+### Nested Schema for `management_agent`
+
+Read-Only:
+
+- `detected` (Boolean)
+
+
+<a id="nestedatt--pv_drivers"></a>
+### Nested Schema for `pv_drivers`
+
+Read-Only:
+
+- `are_up_to_date` (Boolean)
+- `detected` (Boolean)
+- `version` (String)
 
 
 <a id="nestedatt--tools"></a>

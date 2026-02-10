@@ -9,7 +9,7 @@ func FlattenNetworkAdapter(adapter *client.NetworkAdapter) map[string]interface{
 	return map[string]interface{}{
 		"virtual_machine_id": adapter.VirtualMachineId,
 		"name":               adapter.Name,
-		"network_id":         adapter.NetworkId,
+		"network_id":         adapter.Network.ID,
 		"type":               adapter.Type,
 		"mac_type":           adapter.MacType,
 		"mac_address":        adapter.MacAddress,

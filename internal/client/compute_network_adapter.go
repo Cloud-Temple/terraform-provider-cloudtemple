@@ -14,7 +14,7 @@ type NetworkAdapter struct {
 	ID               string
 	VirtualMachineId string
 	Name             string
-	NetworkId        string
+	Network          BaseObject
 	Type             string
 	MacType          string
 	MacAddress       string

@@ -14,11 +14,25 @@ func FlattenOpenIaaSVirtualMachine(vm *client.OpenIaaSVirtualMachine) map[string
 		},
 	}
 
-	// Mapper les tools
+	// Mapper les tools (Deprecated, use pvDrivers and managementAgent instead)
 	tools := []map[string]interface{}{
 		{
-			"detected": vm.Tools.Detected,
-			"version":  vm.Tools.Version,
+			"detected": vm.PVDrivers.Detected,
+			"version":  vm.PVDrivers.Version,
+		},
+	}
+
+	pvDrivers := []map[string]interface{}{
+		{
+			"detected":       vm.PVDrivers.Detected,
+			"version":        vm.PVDrivers.Version,
+			"are_up_to_date": vm.PVDrivers.AreUpToDate,
+		},
+	}
+
+	managementAgent := []map[string]interface{}{
+		{
+			"detected": vm.ManagementAgent.Detected,
 		},
 	}
 
@@ -45,6 +59,8 @@ func FlattenOpenIaaSVirtualMachine(vm *client.OpenIaaSVirtualMachine) map[string
 		"num_cores_per_socket":  vm.NumCoresPerSocket,
 		"memory":                vm.Memory,
 		"tools":                 tools,
+		"pv_drivers":            pvDrivers,
+		"management_agent":      managementAgent,
 		"addresses":             addresses,
 		"host_id":               vm.Host.ID,
 		"pool_id":               vm.Pool.ID,

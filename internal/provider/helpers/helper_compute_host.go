@@ -39,7 +39,8 @@ func FlattenHost(host *client.Host) map[string]interface{} {
 			"esx":                esx,
 			"cpu":                cpu,
 			"memory":             memory,
-			"maintenance_status": host.Metrics.MaintenanceStatus,
+			"maintenance_status": host.Metrics.MaintenanceMode, // Deprecated: use maintenance_mode
+			"maintenance_mode":   host.Metrics.MaintenanceMode,
 			"uptime":             host.Metrics.Uptime,
 			"connected":          host.Metrics.Connected,
 		},

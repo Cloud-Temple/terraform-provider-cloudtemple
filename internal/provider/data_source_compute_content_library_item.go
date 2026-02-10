@@ -62,11 +62,6 @@ func dataSourceContentLibraryItem() *schema.Resource {
 				Computed:    true,
 				Description: "The size of the content library item in bytes.",
 			},
-			"stored": {
-				Type:        schema.TypeBool,
-				Computed:    true,
-				Description: "Flag that indicates whether the item is stored or not. If not, the item must be synchronized.",
-			},
 			"last_modified_time": {
 				Type:        schema.TypeString,
 				Computed:    true,
