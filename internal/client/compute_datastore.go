@@ -18,7 +18,7 @@ type Datastore struct {
 	MaxCapacity           int
 	FreeCapacity          int
 	Accessible            int
-	MaintenanceStatus     bool
+	MaintenanceMode       bool
 	UniqueId              string
 	Type                  string
 	VirtualMachinesNumber int

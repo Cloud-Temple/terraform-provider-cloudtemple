@@ -88,7 +88,7 @@ func FlattenVirtualMachine(vm *client.VirtualMachine) map[string]interface{} {
 		"power_state":                        vm.PowerState,
 		"hardware_version":                   vm.HardwareVersion,
 		"num_cores_per_socket":               vm.NumCoresPerSocket,
-		"operating_system_name":              vm.OperatingSystemName,
+		"operating_system_name":              vm.OperatingSystem.Name,
 		"guest_operating_system_moref":       vm.OperatingSystemMoref,
 		"cpu":                                vm.Cpu,
 		"cpu_hot_add_enabled":                vm.CpuHotAddEnabled,

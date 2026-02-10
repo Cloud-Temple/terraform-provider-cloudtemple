@@ -53,11 +53,6 @@ func dataSourceContentLibraries() *schema.Resource {
 							Computed:    true,
 							Description: "The ID of the machine manager this content library belongs to.",
 						},
-						"type": {
-							Type:        schema.TypeString,
-							Computed:    true,
-							Description: "The type of the content library.",
-						},
 						"datastore": {
 							Type:        schema.TypeList,
 							Computed:    true,

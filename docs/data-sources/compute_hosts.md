@@ -55,6 +55,7 @@ Read-Only:
 - `connected` (Boolean)
 - `cpu` (List of Object) (see [below for nested schema](#nestedobjatt--hosts--metrics--cpu))
 - `esx` (List of Object) (see [below for nested schema](#nestedobjatt--hosts--metrics--esx))
+- `maintenance_mode` (Boolean)
 - `maintenance_status` (Boolean)
 - `memory` (List of Object) (see [below for nested schema](#nestedobjatt--hosts--metrics--memory))
 - `uptime` (Number)

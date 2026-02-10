@@ -20,12 +20,12 @@ type Host struct {
 }
 
 type HostMetrics struct {
-	ESX               HostMetricsESXStub
-	CPU               HostMetricsCPUStub
-	Memory            HostMetricsMemoryStub
-	MaintenanceStatus bool
-	Uptime            int
-	Connected         bool
+	ESX             HostMetricsESXStub
+	CPU             HostMetricsCPUStub
+	Memory          HostMetricsMemoryStub
+	MaintenanceMode bool
+	Uptime          int
+	Connected       bool
 }
 
 type HostMetricsESXStub struct {

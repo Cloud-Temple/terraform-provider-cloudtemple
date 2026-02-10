@@ -103,6 +103,12 @@ func dataSourceDatastore() *schema.Resource {
 			"maintenance_status": {
 				Type:        schema.TypeBool,
 				Computed:    true,
+				Deprecated:  "Use maintenance_mode instead. This field will be removed in a future version.",
+				Description: "Indicates whether the datastore is in maintenance mode. Deprecated: use maintenance_mode instead.",
+			},
+			"maintenance_mode": {
+				Type:        schema.TypeBool,
+				Computed:    true,
 				Description: "Indicates whether the datastore is in maintenance mode.",
 			},
 			"unique_id": {

@@ -112,7 +112,7 @@ Read-Only:
 - `id` (String)
 - `internal_id` (String)
 - `machine_manager_id` (String)
-- `maintenance_status` (Boolean)
+- `maintenance_mode` (Boolean)
 - `max_capacity` (Number)
 - `name` (String)
 - `pool_id` (String)

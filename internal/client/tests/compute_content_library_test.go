@@ -49,7 +49,6 @@ func TestCompute_ContentLibraryRead(t *testing.T) {
 	expected := &clientpkg.ContentLibrary{
 		ID:   os.Getenv(ContentLibraryId),
 		Name: os.Getenv(ContentLibraryName),
-		Type: os.Getenv(ContentLibraryType),
 		Datastore: clientpkg.BaseObject{
 			ID:   os.Getenv(DatastoreId),
 			Name: os.Getenv(DatastoreName),

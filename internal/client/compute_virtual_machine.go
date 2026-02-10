@@ -13,20 +13,22 @@ func (c *ComputeClient) VirtualMachine() *VirtualMachineClient {
 }
 
 type VirtualMachine struct {
-	ID                             string
-	Name                           string
-	Moref                          string
-	MachineManager                 BaseObject
-	Datacenter                     BaseObject
-	HostCluster                    BaseObject
-	Datastore                      BaseObject
-	DatastoreCluster               BaseObject
-	ConsolidationNeeded            bool
-	Template                       bool
-	PowerState                     string
-	HardwareVersion                string
-	NumCoresPerSocket              int
-	OperatingSystemName            string
+	ID                  string
+	Name                string
+	Moref               string
+	MachineManager      BaseObject
+	Datacenter          BaseObject
+	HostCluster         BaseObject
+	Datastore           BaseObject
+	DatastoreCluster    BaseObject
+	ConsolidationNeeded bool
+	Template            bool
+	PowerState          string
+	HardwareVersion     string
+	NumCoresPerSocket   int
+	OperatingSystem     struct {
+		Name string
+	}
 	OperatingSystemMoref           string
 	Cpu                            int
 	CpuHotAddEnabled               bool

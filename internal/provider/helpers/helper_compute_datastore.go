@@ -14,7 +14,8 @@ func FlattenDatastore(datastore *client.Datastore) map[string]interface{} {
 		"max_capacity":            datastore.MaxCapacity,
 		"free_capacity":           datastore.FreeCapacity,
 		"accessible":              datastore.Accessible,
-		"maintenance_status":      datastore.MaintenanceStatus,
+		"maintenance_status":      datastore.MaintenanceMode, // Deprecated: use maintenance_mode
+		"maintenance_mode":        datastore.MaintenanceMode,
 		"unique_id":               datastore.UniqueId,
 		"type":                    datastore.Type,
 		"virtual_machines_number": datastore.VirtualMachinesNumber,

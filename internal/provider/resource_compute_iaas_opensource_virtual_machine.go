@@ -310,6 +310,7 @@ Order of the elements in the list is the boot order.`,
 					},
 				},
 			},
+			// Deprecated: Use pv_drivers and management_agent instead. This field will be removed in a future version.
 			"tools": {
 				Type:        schema.TypeList,
 				Computed:    true,
@@ -325,6 +326,44 @@ Order of the elements in the list is the boot order.`,
 							Type:        schema.TypeString,
 							Computed:    true,
 							Description: "The version of the tools.",
+						},
+					},
+				},
+			},
+			"pv_drivers": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The paravirtual (PV) drivers installed on the virtual machine.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"detected": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the PV drivers are detected.",
+						},
+						"version": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The version of the PV drivers.",
+						},
+						"are_up_to_date": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the PV drivers are up to date.",
+						},
+					},
+				},
+			},
+			"management_agent": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The management agent installed on the virtual machine.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"detected": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the management agent is detected.",
 						},
 					},
 				},

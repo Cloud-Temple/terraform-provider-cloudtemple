@@ -31,9 +31,17 @@ type OpenIaaSVirtualMachine struct {
 	CPU                 int
 	NumCoresPerSocket   int
 	Memory              int
-	Tools               struct {
+	Tools               struct { // Deprecated, use PVDrivers and ManagementAgent instead
 		Detected bool
 		Version  string
+	}
+	PVDrivers struct {
+		Detected    bool
+		Version     string
+		AreUpToDate bool
+	}
+	ManagementAgent struct {
+		Detected bool
 	}
 	Addresses struct {
 		IPv6 string

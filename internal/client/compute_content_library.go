@@ -16,7 +16,6 @@ func (c *ComputeClient) ContentLibrary() *ContentLibraryClient {
 type ContentLibrary struct {
 	ID             string
 	Name           string
-	Type           string
 	MachineManager BaseObject
 	Datastore      BaseObject
 }
@@ -73,7 +72,6 @@ type ContentLibraryItem struct {
 	Type             string
 	CreationTime     time.Time
 	Size             int
-	Stored           bool
 	LastModifiedTime string
 	OvfProperties    []string
 }

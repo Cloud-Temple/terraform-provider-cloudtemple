@@ -44,11 +44,6 @@ func dataSourceContentLibrary() *schema.Resource {
 			},
 
 			// Out
-			"type": {
-				Type:        schema.TypeString,
-				Computed:    true,
-				Description: "The type of the content library.",
-			},
 			"datastore": {
 				Type:        schema.TypeList,
 				Computed:    true,

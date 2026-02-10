@@ -18,7 +18,6 @@ func FlattenContentLibrary(contentLibrary *client.ContentLibrary) map[string]int
 		"id":                 contentLibrary.ID,
 		"name":               contentLibrary.Name,
 		"machine_manager_id": contentLibrary.MachineManager.ID,
-		"type":               contentLibrary.Type,
 		"datastore":          datastore,
 	}
 }
@@ -32,7 +31,6 @@ func FlattenContentLibraryItem(item *client.ContentLibraryItem) map[string]inter
 		"type":               item.Type,
 		"creation_time":      item.CreationTime.Format("2006-01-02T15:04:05Z07:00"),
 		"size":               item.Size,
-		"stored":             item.Stored,
 		"last_modified_time": item.LastModifiedTime,
 		"ovf_properties":     item.OvfProperties,
 	}
