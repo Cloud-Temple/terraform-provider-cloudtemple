@@ -68,7 +68,7 @@ type CloudInit struct {
 
 type OSNetworkAdapter struct {
 	NetworkID string `json:"networkId"`
-	MAC       string `json:"macAddress"`
+	MAC       string `json:"mac,omitempty"`
 }
 
 type CreateOpenIaasVirtualMachineRequest struct {

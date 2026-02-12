@@ -434,6 +434,8 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
+	osNetworkAdapters := d.Get("os_network_adapter").([]interface{})
+
 	// Deploy from template
 	if d.Get("template_id").(string) != "" {
 		template, err := c.Compute().OpenIaaS().Template().Read(ctx, d.Get("template_id").(string))
@@ -444,11 +446,16 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 			return diag.Errorf("Could not find template with id : %s", d.Get("template_id").(string))
 		}
 
+		if osNetworkAdapters != nil && len(osNetworkAdapters) != len(template.NetworkAdapters) {
+			return diag.Errorf("the number of os_network_adapter (%d) must match the number of network adapters in the template (%d)", len(osNetworkAdapters), len(template.NetworkAdapters))
+		}
+
 		templateNetworkAdapters := make([]client.OSNetworkAdapter, len(template.NetworkAdapters))
-		for i, networkAdapter := range template.NetworkAdapters {
+		for i := range template.NetworkAdapters {
+			osNetworkAdapter := osNetworkAdapters[i].(map[string]interface{})
 			templateNetworkAdapters[i] = client.OSNetworkAdapter{
-				NetworkID: networkAdapter.Network.ID,
-				MAC:       networkAdapter.MacAddress,
+				NetworkID: osNetworkAdapter["network_id"].(string),
+				MAC:       osNetworkAdapter["mac_address"].(string),
 			}
 		}
 
@@ -479,7 +486,6 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 			return diag.Errorf("Could not find marketplace item info with id : %s", d.Get("marketplace_item_id").(string))
 		}
 
-		osNetworkAdapters := d.Get("os_network_adapter").([]interface{})
 		if osNetworkAdapters != nil && len(osNetworkAdapters) != len(openIaasItemInfo.NetworkAdapters) {
 			return diag.Errorf("the number of os_network_adapter (%d) must match the number of network adapters in the marketplace item (%d)", len(osNetworkAdapters), len(openIaasItemInfo.NetworkAdapters))
 		}
@@ -535,7 +541,7 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		return diag.Errorf("could not list network adapters of virtual machine, %s", err)
 	}
 
-	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
+	osNetworkAdapters = helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
 	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
 		return diag.FromErr(err)
 	}
