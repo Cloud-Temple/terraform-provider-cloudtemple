@@ -1,7 +1,14 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.5.4 (February 10th, 2026)
+# 1.5.5 (February 12th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+BUG FIXES :
+
+  * Fixed a bug causing `os_network_adapter` on resource `cloudtemple_iaas_opensource_virtual_machine` to be connected to the network from the original template used.
+  * Fixed a bug causing `os_network_adapter` on resource `cloudtemple_iaas_opensource_virtual_machine` to be created with `mac_address` of the network adapter from the original template used.
+
+# 1.5.4 (February 10th, 2026)
 
 BUG FIXES :
 
