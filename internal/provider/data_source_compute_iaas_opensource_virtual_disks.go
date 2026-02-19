@@ -168,7 +168,8 @@ func computeOpenIaaSVirtualDisksRead(ctx context.Context, d *schema.ResourceData
 	// Mapper manuellement les données en utilisant la fonction helper
 	tfDisks := make([]map[string]interface{}, len(disks))
 	for i, disk := range disks {
-		tfDisks[i] = helpers.FlattenOpenIaaSVirtualDisk(disk)
+		// Pour les data sources de liste, on ne gère pas le champ "connected" comme input, donc on passe une chaîne vide
+		tfDisks[i] = helpers.FlattenOpenIaaSVirtualDisk(disk, "")
 		tfDisks[i]["id"] = disk.ID
 	}
 

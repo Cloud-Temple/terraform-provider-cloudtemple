@@ -1,7 +1,18 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.5.5 (February 12th, 2026)
+# 1.6.0 (February 20th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+BUG FIXES :
+
+  * Fixed a bug causing `os_disk` on resource `cloudtemple_compute_iaas_opensource_virtual_machine` to never be reconnected.
+
+NEW FEATURES :
+
+  * Added new `connected` property on resource `cloudtemple_compute_iaas_opensource_virtual_disk`
+  * Added new `wait_for_drivers_timeout` property on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
+
+# 1.5.5 (February 12th, 2026)
 
 BUG FIXES :
 

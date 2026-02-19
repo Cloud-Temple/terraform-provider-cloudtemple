@@ -183,6 +183,7 @@ Order of the elements in the list is the boot order.
 - `storage_repository_id` (String) The storage repository identifier where the virtual machine will be created. Required when `marketplace_item_id` is set.
 - `tags` (Map of String) The tags to attach to the virtual machine.
 - `template_id` (String) The template identifier.
+- `wait_for_drivers_timeout` (Number) The maximum time in seconds to wait for PV drivers to be detected after starting the VM. Set to 0 to skip waiting. Default is 30 seconds.
 
 ### Read-Only
 

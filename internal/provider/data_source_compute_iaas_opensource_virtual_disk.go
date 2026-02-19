@@ -187,7 +187,8 @@ func computeOpenIaaSVirtualDiskRead(ctx context.Context, d *schema.ResourceData,
 	d.SetId(disk.ID)
 
 	// Mapper les données en utilisant la fonction helper
-	diskData := helpers.FlattenOpenIaaSVirtualDisk(disk)
+	// Pour les data sources, on ne gère pas le champ "connected" comme input, donc on passe une chaîne vide
+	diskData := helpers.FlattenOpenIaaSVirtualDisk(disk, "")
 
 	// Définir les données dans le state
 	for k, v := range diskData {

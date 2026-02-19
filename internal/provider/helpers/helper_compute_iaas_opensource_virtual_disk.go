@@ -5,7 +5,8 @@ import (
 )
 
 // FlattenOpenIaaSVirtualDisk convertit un objet OpenIaaSVirtualDisk en une map compatible avec le schéma Terraform
-func FlattenOpenIaaSVirtualDisk(disk *client.OpenIaaSVirtualDisk) map[string]interface{} {
+// vmID est l'ID de la VM configurée dans la ressource Terraform pour déterminer l'état de connexion
+func FlattenOpenIaaSVirtualDisk(disk *client.OpenIaaSVirtualDisk, vmID string) map[string]interface{} {
 	// Mapper les virtual machines
 	virtualMachines := make([]map[string]interface{}, len(disk.VirtualMachines))
 	for i, vm := range disk.VirtualMachines {
@@ -27,7 +28,7 @@ func FlattenOpenIaaSVirtualDisk(disk *client.OpenIaaSVirtualDisk) map[string]int
 		}
 	}
 
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"internal_id":           disk.InternalID,
 		"name":                  disk.Name,
 		"size":                  disk.Size,
@@ -37,4 +38,16 @@ func FlattenOpenIaaSVirtualDisk(disk *client.OpenIaaSVirtualDisk) map[string]int
 		"virtual_machines":      virtualMachines,
 		"templates":             templates,
 	}
+
+	// Déterminer l'état de connexion pour la VM configurée
+	if vmID != "" {
+		for _, vm := range disk.VirtualMachines {
+			if vm.ID == vmID {
+				result["connected"] = vm.Connected
+				break
+			}
+		}
+	}
+
+	return result
 }
