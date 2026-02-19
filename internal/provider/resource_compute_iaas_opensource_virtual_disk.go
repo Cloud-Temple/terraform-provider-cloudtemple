@@ -56,6 +56,12 @@ func resourceOpenIaasVirtualDisk() *schema.Resource {
 				Optional:    true,
 				Default:     false,
 			},
+			"connected": {
+				Type:        schema.TypeBool,
+				Description: "Whether the virtual disk should be connected to the virtual machine. Only applicable when virtual_machine_id is set.",
+				Optional:    true,
+				Default:     true,
+			},
 
 			// Out
 			"id": {
@@ -155,7 +161,21 @@ func openIaasVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta
 		return diag.Errorf("the virtual disk could not be created: %s", err)
 	}
 
-	return openIaasVirtualDiskUpdate(ctx, d, meta)
+	// If connected is false and virtual_machine_id is set, disconnect the disk after creation
+	if !d.Get("connected").(bool) && d.Get("virtual_machine_id").(string) != "" {
+		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, d.Id(), &client.OpenIaaSVirtualDiskConnectionRequest{
+			VirtualMachineID: d.Get("virtual_machine_id").(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to disconnect virtual disk after creation: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to disconnect virtual disk after creation: %s", err)
+		}
+	}
+
+	return openIaasVirtualDiskRead(ctx, d, meta)
 }
 
 func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
@@ -172,7 +192,8 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 	}
 
 	// Mapper les données en utilisant la fonction helper
-	diskData := helpers.FlattenOpenIaaSVirtualDisk(virtualDisk)
+	vmID := d.Get("virtual_machine_id").(string)
+	diskData := helpers.FlattenOpenIaaSVirtualDisk(virtualDisk, vmID)
 
 	// Définir les données dans le state
 	for k, v := range diskData {
@@ -190,6 +211,38 @@ func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta
 	disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
 	if err != nil {
 		return diag.Errorf("failed to read virtual disk state before update: %s", err)
+	}
+
+	// Handle connection state changes
+	if d.HasChange("connected") && d.Get("virtual_machine_id").(string) != "" {
+		connected := d.Get("connected").(bool)
+		vmID := d.Get("virtual_machine_id").(string)
+
+		if connected {
+			// Connect the disk to the VM
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, d.Id(), &client.OpenIaaSVirtualDiskConnectionRequest{
+				VirtualMachineID: vmID,
+			})
+			if err != nil {
+				return diag.Errorf("failed to connect virtual disk: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to connect virtual disk: %s", err)
+			}
+		} else {
+			// Disconnect the disk from the VM
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, d.Id(), &client.OpenIaaSVirtualDiskConnectionRequest{
+				VirtualMachineID: vmID,
+			})
+			if err != nil {
+				return diag.Errorf("failed to disconnect virtual disk: %s", err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to disconnect virtual disk: %s", err)
+			}
+		}
 	}
 
 	// Virtual disk attachment cycle management
@@ -299,6 +352,26 @@ func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta
 
 func openIaasVirtualDiskDelete(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
+
+	// Disconnect disk before delete
+	disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to read virtual disk state before delete: %s", err)
+	}
+	for _, vm := range disk.VirtualMachines {
+		if vm.Connected {
+			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, d.Id(), &client.OpenIaaSVirtualDiskConnectionRequest{
+				VirtualMachineID: vm.ID,
+			})
+			if err != nil {
+				return diag.Errorf("failed to disconnect virtual disk from VM %s before delete: %s", vm.ID, err)
+			}
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to disconnect virtual disk from VM %s before delete: %s", vm.ID, err)
+			}
+		}
+	}
 
 	activityId, err := c.Compute().OpenIaaS().VirtualDisk().Delete(ctx, d.Id())
 	if err != nil {

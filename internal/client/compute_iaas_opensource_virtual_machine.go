@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"time"
-
-	"github.com/sethvargo/go-retry"
 )
 
 type OpenIaaSVirtualMachineClient struct {
@@ -183,62 +181,69 @@ func (v *OpenIaaSVirtualMachineClient) UpdateBootOrder(ctx context.Context, id s
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
-func (c *OpenIaaSVirtualMachineClient) WaitForTools(ctx context.Context, id string, options *WaiterOptions) (*OpenIaaSVirtualMachine, error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
+func (c *OpenIaaSVirtualMachineClient) WaitForDrivers(
+	ctx context.Context,
+	id string,
+	timeout time.Duration,
+	options *WaiterOptions,
+) (*OpenIaaSVirtualMachine, error) {
 
-	b := retry.NewFibonacci(1 * time.Second)
-	b = retry.WithMaxRetries(30, b)
-
-	var res *OpenIaaSVirtualMachine
-	var count int
-
-	err := retry.Do(ctx, b, func(ctx context.Context) error {
-		count++
-
-		if ctx.Err() != nil {
-			vm, err := c.Read(ctx, id)
-			if err != nil {
-				return err
-			}
-			res = vm
-			options.log(fmt.Sprintf("timeout reached, continuing without tools for virtual machine %q", id))
-			return nil
-		}
-
-		vm, err := c.Read(ctx, id)
-		if err != nil {
-			return options.retryableError(&StatusError{
-				Code: 500,
-				Body: "an error occurred while getting the status of the virtual machine"})
-		}
-		if vm == nil {
-			err := &StatusError{
-				Code: 404,
-				Body: fmt.Sprintf("the virtual machine %q could not be found", id),
-			}
-			if count == 1 {
-				return options.retryableError(err)
-			}
-			return options.error(err)
-		}
-
-		res = vm
-		if vm.Tools.Detected {
-			options.log(fmt.Sprintf("the virtual machine %q has the tools installed", id))
-			return nil
-		}
-
-		return options.retryableError(&StatusError{
-			Code: 500,
-			Body: fmt.Sprintf("the tools are not detected for the virtual machine %q", id),
-		})
-	})
-
-	// Si c'est une erreur de timeout, on l'ignore
-	if err != nil && ctx.Err() != nil {
-		return res, nil
+	if timeout == 0 {
+		options.log(fmt.Sprintf(
+			"[WAITER] skipping wait for drivers for virtual machine %q (timeout = 0)",
+			id,
+		))
+		return c.Read(ctx, id)
 	}
 
-	return res, err
+	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	var lastVM *OpenIaaSVirtualMachine
+
+	for {
+		select {
+
+		case <-timeoutCtx.Done():
+			options.log(fmt.Sprintf(
+				"[WAITER] timeout reached, continuing without PV drivers for virtual machine %q",
+				id,
+			))
+			return lastVM, nil
+
+		case <-ticker.C:
+
+			if timeoutCtx.Err() != nil {
+				options.log("[WAITER] timeout reached while waiting, continuing without PV drivers")
+				return lastVM, nil
+			}
+
+			vm, err := c.Read(timeoutCtx, id)
+			if err != nil {
+				return nil, fmt.Errorf(
+					"[WAITER] failed to read virtual machine %q while waiting for drivers: %s",
+					id, err,
+				)
+			}
+
+			if vm == nil {
+				return nil, fmt.Errorf(
+					"[WAITER] the virtual machine %q could not be found",
+					id,
+				)
+			}
+
+			lastVM = vm
+			if vm.PVDrivers.Detected {
+				options.log(fmt.Sprintf(
+					"[WAITER] the virtual machine %q has the PV drivers detected",
+					id,
+				))
+				return vm, nil
+			}
+		}
+	}
 }

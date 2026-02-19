@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -147,6 +148,13 @@ Order of the elements in the list is the boot order.`,
 					Type:         schema.TypeString,
 					ValidateFunc: validation.IsUUID,
 				},
+			},
+			"wait_for_drivers_timeout": {
+				Type:         schema.TypeInt,
+				Description:  "The maximum time in seconds to wait for PV drivers to be detected after starting the VM. Set to 0 to skip waiting. Default is 30 seconds.",
+				Optional:     true,
+				Default:      30,
+				ValidateFunc: validation.IntBetween(0, 900),
 			},
 			"tags": {
 				Type:        schema.TypeMap,
@@ -775,10 +783,13 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 			return diag.Errorf("failed to power on virtual machine: %s", err)
 		}
 
-		// Wait for tools to be available
-		_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForTools(ctx, d.Id(), getWaiterOptions(ctx))
-		if err != nil {
-			return diag.Errorf("failed to get tools on virtual machine after power on, %s", err)
+		// Wait for PV drivers to be available
+		timeout := time.Duration(d.Get("wait_for_drivers_timeout").(int)) * time.Second
+		if timeout > 0 {
+			_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForDrivers(ctx, d.Id(), timeout, getWaiterOptions(ctx))
+			if err != nil {
+				return diag.Errorf("failed to get PV drivers on virtual machine after power on, %s", err)
+			}
 		}
 	}
 
@@ -844,10 +855,13 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 			if err != nil {
 				return diag.Errorf("failed to power %s virtual machine, %s", powerState, err)
 			}
-			// We have to wait for the tools to be mounted, otherwise, operations like creating new network adapters will fail. If tools are not found after 30 seconds, we continue anyway.
-			_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForTools(ctx, d.Id(), getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to get tools on virtual machine, %s", err)
+			// We have to wait for the PV drivers to be detected, otherwise, operations like creating new network adapters will fail.
+			timeout := time.Duration(d.Get("wait_for_drivers_timeout").(int)) * time.Second
+			if timeout > 0 {
+				_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForDrivers(ctx, d.Id(), timeout, getWaiterOptions(ctx))
+				if err != nil {
+					return diag.Errorf("failed to get PV drivers on virtual machine, %s", err)
+				}
 			}
 		}
 	}
@@ -921,7 +935,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 	wasConnected := vbd.Connected
 
 	// Vérifier si l'utilisateur a modifié la propriété "connected"
-	userChangedConnected := d.HasChange(fmt.Sprintf("os_disk.%d.connected", i))
+	userChangedConnected := d.HasChange(fmt.Sprintf("os_disk.%d.connected", i)) && !d.IsNewResource()
 
 	// Déconnecter si nécessaire pour la mise à jour
 	if needsDisconnect && vbd.Connected {
