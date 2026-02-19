@@ -32,7 +32,7 @@ resource "cloudtemple_compute_iaas_opensource_virtual_disk" "openiaas-disk-03" {
   virtual_machine_id    = cloudtemple_compute_iaas_opensource_virtual_machine.OPENIAAS-TERRAFORM-01.id
 }
 
-# Exemple with a non-bootable Read/Write standalone disk, not attached to any VM
+# Exemple with a standalone disk, not attached to any VM
 resource "cloudtemple_compute_iaas_opensource_virtual_disk" "openiaas-disk-04" {
   name     = "openiaas-disk-04"
   size     = 4 * 1024 * 1024 * 1024
