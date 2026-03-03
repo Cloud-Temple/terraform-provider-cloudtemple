@@ -237,7 +237,7 @@ func (c *OpenIaaSVirtualMachineClient) WaitForDrivers(
 			}
 
 			lastVM = vm
-			if vm.PVDrivers.Detected {
+			if vm.PVDrivers.Detected && vm.PVDrivers.Version != "" {
 				options.log(fmt.Sprintf(
 					"[WAITER] the virtual machine %q has the PV drivers detected",
 					id,

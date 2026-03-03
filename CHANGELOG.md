@@ -1,5 +1,13 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.6.0-experimental.1 (March 3rd, 2026)
+<img id="latest" src="https://badgen.net/badge/status/experimental/purple" alt="Status: experimental" />
+**Warning: This is an experimental release. Do not use in an production environment.
+
+MISCELLANEOUS :
+
+  * Modified the `waitForDrivers` waiter to try to wait for the drivers to be fully loaded before continuing.
+
 # 1.6.0 (February 20th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
