@@ -1,7 +1,13 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.6.0 (February 20th, 2026)
+# 1.6.1 (March 4th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+IMPROVEMENTS :
+
+  * Added missing properties `tenant_id` and `tenant_name`to datasources `cloudtemple_iam_personal_access_token` and `cloudtemple_iam_personal_access_tokens`.
+
+# 1.6.0 (February 20th, 2026)
 
 BUG FIXES :
 
