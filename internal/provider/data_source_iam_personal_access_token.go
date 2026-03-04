@@ -37,6 +37,7 @@ func dataSourcePersonalAccessToken() *schema.Resource {
 			"user_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
+				Computed:      true,
 				ConflictsWith: []string{"id"},
 				ValidateFunc:  validation.IsUUID,
 				Description:   "The ID of the user who owns the personal access token. Used when searching by name.",
@@ -44,12 +45,18 @@ func dataSourcePersonalAccessToken() *schema.Resource {
 			"tenant_id": {
 				Type:          schema.TypeString,
 				Optional:      true,
+				Computed:      true,
 				ConflictsWith: []string{"id"},
 				ValidateFunc:  validation.IsUUID,
 				Description:   "The ID of the tenant where the personal access token is defined. Used when searching by name.",
 			},
 
 			// Out
+			"tenant_name": {
+				Description: "The name of the tenant where the personal access token is defined.",
+				Type:        schema.TypeString,
+				Computed:    true,
+			},
 			"roles": {
 				Description: "The roles associated with the personal access token.",
 				Type:        schema.TypeList,
@@ -75,47 +82,63 @@ func dataSourcePersonalAccessTokenRead(ctx context.Context, d *schema.ResourceDa
 	var token *client.Token
 	var err error
 
-	// Recherche par ID
+	name := d.Get("name").(string)
 	id := d.Get("id").(string)
-	if id != "" {
-		token, err = c.IAM().PAT().Read(ctx, id)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-		if token == nil {
-			return diag.FromErr(fmt.Errorf("failed to find personal access token with id %q", id))
-		}
-	} else {
-		// Obtenir les IDs utilisateur et tenant
-		userId, err := getUserID(ctx, c, d)
-		if err != nil {
-			return diag.FromErr(err)
-		}
-		tenantId, err := getTenantID(ctx, c, d)
-		if err != nil {
-			return diag.FromErr(err)
-		}
 
-		// Recherche par nom
-		name := d.Get("name").(string)
-		if name != "" {
-			tokens, err := c.IAM().PAT().List(ctx, userId, tenantId)
-			if err != nil {
-				return diag.FromErr(fmt.Errorf("failed to list personal access tokens: %s", err))
-			}
-			for _, t := range tokens {
-				if t.Name == name {
-					token = t
-					break
-				}
-			}
-			if token == nil {
-				return diag.FromErr(fmt.Errorf("failed to find personal access token with name %q", name))
-			}
-		} else {
-			return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+	tokens, err := c.IAM().PAT().List(ctx)
+	if err != nil {
+		return diag.FromErr(fmt.Errorf("failed to list personal access tokens: %s", err))
+	}
+	for _, t := range tokens {
+		if t.Name == name || t.ID == id {
+			token = t
+			break
 		}
 	}
+	if token == nil {
+		return diag.FromErr(fmt.Errorf("failed to find personal access token with name %q", name))
+	}
+
+	// // Recherche par ID
+	// id := d.Get("id").(string)
+	// if id != "" {
+	// 	token, err = c.IAM().PAT().Read(ctx, id)
+	// 	if err != nil {
+	// 		return diag.FromErr(err)
+	// 	}
+	// 	if token == nil {
+	// 		return diag.FromErr(fmt.Errorf("failed to find personal access token with id %q", id))
+	// 	}
+	// } else {
+	// 	// Obtenir les IDs utilisateur et tenant
+	// 	userId, err := getUserID(ctx, c, d)
+	// 	if err != nil {
+	// 		return diag.FromErr(err)
+	// 	}
+	// 	tenantId, err := getTenantID(ctx, c, d)
+	// 	if err != nil {
+	// 		return diag.FromErr(err)
+	// 	}
+
+	// 	// Recherche par nom
+	// 	name := d.Get("name").(string)
+	// 	if name != "" {
+	// 		tokens, err := c.IAM().PAT().List(ctx, userId, tenantId)
+	// 		if err != nil {
+	// 			return diag.FromErr(fmt.Errorf("failed to list personal access tokens: %s", err))
+	// 		}
+	// 		for _, t := range tokens {
+	// 			if t.Name == name {
+	// 				token = t
+	// 				break
+	// 			}
+	// 		}
+	// 		if token == nil {
+	// 			return diag.FromErr(fmt.Errorf("failed to find personal access token with name %q", name))
+	// 		}
+	// 	} else {
+	// 		return diag.FromErr(fmt.Errorf("either id or name must be specified"))
+	// 	}
 
 	// Définir l'ID de la datasource
 	d.SetId(token.ID)
