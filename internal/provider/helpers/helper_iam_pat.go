@@ -11,5 +11,8 @@ func FlattenToken(token *client.Token) map[string]interface{} {
 		"name":            token.Name,
 		"roles":           token.Roles,
 		"expiration_date": token.ExpirationDate,
+		"user_id":         token.UserId,
+		"tenant_id":       token.TenantId,
+		"tenant_name":     token.TenantName,
 	}
 }

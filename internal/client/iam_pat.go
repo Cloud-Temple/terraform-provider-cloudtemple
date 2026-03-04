@@ -21,12 +21,13 @@ type Token struct {
 	Secret         string
 	Roles          []string
 	ExpirationDate string
+	UserId         string
+	TenantId       string
+	TenantName     string
 }
 
-func (p *PATClient) List(ctx context.Context, userId string, tenantId string) ([]*Token, error) {
+func (p *PATClient) List(ctx context.Context) ([]*Token, error) {
 	r := p.c.newRequest("GET", "/iam/v2/personal_access_tokens")
-	r.params.Set("userId", userId)
-	r.params.Set("tenantId", tenantId)
 	resp, err := p.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err

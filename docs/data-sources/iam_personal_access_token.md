@@ -41,5 +41,6 @@ data "cloudtemple_iam_personal_access_token" "name" {
 
 - `expiration_date` (String) The expiration date of the personal access token.
 - `roles` (List of String) The roles associated with the personal access token.
+- `tenant_name` (String) The name of the tenant where the personal access token is defined.
 
 

@@ -7,7 +7,6 @@ import (
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
-	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 func dataSourcePersonalAccessTokens() *schema.Resource {
@@ -17,20 +16,6 @@ func dataSourcePersonalAccessTokens() *schema.Resource {
 		ReadContext: dataSourcePersonalAccessTokensRead,
 
 		Schema: map[string]*schema.Schema{
-			// In
-			"user_id": {
-				Description:  "The ID of the user to retrieve tokens for.",
-				Type:         schema.TypeString,
-				Optional:     true,
-				ValidateFunc: validation.IsUUID,
-			},
-			"tenant_id": {
-				Description:  "The ID of the tenant to retrieve tokens for.",
-				Type:         schema.TypeString,
-				Optional:     true,
-				ValidateFunc: validation.IsUUID,
-			},
-
 			// Out
 			"tokens": {
 				Description: "The list of personal access tokens.",
@@ -62,6 +47,21 @@ func dataSourcePersonalAccessTokens() *schema.Resource {
 							Type:        schema.TypeString,
 							Computed:    true,
 						},
+						"user_id": {
+							Description: "The ID of the user this token is related to.",
+							Type:        schema.TypeString,
+							Computed:    true,
+						},
+						"tenant_id": {
+							Description: "The ID of the tenant this token is related to.",
+							Type:        schema.TypeString,
+							Computed:    true,
+						},
+						"tenant_name": {
+							Description: "The name of the tenant this token is related to.",
+							Type:        schema.TypeString,
+							Computed:    true,
+						},
 					},
 				},
 			},
@@ -74,18 +74,8 @@ func dataSourcePersonalAccessTokensRead(ctx context.Context, d *schema.ResourceD
 	var c *client.Client = getClient(meta)
 	var diags diag.Diagnostics
 
-	// Obtenir les IDs utilisateur et tenant
-	userID, err := getUserID(ctx, c, d)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-	tenantID, err := getTenantID(ctx, c, d)
-	if err != nil {
-		return diag.FromErr(err)
-	}
-
 	// Récupérer les tokens
-	tokens, err := c.IAM().PAT().List(ctx, userID, tenantID)
+	tokens, err := c.IAM().PAT().List(ctx)
 	if err != nil {
 		return diag.FromErr(err)
 	}
