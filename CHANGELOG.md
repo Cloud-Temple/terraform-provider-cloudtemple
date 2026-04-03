@@ -1,7 +1,24 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.6.1 (March 4th, 2026)
+# 1.7.0 (April 3rd, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+IMPROVMENTS :
+
+  * Added property `allow_vm_restart` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`. (Default: true)
+    - This new property will avoid any virtual machine restart without user's consent.
+    - It is necessary to allow virtual machine restart in order to updated the following properties :
+      - `ram`
+      - `cpu`
+      - `num_cores_per_socket`
+      - `os_disk.size`
+      - `os_disk.name`
+      - `os_network_adapter.mac_address`
+      
+  * Deprecated property `os_disk.connected` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
+  * Deprecated property `os_network_adapter.attached` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
+
+# 1.6.1 (March 4th, 2026)
 
 IMPROVEMENTS :
 
@@ -19,6 +36,7 @@ NEW FEATURES :
   * Added new `wait_for_drivers_timeout` property on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
 
 # 1.5.5 (February 12th, 2026)
+<img id="stable" src="https://badgen.net/badge/channel/stable/green" alt="Channel: stable" />
 
 BUG FIXES :
 
@@ -101,7 +119,6 @@ NEW FEATURES :
   * Added property `marketplace_item_id` in resource `cloudtemple_compute_iaas_opensource_virtual_machine` used to deploy a virtual machine from a VMI of the Marketplace.
 
 ## 1.3.0 (October 30th, 2025)
-<img id="stable" src="https://badgen.net/badge/channel/stable/green" alt="Channel: stable" />
 
 INFORMATIONS :
 

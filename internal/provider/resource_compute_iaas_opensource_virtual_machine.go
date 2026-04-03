@@ -156,6 +156,16 @@ Order of the elements in the list is the boot order.`,
 				Default:      30,
 				ValidateFunc: validation.IntBetween(0, 900),
 			},
+			"allow_vm_restart": {
+				Type: schema.TypeBool,
+				Description: `Whether the user allows the povider to restart the VM if necessary operations require it. Default is true.
+	The virtual machine will need to be restart when at least one of these properties are modified :
+		- "cpu", "ram" or "num_cores_per_socket"
+		- "os_disk.size" or "os_disk.name"
+		- "os_network_adapter.mac_address"`,
+				Optional: true,
+				Default:  true,
+			},
 			"tags": {
 				Type:        schema.TypeMap,
 				Description: "The tags to attach to the virtual machine.",
@@ -214,6 +224,7 @@ Order of the elements in the list is the boot order.`,
 							Optional:    true,
 							Computed:    true,
 							Description: "Whether the disk is connected or not.",
+							Deprecated:  "This property is deprecated and will be definitly removed in a future version.",
 						},
 						"storage_repository_id": {
 							Type:        schema.TypeString,
@@ -259,6 +270,7 @@ Order of the elements in the list is the boot order.`,
 							Type:        schema.TypeBool,
 							Optional:    true,
 							Computed:    true,
+							Deprecated:  "This property is deprecated and will be definitly removed in a future version.",
 							Description: "Whether the network adapter is attached.",
 						},
 						"tx_checksumming": {
@@ -735,17 +747,21 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		if vm.PowerState == "Running" {
 			wasRunning = true
 
-			// Power off the VM
-			activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
-				PowerState: "off",
-				Force:      true,
-			})
-			if err != nil {
-				return diag.Errorf("failed to power off virtual machine: %s", err)
-			}
-			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to power off virtual machine: %s", err)
+			if d.Get("allow_vm_restart").(bool) {
+				// Power off the VM
+				activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
+					PowerState: "off",
+					Force:      !vm.PVDrivers.Detected,
+				})
+				if err != nil {
+					return diag.Errorf("failed to power off virtual machine: %s", err)
+				}
+				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+				if err != nil {
+					return diag.Errorf("failed to power off virtual machine: %s", err)
+				}
+			} else {
+				return diag.Errorf("The virtual machine %s (%s) needs to be powered off to apply changes to cpu, memory or num_cores_per_socket. Please set allow_vm_restart to true to allow the provider to power off and on the VM if necessary.", vm.Name, d.Id())
 			}
 		}
 	}
@@ -836,6 +852,34 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
+	// Handle os_disk and os_network_adapter updates
+	// We don't handle adding/removing disks/vifs here, only updating existing ones
+	// New disks should be added via a separate resource
+	disks := []map[string]interface{}{}
+	networkAdapters := []map[string]interface{}{}
+
+	if d.HasChange("os_disk") {
+		for _, disk := range d.Get("os_disk").([]interface{}) {
+			if disk == nil {
+				continue
+			}
+			disks = append(disks, disk.(map[string]interface{}))
+		}
+	}
+
+	if d.HasChange("os_network_adapter") {
+		for _, networkAdapter := range d.Get("os_network_adapter").([]interface{}) {
+			if networkAdapter == nil {
+				continue
+			}
+			networkAdapters = append(networkAdapters, networkAdapter.(map[string]interface{}))
+		}
+	}
+
+	if diags := handleUpdateOSDevices(ctx, c, d, disks, networkAdapters); diags != nil {
+		return diags
+	}
+
 	if d.HasChange("power_state") {
 		powerState := d.Get("power_state").(string)
 		// Avoid trying to power off a halted VM
@@ -855,42 +899,16 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 			if err != nil {
 				return diag.Errorf("failed to power %s virtual machine, %s", powerState, err)
 			}
-			// We have to wait for the PV drivers to be detected, otherwise, operations like creating new network adapters will fail.
-			timeout := time.Duration(d.Get("wait_for_drivers_timeout").(int)) * time.Second
-			if timeout > 0 {
-				_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForDrivers(ctx, d.Id(), timeout, getWaiterOptions(ctx))
-				if err != nil {
-					return diag.Errorf("failed to get PV drivers on virtual machine, %s", err)
+			// Avoid trying to wait for the drivers on a halter virtual machine
+			if powerState != "off" {
+				// We have to wait for the PV drivers to be detected, otherwise, operations like creating new network adapters will fail.
+				timeout := time.Duration(d.Get("wait_for_drivers_timeout").(int)) * time.Second
+				if timeout > 0 {
+					_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForDrivers(ctx, d.Id(), timeout, getWaiterOptions(ctx))
+					if err != nil {
+						return diag.Errorf("failed to get PV drivers on virtual machine, %s", err)
+					}
 				}
-			}
-		}
-	}
-
-	// Handle os_disk updates (name, size, connected, storage_repository_id)
-	// We don't handle adding/removing disks here, only updating existing ones
-	// New disks should be added via a separate resource
-	if d.HasChange("os_disk") {
-		for i, osDisk := range d.Get("os_disk").([]interface{}) {
-			if osDisk == nil {
-				continue
-			}
-			disk := osDisk.(map[string]interface{})
-
-			if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
-				return diags
-			}
-		}
-	}
-
-	if d.HasChange("os_network_adapter") {
-		for i, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
-			if osNetworkAdapter == nil {
-				continue
-			}
-			disk := osNetworkAdapter.(map[string]interface{})
-
-			if diags := osNetworkAdapterUpdate(ctx, c, d, i, disk); diags != nil {
-				return diags
 			}
 		}
 	}
@@ -915,44 +933,84 @@ func openIaasVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, m
 	return nil
 }
 
-// handleOSDiskUpdate gère la mise à jour d'un disque OS, y compris la reconnexion si nécessaire
-func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, i int, disk map[string]interface{}) diag.Diagnostics {
-	// Vérifier si on doit modifier la taille ou le nom
-	needsDisconnect := d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i))
+func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.ResourceData, disks []map[string]interface{}, networkAdapters []map[string]interface{}) diag.Diagnostics {
+	needsReboot := false
 
-	// Vérifier l'état actuel du disque
-	diskState, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, disk["id"].(string))
+	// Lire l'état actuel de la VM pour vérifier son état et les connexions des disques
+	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
 	if err != nil {
-		return diag.Errorf("failed to read virtual disk state: %s", err)
+		return diag.Errorf("failed to read virtual machine: %s", err)
+	} else if vm == nil {
+		return diag.Errorf("failed to find virtual machine: %s", d.Id())
 	}
 
-	// Trouver la connexion pour cette VM
-	vbd := helpers.Find(diskState.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
-		return virtualMachine.ID == d.Id()
-	})
+	for i := range disks {
+		if (d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i))) && vm.PowerState == "Running" {
+			needsReboot = true
+		}
+	}
 
-	// Sauvegarder l'état de connexion initial
-	wasConnected := vbd.Connected
+	for i := range networkAdapters {
+		if d.HasChange(fmt.Sprintf("os_network_adapter.%d.mac_address", i)) && vm.PowerState == "Running" {
+			needsReboot = true
+		}
+	}
 
-	// Vérifier si l'utilisateur a modifié la propriété "connected"
-	userChangedConnected := d.HasChange(fmt.Sprintf("os_disk.%d.connected", i)) && !d.IsNewResource()
+	// Si un redémarrage est nécessaire, vérifier que l'utilisateur a autorisé le provider à redémarrer la VM
+	if needsReboot && !d.Get("allow_vm_restart").(bool) {
+		return diag.Errorf("The virtual machine %s (%s) needs to be powered off to apply changes to the os_disks/os_network_adapters. Please set allow_vm_restart to true to allow the provider to power off and on the VM if necessary.", vm.Name, d.Id())
+	}
 
-	// Déconnecter si nécessaire pour la mise à jour
-	if needsDisconnect && vbd.Connected {
-		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskConnectionRequest{
-			VirtualMachineID: d.Id(),
+	if needsReboot && d.Get("allow_vm_restart").(bool) {
+		// Power off the VM
+		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
+			PowerState: "off",
+			Force:      !vm.PVDrivers.Detected, // Si les PV drivers ne sont pas détectés, forcer l'arrêt pour éviter les problèmes de communication avec la VM, sinon faire un soft shutdown.
 		})
 		if err != nil {
-			return diag.Errorf("failed to disconnect os disk: %s", err)
+			return diag.Errorf("failed to power off virtual machine: %s", err)
 		}
 		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
-			return diag.Errorf("failed to disconnect os disk: %s", err)
+			return diag.Errorf("failed to power off virtual machine: %s", err)
 		}
 	}
 
+	// Effectuer les modifications sur les disques
+	for i, disk := range disks {
+		if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
+			return diags
+		}
+	}
+
+	// Effectuer les modifications sur les cartes réseaux
+	for _, networkAdapter := range networkAdapters {
+		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter); diags != nil {
+			return diags
+		}
+	}
+
+	// Rallumer la VM si elle a été arrêtée pour la mise à jour
+	if needsReboot {
+		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
+			PowerState: "on",
+			HostId:     d.Get("host_id").(string),
+		})
+		if err != nil {
+			return diag.Errorf("failed to power on virtual machine: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to power on virtual machine: %s", err)
+		}
+	}
+
+	return nil
+}
+
+func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, i int, disk map[string]interface{}) diag.Diagnostics {
 	// Mettre à jour le disque si nécessaire
-	if needsDisconnect {
+	if d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i)) {
 		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskUpdateRequest{
 			Size: disk["size"].(int),
 			Name: disk["name"].(string),
@@ -980,108 +1038,21 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 		}
 	}
 
-	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
-	if err != nil {
-		return diag.Errorf("failed to read virtual machine : %s", err)
-	}
-	if vm == nil {
-		return diag.Errorf("failed to find virtual machine : %s", d.Id())
-	}
-
-	// Gérer l'état de connexion seulement si la VM est allumée (sinon, risque d'erreur)
-	if userChangedConnected && vm.PowerState == "Running" {
-		// Utiliser la valeur définie par l'utilisateur
-		wantConnected := disk["connected"].(bool)
-
-		// Si l'état actuel ne correspond pas à l'état souhaité
-		if wantConnected && !vbd.Connected {
-			// Connecter le disque
-			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskConnectionRequest{
-				VirtualMachineID: d.Id(),
-			})
-			if err != nil {
-				return diag.Errorf("failed to connect os disk: %s", err)
-			}
-			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to connect os disk: %s", err)
-			}
-			// Ne pas déconnecter si il déjà été déconnecté pour la mise à jour du nom ou de la taille (!needsDisconnect)
-		} else if !wantConnected && vbd.Connected && !needsDisconnect {
-			// Déconnecter le disque
-			activityId, err := c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskConnectionRequest{
-				VirtualMachineID: d.Id(),
-			})
-			if err != nil {
-				return diag.Errorf("failed to disconnect os disk: %s", err)
-			}
-			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to disconnect os disk: %s", err)
-			}
-		}
-	} else if needsDisconnect && wasConnected {
-		// Si l'utilisateur n'a pas modifié l'état de connexion et que le disque était connecté avant
-		// et qu'on l'a déconnecté pour la mise à jour, on le reconnecte
-		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Connect(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskConnectionRequest{
-			VirtualMachineID: d.Id(),
-		})
-		if err != nil {
-			return diag.Errorf("failed to reconnect os disk: %s", err)
-		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		if err != nil {
-			return diag.Errorf("failed to reconnect os disk: %s", err)
-		}
-	}
-
 	return nil
 }
 
-func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, i int, networkAdapter map[string]interface{}) diag.Diagnostics {
-	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
+func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}) diag.Diagnostics {
+	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), &client.UpdateOpenIaasNetworkAdapterRequest{
+		NetworkID:      networkAdapter["network_id"].(string),
+		MAC:            networkAdapter["mac_address"].(string),
+		TxChecksumming: networkAdapter["tx_checksumming"].(bool),
+	})
 	if err != nil {
-		return diag.Errorf("failed to read virtual machine : %s", err)
+		return diag.Errorf("failed to update os network adapter: %s", err)
 	}
-	if vm == nil {
-		return diag.Errorf("failed to find virtual machine : %s", d.Id())
-	}
-
-	if d.HasChange(fmt.Sprintf("os_network_adapter.%d.attached", i)) && vm.PowerState == "Running" {
-		if networkAdapter["attached"].(bool) {
-			activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Connect(ctx, networkAdapter["id"].(string))
-			if err != nil {
-				return diag.Errorf("failed to connect os network adapter: %s", err)
-			}
-			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to connect os network adapter: %s", err)
-			}
-		} else {
-			activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Disconnect(ctx, networkAdapter["id"].(string))
-			if err != nil {
-				return diag.Errorf("failed to disconnect os network adapter: %s", err)
-			}
-			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to disconnect os network adapter: %s", err)
-			}
-		}
-	}
-
-	if d.HasChange(fmt.Sprintf("os_network_adapter.%d.mac_address", i)) || d.HasChange(fmt.Sprintf("os_network_adapter.%d.network_id", i)) || d.HasChange(fmt.Sprintf("os_network_adapter.%d.tx_checksumming", i)) {
-		activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), &client.UpdateOpenIaasNetworkAdapterRequest{
-			NetworkID:      networkAdapter["network_id"].(string),
-			MAC:            networkAdapter["mac_address"].(string),
-			TxChecksumming: networkAdapter["tx_checksumming"].(bool),
-		})
-		if err != nil {
-			return diag.Errorf("failed to update os network adapter: %s", err)
-		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		if err != nil {
-			return diag.Errorf("failed to update os network adapter: %s", err)
-		}
+	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	if err != nil {
+		return diag.Errorf("failed to update os network adapter: %s", err)
 	}
 
 	return nil
