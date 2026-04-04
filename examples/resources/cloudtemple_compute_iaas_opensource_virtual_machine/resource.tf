@@ -9,23 +9,21 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
   memory               = 8 * 1024 * 1024 * 1024
   cpu                  = 4
   num_cores_per_socket = 2
-
-  secure_boot       = false
-  auto_power_on     = true
-  high_availability = "best-effort"
+  allow_vm_restart     = true
+  secure_boot          = false
+  auto_power_on        = true
+  high_availability    = "best-effort"
 
   # Define an os_network_adapter block for each network adapter in the template 
   os_network_adapter {
     network_id      = data.cloudtemple_compute_iaas_opensource_network.p-vlan-01.id
     mac_address     = "c2:db:4f:15:41:3e"
     tx_checksumming = true
-    attached        = true
   }
 
   # Define an os_disk block for each virtual disk in the template
   os_disk {
     name                  = "data-disk-01"
-    connected             = true
     size                  = 14 * 1024 * 1024 * 1024
     storage_repository_id = data.cloudtemple_compute_iaas_opensource_storage_repository.sr011-clu001-t0001-az05-r-flh1-data13.id
   }
@@ -78,11 +76,9 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
   os_network_adapter {
     network_id      = data.cloudtemple_compute_iaas_opensource_network.PBT-VLAN-01.id
     tx_checksumming = true
-    attached        = true
   }
 
   os_disk {
-    connected             = true
     storage_repository_id = data.cloudtemple_compute_iaas_opensource_storage_repository.sr011-clu001-t0001-az05-r-flh1-data13.id
   }
 
@@ -99,6 +95,23 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
     "Hard-Drive",
     "DVD-Drive",
   ]
+
+  tags = {
+    created_by  = "pbt"
+    environment = "development"
+  }
+}
+
+# Avoid the virtual machine to be restarted if user changes a property that need to be done when the virtual machine is Halted.
+resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01" {
+  name        = "terraform-marketplace-openiaas-01"
+  power_state = "on"
+
+  // ...
+
+  allow_vm_restart = false
+
+  // ...
 
   tags = {
     created_by  = "pbt"
