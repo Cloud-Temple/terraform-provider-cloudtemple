@@ -591,17 +591,17 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 	c := getClient(meta)
 	var diags diag.Diagnostics
 
-	// Récupérer la machine virtuelle par son ID
+	// Get the virtual machine by its ID
 	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
 	if err != nil {
 		return diag.Errorf("the virtual machine could not be read: %s", err)
 	}
 	if vm == nil {
-		d.SetId("") // La VM n'existe plus, marquer la ressource comme supprimée
+		d.SetId("") // The VM no longer exists, mark the resource as deleted
 		return nil
 	}
 
-	// Normaliser le power state pour qu'il soit cohérent avec l'entrée
+	// Normalize the power state to be consistent with the input
 	switch vm.PowerState {
 	case "Running":
 		vm.PowerState = "on"
@@ -613,10 +613,10 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		return diag.Errorf("unknown power state %q", vm.PowerState)
 	}
 
-	// Mapper les données en utilisant la fonction helper
+	// Map the data using the helper function
 	vmData := helpers.FlattenOpenIaaSVirtualMachine(vm)
 
-	// Récupérer les OS disks
+	// Get the OS disks
 	osDisks := []interface{}{}
 	for _, osDisk := range d.Get("os_disk").([]interface{}) {
 		if osDisk == nil {
@@ -633,7 +633,7 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 	}
 	vmData["os_disk"] = osDisks
 
-	// Récupérer les OS network adapters
+	// Get the OS network adapters
 	osNetworkAdapters := []interface{}{}
 	for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
 		if osNetworkAdapter == nil {
@@ -661,7 +661,7 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 	}
 	d.Set("tags", tagsMap)
 
-	// Récupérer les SLA policies
+	// Get the SLA policies
 	slaPolicies, err := c.Backup().OpenIaaS().Policy().List(ctx, &client.BackupOpenIaasPolicyFilter{
 		VirtualMachineId: d.Id(),
 	})
@@ -674,7 +674,7 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		slaPoliciesIds = append(slaPoliciesIds, slaPolicy.ID)
 	}
 
-	// Récupérer les informations de réplication
+	// Get the replication information
 	replicationPolicyId := ""
 	replicationPolicy, err := c.Compute().OpenIaaS().Replication().Policy().VirtualMachine().Read(ctx, d.Id())
 	if err != nil {
@@ -687,7 +687,7 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 	vmData["backup_sla_policies"] = slaPoliciesIds
 	vmData["replication_policy_id"] = replicationPolicyId
 
-	// Définir les données dans le state
+	// Set the data in the state
 	for k, v := range vmData {
 		if err := d.Set(k, v); err != nil {
 			return diag.FromErr(err)
@@ -936,7 +936,7 @@ func openIaasVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, m
 func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.ResourceData, disks []map[string]interface{}, networkAdapters []map[string]interface{}) diag.Diagnostics {
 	needsReboot := false
 
-	// Lire l'état actuel de la VM pour vérifier son état et les connexions des disques
+	// Read the current state of the VM to check its state and disk connections
 	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
 	if err != nil {
 		return diag.Errorf("failed to read virtual machine: %s", err)
@@ -956,7 +956,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		}
 	}
 
-	// Si un redémarrage est nécessaire, vérifier que l'utilisateur a autorisé le provider à redémarrer la VM
+	// If a reboot is necessary, check that the user has allowed the provider to restart the VM
 	if needsReboot && !d.Get("allow_vm_restart").(bool) {
 		return diag.Errorf("The virtual machine %s (%s) needs to be powered off to apply changes to the os_disks/os_network_adapters. Please set allow_vm_restart to true to allow the provider to power off and on the VM if necessary.", vm.Name, d.Id())
 	}
@@ -965,7 +965,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		// Power off the VM
 		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
 			PowerState: "off",
-			Force:      !vm.PVDrivers.Detected, // Si les PV drivers ne sont pas détectés, forcer l'arrêt pour éviter les problèmes de communication avec la VM, sinon faire un soft shutdown.
+			Force:      !vm.PVDrivers.Detected, // If PV drivers are not detected, force shutdown to avoid communication issues with the VM, otherwise do a soft shutdown.
 		})
 		if err != nil {
 			return diag.Errorf("failed to power off virtual machine: %s", err)
@@ -976,21 +976,21 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		}
 	}
 
-	// Effectuer les modifications sur les disques
+	// Apply modifications to the disks
 	for i, disk := range disks {
 		if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
 			return diags
 		}
 	}
 
-	// Effectuer les modifications sur les cartes réseaux
+	// Apply modifications to the network adapters
 	for _, networkAdapter := range networkAdapters {
 		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter); diags != nil {
 			return diags
 		}
 	}
 
-	// Rallumer la VM si elle a été arrêtée pour la mise à jour
+	// Power on the VM if it was powered off for the update
 	if needsReboot {
 		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
 			PowerState: "on",
@@ -1009,7 +1009,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 }
 
 func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, i int, disk map[string]interface{}) diag.Diagnostics {
-	// Mettre à jour le disque si nécessaire
+	// Update the disk if necessary
 	if d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i)) {
 		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskUpdateRequest{
 			Size: disk["size"].(int),
@@ -1024,7 +1024,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 		}
 	}
 
-	// Gérer le déplacement du disque si nécessaire
+	// Handle the disk relocation if necessary
 	if d.HasChange(fmt.Sprintf("os_disk.%d.storage_repository_id", i)) {
 		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Relocate(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskRelocateRequest{
 			StorageRepositoryID: disk["storage_repository_id"].(string),
