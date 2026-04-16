@@ -1140,6 +1140,9 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 			if err != nil {
 				return diag.Errorf("failed to read os disk: %s", err)
 			}
+			if disk == nil {
+				return diag.Errorf("os disk not found: %s for virtual machine: %s", osDiskId, id)
+			}
 			osDisks = append(osDisks, helpers.FlattenOSDiskData(disk))
 		}
 	}
@@ -1156,6 +1159,9 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 			networkAdapter, err := c.Compute().NetworkAdapter().Read(ctx, osNetworkAdapterId)
 			if err != nil {
 				return diag.Errorf("failed to read os network adapter: %s", err)
+			}
+			if networkAdapter == nil {
+				return diag.Errorf("os network adapter not found: %s for virtual machine: %s", osNetworkAdapterId, id)
 			}
 			osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOSNetworkAdapterData(networkAdapter))
 		}
