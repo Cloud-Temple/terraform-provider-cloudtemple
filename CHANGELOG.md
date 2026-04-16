@@ -1,7 +1,13 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.7.0 (April 3rd, 2026)
+# 1.7.1 (April 15th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+BUG FIXES :
+
+  * Fixed a bug causing the provider to crash when an osDisk is not found.
+
+# 1.7.0 (April 3rd, 2026)
 
 IMPROVMENTS :
 
