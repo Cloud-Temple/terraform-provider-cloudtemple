@@ -106,12 +106,7 @@ func TestMain(m *testing.M) {
 		"client-test": {},
 	}
 
-	lt, err := client.Token(context.Background())
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
-		os.Exit(1)
-	}
-	tokens, err := client.IAM().PAT().List(ctx, lt.UserID(), lt.TenantID())
+	tokens, err := client.IAM().PAT().List(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)

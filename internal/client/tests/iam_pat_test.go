@@ -15,7 +15,7 @@ const (
 
 func TestIAM_PATList(t *testing.T) {
 	ctx := context.Background()
-	tokens, err := client.IAM().PAT().List(ctx, testUserID(t), testTenantID(t))
+	tokens, err := client.IAM().PAT().List(ctx)
 	require.NoError(t, err)
 
 	found := false
@@ -30,7 +30,7 @@ func TestIAM_PATList(t *testing.T) {
 
 func TestIAM_PATRead(t *testing.T) {
 	ctx := context.Background()
-	tokens, err := client.IAM().PAT().List(ctx, testUserID(t), testTenantID(t))
+	tokens, err := client.IAM().PAT().List(ctx)
 	require.NoError(t, err)
 
 	var id string

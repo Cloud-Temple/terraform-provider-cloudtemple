@@ -174,6 +174,16 @@ func New(version string) func() *schema.Provider {
 				// Marketplace
 				"cloudtemple_marketplace_item":  documentDatasource(dataSourceMarketplaceItem(), ""),
 				"cloudtemple_marketplace_items": documentDatasource(dataSourceMarketplaceItems(), ""),
+
+				// VPC
+				"cloudtemple_vpc_vpc":              documentDatasource(dataSourceVPCVPC(), "vpc_read"),
+				"cloudtemple_vpc_vpcs":             documentDatasource(dataSourceVPCVPCs(), "vpc_read"),
+				"cloudtemple_vpc_floating_ip":      documentDatasource(dataSourceVPCFloatingIP(), "vpc_read"),
+				"cloudtemple_vpc_floating_ips":     documentDatasource(dataSourceVPCFloatingIPs(), "vpc_read"),
+				"cloudtemple_vpc_private_network":  documentDatasource(dataSourceVPCPrivateNetwork(), "vpc_read"),
+				"cloudtemple_vpc_private_networks": documentDatasource(dataSourceVPCPrivateNetworks(), "vpc_read"),
+				"cloudtemple_vpc_static_ip":        documentDatasource(dataSourceVPCStaticIP(), "vpc_read"),
+				"cloudtemple_vpc_static_ips":       documentDatasource(dataSourceVPCStaticIPs(), "vpc_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				// Compute - IaaS VMWare
