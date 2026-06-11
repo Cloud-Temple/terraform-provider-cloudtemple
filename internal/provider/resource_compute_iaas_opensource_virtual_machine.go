@@ -514,6 +514,10 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		for i, networkAdapter := range openIaasItemInfo.NetworkAdapters {
 			osNetworkAdapter := osNetworkAdapters[i].(map[string]interface{})
 			networkData = append(networkData, client.NetworkDataMapping{
+				// networkAdapterName is the field recommended by the
+				// marketplace API (sourceNetworkName is deprecated); both are
+				// sent for backward compatibility, the name takes priority.
+				NetworkAdapterName:   networkAdapter.Name,
 				SourceNetworkName:    networkAdapter.NetworkName,
 				DestinationNetworkId: osNetworkAdapter["network_id"].(string),
 			})
@@ -933,7 +937,59 @@ func openIaasVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, m
 	return nil
 }
 
+// osDiskPendingChanges describes the operations actually required to bring a
+// disk in line with the desired configuration, based on the LIVE API state.
+type osDiskPendingChanges struct {
+	update   bool // size and/or name differ
+	relocate bool // storage repository differs
+}
+
+// diskPendingChanges compares the desired os_disk block against the actual
+// disk returned by the API. A nil actual disk conservatively requests both
+// operations.
+func diskPendingChanges(desired map[string]interface{}, actual *client.OpenIaaSVirtualDisk) osDiskPendingChanges {
+	if actual == nil {
+		return osDiskPendingChanges{update: true, relocate: true}
+	}
+	changes := osDiskPendingChanges{}
+	if size, ok := desired["size"].(int); ok && size != actual.Size {
+		changes.update = true
+	}
+	if name, ok := desired["name"].(string); ok && name != "" && name != actual.Name {
+		changes.update = true
+	}
+	if srID, ok := desired["storage_repository_id"].(string); ok && srID != "" && srID != actual.StorageRepository.ID {
+		changes.relocate = true
+	}
+	return changes
+}
+
+// adapterNeedsUpdate compares the desired os_network_adapter block against
+// the actual adapter returned by the API. An empty desired value never
+// triggers an update (an unset MAC must not be pushed).
+func adapterNeedsUpdate(desired map[string]interface{}, actual *client.OpenIaaSNetworkAdapter) bool {
+	if actual == nil {
+		return true
+	}
+	if networkID, ok := desired["network_id"].(string); ok && networkID != "" && networkID != actual.Network.ID {
+		return true
+	}
+	if mac, ok := desired["mac_address"].(string); ok && mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
+		return true
+	}
+	if tx, ok := desired["tx_checksumming"].(bool); ok && tx != actual.TxChecksumming {
+		return true
+	}
+	return false
+}
+
 func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.ResourceData, disks []map[string]interface{}, networkAdapters []map[string]interface{}) diag.Diagnostics {
+	// Nothing to reconcile: do not make an unrelated update (tags, power
+	// state, boot order…) depend on the disk/adapter listing endpoints.
+	if len(disks) == 0 && len(networkAdapters) == 0 {
+		return nil
+	}
+
 	needsReboot := false
 
 	// Read the current state of the VM to check its state and disk connections
@@ -944,16 +1000,74 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		return diag.Errorf("failed to find virtual machine: %s", d.Id())
 	}
 
-	for i := range disks {
-		if (d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i))) && vm.PowerState == "Running" {
-			needsReboot = true
+	// Compare the desired configuration against the LIVE API state instead of
+	// relying on d.HasChange alone: during the create→update chaining every
+	// HasChange is true, while the marketplace deploy has already applied the
+	// network mapping (networkData). Pushing unconditional VIF updates turned
+	// a platform-side incident on that single operation into a full
+	// provisioning failure for otherwise healthy VMs (issue #246).
+	actualDisks := map[string]*client.OpenIaaSVirtualDisk{}
+	diskList, err := c.Compute().OpenIaaS().VirtualDisk().List(ctx, &client.OpenIaaSVirtualDiskFilter{
+		VirtualMachineID: d.Id(),
+	})
+	if err != nil {
+		return diag.Errorf("failed to list virtual disks: %s", err)
+	}
+	for _, disk := range diskList {
+		actualDisks[disk.ID] = disk
+	}
+	actualAdapters := map[string]*client.OpenIaaSNetworkAdapter{}
+	adapterList, err := c.Compute().OpenIaaS().NetworkAdapter().List(ctx, &client.OpenIaaSNetworkAdapterFilter{
+		VirtualMachineID: d.Id(),
+	})
+	if err != nil {
+		return diag.Errorf("failed to list network adapters: %s", err)
+	}
+	for _, adapter := range adapterList {
+		actualAdapters[adapter.ID] = adapter
+	}
+
+	pendingDisks := map[string]osDiskPendingChanges{}
+	for _, disk := range disks {
+		id, ok := disk["id"].(string)
+		if !ok || id == "" {
+			return diag.Errorf("os_disk without id in the state of virtual machine %s: cannot reconcile (partial or corrupted state)", d.Id())
+		}
+		actual, found := actualDisks[id]
+		if !found {
+			// Never act (let alone power off the VM) on a device the API
+			// does not know about: surface the divergence instead.
+			return diag.Errorf("os_disk %s is in the Terraform state but not returned by the API for virtual machine %s: refresh the state before updating", id, d.Id())
+		}
+		if changes := diskPendingChanges(disk, actual); changes.update || changes.relocate {
+			pendingDisks[id] = changes
+			if changes.update && vm.PowerState == "Running" {
+				needsReboot = true
+			}
 		}
 	}
 
-	for i := range networkAdapters {
-		if d.HasChange(fmt.Sprintf("os_network_adapter.%d.mac_address", i)) && vm.PowerState == "Running" {
-			needsReboot = true
+	pendingAdapters := map[string]bool{}
+	for _, networkAdapter := range networkAdapters {
+		id, ok := networkAdapter["id"].(string)
+		if !ok || id == "" {
+			return diag.Errorf("os_network_adapter without id in the state of virtual machine %s: cannot reconcile (partial or corrupted state)", d.Id())
 		}
+		actual, found := actualAdapters[id]
+		if !found {
+			return diag.Errorf("os_network_adapter %s is in the Terraform state but not returned by the API for virtual machine %s: refresh the state before updating", id, d.Id())
+		}
+		if adapterNeedsUpdate(networkAdapter, actual) {
+			pendingAdapters[id] = true
+			mac, _ := networkAdapter["mac_address"].(string)
+			if mac != "" && !strings.EqualFold(mac, actual.MacAddress) && vm.PowerState == "Running" {
+				needsReboot = true
+			}
+		}
+	}
+
+	if len(pendingDisks) == 0 && len(pendingAdapters) == 0 {
+		return nil
 	}
 
 	// If a reboot is necessary, check that the user has allowed the provider to restart the VM
@@ -976,15 +1090,24 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		}
 	}
 
-	// Apply modifications to the disks
-	for i, disk := range disks {
-		if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
+	// Apply modifications to the disks that actually diverge from the API
+	for _, disk := range disks {
+		id, _ := disk["id"].(string)
+		changes, pending := pendingDisks[id]
+		if !pending {
+			continue
+		}
+		if diags := osDiskUpdate(ctx, c, disk, changes); diags != nil {
 			return diags
 		}
 	}
 
-	// Apply modifications to the network adapters
+	// Apply modifications to the network adapters that actually diverge
 	for _, networkAdapter := range networkAdapters {
+		id, _ := networkAdapter["id"].(string)
+		if !pendingAdapters[id] {
+			continue
+		}
 		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter); diags != nil {
 			return diags
 		}
@@ -1008,9 +1131,9 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 	return nil
 }
 
-func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, i int, disk map[string]interface{}) diag.Diagnostics {
+func osDiskUpdate(ctx context.Context, c *client.Client, disk map[string]interface{}, changes osDiskPendingChanges) diag.Diagnostics {
 	// Update the disk if necessary
-	if d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i)) {
+	if changes.update {
 		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskUpdateRequest{
 			Size: disk["size"].(int),
 			Name: disk["name"].(string),
@@ -1025,7 +1148,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 	}
 
 	// Handle the disk relocation if necessary
-	if d.HasChange(fmt.Sprintf("os_disk.%d.storage_repository_id", i)) {
+	if changes.relocate {
 		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Relocate(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskRelocateRequest{
 			StorageRepositoryID: disk["storage_repository_id"].(string),
 		})
@@ -1042,10 +1165,11 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 }
 
 func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}) diag.Diagnostics {
+	txChecksumming, _ := networkAdapter["tx_checksumming"].(bool)
 	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), &client.UpdateOpenIaasNetworkAdapterRequest{
 		NetworkID:      networkAdapter["network_id"].(string),
 		MAC:            networkAdapter["mac_address"].(string),
-		TxChecksumming: networkAdapter["tx_checksumming"].(bool),
+		TxChecksumming: &txChecksumming,
 	})
 	if err != nil {
 		return diag.Errorf("failed to update os network adapter: %s", err)

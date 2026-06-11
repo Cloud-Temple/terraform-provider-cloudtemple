@@ -145,10 +145,11 @@ func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, m
 	c := getClient(meta)
 
 	if d.HasChange("network_id") || d.HasChange("mac_address") || d.HasChange("tx_checksumming") {
+		txChecksumming := d.Get("tx_checksumming").(bool)
 		activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, d.Id(), &client.UpdateOpenIaasNetworkAdapterRequest{
 			MAC:            d.Get("mac_address").(string),
 			NetworkID:      d.Get("network_id").(string),
-			TxChecksumming: d.Get("tx_checksumming").(bool),
+			TxChecksumming: &txChecksumming,
 		})
 		if err != nil {
 			return diag.Errorf("the network adapter could not be updated: %s", err)
