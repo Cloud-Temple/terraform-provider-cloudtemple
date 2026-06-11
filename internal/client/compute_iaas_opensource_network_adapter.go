@@ -81,7 +81,10 @@ func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaa
 }
 
 type UpdateOpenIaasNetworkAdapterRequest struct {
-	NetworkID string `json:"networkId"`
+	// All fields are optional (PATCH semantics): callers only set the
+	// fields that actually diverge — re-sending the current networkId/mac
+	// is rejected platform-side as a VPC Static IP self-conflict (#246).
+	NetworkID string `json:"networkId,omitempty"`
 	MAC       string `json:"mac,omitempty"`
 	Attached  bool   `json:"attached,omitempty"`
 	// Pointer so that an explicit `false` is serialized: with a plain bool

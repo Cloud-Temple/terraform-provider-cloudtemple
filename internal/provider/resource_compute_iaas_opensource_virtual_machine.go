@@ -1108,7 +1108,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		if !pendingAdapters[id] {
 			continue
 		}
-		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter); diags != nil {
+		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter, actualAdapters[id]); diags != nil {
 			return diags
 		}
 	}
@@ -1164,13 +1164,24 @@ func osDiskUpdate(ctx context.Context, c *client.Client, disk map[string]interfa
 	return nil
 }
 
-func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}) diag.Diagnostics {
-	txChecksumming, _ := networkAdapter["tx_checksumming"].(bool)
-	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), &client.UpdateOpenIaasNetworkAdapterRequest{
-		NetworkID:      networkAdapter["network_id"].(string),
-		MAC:            networkAdapter["mac_address"].(string),
-		TxChecksumming: &txChecksumming,
-	})
+func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter) diag.Diagnostics {
+	// Payload limited to the fields that actually diverge from the live
+	// adapter: re-sending the current networkId/mac is rejected platform-side
+	// as a VPC Static IP self-conflict (#246).
+	req := &client.UpdateOpenIaasNetworkAdapterRequest{}
+	if networkID, _ := networkAdapter["network_id"].(string); networkID != "" && networkID != actual.Network.ID {
+		req.NetworkID = networkID
+	}
+	if mac, _ := networkAdapter["mac_address"].(string); mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
+		req.MAC = mac
+	}
+	if tx, ok := networkAdapter["tx_checksumming"].(bool); ok && tx != actual.TxChecksumming {
+		req.TxChecksumming = &tx
+	}
+	if req.NetworkID == "" && req.MAC == "" && req.TxChecksumming == nil {
+		return nil
+	}
+	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), req)
 	if err != nil {
 		return diag.Errorf("failed to update os network adapter: %s", err)
 	}
