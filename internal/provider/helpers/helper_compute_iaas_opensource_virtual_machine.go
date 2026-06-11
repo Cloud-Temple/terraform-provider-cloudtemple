@@ -68,18 +68,32 @@ func FlattenOpenIaaSVirtualMachine(vm *client.OpenIaaSVirtualMachine) map[string
 	}
 }
 
+// cloudConfigDriveName is the name XO gives to the cloud-init config drive
+// it attaches at deploy time.
+const cloudConfigDriveName = "XO CloudConfigDrive"
+
+// isPlatformManagedDisk reports whether the disk is managed by the platform
+// (cloud-init config drive, attached read-only by XO at deploy time) and must
+// never be reconciled as an os_disk: capturing it — which is timing dependent
+// at create — produces a permanent removal drift in every subsequent plan.
+// Deliberately restricted to the exact XO naming: a broader criterion (e.g.
+// any read-only VBD) could silently drop legitimate disks without a formal
+// API invariant.
+func isPlatformManagedDisk(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) bool {
+	return osDisk.Name == cloudConfigDriveName
+}
+
 func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMachineId string) []interface{} {
-	if osDisks != nil {
-		disks := make([]interface{}, len(osDisks))
+	disks := make([]interface{}, 0, len(osDisks))
 
-		for i, osDisk := range osDisks {
-			disks[i] = FlattenOpenIaaSOSDiskData(osDisk, virtualMachineId)
+	for _, osDisk := range osDisks {
+		if isPlatformManagedDisk(osDisk, virtualMachineId) {
+			continue
 		}
-
-		return disks
+		disks = append(disks, FlattenOpenIaaSOSDiskData(osDisk, virtualMachineId))
 	}
 
-	return make([]interface{}, 0)
+	return disks
 }
 
 func FlattenOpenIaaSOSDiskData(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) interface{} {
