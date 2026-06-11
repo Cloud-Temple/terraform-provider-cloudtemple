@@ -51,7 +51,7 @@ resource "cloudtemple_compute_network_adapter" "foo" {
   virtual_machine_id = cloudtemple_compute_virtual_machine.web.id
   network_id         = data.cloudtemple_compute_network.vlan.id
   type               = "VMXNET3"
-  mac_type           = "ASSIGNED"
+  ip_address         = "192.168.1.100" # Optionnal property, only available with a VPC network.
 }
 ```
 
@@ -68,6 +68,7 @@ resource "cloudtemple_compute_network_adapter" "foo" {
 
 - `auto_connect` (Boolean) Whether the network adapter should connect to the network automatically when the virtual machine is powered on.
 - `connected` (Boolean) Whether the network adapter should be connected to the network. Defaults to true.
+- `ip_address` (String) The IP address to assign to this network adapter (only compatible with VPC networks).
 - `mac_address` (String) The MAC address of the network adapter. If not provided, a MAC address will be generated automatically.
 
 ### Read-Only

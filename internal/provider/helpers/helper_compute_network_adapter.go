@@ -13,6 +13,7 @@ func FlattenNetworkAdapter(adapter *client.NetworkAdapter) map[string]interface{
 		"type":               adapter.Type,
 		"mac_type":           adapter.MacType,
 		"mac_address":        adapter.MacAddress,
+		"ip_address":         adapter.IPAddress,
 		"connected":          adapter.Connected,
 		"auto_connect":       adapter.AutoConnect,
 	}

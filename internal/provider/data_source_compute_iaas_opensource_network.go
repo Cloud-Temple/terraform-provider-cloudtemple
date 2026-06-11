@@ -39,7 +39,7 @@ func dataSourceOpenIaasNetwork() *schema.Resource {
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
-				AtLeastOneOf:  []string{"id", "name"},
+				RequiredWith:  []string{"name"},
 				Description:   "The ID of the machine manager to filter networks by. Required when searching by `name`.",
 			},
 			"pool_id": {
@@ -47,7 +47,7 @@ func dataSourceOpenIaasNetwork() *schema.Resource {
 				Optional:      true,
 				ValidateFunc:  validation.IsUUID,
 				ConflictsWith: []string{"id"},
-				AtLeastOneOf:  []string{"id", "name"},
+				RequiredWith:  []string{"name"},
 				Description:   "The ID of the pool to filter networks by. Required when searching by `name`.",
 			},
 

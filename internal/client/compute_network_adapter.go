@@ -18,6 +18,7 @@ type NetworkAdapter struct {
 	Type             string
 	MacType          string
 	MacAddress       string
+	IPAddress        string
 	Connected        bool
 	AutoConnect      bool
 }
@@ -52,6 +53,7 @@ type CreateNetworkAdapterRequest struct {
 	NetworkId        string `json:"networkId"`
 	Type             string `json:"type"`
 	MacAddress       string `json:"macAddress,omitempty"`
+	IPAddress        string `json:"ipAddress,omitempty"`
 }
 
 func (n *NetworkAdapterClient) Create(ctx context.Context, req *CreateNetworkAdapterRequest) (string, error) {
@@ -85,6 +87,7 @@ type UpdateNetworkAdapterRequest struct {
 	NewNetworkId string `json:"newNetworkId"`
 	AutoConnect  bool   `json:"autoConnect"`
 	MacAddress   string `json:"macAddress,omitempty"`
+	IPAddress    string `json:"ipAddress,omitempty"`
 }
 
 func (n *NetworkAdapterClient) Update(ctx context.Context, req *UpdateNetworkAdapterRequest) (string, error) {

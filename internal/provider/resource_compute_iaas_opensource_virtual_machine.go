@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"html"
 	"regexp"
 	"strings"
 	"time"
@@ -254,6 +255,14 @@ Order of the elements in the list is the boot order.`,
 				Description: "The network adapters of the virtual machine.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
+						// WIP : Not possible at this moment since we cannot send a vpc network id at the virtual machine creation.
+						// "ip_address": {
+						// 	Type:         schema.TypeString,
+						// 	Optional:     true,
+						// 	Computed:     true,
+						// 	Description:  "The IP address to assign to this network adapter (only compatible with VPC networks).",
+						// 	ValidateFunc: validation.IsIPv4Address,
+						//},
 						"mac_address": {
 							Type:        schema.TypeString,
 							Optional:    true,
@@ -475,7 +484,8 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 			osNetworkAdapter := osNetworkAdapters[i].(map[string]interface{})
 			templateNetworkAdapters[i] = client.OSNetworkAdapter{
 				NetworkID: osNetworkAdapter["network_id"].(string),
-				MAC:       osNetworkAdapter["mac_address"].(string),
+				// IPAddress: osNetworkAdapter["ip_address"].(string), // WIP : Not possible at this moment.
+				MAC: osNetworkAdapter["mac_address"].(string),
 			}
 		}
 
@@ -657,7 +667,7 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 
 	tagsMap := make(map[string]interface{})
 	for _, tag := range tags {
-		tagsMap[tag.Key] = tag.Value
+		tagsMap[html.UnescapeString(tag.Key)] = html.UnescapeString(tag.Value)
 	}
 	d.Set("tags", tagsMap)
 
@@ -1043,7 +1053,8 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 
 func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}) diag.Diagnostics {
 	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), &client.UpdateOpenIaasNetworkAdapterRequest{
-		NetworkID:      networkAdapter["network_id"].(string),
+		NetworkID: networkAdapter["network_id"].(string),
+		// IPAddress:      networkAdapter["ip_address"].(string), // WIP : Not possible at this moment.
 		MAC:            networkAdapter["mac_address"].(string),
 		TxChecksumming: networkAdapter["tx_checksumming"].(bool),
 	})

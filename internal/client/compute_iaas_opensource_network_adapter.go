@@ -26,6 +26,7 @@ type OpenIaaSNetworkAdapter struct {
 type CreateOpenIaasNetworkAdapterRequest struct {
 	VirtualMachineID string `json:"virtualMachineId"`
 	NetworkID        string `json:"networkId"`
+	IPAddress        string `json:"ipAddress,omitempty"`
 	MAC              string `json:"mac,omitempty"`
 }
 
@@ -82,6 +83,7 @@ func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaa
 
 type UpdateOpenIaasNetworkAdapterRequest struct {
 	NetworkID      string `json:"networkId"`
+	IPAddress      string `json:"ipAddress,omitempty"`
 	MAC            string `json:"mac,omitempty"`
 	Attached       bool   `json:"attached,omitempty"`
 	TxChecksumming bool   `json:"txChecksumming,omitempty"`

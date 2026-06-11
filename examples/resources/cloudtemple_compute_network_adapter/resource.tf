@@ -27,5 +27,5 @@ resource "cloudtemple_compute_network_adapter" "foo" {
   virtual_machine_id = cloudtemple_compute_virtual_machine.web.id
   network_id         = data.cloudtemple_compute_network.vlan.id
   type               = "VMXNET3"
-  mac_type           = "ASSIGNED"
+  ip_address         = "192.168.1.100" # Optionnal property, only available with a VPC network.
 }

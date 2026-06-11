@@ -1,6 +1,8 @@
 package client
 
-import "context"
+import (
+	"context"
+)
 
 // VPCFloatingIPClient handles floating IP operations
 type VPCFloatingIPClient struct {
@@ -65,4 +67,52 @@ func (f *VPCFloatingIPClient) Read(ctx context.Context, id string) (*FloatingIP,
 	}
 
 	return &out, nil
+}
+
+// CreateFloatingIPRequest represents a request to create a floating IP
+type CreateFloatingIPRequest struct {
+	Count int `json:"count"`
+}
+
+// Create creates a new floating IP
+// Returns the activity ID that should be waited for completion
+func (f *VPCFloatingIPClient) Create(ctx context.Context, req *CreateFloatingIPRequest) (string, error) {
+	r := f.c.newRequest("POST", "/vpc/v1/floating_ips")
+	r.obj = req
+	return f.c.doRequestAndReturnActivity(ctx, r)
+}
+
+// UpdateFloatingIPRequest represents a request to update a floating IP
+type UpdateFloatingIPRequest struct {
+	ID          string `json:"id"`
+	Description string `json:"description"`
+}
+
+// Update updates a floating IP
+// Returns the activity ID that should be waited for completion
+func (f *VPCFloatingIPClient) Update(ctx context.Context, req *UpdateFloatingIPRequest) (string, error) {
+	r := f.c.newRequest("PATCH", "/vpc/v1/floating_ips/%s", req.ID)
+	r.obj = req
+	return f.c.doRequestAndReturnActivity(ctx, r)
+}
+
+// Bind binds a floating IP to a static IP
+// Returns the activity ID that should be waited for completion
+func (f *VPCFloatingIPClient) Bind(ctx context.Context, floatingIPID, staticIPID string) (string, error) {
+	r := f.c.newRequest("POST", "/vpc/v1/floating_ips/%s/bind/static_ips/%s", floatingIPID, staticIPID)
+	return f.c.doRequestAndReturnActivity(ctx, r)
+}
+
+// Unbind unbinds a floating IP from a static IP
+// Returns the activity ID that should be waited for completion
+func (f *VPCFloatingIPClient) Unbind(ctx context.Context, floatingIPID, staticIPID string) (string, error) {
+	r := f.c.newRequest("DELETE", "/vpc/v1/floating_ips/%s/unbind/static_ips/%s", floatingIPID, staticIPID)
+	return f.c.doRequestAndReturnActivity(ctx, r)
+}
+
+// Delete deletes a floating IP
+// Returns the activity ID that should be waited for completion
+func (f *VPCFloatingIPClient) Delete(ctx context.Context, id string) (string, error) {
+	r := f.c.newRequest("DELETE", "/vpc/v1/floating_ips/%s", id)
+	return f.c.doRequestAndReturnActivity(ctx, r)
 }

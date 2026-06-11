@@ -35,6 +35,13 @@ func resourceOpenIaasNetworkAdapter() *schema.Resource {
 				Required:     true,
 				ValidateFunc: validation.IsUUID,
 			},
+			"ip_address": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				Computed:     true,
+				Description:  "The IP address to assign to this network adapter (only compatible with VPC networks).",
+				ValidateFunc: validation.IsIPv4Address,
+			},
 			"mac_address": {
 				Type:        schema.TypeString,
 				Description: "The MAC address of the network adapter. If not specified, a random MAC address will be generated.",
@@ -90,6 +97,7 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Create(ctx, &client.CreateOpenIaasNetworkAdapterRequest{
 		VirtualMachineID: d.Get("virtual_machine_id").(string),
 		NetworkID:        d.Get("network_id").(string),
+		IPAddress:        d.Get("ip_address").(string),
 		MAC:              d.Get("mac_address").(string),
 	})
 	if err != nil {
@@ -148,6 +156,7 @@ func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, m
 		activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, d.Id(), &client.UpdateOpenIaasNetworkAdapterRequest{
 			MAC:            d.Get("mac_address").(string),
 			NetworkID:      d.Get("network_id").(string),
+			IPAddress:      d.Get("ip_address").(string),
 			TxChecksumming: d.Get("tx_checksumming").(bool),
 		})
 		if err != nil {

@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"html"
 	"regexp"
 	"strings"
 	"time"
@@ -1176,7 +1177,7 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 
 	tagsMap := make(map[string]interface{})
 	for _, tag := range tags {
-		tagsMap[tag.Key] = tag.Value
+		tagsMap[html.UnescapeString(tag.Key)] = html.UnescapeString(tag.Value)
 	}
 	vmData["tags"] = tagsMap
 

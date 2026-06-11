@@ -66,6 +66,7 @@ type CloudInit struct {
 
 type OSNetworkAdapter struct {
 	NetworkID string `json:"networkId"`
+	IPAddress string `json:"ipAddress,omitempty"`
 	MAC       string `json:"mac,omitempty"`
 }
 

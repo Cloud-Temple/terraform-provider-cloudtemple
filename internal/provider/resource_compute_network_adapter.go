@@ -52,6 +52,13 @@ func resourceNetworkAdapter() *schema.Resource {
 				Computed:    true,
 				Description: "The MAC address of the network adapter. If not provided, a MAC address will be generated automatically.",
 			},
+			"ip_address": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				Computed:     true,
+				Description:  "The IP address to assign to this network adapter (only compatible with VPC networks).",
+				ValidateFunc: validation.IsIPv4Address,
+			},
 			"auto_connect": {
 				Type:        schema.TypeBool,
 				Optional:    true,
@@ -86,6 +93,7 @@ func computeNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, me
 		MacAddress:       d.Get("mac_address").(string),
 		NetworkId:        d.Get("network_id").(string),
 		Type:             d.Get("type").(string),
+		IPAddress:        d.Get("ip_address").(string),
 	})
 	if err != nil {
 		return diag.Errorf("the network adapter could not be created: %s", err)
@@ -134,6 +142,7 @@ func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, me
 		NewNetworkId: d.Get("network_id").(string),
 		AutoConnect:  d.Get("auto_connect").(bool),
 		MacAddress:   d.Get("mac_address").(string),
+		IPAddress:    d.Get("ip_address").(string),
 	})
 	if err != nil {
 		return diag.Errorf("failed to update network adapter, %s", err)
