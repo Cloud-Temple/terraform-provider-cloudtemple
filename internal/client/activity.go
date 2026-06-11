@@ -2,12 +2,38 @@ package client
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/sethvargo/go-retry"
 )
+
+// transientActivityReasons lists platform-side failure reasons known to be
+// temporary (VPC workers not responding) and safe to retry at the operation
+// level (#251). Permanent reasons (MAC conflict, insufficient space…) must
+// stay immediately fatal.
+var transientActivityReasons = []string{
+	"None of the workers were able to respond",
+}
+
+// IsTransientActivityFailure reports whether err is an activity that reached
+// the "failed" state for a reason known to be transient platform-side.
+func IsTransientActivityFailure(err error) bool {
+	var ace *ActivityCompletionError
+	if !errors.As(err, &ace) || ace.activity == nil {
+		return false
+	}
+	for _, state := range ace.activity.State {
+		for _, marker := range transientActivityReasons {
+			if strings.Contains(state.Reason, marker) {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 type ActivityClient struct {
 	c *Client

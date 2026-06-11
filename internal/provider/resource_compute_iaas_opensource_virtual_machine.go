@@ -1181,12 +1181,11 @@ func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapte
 	if req.NetworkID == "" && req.MAC == "" && req.TxChecksumming == nil {
 		return nil
 	}
-	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), req)
-	if err != nil {
-		return diag.Errorf("failed to update os network adapter: %s", err)
-	}
-	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	if err != nil {
+	adapterID := networkAdapter["id"].(string)
+	// PATCH idempotent : retry borne sur echec transitoire (#251).
+	if _, err := runActivityWithRetry(ctx, c, fmt.Sprintf("update os network adapter %s", adapterID), func() (string, error) {
+		return c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, adapterID, req)
+	}); err != nil {
 		return diag.Errorf("failed to update os network adapter: %s", err)
 	}
 
