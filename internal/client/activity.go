@@ -146,21 +146,37 @@ func (a *ActivityCompletionError) Error() string {
 	return message
 }
 
+// maxActivityReadRetries bounds the number of CONSECUTIVE transient read
+// failures (5xx, throttling, transport errors) tolerated while polling an
+// activity. Without it, a single transient 500 while reading the activity
+// status fails an operation that keeps running platform-side, leaving the
+// resource orphaned outside the Terraform state (issue #245).
+const maxActivityReadRetries = 8
+
 func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string, options *WaiterOptions) (*Activity, error) {
 	b := retry.NewFibonacci(1 * time.Second)
 	b = retry.WithCappedDuration(30*time.Second, b)
 
 	var res *Activity
 	var count int
+	var consecutiveReadFailures int
 
 	err := retry.Do(ctx, b, func(ctx context.Context) error {
 		count++
 		activity, err := c.Read(ctx, id)
 		if err != nil {
+			if isTransientAPIError(err) && consecutiveReadFailures < maxActivityReadRetries {
+				consecutiveReadFailures++
+				return options.retryableError(&ActivityCompletionError{
+					message: fmt.Sprintf("transient error while getting the status of activity %q (attempt %d/%d): %s",
+						id, consecutiveReadFailures, maxActivityReadRetries, err),
+				})
+			}
 			return options.error(&ActivityCompletionError{
 				message: fmt.Sprintf("an error occured while getting the status of activity %q: %s", id, err),
 			})
 		}
+		consecutiveReadFailures = 0
 
 		if activity == nil {
 			err := &ActivityCompletionError{
