@@ -116,9 +116,12 @@ Order of the elements in the list is the boot order.`,
 				Computed:    true,
 			},
 			"boot_firmware": {
-				Type:         schema.TypeString,
-				Description:  "The boot firmware to use. Available values are 'bios' and 'uefi'.",
-				Optional:     true,
+				Type:        schema.TypeString,
+				Description: "The boot firmware to use. Available values are 'bios' and 'uefi'.",
+				Optional:    true,
+				// Computed: marketplace images set it (uefi). Without it the
+				// plan never converges (permanent "uefi" -> null drift).
+				Computed:     true,
 				ValidateFunc: validation.StringInSlice([]string{"bios", "uefi"}, false),
 			},
 			"auto_power_on": {
