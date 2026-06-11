@@ -44,6 +44,16 @@ func dataSourceOpenIaasPools() *schema.Resource {
 							Computed:    true,
 							Description: "The name of the pool.",
 						},
+						"label": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The label of the pool.",
+						},
+						"master": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The ID of the master host of the pool.",
+						},
 						"internal_id": {
 							Type:        schema.TypeString,
 							Computed:    true,
@@ -65,6 +75,25 @@ func dataSourceOpenIaasPools() *schema.Resource {
 							Description: "List of host IDs in this pool.",
 							Elem: &schema.Schema{
 								Type: schema.TypeString,
+							},
+						},
+						"memory": {
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Memory information for the pool.",
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"usage": {
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The current memory usage in bytes.",
+									},
+									"size": {
+										Type:        schema.TypeInt,
+										Computed:    true,
+										Description: "The total memory size in bytes.",
+									},
+								},
 							},
 						},
 						"cpu": {
