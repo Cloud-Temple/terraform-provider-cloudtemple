@@ -83,3 +83,7 @@ terraform.rc
 .env
 .env.test
 .vscode/
+
+# Local-only internal audit subtree (kept on workstation, never published to
+# this public repo). Other DESIGN/ content may be intentionally tracked.
+DESIGN/tf-cloudtemple-api-gap
