@@ -59,6 +59,29 @@ type OpenIaaSNetworkAdapterFilter struct {
 	VirtualMachineID string `filter:"virtualMachineId"`
 }
 
+// ListStrict behaves like List but treats an access-denied answer as an
+// error instead of an empty result: callers using the listing as EVIDENCE
+// for state-shrinking decisions must fail closed (#273).
+func (v *OpenIaaSNetworkAdapterClient) ListStrict(ctx context.Context, filter *OpenIaaSNetworkAdapterFilter) ([]*OpenIaaSNetworkAdapter, error) {
+	r := v.c.newRequest("GET", "/compute/v1/open_iaas/network_adapters")
+	r.addFilter(filter)
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireOK(resp); err != nil {
+		return nil, err
+	}
+
+	var out []*OpenIaaSNetworkAdapter
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaaSNetworkAdapterFilter) ([]*OpenIaaSNetworkAdapter, error) {
 	r := v.c.newRequest("GET", "/compute/v1/open_iaas/network_adapters")
 	r.addFilter(filter)
