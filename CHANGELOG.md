@@ -1,5 +1,13 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.8.0 (Unreleased)
+
+SECURITY :
+
+  * Replaced the archived `github.com/dgrijalva/jwt-go` dependency with the maintained fork `github.com/golang-jwt/jwt/v4` (CVE-2020-26160).
+  * Updated `google.golang.org/grpc` to v1.79.3 (CVE-2026-33186), `golang.org/x/crypto` to v0.46.0 (CVE-2025-22869, CVE-2025-47914, CVE-2025-58181), `golang.org/x/net` to v0.48.0 (CVE-2025-22870, CVE-2025-22872) and `github.com/cloudflare/circl` to v1.6.3 (CVE-2025-8556, CVE-2026-1229).
+  * The provider is now built with Go 1.24.
+
 # 1.7.1 (April 15th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
