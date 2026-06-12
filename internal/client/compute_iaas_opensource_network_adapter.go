@@ -81,10 +81,15 @@ func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaa
 }
 
 type UpdateOpenIaasNetworkAdapterRequest struct {
-	NetworkID      string `json:"networkId"`
-	MAC            string `json:"mac,omitempty"`
-	Attached       bool   `json:"attached,omitempty"`
-	TxChecksumming bool   `json:"txChecksumming,omitempty"`
+	// All fields are optional (PATCH semantics): callers only set the
+	// fields that actually diverge — re-sending the current networkId/mac
+	// is rejected platform-side as a VPC Static IP self-conflict (#246).
+	NetworkID string `json:"networkId,omitempty"`
+	MAC       string `json:"mac,omitempty"`
+	Attached  bool   `json:"attached,omitempty"`
+	// Pointer so that an explicit `false` is serialized: with a plain bool
+	// and omitempty, disabling TX checksumming could never be sent (#246).
+	TxChecksumming *bool `json:"txChecksumming,omitempty"`
 }
 
 func (v *OpenIaaSNetworkAdapterClient) Update(ctx context.Context, id string, req *UpdateOpenIaasNetworkAdapterRequest) (string, error) {
