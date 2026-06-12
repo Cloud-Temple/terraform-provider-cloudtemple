@@ -406,3 +406,82 @@ func TestBuildOpenIaasVIFPatch(t *testing.T) {
 		}
 	})
 }
+
+func TestClassifyOSDiskOnRead(t *testing.T) {
+	const vmID = "vm-1"
+
+	tests := []struct {
+		name string
+		disk *client.OpenIaaSVirtualDisk
+		want osDiskReadAction
+	}{
+		{
+			name: "deleted disk is dropped instead of crashing",
+			disk: nil,
+			want: osDiskReadDropGone,
+		},
+		{
+			name: "read-only XO config drive on this VM is cleaned up",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: "XO CloudConfigDrive",
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: vmID, ReadOnly: true},
+				},
+			},
+			want: osDiskReadDropPlatformManaged,
+		},
+		{
+			name: "writable user disk with the colliding name stays managed (ambiguous)",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: "XO CloudConfigDrive",
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: vmID, ReadOnly: false},
+				},
+			},
+			want: osDiskReadKeep,
+		},
+		{
+			name: "XO-named disk read-only on another VM stays managed (ambiguous)",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: "XO CloudConfigDrive",
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: "vm-other", ReadOnly: true},
+				},
+			},
+			want: osDiskReadKeep,
+		},
+		{
+			name: "XO-named disk without any VBD stays managed (ambiguous, fail-safe)",
+			disk: &client.OpenIaaSVirtualDisk{Name: "XO CloudConfigDrive"},
+			want: osDiskReadKeep,
+		},
+		{
+			name: "ordinary user disk stays managed",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: "data-disk",
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: vmID, ReadOnly: false, Connected: true},
+				},
+			},
+			want: osDiskReadKeep,
+		},
+		{
+			name: "legitimate read-only disk with another name stays managed",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: "shared-iso",
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: vmID, ReadOnly: true},
+				},
+			},
+			want: osDiskReadKeep,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := classifyOSDiskOnRead(tt.disk, vmID); got != tt.want {
+				t.Errorf("classifyOSDiskOnRead() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

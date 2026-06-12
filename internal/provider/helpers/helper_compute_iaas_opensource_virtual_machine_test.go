@@ -65,8 +65,8 @@ func TestIsPlatformManagedDisk(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := isPlatformManagedDisk(tt.disk, vmID); got != tt.want {
-				t.Errorf("isPlatformManagedDisk() = %v, want %v", got, tt.want)
+			if got := IsPlatformManagedDisk(tt.disk, vmID); got != tt.want {
+				t.Errorf("IsPlatformManagedDisk() = %v, want %v", got, tt.want)
 			}
 		})
 	}

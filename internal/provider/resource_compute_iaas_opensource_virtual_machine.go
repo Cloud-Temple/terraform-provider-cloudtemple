@@ -631,12 +631,33 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 			continue
 		}
 		osDiskId := osDisk.(map[string]interface{})["id"].(string)
-		if osDiskId != "" {
-			disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, osDiskId)
-			if err != nil {
-				return diag.Errorf("failed to read os disk: %s", err)
-			}
+		if osDiskId == "" {
+			continue
+		}
+		disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, osDiskId)
+		if err != nil {
+			return diag.Errorf("failed to read os disk: %s", err)
+		}
+		switch classifyOSDiskOnRead(disk, d.Id()) {
+		case osDiskReadKeep:
 			osDisks = append(osDisks, helpers.FlattenOpenIaaSOSDiskData(disk, d.Id()))
+		case osDiskReadDropGone:
+			// The disk no longer exists platform-side: reflect reality in
+			// the state instead of crashing on the stale entry (#234 class).
+		case osDiskReadDropPlatformManaged:
+			// Legacy state pollution (#255): pre-1.8.0 creations could
+			// capture the cloud-init config drive as a managed os_disk,
+			// leaving a permanent removal drift. The strict live evidence
+			// (exact XO name AND read-only VBD on this VM) allows the
+			// cleanup; ambiguous disks stay in the state and require the
+			// documented manual remediation. No platform-side change is
+			// ever made: this is a state-shape correction only.
+			diags = append(diags, diag.Diagnostic{
+				Severity: diag.Warning,
+				Summary:  "Platform-managed cloud-init config drive removed from os_disk",
+				Detail: fmt.Sprintf("The disk %s (%q) is the XO cloud-init config drive, attached read-only by the platform at deploy time. It was captured in the Terraform state by a pre-1.8.0 creation and is now dropped from os_disk to stop the permanent removal drift. No platform-side change was made.",
+					osDiskId, disk.Name),
+			})
 		}
 	}
 	vmData["os_disk"] = osDisks
@@ -648,13 +669,19 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 			continue
 		}
 		osNetworkAdapterId := osNetworkAdapter.(map[string]interface{})["id"].(string)
-		if osNetworkAdapterId != "" {
-			networkAdapter, err := c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, osNetworkAdapterId)
-			if err != nil {
-				return diag.Errorf("failed to read os network adapter: %s", err)
-			}
-			osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOpenIaaSOSNetworkAdapterData(networkAdapter))
+		if osNetworkAdapterId == "" {
+			continue
 		}
+		networkAdapter, err := c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, osNetworkAdapterId)
+		if err != nil {
+			return diag.Errorf("failed to read os network adapter: %s", err)
+		}
+		if networkAdapter == nil {
+			// The adapter no longer exists platform-side: reflect reality
+			// instead of crashing on the stale entry (#234 class).
+			continue
+		}
+		osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOpenIaaSOSNetworkAdapterData(networkAdapter))
 	}
 	vmData["os_network_adapter"] = osNetworkAdapters
 
@@ -961,6 +988,36 @@ func diskPendingChanges(desired map[string]interface{}, actual *client.OpenIaaSV
 		changes.relocate = true
 	}
 	return changes
+}
+
+// osDiskReadAction is the decision of classifyOSDiskOnRead for one os_disk
+// entry of the state during a refresh.
+type osDiskReadAction int
+
+const (
+	// osDiskReadKeep: the disk exists and is user-managed — keep it.
+	osDiskReadKeep osDiskReadAction = iota
+	// osDiskReadDropGone: the disk no longer exists platform-side — drop
+	// the stale entry instead of crashing on the nil API answer.
+	osDiskReadDropGone
+	// osDiskReadDropPlatformManaged: the disk is the XO cloud-init config
+	// drive (strict live evidence: exact name AND read-only VBD on this
+	// VM) captured by a pre-1.8.0 creation — drop it with a warning.
+	osDiskReadDropPlatformManaged
+)
+
+// classifyOSDiskOnRead decides what the refresh does with an os_disk entry
+// of the state, based exclusively on the live API answer. Ambiguity is
+// conservative: a disk that merely shares the XO config drive name (writable,
+// read-only on another VM, or without a VBD on this VM) stays managed.
+func classifyOSDiskOnRead(disk *client.OpenIaaSVirtualDisk, virtualMachineID string) osDiskReadAction {
+	if disk == nil {
+		return osDiskReadDropGone
+	}
+	if helpers.IsPlatformManagedDisk(disk, virtualMachineID) {
+		return osDiskReadDropPlatformManaged
+	}
+	return osDiskReadKeep
 }
 
 // openIaasVMDesiredProperties carries the desired VM properties from the
