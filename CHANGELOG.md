@@ -18,6 +18,9 @@ BUG FIXES :
   * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to send an unconditional full-properties update on every apply. Properties are now only patched when they actually diverge from the live API state, and `secure_boot` is only sent when explicitly configured.
   * Fixed a bug causing an in-progress operation to be reported as failed when a transient error (429, 5xx or a transport failure) occurred while polling its activity status. Transient read failures are now retried with a bounded consecutive budget.
   * Fixed datasources `cloudtemple_compute_iaas_opensource_pools`, `cloudtemple_compute_iaas_opensource_virtual_machine`, `cloudtemple_compute_iaas_opensource_virtual_machines`, `cloudtemple_compute_iaas_opensource_virtual_disk` and `cloudtemple_compute_iaas_opensource_virtual_disks` failing at read time with an `Invalid address to set` error: the schemas now declare every attribute emitted by the flatten helpers.
+  * Fixed resource `cloudtemple_compute_virtual_machine` re-sending the full `boot_options` block (including values merely inherited from the live state) on every update. The block is now only sent when explicitly configured, and its booleans only when explicitly set.
+  * Fixed resource `cloudtemple_iam_personal_access_token` erasing `secret_id` from the state on refresh (the API only returns the secret at creation).
+  * Fixed resources `cloudtemple_compute_iaas_opensource_replication_policy` and `cloudtemple_compute_iaas_opensource_virtual_disk` being dropped from the Terraform state when a transient API error occurred during refresh, which made the next apply create a duplicate.
 
 IMPROVEMENTS :
 

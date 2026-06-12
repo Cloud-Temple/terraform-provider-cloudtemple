@@ -128,7 +128,13 @@ func openIaasReplicationPolicyRead(ctx context.Context, d *schema.ResourceData, 
 	var diags diag.Diagnostics
 
 	replicationPolicy, err := c.Compute().OpenIaaS().Replication().Policy().Read(ctx, d.Id())
-	if replicationPolicy == nil || err != nil {
+	// A read error is NOT a deletion: clearing the id on a transient
+	// failure would drop the resource from the state and the next apply
+	// would create a duplicate (#264 plan, Lot D).
+	if err != nil {
+		return diag.Errorf("failed to read replication policy: %s", err)
+	}
+	if replicationPolicy == nil {
 		d.SetId("")
 		return nil
 	}

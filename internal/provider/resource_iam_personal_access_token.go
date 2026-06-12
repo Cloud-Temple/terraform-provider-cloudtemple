@@ -129,7 +129,11 @@ func resourcePersonalAccessTokenRead(ctx context.Context, d *schema.ResourceData
 	sw.set("roles", stringSliceToInterfaceSlice(token.Roles))
 	sw.set("expiration_date", expirationDate.Format(time.RFC3339))
 	sw.set("client_id", token.ID)
-	sw.set("secret_id", token.Secret)
+	// The API only returns the secret at creation: overwriting it on
+	// refresh would erase the only copy from the state (#264 plan, Lot D).
+	if token.Secret != "" {
+		sw.set("secret_id", token.Secret)
+	}
 
 	return sw.diags
 }

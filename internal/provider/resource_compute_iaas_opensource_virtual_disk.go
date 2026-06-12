@@ -184,9 +184,14 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 
 	// Récupérer le disque virtuel par son ID
 	virtualDisk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
-	if virtualDisk == nil || err != nil {
-		// Si le disque virtuel n'existe pas, on définit l'ID à une chaîne vide
-		// pour indiquer à Terraform que la ressource n'existe plus
+	// A read error is NOT a deletion: clearing the id on a transient
+	// failure would drop the resource from the state and the next apply
+	// would create a duplicate (#264 plan, Lot D).
+	if err != nil {
+		return diag.Errorf("failed to read virtual disk: %s", err)
+	}
+	if virtualDisk == nil {
+		// The virtual disk no longer exists: remove it from the state.
 		d.SetId("")
 		return nil
 	}

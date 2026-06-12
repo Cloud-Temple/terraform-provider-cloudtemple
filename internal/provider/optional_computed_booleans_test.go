@@ -25,11 +25,11 @@ var optionalComputedBooleanGuards = map[string]string{
 	"cloudtemple_compute_iaas_opensource_virtual_machine.os_network_adapter.attached":        "deprecated attribute, never written from the VM path",
 	"cloudtemple_compute_iaas_opensource_virtual_machine.os_network_adapter.tx_checksumming": "raw-config gated through osAdapterTxConfigured (map[string]*bool)",
 	"cloudtemple_compute_iaas_opensource_network_adapter.tx_checksumming":                    "raw-config gated in openIaasNetworkAdapterUpdate (txConfigured)",
-	"cloudtemple_compute_virtual_machine.boot_options.enter_bios_setup":                      "UNGATED-LEGACY: VMware parity batch (Lot D of the #264 plan)",
-	"cloudtemple_compute_virtual_machine.boot_options.boot_retry_enabled":                    "UNGATED-LEGACY: VMware parity batch (Lot D of the #264 plan)",
-	"cloudtemple_compute_virtual_machine.boot_options.efi_secure_boot_enabled":               "UNGATED-LEGACY: VMware parity batch (Lot D of the #264 plan)",
-	"cloudtemple_compute_virtual_machine.os_network_adapter.auto_connect":                    "UNGATED-LEGACY: VMware parity batch (Lot D of the #264 plan)",
-	"cloudtemple_compute_virtual_machine.os_network_adapter.connected":                       "UNGATED-LEGACY: VMware parity batch (Lot D of the #264 plan)",
+	"cloudtemple_compute_virtual_machine.boot_options.enter_bios_setup":                      "raw-config gated in buildVMwareBootOptionsFromRaw (Lot D)",
+	"cloudtemple_compute_virtual_machine.boot_options.boot_retry_enabled":                    "raw-config gated in buildVMwareBootOptionsFromRaw (Lot D)",
+	"cloudtemple_compute_virtual_machine.boot_options.efi_secure_boot_enabled":               "raw-config gated in buildVMwareBootOptionsFromRaw (Lot D)",
+	"cloudtemple_compute_virtual_machine.os_network_adapter.auto_connect":                    "UNGATED-LEGACY: write guarded by per-index HasChange in updateVirtualMachine; merged value still pushed when any adapter field changes — full raw-config gating tracked in the #264 plan",
+	"cloudtemple_compute_virtual_machine.os_network_adapter.connected":                       "UNGATED-LEGACY: connect/disconnect guarded by per-index HasChange on the attribute itself — full raw-config gating tracked in the #264 plan",
 }
 
 // collectOptionalComputedBooleans walks a schema map recursively and
