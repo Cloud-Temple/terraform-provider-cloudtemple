@@ -97,8 +97,8 @@ func runVIFUpdateWithRetry(ctx context.Context, adapterID string, funcs vifUpdat
 		}
 		tflog.Warn(ctx, fmt.Sprintf("update network adapter %s: transient platform failure (attempt %d/%d), retrying: %s",
 			adapterID, attempt, maxTransientVIFAttempts, err))
-		if err := funcs.sleep(ctx, attempt); err != nil {
-			return lastErr
+		if sleepErr := funcs.sleep(ctx, attempt); sleepErr != nil {
+			return fmt.Errorf("cancelled while retrying: %w (last transient failure: %s)", sleepErr, lastErr)
 		}
 	}
 	return lastErr

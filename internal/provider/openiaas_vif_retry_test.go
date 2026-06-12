@@ -152,3 +152,16 @@ func TestVIFRetryAlreadyConvergedIsANoOp(t *testing.T) {
 		t.Fatalf("updates=%d, want 0 (converged adapter produces no PATCH)", counts.updates)
 	}
 }
+
+func TestVIFRetryCancellationCarriesContext(t *testing.T) {
+	counts := &vifCallCounts{}
+	funcs := scriptedVIFFuncs(counts, []*client.OpenIaaSNetworkAdapter{divergedAdapter()}, []error{errTransientVIF})
+	funcs.sleep = func(ctx context.Context, attempt int) error { return context.Canceled }
+	err := runVIFUpdateWithRetry(context.Background(), "vif-1", funcs, buildWantNet)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancellation must surface the context error, got: %v", err)
+	}
+	if counts.updates != 1 {
+		t.Fatalf("updates=%d, want 1 (no retry after cancellation)", counts.updates)
+	}
+}

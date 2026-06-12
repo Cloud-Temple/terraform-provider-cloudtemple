@@ -105,25 +105,22 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 			return diag.Errorf("the network adapter could not be created: %s", err)
 		}
 		activity, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		if err == nil || !client.IsTransientActivityFailure(err) {
+		if err == nil {
 			break
 		}
-		// Anti-duplicate guard (#251): only delete the VIF referenced by the
-		// FAILED activity itself (ConcernedItems) — never by listing diff,
-		// another actor may legitimately create VIFs on the same VM in the
-		// meantime. A half-created VIF has an uncertain VPC registration:
-		// cleaning it is safer than adopting it. If the failed activity
-		// references no adapter, nothing is deleted and the retry may leave
-		// an orphan VIF platform-side: accepted trade-off — the platform did
-		// not report what it created, and a wrong deletion would be worse.
-		if activity != nil {
-			for _, item := range activity.ConcernedItems {
-				if item.Type == "network_adapter" && item.ID != "" {
-					if delActivity, derr := c.Compute().OpenIaaS().NetworkAdapter().Delete(ctx, item.ID); derr == nil {
-						_, _ = c.Activity().WaitForCompletion(ctx, delActivity, getWaiterOptions(ctx))
-					}
-				}
-			}
+		if !client.IsTransientActivityFailure(err) {
+			// A permanent failure never seeds the state: the failed
+			// activity's adapter id must not become the resource id.
+			return diag.Errorf("the network adapter could not be created: %s", err)
+		}
+		// Anti-duplicate guard (#251, hardened by FF-1): only the adapters
+		// that the FAILED activity itself references AND that the strict
+		// VM-scoped listing confirms present on this VM are deleted. An
+		// UNCONFIRMED cleanup (strict listing unavailable, delete refused,
+		// delete activity failed) forbids any retry: the half-created
+		// adapter may still exist and a new attempt would duplicate it.
+		if cleanupErr := cleanupHalfCreatedVIFs(ctx, c, activity, vmID); cleanupErr != nil {
+			return diag.Errorf("the network adapter creation failed transiently and the cleanup could not be confirmed, refusing to retry (check virtual machine %s manually): create failure: %s; cleanup failure: %s", vmID, err, cleanupErr)
 		}
 		if attempt == maxTransientVIFAttempts {
 			break
@@ -132,13 +129,22 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 			vmID, attempt, maxTransientVIFAttempts, err))
 		select {
 		case <-ctx.Done():
-			return diag.Errorf("the network adapter could not be created: %s", err)
+			return diag.Errorf("the network adapter could not be created (cancelled while retrying: %s): %s", ctx.Err(), err)
 		case <-time.After(time.Duration(attempt) * 10 * time.Second):
 		}
 	}
-	setIdFromActivityState(d, activity)
 	if err != nil {
+		// Final failure after a confirmed cleanup (or with no reported
+		// adapter): never seed the state from a failed activity — its id
+		// would point at an adapter that was just deleted (FF-1).
 		return diag.Errorf("the network adapter could not be created: %s", err)
+	}
+	setIdFromActivityState(d, activity)
+	if d.Id() == "" {
+		// setIdFromActivityState is silent on a malformed activity state:
+		// every post-create action below requires a real id (FF-1,
+		// invariant 5 — a Disconnect on an empty id must never be sent).
+		return diag.Errorf("the network adapter creation succeeded but the activity did not report the adapter id: refresh the state and import the adapter manually if needed")
 	}
 
 	if !d.Get("attached").(bool) {
@@ -271,6 +277,61 @@ func openIaasNetworkAdapterDelete(ctx context.Context, d *schema.ResourceData, m
 	}
 	if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
 		return diag.Errorf("failed to delete network adapter, %s", err)
+	}
+	return nil
+}
+
+// vifCleanupTargets returns the adapter ids that the failed create activity
+// references AND that the strict VM-scoped listing confirms present on the
+// VM this create targeted. Referenced ids absent from the listing are
+// skipped: already gone, or not attached to this VM — never ours to delete.
+// Existence and ownership proofs come from the same strict, fail-closed
+// channel (#275 doctrine).
+func vifCleanupTargets(failed *client.Activity, listedAdapterIDs map[string]bool) []string {
+	if failed == nil {
+		return nil
+	}
+	targets := []string{}
+	for _, item := range failed.ConcernedItems {
+		if item.Type != "network_adapter" || item.ID == "" {
+			continue
+		}
+		if listedAdapterIDs[item.ID] {
+			targets = append(targets, item.ID)
+		}
+	}
+	return targets
+}
+
+// cleanupHalfCreatedVIFs deletes the adapters referenced by THIS create's
+// failed activity, under strict evidence, and returns an error whenever the
+// cleanup cannot be CONFIRMED: retrying after an unconfirmed cleanup could
+// duplicate the adapter on the VM (#251, FF-1). A nil failed activity (the
+// platform did not report what it created) cleans nothing: the retry may
+// leave an orphan VIF platform-side — accepted trade-off, a wrong deletion
+// would be worse.
+func cleanupHalfCreatedVIFs(ctx context.Context, c *client.Client, failed *client.Activity, vmID string) error {
+	if failed == nil {
+		return nil
+	}
+	adapters, err := c.Compute().OpenIaaS().NetworkAdapter().ListStrict(ctx, &client.OpenIaaSNetworkAdapterFilter{
+		VirtualMachineID: vmID,
+	})
+	if err != nil {
+		return fmt.Errorf("could not list the adapters of virtual machine %s to confirm the cleanup: %w", vmID, err)
+	}
+	listed := map[string]bool{}
+	for _, adapter := range adapters {
+		listed[adapter.ID] = true
+	}
+	for _, id := range vifCleanupTargets(failed, listed) {
+		delActivity, err := c.Compute().OpenIaaS().NetworkAdapter().Delete(ctx, id)
+		if err != nil {
+			return fmt.Errorf("failed to delete the half-created adapter %s: %w", id, err)
+		}
+		if _, err := c.Activity().WaitForCompletion(ctx, delActivity, getWaiterOptions(ctx)); err != nil {
+			return fmt.Errorf("failed to confirm the deletion of the half-created adapter %s: %w", id, err)
+		}
 	}
 	return nil
 }
