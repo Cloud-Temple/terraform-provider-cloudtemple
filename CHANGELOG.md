@@ -16,6 +16,7 @@ BUG FIXES :
   * Fixed a bug causing `tx_checksumming` to be pushed from resource `cloudtemple_compute_iaas_opensource_virtual_machine` when it was not explicitly configured.
   * Fixed a bug causing the cloud-init config drive (`XO CloudConfigDrive`) to be captured as a managed `os_disk` at creation on resource `cloudtemple_compute_iaas_opensource_virtual_machine`, producing a permanent removal drift.
   * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to send an unconditional full-properties update on every apply. Properties are now only patched when they actually diverge from the live API state, and `secure_boot` is only sent when explicitly configured.
+  * Fixed a bug causing an in-progress operation to be reported as failed when a transient error (429, 5xx or a transport failure) occurred while polling its activity status. Transient read failures are now retried with a bounded consecutive budget.
 
 IMPROVEMENTS :
 
