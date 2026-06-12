@@ -84,6 +84,30 @@ func (c *OpenIaaSVirtualMachineClient) Create(ctx context.Context, req *CreateOp
 	return c.c.doRequestAndReturnActivity(ctx, r)
 }
 
+// ListStrict behaves like List but requires a complete 200 answer: callers
+// using the listing as EVIDENCE for state-shrinking decisions must fail
+// closed on access-denied or partial answers (#275 doctrine, FF-5).
+func (v *OpenIaaSVirtualMachineClient) ListStrict(ctx context.Context, filter *OpenIaaSVirtualMachineFilter) ([]*OpenIaaSVirtualMachine, error) {
+	r := v.c.newRequest("GET", "/compute/v1/open_iaas/virtual_machines")
+	r.addFilter(filter)
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	// Strictly 200: a 206 partial listing cannot prove an absence.
+	if err := requireHttpCodes(resp, 200); err != nil {
+		return nil, err
+	}
+
+	var out []*OpenIaaSVirtualMachine
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (v *OpenIaaSVirtualMachineClient) List(
 	ctx context.Context,
 	filter *OpenIaaSVirtualMachineFilter) ([]*OpenIaaSVirtualMachine, error) {

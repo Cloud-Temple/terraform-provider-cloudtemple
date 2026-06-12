@@ -50,3 +50,18 @@ func TestVIFCleanupTargets(t *testing.T) {
 		}
 	})
 }
+
+func TestClassifyMissingDevice(t *testing.T) {
+	scoped := map[string]bool{"on-vm": true}
+	tenant := map[string]bool{"on-vm": true, "elsewhere": true}
+
+	if got := classifyMissingDevice("gone", scoped, tenant); got != deviceDeletionConfirmed {
+		t.Fatalf("absent everywhere must confirm the deletion, got %v", got)
+	}
+	if got := classifyMissingDevice("on-vm", scoped, tenant); got != deviceStillInScope {
+		t.Fatalf("still in the scoped listing must fail closed (access restriction), got %v", got)
+	}
+	if got := classifyMissingDevice("elsewhere", scoped, tenant); got != deviceExistsOutOfScope {
+		t.Fatalf("present tenant-wide only is drift (detached/moved), never a deletion, got %v", got)
+	}
+}

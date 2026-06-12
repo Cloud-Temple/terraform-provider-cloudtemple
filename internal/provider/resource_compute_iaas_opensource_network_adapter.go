@@ -175,7 +175,40 @@ func openIaasNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, met
 		return diag.FromErr(err)
 	}
 	if networkAdapter == nil {
-		d.SetId("") // L'adaptateur n'existe plus, marquer la ressource comme supprimée
+		// The API answers 403 for unknown AND forbidden ids alike, and the
+		// client maps both to nil: a deletion is only accepted under
+		// strict listing evidence (#275 doctrine, FF-5).
+		vmID := d.Get("virtual_machine_id").(string)
+		scoped, err := c.Compute().OpenIaaS().NetworkAdapter().ListStrict(ctx, &client.OpenIaaSNetworkAdapterFilter{
+			VirtualMachineID: vmID,
+		})
+		if err != nil {
+			return diag.Errorf("network adapter %s could not be read and its deletion could not be confirmed: %s", d.Id(), err)
+		}
+		tenant, err := c.Compute().OpenIaaS().NetworkAdapter().ListStrict(ctx, &client.OpenIaaSNetworkAdapterFilter{})
+		if err != nil {
+			return diag.Errorf("network adapter %s could not be read and its deletion could not be confirmed: %s", d.Id(), err)
+		}
+		scopedIDs := map[string]bool{}
+		for _, adapter := range scoped {
+			if adapter != nil {
+				scopedIDs[adapter.ID] = true
+			}
+		}
+		tenantIDs := map[string]bool{}
+		for _, adapter := range tenant {
+			if adapter != nil {
+				tenantIDs[adapter.ID] = true
+			}
+		}
+		switch classifyMissingDevice(d.Id(), scopedIDs, tenantIDs) {
+		case deviceStillInScope:
+			return diag.Errorf("network adapter %s could not be read but is still listed on virtual machine %s: refusing to drop it from the state (possible access restriction)", d.Id(), vmID)
+		case deviceExistsOutOfScope:
+			return diag.Errorf("network adapter %s could not be read and is no longer attached to virtual machine %s but still exists platform-side: refusing to treat this drift as a deletion — refresh or import after fixing the attachment", d.Id(), vmID)
+		}
+		// Deletion confirmed by independent strict reads.
+		d.SetId("")
 		return nil
 	}
 
