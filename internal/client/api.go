@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -375,6 +376,19 @@ type StatusError struct {
 
 func (e StatusError) Error() string {
 	return fmt.Sprintf("Unexpected response code: %d (%s)", e.Code, e.Body)
+}
+
+// isTransientAPIError reports whether an error is worth retrying: throttling
+// (429), server-side errors (5xx) or transport-level failures (timeouts,
+// connection resets). Authentication, authorization and decoding errors are
+// permanent and must not be retried.
+func isTransientAPIError(err error) bool {
+	var statusErr StatusError
+	if errors.As(err, &statusErr) {
+		return statusErr.Code == http.StatusTooManyRequests || statusErr.Code >= 500
+	}
+	var urlErr *url.Error
+	return errors.As(err, &urlErr)
 }
 
 // generateUnexpectedResponseCodeError consumes the rest of the body, closes
