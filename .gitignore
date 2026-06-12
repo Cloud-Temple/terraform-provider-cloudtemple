@@ -83,3 +83,6 @@ terraform.rc
 .env
 .env.test
 .vscode/
+
+# Local-only internal audit (kept on workstation, never published to this public repo)
+/DESIGN/
