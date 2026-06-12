@@ -95,6 +95,9 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 	var activity *client.Activity
 	var err error
 	for attempt := 1; attempt <= maxTransientVIFAttempts; attempt++ {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return diag.Errorf("the network adapter could not be created (cancelled: %s)", ctxErr)
+		}
 		var activityId string
 		activityId, err = c.Compute().OpenIaaS().NetworkAdapter().Create(ctx, &client.CreateOpenIaasNetworkAdapterRequest{
 			VirtualMachineID: vmID,
@@ -113,12 +116,14 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 			// activity's adapter id must not become the resource id.
 			return diag.Errorf("the network adapter could not be created: %s", err)
 		}
-		// Anti-duplicate guard (#251, hardened by FF-1): only the adapters
-		// that the FAILED activity itself references AND that the strict
-		// VM-scoped listing confirms present on this VM are deleted. An
-		// UNCONFIRMED cleanup (strict listing unavailable, delete refused,
-		// delete activity failed) forbids any retry: the half-created
-		// adapter may still exist and a new attempt would duplicate it.
+		// Anti-duplicate guard (#251, hardened by FF-1): the retry is only
+		// allowed after a fully VERIFIED cleanup — the failed activity must
+		// report exactly one adapter, confirmed present on this VM by the
+		// strict listing, and its deletion must complete. Anything short of
+		// that (silent activity, unconfirmed reference, listing
+		// unavailable, delete refused or failed) aborts with an explicit
+		// error: an unverified half-created adapter could be duplicated by
+		// a new attempt.
 		if cleanupErr := cleanupHalfCreatedVIFs(ctx, c, activity, vmID); cleanupErr != nil {
 			return diag.Errorf("the network adapter creation failed transiently and the cleanup could not be confirmed, refusing to retry (check virtual machine %s manually): create failure: %s; cleanup failure: %s", vmID, err, cleanupErr)
 		}
@@ -281,38 +286,40 @@ func openIaasNetworkAdapterDelete(ctx context.Context, d *schema.ResourceData, m
 	return nil
 }
 
-// vifCleanupTargets returns the adapter ids that the failed create activity
-// references AND that the strict VM-scoped listing confirms present on the
-// VM this create targeted. Referenced ids absent from the listing are
-// skipped: already gone, or not attached to this VM — never ours to delete.
-// Existence and ownership proofs come from the same strict, fail-closed
-// channel (#275 doctrine).
-func vifCleanupTargets(failed *client.Activity, listedAdapterIDs map[string]bool) []string {
+// vifCleanupTargets partitions the adapter ids referenced by the failed
+// create activity: ids confirmed present on this VM by the strict listing
+// must be deleted; referenced ids ABSENT from the listing are UNCONFIRMED.
+// By attribution the ConcernedItems of OUR create activity are ours, so an
+// absence from the listing — which may lag the platform state right after
+// a transient incident — is an inconsistency, never a green light: an
+// unconfirmed id forbids the retry (fail closed, #275 doctrine).
+func vifCleanupTargets(failed *client.Activity, listedAdapterIDs map[string]bool) (toDelete []string, unconfirmed []string) {
 	if failed == nil {
-		return nil
+		return nil, nil
 	}
-	targets := []string{}
 	for _, item := range failed.ConcernedItems {
 		if item.Type != "network_adapter" || item.ID == "" {
 			continue
 		}
 		if listedAdapterIDs[item.ID] {
-			targets = append(targets, item.ID)
+			toDelete = append(toDelete, item.ID)
+		} else {
+			unconfirmed = append(unconfirmed, item.ID)
 		}
 	}
-	return targets
+	return toDelete, unconfirmed
 }
 
-// cleanupHalfCreatedVIFs deletes the adapters referenced by THIS create's
+// cleanupHalfCreatedVIFs deletes the adapter referenced by THIS create's
 // failed activity, under strict evidence, and returns an error whenever the
 // cleanup cannot be CONFIRMED: retrying after an unconfirmed cleanup could
-// duplicate the adapter on the VM (#251, FF-1). A nil failed activity (the
-// platform did not report what it created) cleans nothing: the retry may
-// leave an orphan VIF platform-side — accepted trade-off, a wrong deletion
-// would be worse.
+// duplicate the adapter on the VM (#251, FF-1). The retry is only allowed
+// when the platform reported what the failed create touched AND the
+// cleanup is fully verified — a silent activity forbids the retry: an
+// unreported half-created adapter could otherwise be duplicated.
 func cleanupHalfCreatedVIFs(ctx context.Context, c *client.Client, failed *client.Activity, vmID string) error {
 	if failed == nil {
-		return nil
+		return fmt.Errorf("the platform did not report the failed create activity: the cleanup cannot be verified")
 	}
 	adapters, err := c.Compute().OpenIaaS().NetworkAdapter().ListStrict(ctx, &client.OpenIaaSNetworkAdapterFilter{
 		VirtualMachineID: vmID,
@@ -324,7 +331,22 @@ func cleanupHalfCreatedVIFs(ctx context.Context, c *client.Client, failed *clien
 	for _, adapter := range adapters {
 		listed[adapter.ID] = true
 	}
-	for _, id := range vifCleanupTargets(failed, listed) {
+	toDelete, unconfirmed := vifCleanupTargets(failed, listed)
+	if len(unconfirmed) > 0 {
+		return fmt.Errorf("the failed activity references adapter(s) %s that the strict listing of virtual machine %s does not confirm: the cleanup cannot be verified", strings.Join(unconfirmed, ", "), vmID)
+	}
+	if len(toDelete) == 0 {
+		// No adapter reported at all: nothing can be safely cleaned up,
+		// and an unreported half-created adapter could be duplicated by a
+		// new attempt.
+		return fmt.Errorf("the failed activity reports no adapter on virtual machine %s: the cleanup cannot be verified", vmID)
+	}
+	if len(toDelete) > 1 {
+		// A create produces exactly one adapter: an activity referencing
+		// several confirmed adapters cannot be attributed safely.
+		return fmt.Errorf("the failed activity references %d adapters (%s) on virtual machine %s: the cleanup cannot be attributed to this create", len(toDelete), strings.Join(toDelete, ", "), vmID)
+	}
+	for _, id := range toDelete {
 		delActivity, err := c.Compute().OpenIaaS().NetworkAdapter().Delete(ctx, id)
 		if err != nil {
 			return fmt.Errorf("failed to delete the half-created adapter %s: %w", id, err)

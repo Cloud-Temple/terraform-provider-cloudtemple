@@ -10,8 +10,9 @@ func TestVIFCleanupTargets(t *testing.T) {
 	listed := map[string]bool{"vif-ours": true}
 
 	t.Run("nil failed activity cleans nothing", func(t *testing.T) {
-		if got := vifCleanupTargets(nil, listed); len(got) != 0 {
-			t.Fatalf("targets=%v, want none", got)
+		toDelete, unconfirmed := vifCleanupTargets(nil, listed)
+		if len(toDelete) != 0 || len(unconfirmed) != 0 {
+			t.Fatalf("toDelete=%v unconfirmed=%v, want none", toDelete, unconfirmed)
 		}
 	})
 
@@ -19,18 +20,22 @@ func TestVIFCleanupTargets(t *testing.T) {
 		failed := &client.Activity{ConcernedItems: []client.ActivityConcernedItem{
 			{ID: "vif-ours", Type: "network_adapter"},
 		}}
-		got := vifCleanupTargets(failed, listed)
-		if len(got) != 1 || got[0] != "vif-ours" {
-			t.Fatalf("targets=%v, want [vif-ours]", got)
+		toDelete, unconfirmed := vifCleanupTargets(failed, listed)
+		if len(toDelete) != 1 || toDelete[0] != "vif-ours" || len(unconfirmed) != 0 {
+			t.Fatalf("toDelete=%v unconfirmed=%v, want [vif-ours]/none", toDelete, unconfirmed)
 		}
 	})
 
-	t.Run("referenced but absent from the strict listing is never deleted", func(t *testing.T) {
+	t.Run("referenced but absent from the strict listing is UNCONFIRMED (forbids the retry)", func(t *testing.T) {
+		// By attribution the ConcernedItems of OUR create are ours: an
+		// absence from the listing may be eventual consistency right after
+		// the incident — never a green light to retry (would duplicate).
 		failed := &client.Activity{ConcernedItems: []client.ActivityConcernedItem{
-			{ID: "vif-elsewhere", Type: "network_adapter"},
+			{ID: "vif-laggy", Type: "network_adapter"},
 		}}
-		if got := vifCleanupTargets(failed, listed); len(got) != 0 {
-			t.Fatalf("targets=%v, want none (gone, or not ours to delete)", got)
+		toDelete, unconfirmed := vifCleanupTargets(failed, listed)
+		if len(toDelete) != 0 || len(unconfirmed) != 1 || unconfirmed[0] != "vif-laggy" {
+			t.Fatalf("toDelete=%v unconfirmed=%v, want none/[vif-laggy]", toDelete, unconfirmed)
 		}
 	})
 
@@ -39,8 +44,9 @@ func TestVIFCleanupTargets(t *testing.T) {
 			{ID: "vif-ours", Type: "virtual_machine"},
 			{ID: "", Type: "network_adapter"},
 		}}
-		if got := vifCleanupTargets(failed, listed); len(got) != 0 {
-			t.Fatalf("targets=%v, want none", got)
+		toDelete, unconfirmed := vifCleanupTargets(failed, listed)
+		if len(toDelete) != 0 || len(unconfirmed) != 0 {
+			t.Fatalf("toDelete=%v unconfirmed=%v, want none", toDelete, unconfirmed)
 		}
 	})
 }
