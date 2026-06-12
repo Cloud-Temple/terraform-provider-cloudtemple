@@ -10,6 +10,8 @@ SECURITY :
 
 BUG FIXES :
 
+  * Fixed a permanent plan drift (`uefi -> null`) on `boot_firmware` for marketplace virtual machines: the property is now `Computed` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
+
   * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to push redundant network adapter and disk updates right after a marketplace deployment. OS devices are now reconciled against the live API state after creation and only real divergences are pushed.
   * Fixed a bug causing an explicit `tx_checksumming = false` to never be sent to the API.
   * Fixed a bug causing `tx_checksumming` to be pushed from resource `cloudtemple_compute_iaas_opensource_virtual_machine` when it was not explicitly configured.
@@ -674,7 +676,6 @@ IMPROVEMENTS:
 
   * The provider now periodically logs information regarding the state of the activity or job running while waiting for them to complete.
 
-
 ## 0.2.2 (November 24, 2022)
 
 IMPROVEMENTS:
@@ -693,7 +694,6 @@ IMPROVEMENTS:
 
   * The Go client used by the Terraform provider now automatically renew the API token before expiration.
 
-
 ## 0.2.0 (November 18, 2022)
 
 BUG FIXES:
@@ -704,7 +704,6 @@ NEW FEATURES:
 
   * The `cloudtemple_compute_virtual_machine` resource can now clone an already existing virtual machine using the `clone_virtual_machine_id` argument.
   * The `cloudtemple_backup_sla_policy_assignment` resource can now be used to associate SLA policies to a virtual machine.
-
 
 ## 0.1.0 (November 17, 2022)
 
