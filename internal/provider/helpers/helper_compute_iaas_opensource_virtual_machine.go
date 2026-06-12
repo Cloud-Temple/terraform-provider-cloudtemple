@@ -68,18 +68,41 @@ func FlattenOpenIaaSVirtualMachine(vm *client.OpenIaaSVirtualMachine) map[string
 	}
 }
 
+// cloudConfigDriveName is the name XO gives to the cloud-init config drive
+// it attaches at deploy time.
+const cloudConfigDriveName = "XO CloudConfigDrive"
+
+// isPlatformManagedDisk reports whether the disk is managed by the platform
+// (cloud-init config drive, attached read-only by XO at deploy time) and must
+// never be reconciled as an os_disk: capturing it — which is timing dependent
+// at create — produces a permanent removal drift in every subsequent plan.
+// Both discriminators are required: the exact XO naming alone could hide a
+// legitimate user disk carrying the same name, and a read-only criterion
+// alone could drop legitimate read-only disks without a formal API
+// invariant. Only a disk attached read-only to this VM under the exact XO
+// platform naming is excluded; when the VBD is absent Find returns a zero
+// value, so the default stays fail-safe (the disk remains managed).
+func isPlatformManagedDisk(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) bool {
+	if osDisk.Name != cloudConfigDriveName {
+		return false
+	}
+	vbd := Find(osDisk.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
+		return virtualMachine.ID == virtualMachineId
+	})
+	return vbd.ReadOnly
+}
+
 func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMachineId string) []interface{} {
-	if osDisks != nil {
-		disks := make([]interface{}, len(osDisks))
+	disks := make([]interface{}, 0, len(osDisks))
 
-		for i, osDisk := range osDisks {
-			disks[i] = FlattenOpenIaaSOSDiskData(osDisk, virtualMachineId)
+	for _, osDisk := range osDisks {
+		if isPlatformManagedDisk(osDisk, virtualMachineId) {
+			continue
 		}
-
-		return disks
+		disks = append(disks, FlattenOpenIaaSOSDiskData(osDisk, virtualMachineId))
 	}
 
-	return make([]interface{}, 0)
+	return disks
 }
 
 func FlattenOpenIaaSOSDiskData(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) interface{} {

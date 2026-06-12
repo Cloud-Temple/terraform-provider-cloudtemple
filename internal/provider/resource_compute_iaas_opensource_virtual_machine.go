@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -116,9 +117,12 @@ Order of the elements in the list is the boot order.`,
 				Computed:    true,
 			},
 			"boot_firmware": {
-				Type:         schema.TypeString,
-				Description:  "The boot firmware to use. Available values are 'bios' and 'uefi'.",
-				Optional:     true,
+				Type:        schema.TypeString,
+				Description: "The boot firmware to use. Available values are 'bios' and 'uefi'.",
+				Optional:    true,
+				// Computed: marketplace images set it (uefi). Without it the
+				// plan never converges (permanent "uefi" -> null drift).
+				Computed:     true,
 				ValidateFunc: validation.StringInSlice([]string{"bios", "uefi"}, false),
 			},
 			"auto_power_on": {
@@ -514,6 +518,10 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		for i, networkAdapter := range openIaasItemInfo.NetworkAdapters {
 			osNetworkAdapter := osNetworkAdapters[i].(map[string]interface{})
 			networkData = append(networkData, client.NetworkDataMapping{
+				// networkAdapterName is the field recommended by the
+				// marketplace API (sourceNetworkName is deprecated); both are
+				// sent for backward compatibility, the name takes priority.
+				NetworkAdapterName:   networkAdapter.Name,
 				SourceNetworkName:    networkAdapter.NetworkName,
 				DestinationNetworkId: osNetworkAdapter["network_id"].(string),
 			})
@@ -731,20 +739,24 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	// Check if hardware-related properties have changed
-	needsReboot := d.HasChange("cpu") || d.HasChange("memory") || d.HasChange("num_cores_per_socket")
+	// PATCH only the properties that actually diverge from the live API
+	// state (#267): during the create→update chaining every HasChange is
+	// true while the deploy already applied the configuration, and values
+	// merged through Computed are not write intent (#246 class).
+	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("failed to read virtual machine state: %s", err)
+	}
+	if vm == nil {
+		return diag.Errorf("failed to find virtual machine: %s", d.Id())
+	}
+
+	patch, changed, needsReboot := buildOpenIaasVMPropertiesPatch(vm, openIaasVMDesiredPropertiesFromResourceData(d))
 	wasRunning := false
 
-	// If hardware-related properties have changed, we need to power off the VM first
-	if needsReboot {
-		// Get current VM state to check if it's running
-		vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
-		if err != nil {
-			return diag.Errorf("failed to read virtual machine state: %s", err)
-		}
-
-		// Only power off if the VM is running
-		if vm.PowerState == "Running" {
+	if changed {
+		// The cpu/memory/cores divergences require a power cycle first
+		if needsReboot && vm.PowerState == "Running" {
 			wasRunning = true
 
 			if d.Get("allow_vm_restart").(bool) {
@@ -764,25 +776,16 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 				return diag.Errorf("The virtual machine %s (%s) needs to be powered off to apply changes to cpu, memory or num_cores_per_socket. Please set allow_vm_restart to true to allow the provider to power off and on the VM if necessary.", vm.Name, d.Id())
 			}
 		}
-	}
 
-	// Update the VM properties
-	activityId, err := c.Compute().OpenIaaS().VirtualMachine().Update(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachineRequest{
-		Name:              d.Get("name").(string),
-		CPU:               d.Get("cpu").(int),
-		NumCoresPerSocket: d.Get("num_cores_per_socket").(int),
-		Memory:            d.Get("memory").(int),
-		BootFirmware:      d.Get("boot_firmware").(string),
-		SecureBoot:        d.Get("secure_boot").(bool),
-		AutoPowerOn:       d.Get("auto_power_on").(bool),
-		HighAvailability:  d.Get("high_availability").(string),
-	})
-	if err != nil {
-		return diag.Errorf("failed to update virtual machine: %s", err)
-	}
-	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	if err != nil {
-		return diag.Errorf("failed to update virtual machine, %s", err)
+		// Update the VM properties
+		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Update(ctx, d.Id(), patch)
+		if err != nil {
+			return diag.Errorf("failed to update virtual machine: %s", err)
+		}
+		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err != nil {
+			return diag.Errorf("failed to update virtual machine, %s", err)
+		}
 	}
 
 	// If VM was running before and we powered it off, power it back on
@@ -933,7 +936,194 @@ func openIaasVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, m
 	return nil
 }
 
+// osDiskPendingChanges describes the operations actually required to bring a
+// disk in line with the desired configuration, based on the LIVE API state.
+type osDiskPendingChanges struct {
+	update   bool // size and/or name differ
+	relocate bool // storage repository differs
+}
+
+// diskPendingChanges compares the desired os_disk block against the actual
+// disk returned by the API. A nil actual disk conservatively requests both
+// operations.
+func diskPendingChanges(desired map[string]interface{}, actual *client.OpenIaaSVirtualDisk) osDiskPendingChanges {
+	if actual == nil {
+		return osDiskPendingChanges{update: true, relocate: true}
+	}
+	changes := osDiskPendingChanges{}
+	if size, ok := desired["size"].(int); ok && size != actual.Size {
+		changes.update = true
+	}
+	if name, ok := desired["name"].(string); ok && name != "" && name != actual.Name {
+		changes.update = true
+	}
+	if srID, ok := desired["storage_repository_id"].(string); ok && srID != "" && srID != actual.StorageRepository.ID {
+		changes.relocate = true
+	}
+	return changes
+}
+
+// openIaasVMDesiredProperties carries the desired VM properties from the
+// plan. SecureBoot holds raw-config evidence: the attribute is
+// Optional+Computed, so the merged plan value is not write intent — nil
+// means "not explicitly configured, never push". AutoPowerOn is a plain
+// Optional boolean: its plan value is authoritative (absent means false by
+// the Terraform contract) and it is always set.
+type openIaasVMDesiredProperties struct {
+	Name              string
+	CPU               int
+	NumCoresPerSocket int
+	Memory            int
+	BootFirmware      string
+	HighAvailability  string
+	SecureBoot        *bool
+	AutoPowerOn       *bool
+}
+
+// openIaasVMDesiredPropertiesFromResourceData extracts the desired VM
+// properties and the raw-config evidence for secure_boot.
+func openIaasVMDesiredPropertiesFromResourceData(d *schema.ResourceData) openIaasVMDesiredProperties {
+	desired := openIaasVMDesiredProperties{
+		Name:              d.Get("name").(string),
+		CPU:               d.Get("cpu").(int),
+		NumCoresPerSocket: d.Get("num_cores_per_socket").(int),
+		Memory:            d.Get("memory").(int),
+		BootFirmware:      d.Get("boot_firmware").(string),
+		HighAvailability:  d.Get("high_availability").(string),
+	}
+	autoPowerOn := d.Get("auto_power_on").(bool)
+	desired.AutoPowerOn = &autoPowerOn
+	if raw := d.GetRawConfig(); !raw.IsNull() && raw.IsKnown() {
+		if v := raw.GetAttr("secure_boot"); !v.IsNull() && v.IsKnown() {
+			secureBoot := v.True()
+			desired.SecureBoot = &secureBoot
+		}
+	}
+	return desired
+}
+
+// buildOpenIaasVMPropertiesPatch compares the desired properties against
+// the live API state and returns the PATCH limited to the real
+// divergences. changed reports whether the PATCH carries anything;
+// needsReboot reports whether one of the included fields (cpu, memory,
+// num_cores_per_socket) requires a power cycle. Zero/empty desired values
+// never overwrite live values: a value merged through Computed is not
+// write intent (#246 class, #267).
+func buildOpenIaasVMPropertiesPatch(live *client.OpenIaaSVirtualMachine, desired openIaasVMDesiredProperties) (*client.UpdateOpenIaasVirtualMachineRequest, bool, bool) {
+	req := &client.UpdateOpenIaasVirtualMachineRequest{}
+	changed := false
+	needsReboot := false
+
+	if desired.Name != "" && desired.Name != live.Name {
+		req.Name = desired.Name
+		changed = true
+	}
+	if desired.CPU != 0 && desired.CPU != live.CPU {
+		req.CPU = desired.CPU
+		changed = true
+		needsReboot = true
+	}
+	if desired.NumCoresPerSocket != 0 && desired.NumCoresPerSocket != live.NumCoresPerSocket {
+		req.NumCoresPerSocket = desired.NumCoresPerSocket
+		changed = true
+		needsReboot = true
+	}
+	if desired.Memory != 0 && desired.Memory != live.Memory {
+		req.Memory = desired.Memory
+		changed = true
+		needsReboot = true
+	}
+	if desired.BootFirmware != "" && desired.BootFirmware != live.BootFirmware {
+		req.BootFirmware = desired.BootFirmware
+		changed = true
+	}
+	if desired.HighAvailability != "" && desired.HighAvailability != live.HighAvailability {
+		req.HighAvailability = desired.HighAvailability
+		changed = true
+	}
+	if desired.SecureBoot != nil && *desired.SecureBoot != live.SecureBoot {
+		req.SecureBoot = desired.SecureBoot
+		changed = true
+	}
+	if desired.AutoPowerOn != nil && *desired.AutoPowerOn != live.AutoPowerOn {
+		req.AutoPowerOn = desired.AutoPowerOn
+		changed = true
+	}
+
+	return req, changed, needsReboot
+}
+
+// adapterNeedsUpdate compares the desired os_network_adapter block against
+// the actual adapter returned by the API. An empty desired value never
+// triggers an update (an unset MAC must not be pushed). tx_checksumming is
+// Optional+Computed and the post-create state merge does not retain
+// explicit false booleans, so the desired map cannot be trusted for it:
+// the divergence is evaluated against the explicitly configured raw value
+// (txWant, nil when the block does not configure it).
+func adapterNeedsUpdate(desired map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool) bool {
+	if actual == nil {
+		return true
+	}
+	if networkID, ok := desired["network_id"].(string); ok && networkID != "" && networkID != actual.Network.ID {
+		return true
+	}
+	if mac, ok := desired["mac_address"].(string); ok && mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
+		return true
+	}
+	if txWant != nil && *txWant != actual.TxChecksumming {
+		return true
+	}
+	return false
+}
+
+// osAdapterTxConfigured returns, keyed by adapter id, the tx_checksumming
+// value explicitly set by the os_network_adapter block at the same index in
+// the raw user configuration (raw is d.GetRawConfig()); absent ids mean the
+// block does not configure it. The raw value is authoritative: the merged
+// desired map seeds tx_checksumming from the live adapter (Computed) and
+// the state merge swallows explicit false values, which would either push
+// an unrequested VIF PATCH (#246) or skip a requested one on first apply.
+// The raw config list is aligned by index with the unfiltered
+// d.Get("os_network_adapter") list. An unknown raw value cannot occur
+// during apply and has no concrete value to push: it stays unconfigured
+// (fail-safe, no PATCH).
+func osAdapterTxConfigured(raw cty.Value, adapters []interface{}) map[string]*bool {
+	configured := map[string]*bool{}
+	if raw.IsNull() || !raw.IsKnown() {
+		return configured
+	}
+	rawAdapters := raw.GetAttr("os_network_adapter")
+	if rawAdapters.IsNull() || !rawAdapters.IsKnown() {
+		return configured
+	}
+	rawList := rawAdapters.AsValueSlice()
+	for i, adapter := range adapters {
+		if i >= len(rawList) {
+			break
+		}
+		desired, ok := adapter.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		id, _ := desired["id"].(string)
+		if id == "" {
+			continue
+		}
+		if v := rawList[i].GetAttr("tx_checksumming"); !v.IsNull() && v.IsKnown() {
+			tx := v.True()
+			configured[id] = &tx
+		}
+	}
+	return configured
+}
+
 func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.ResourceData, disks []map[string]interface{}, networkAdapters []map[string]interface{}) diag.Diagnostics {
+	// Nothing to reconcile: do not make an unrelated update (tags, power
+	// state, boot order…) depend on the disk/adapter listing endpoints.
+	if len(disks) == 0 && len(networkAdapters) == 0 {
+		return nil
+	}
+
 	needsReboot := false
 
 	// Read the current state of the VM to check its state and disk connections
@@ -944,16 +1134,78 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		return diag.Errorf("failed to find virtual machine: %s", d.Id())
 	}
 
-	for i := range disks {
-		if (d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i))) && vm.PowerState == "Running" {
-			needsReboot = true
+	// Compare the desired configuration against the LIVE API state instead of
+	// relying on d.HasChange alone: during the create→update chaining every
+	// HasChange is true, while the marketplace deploy has already applied the
+	// network mapping (networkData). Pushing unconditional VIF updates turned
+	// a platform-side incident on that single operation into a full
+	// provisioning failure for otherwise healthy VMs (issue #246).
+	actualDisks := map[string]*client.OpenIaaSVirtualDisk{}
+	diskList, err := c.Compute().OpenIaaS().VirtualDisk().List(ctx, &client.OpenIaaSVirtualDiskFilter{
+		VirtualMachineID: d.Id(),
+	})
+	if err != nil {
+		return diag.Errorf("failed to list virtual disks: %s", err)
+	}
+	for _, disk := range diskList {
+		actualDisks[disk.ID] = disk
+	}
+	actualAdapters := map[string]*client.OpenIaaSNetworkAdapter{}
+	adapterList, err := c.Compute().OpenIaaS().NetworkAdapter().List(ctx, &client.OpenIaaSNetworkAdapterFilter{
+		VirtualMachineID: d.Id(),
+	})
+	if err != nil {
+		return diag.Errorf("failed to list network adapters: %s", err)
+	}
+	for _, adapter := range adapterList {
+		actualAdapters[adapter.ID] = adapter
+	}
+
+	// Indexes the raw configuration before the nil-filtered adapter slice is
+	// walked: the raw config list is aligned with the unfiltered d.Get list.
+	txConfigured := osAdapterTxConfigured(d.GetRawConfig(), d.Get("os_network_adapter").([]interface{}))
+
+	pendingDisks := map[string]osDiskPendingChanges{}
+	for _, disk := range disks {
+		id, ok := disk["id"].(string)
+		if !ok || id == "" {
+			return diag.Errorf("os_disk without id in the state of virtual machine %s: cannot reconcile (partial or corrupted state)", d.Id())
+		}
+		actual, found := actualDisks[id]
+		if !found {
+			// Never act (let alone power off the VM) on a device the API
+			// does not know about: surface the divergence instead.
+			return diag.Errorf("os_disk %s is in the Terraform state but not returned by the API for virtual machine %s: refresh the state before updating", id, d.Id())
+		}
+		if changes := diskPendingChanges(disk, actual); changes.update || changes.relocate {
+			pendingDisks[id] = changes
+			if changes.update && vm.PowerState == "Running" {
+				needsReboot = true
+			}
 		}
 	}
 
-	for i := range networkAdapters {
-		if d.HasChange(fmt.Sprintf("os_network_adapter.%d.mac_address", i)) && vm.PowerState == "Running" {
-			needsReboot = true
+	pendingAdapters := map[string]bool{}
+	for _, networkAdapter := range networkAdapters {
+		id, ok := networkAdapter["id"].(string)
+		if !ok || id == "" {
+			return diag.Errorf("os_network_adapter without id in the state of virtual machine %s: cannot reconcile (partial or corrupted state)", d.Id())
 		}
+		actual, found := actualAdapters[id]
+		if !found {
+			return diag.Errorf("os_network_adapter %s is in the Terraform state but not returned by the API for virtual machine %s: refresh the state before updating", id, d.Id())
+		}
+		if adapterNeedsUpdate(networkAdapter, actual, txConfigured[id]) {
+			pendingAdapters[id] = true
+			mac, _ := networkAdapter["mac_address"].(string)
+			if mac != "" && !strings.EqualFold(mac, actual.MacAddress) && vm.PowerState == "Running" {
+				needsReboot = true
+			}
+		}
+	}
+
+	if len(pendingDisks) == 0 && len(pendingAdapters) == 0 {
+		return nil
 	}
 
 	// If a reboot is necessary, check that the user has allowed the provider to restart the VM
@@ -976,16 +1228,25 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		}
 	}
 
-	// Apply modifications to the disks
-	for i, disk := range disks {
-		if diags := osDiskUpdate(ctx, c, d, i, disk); diags != nil {
+	// Apply modifications to the disks that actually diverge from the API
+	for _, disk := range disks {
+		id, _ := disk["id"].(string)
+		changes, pending := pendingDisks[id]
+		if !pending {
+			continue
+		}
+		if diags := osDiskUpdate(ctx, c, disk, changes); diags != nil {
 			return diags
 		}
 	}
 
-	// Apply modifications to the network adapters
+	// Apply modifications to the network adapters that actually diverge
 	for _, networkAdapter := range networkAdapters {
-		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter); diags != nil {
+		id, _ := networkAdapter["id"].(string)
+		if !pendingAdapters[id] {
+			continue
+		}
+		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter, actualAdapters[id], txConfigured[id]); diags != nil {
 			return diags
 		}
 	}
@@ -1008,9 +1269,9 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 	return nil
 }
 
-func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, i int, disk map[string]interface{}) diag.Diagnostics {
+func osDiskUpdate(ctx context.Context, c *client.Client, disk map[string]interface{}, changes osDiskPendingChanges) diag.Diagnostics {
 	// Update the disk if necessary
-	if d.HasChange(fmt.Sprintf("os_disk.%d.size", i)) || d.HasChange(fmt.Sprintf("os_disk.%d.name", i)) {
+	if changes.update {
 		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Update(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskUpdateRequest{
 			Size: disk["size"].(int),
 			Name: disk["name"].(string),
@@ -1025,7 +1286,7 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 	}
 
 	// Handle the disk relocation if necessary
-	if d.HasChange(fmt.Sprintf("os_disk.%d.storage_repository_id", i)) {
+	if changes.relocate {
 		activityId, err := c.Compute().OpenIaaS().VirtualDisk().Relocate(ctx, disk["id"].(string), &client.OpenIaaSVirtualDiskRelocateRequest{
 			StorageRepositoryID: disk["storage_repository_id"].(string),
 		})
@@ -1041,12 +1302,35 @@ func osDiskUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData,
 	return nil
 }
 
-func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}) diag.Diagnostics {
-	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), &client.UpdateOpenIaasNetworkAdapterRequest{
-		NetworkID:      networkAdapter["network_id"].(string),
-		MAC:            networkAdapter["mac_address"].(string),
-		TxChecksumming: networkAdapter["tx_checksumming"].(bool),
-	})
+// buildOpenIaasVIFPatch returns the PATCH limited to the fields that
+// actually diverge from the live adapter, or nil when the adapter is
+// already converged: re-sending the current networkId/mac is rejected
+// platform-side as a VPC Static IP self-conflict (#246). tx_checksumming
+// is only sent when explicitly configured in the block, using the raw
+// config value (the merged map swallows explicit false on first apply).
+func buildOpenIaasVIFPatch(networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool) *client.UpdateOpenIaasNetworkAdapterRequest {
+	req := &client.UpdateOpenIaasNetworkAdapterRequest{}
+	if networkID, _ := networkAdapter["network_id"].(string); networkID != "" && networkID != actual.Network.ID {
+		req.NetworkID = networkID
+	}
+	if mac, _ := networkAdapter["mac_address"].(string); mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
+		req.MAC = mac
+	}
+	if txWant != nil && *txWant != actual.TxChecksumming {
+		req.TxChecksumming = txWant
+	}
+	if req.NetworkID == "" && req.MAC == "" && req.TxChecksumming == nil {
+		return nil
+	}
+	return req
+}
+
+func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool) diag.Diagnostics {
+	req := buildOpenIaasVIFPatch(networkAdapter, actual, txWant)
+	if req == nil {
+		return nil
+	}
+	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), req)
 	if err != nil {
 		return diag.Errorf("failed to update os network adapter: %s", err)
 	}

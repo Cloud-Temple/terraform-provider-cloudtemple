@@ -16,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/sethvargo/go-retry"
 )
