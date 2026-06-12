@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -989,14 +990,16 @@ func adapterNeedsUpdate(desired map[string]interface{}, actual *client.OpenIaaSN
 
 // osAdapterTxConfigured returns, keyed by adapter id, whether the
 // os_network_adapter block at the same index explicitly sets
-// tx_checksumming in the user configuration. Like the standalone network
-// adapter resource, only an explicit configuration may produce a VIF PATCH:
-// pushing a value inherited through Computed would re-introduce the
-// unrequested VIF update this reconciliation removes (#246).
-func osAdapterTxConfigured(d *schema.ResourceData, adapters []interface{}) map[string]bool {
+// tx_checksumming in the raw user configuration (raw is d.GetRawConfig()).
+// Like the standalone network adapter resource, only an explicit
+// configuration may produce a VIF PATCH (null = not configured, same
+// IsNull-only semantics): pushing a value inherited through Computed would
+// re-introduce the unrequested VIF update this reconciliation removes
+// (#246). The raw config list is aligned by index with the unfiltered
+// d.Get("os_network_adapter") list.
+func osAdapterTxConfigured(raw cty.Value, adapters []interface{}) map[string]bool {
 	configured := map[string]bool{}
-	raw := d.GetRawConfig()
-	if raw.IsNull() {
+	if raw.IsNull() || !raw.IsKnown() {
 		return configured
 	}
 	rawAdapters := raw.GetAttr("os_network_adapter")
@@ -1016,7 +1019,7 @@ func osAdapterTxConfigured(d *schema.ResourceData, adapters []interface{}) map[s
 		if id == "" {
 			continue
 		}
-		if v := rawList[i].GetAttr("tx_checksumming"); v.IsKnown() && !v.IsNull() {
+		if v := rawList[i].GetAttr("tx_checksumming"); !v.IsNull() {
 			configured[id] = true
 		}
 	}
@@ -1069,7 +1072,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 
 	// Indexes the raw configuration before the nil-filtered adapter slice is
 	// walked: the raw config list is aligned with the unfiltered d.Get list.
-	txConfigured := osAdapterTxConfigured(d, d.Get("os_network_adapter").([]interface{}))
+	txConfigured := osAdapterTxConfigured(d.GetRawConfig(), d.Get("os_network_adapter").([]interface{}))
 
 	pendingDisks := map[string]osDiskPendingChanges{}
 	for _, disk := range disks {
