@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -145,16 +146,51 @@ func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, m
 	c := getClient(meta)
 
 	if d.HasChange("network_id") || d.HasChange("mac_address") || d.HasChange("tx_checksumming") {
-		activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, d.Id(), &client.UpdateOpenIaasNetworkAdapterRequest{
-			MAC:            d.Get("mac_address").(string),
-			NetworkID:      d.Get("network_id").(string),
-			TxChecksumming: d.Get("tx_checksumming").(bool),
-		})
+		// At create time every HasChange is true while the Create request
+		// already carried network_id and mac: compare against the live
+		// adapter and only push real divergences. The redundant PATCH was
+		// rejected platform-side as a Static IP self-conflict ("MAC address
+		// is already used by virtual machine <the adapter's own VM>"),
+		// failing otherwise healthy multi-NIC provisioning (#246).
+		adapter, err := c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, d.Id())
 		if err != nil {
-			return diag.Errorf("the network adapter could not be updated: %s", err)
+			return diag.Errorf("failed to read network adapter: %s", err)
 		}
-		if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
-			return diag.Errorf("failed to update network adapter, %s", err)
+		if adapter == nil {
+			return diag.Errorf("network adapter %s not found", d.Id())
+		}
+		networkID := d.Get("network_id").(string)
+		mac := d.Get("mac_address").(string)
+		txChecksumming := d.Get("tx_checksumming").(bool)
+		// tx_checksumming is Optional+Computed and absent from the Create
+		// request: push it whenever it is EXPLICITLY configured and diverges
+		// from the live value (also covers the first apply).
+		txConfigured := false
+		if raw := d.GetRawConfig(); !raw.IsNull() {
+			if v := raw.GetAttr("tx_checksumming"); !v.IsNull() {
+				txConfigured = true
+			}
+		}
+		// Payload limite aux champs reellement divergents : renvoyer le
+		// networkId/mac courants declenche le self-conflict VPC (#246).
+		req := &client.UpdateOpenIaasNetworkAdapterRequest{}
+		if networkID != "" && networkID != adapter.Network.ID {
+			req.NetworkID = networkID
+		}
+		if mac != "" && !strings.EqualFold(mac, adapter.MacAddress) {
+			req.MAC = mac
+		}
+		if txConfigured && txChecksumming != adapter.TxChecksumming {
+			req.TxChecksumming = &txChecksumming
+		}
+		if req.NetworkID != "" || req.MAC != "" || req.TxChecksumming != nil {
+			activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, d.Id(), req)
+			if err != nil {
+				return diag.Errorf("the network adapter could not be updated: %s", err)
+			}
+			if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
+				return diag.Errorf("failed to update network adapter, %s", err)
+			}
 		}
 	}
 
