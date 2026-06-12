@@ -251,13 +251,15 @@ func TestBuildOpenIaasVMPropertiesPatch(t *testing.T) {
 		SecureBoot:        true,
 		AutoPowerOn:       true,
 	}
+	intPtr := func(i int) *int { return &i }
+	strPtr := func(s string) *string { return &s }
 	converged := openIaasVMDesiredProperties{
 		Name:              "vm-prod",
 		CPU:               4,
-		NumCoresPerSocket: 2,
 		Memory:            8589934592,
-		BootFirmware:      "uefi",
 		HighAvailability:  "disabled",
+		NumCoresPerSocket: intPtr(2),
+		BootFirmware:      strPtr("uefi"),
 		SecureBoot:        nil,
 		AutoPowerOn:       boolPtr(true),
 	}
@@ -271,12 +273,40 @@ func TestBuildOpenIaasVMPropertiesPatch(t *testing.T) {
 
 	t.Run("absent Computed values never overwrite live", func(t *testing.T) {
 		desired := converged
-		desired.BootFirmware = ""
-		desired.NumCoresPerSocket = 0
+		desired.BootFirmware = nil
+		desired.NumCoresPerSocket = nil
 		desired.HighAvailability = ""
 		req, changed, _ := buildOpenIaasVMPropertiesPatch(live, desired)
 		if changed {
 			t.Fatalf("changed=true for absent values, req=%+v", req)
+		}
+	})
+
+	t.Run("unconfigured cores and firmware never push even when state-stale vs live", func(t *testing.T) {
+		// FF-2 finding: a state value merged through Computed could be
+		// pushed when the live value changed platform-side after the
+		// refresh. nil = unconfigured = never write intent.
+		desired := converged
+		desired.NumCoresPerSocket = nil
+		desired.BootFirmware = nil
+		liveDiverged := *live
+		liveDiverged.NumCoresPerSocket = 4
+		liveDiverged.BootFirmware = "bios"
+		req, changed, _ := buildOpenIaasVMPropertiesPatch(&liveDiverged, desired)
+		if changed {
+			t.Fatalf("unconfigured Optional+Computed values were pushed: %+v", req)
+		}
+	})
+
+	t.Run("explicitly configured firmware diverging from live is pushed", func(t *testing.T) {
+		desired := converged
+		desired.BootFirmware = strPtr("bios")
+		req, changed, needsReboot := buildOpenIaasVMPropertiesPatch(live, desired)
+		if !changed || req.BootFirmware != "bios" {
+			t.Fatalf("configured diverging firmware not pushed: %+v", req)
+		}
+		if needsReboot {
+			t.Fatal("boot_firmware change must not require a reboot")
 		}
 	})
 
