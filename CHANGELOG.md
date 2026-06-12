@@ -9,6 +9,7 @@ SECURITY :
   * The provider is now built with Go 1.24.
 
 BUG FIXES :
+
   * Fixed a permanent plan drift (`uefi -> null`) on `boot_firmware` for marketplace virtual machines: the property is now `Computed` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
   * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to push redundant network adapter and disk updates right after a marketplace deployment. OS devices are now reconciled against the live API state after creation and only real divergences are pushed.
   * Fixed a bug causing an explicit `tx_checksumming = false` to never be sent to the API.
@@ -23,11 +24,13 @@ IMPROVEMENTS :
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 BUG FIXES :
+
   * Fixed a bug causing the provider to crash when an osDisk is not found.
 
 # 1.7.0 (April 3rd, 2026)
 
 IMPROVMENTS :
+
   * Added property `allow_vm_restart` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`. (Default: true)
     - This new property will avoid any virtual machine restart without user's consent.
     - It is necessary to allow virtual machine restart in order to updated the following properties :
@@ -37,11 +40,11 @@ IMPROVMENTS :
       - `os_disk.size`
       - `os_disk.name`
       - `os_network_adapter.mac_address`
+      
   * Deprecated property `os_disk.connected` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
   * Deprecated property `os_network_adapter.attached` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
 
 # 1.6.1 (March 4th, 2026)
-  * Fixed a bug causing the cloud-init config drive (`XO CloudConfigDrive`) to be captured as a managed `os_disk` at creation on resource `cloudtemple_compute_iaas_opensource_virtual_machine`, producing a permanent removal drift.
 
 IMPROVEMENTS :
 
@@ -50,9 +53,11 @@ IMPROVEMENTS :
 # 1.6.0 (February 20th, 2026)
 
 BUG FIXES :
+
   * Fixed a bug causing `os_disk` on resource `cloudtemple_compute_iaas_opensource_virtual_machine` to never be reconnected.
 
 NEW FEATURES :
+
   * Added new `connected` property on resource `cloudtemple_compute_iaas_opensource_virtual_disk`
   * Added new `wait_for_drivers_timeout` property on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
 
@@ -60,14 +65,15 @@ NEW FEATURES :
 <img id="stable" src="https://badgen.net/badge/channel/stable/green" alt="Channel: stable" />
 
 BUG FIXES :
+
   * Fixed a bug causing `os_network_adapter` on resource `cloudtemple_iaas_opensource_virtual_machine` to be connected to the network from the original template used.
   * Fixed a bug causing `os_network_adapter` on resource `cloudtemple_iaas_opensource_virtual_machine` to be created with `mac_address` of the network adapter from the original template used.
 
 # 1.5.4 (February 10th, 2026)
 
 BUG FIXES :
+
   * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_network_adapter` to be created disconnected by default when `attached` property was not set.
-  * Fixed a bug causing the cloud-init config drive (`XO CloudConfigDrive`) to be captured as a managed `os_disk` at creation on resource `cloudtemple_compute_iaas_opensource_virtual_machine`, producing a permanent removal drift.
 
 IMPROVEMENTS :
 
@@ -100,16 +106,19 @@ MISCELLANEOUS :
 # 1.5.3 (December 16th, 2025)
 
 BUG FIXES :
+
   * Fixed a bug causing resources `cloudtemple_compute_iaas_opensource_virtual_disk` and `cloudtemple_compute_iaas_opensource_network_adapter` to be detected as `os_disk` and `os_network_adapter`.
 
 ## 1.5.2 (December 3rd, 2025)
 
 BUG FIXES :
+
   * Fixed a bug causing `cloudtemple_compute_iaas_opensource_network_adapter` creation to fail with "Must be a MAC address" error when MAC address is not explicitly specified.
 
 ## 1.5.1 (November 25th, 2025)
 
 BUG FIXES :
+
   * Fixed a bug causing `cloudtemple_compute_iaas_opensource_virtual_machine` creation to fail due to missing `disabled` option in `high_availability' property.
 
 ## 1.5.0 (November 18th, 2025)
@@ -138,18 +147,19 @@ NEW FEATURES :
 ## 1.3.0 (October 30th, 2025)
 
 INFORMATIONS :
+
   * Promoted `v1.3.0-rc.1` from latest build to stable release. No functional changes.
 
 ## 1.3.0-rc.1 (October 9th, 2025)
 
 IMPROVMENTS :
+
   * Added new resource `cloudtemple_compute_iaas_opensource_replication_policy`.
   * Added new datasource `cloudtemple_compute_iaas_opensource_replication_policy`.
   * Added new datasource `cloudtemple_compute_iaas_opensource_replication_policies`.
   * Added new property `replication_policy_id` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
 
 ## 1.2.0-rc.1 (October 2nd, 2025)  
-  * Fixed a bug causing the cloud-init config drive (`XO CloudConfigDrive`) to be captured as a managed `os_disk` at creation on resource `cloudtemple_compute_iaas_opensource_virtual_machine`, producing a permanent removal drift.
 
 IMPROVEMENTS :
 
@@ -308,20 +318,22 @@ CODE ORGANIZATION:
 ## 0.16.3 (April 4th, 2025)
 
 BUG FIXES :
+
   * Fixed a bug causing the provider to wait indefinitely the result of an activity when the PAT doesn't have the `activity_read` permission. 
 
 ## 0.16.3-rc.1 (April 3rd, 2025)
 
 MISCELLANEOUS :
+
   * Updated the way the ID of the `cloudtemple_compute_iaas_opensource_virtual_machine` resource is retreived from the activity.
 
 ## 0.16.2 (April 2nd, 2025)
 
 NEW FEATURES :
+
   * Added import capability to resources:
     - `cloudtemple_COMPUTE_IAAS_OPENSOURCE_network_adapter`
     - `cloudtemple_iam_personal_access_token`
-  * Fixed a bug causing the cloud-init config drive (`XO CloudConfigDrive`) to be captured as a managed `os_disk` at creation on resource `cloudtemple_compute_iaas_opensource_virtual_machine`, producing a permanent removal drift.
   
 IMPROVEMENTS :
 
@@ -333,51 +345,60 @@ IMPROVEMENTS :
     - `cloudtemple_compute_virtual_disk`
 
 BUG FIXES :
+
   * Fixed provider documentation to properly display client_id and secret_id as required fields by customizing the template
 
 ## 0.16.1 (February 27th, 2025)
 
 NEW FEATURES :
+
   * Added import capability to resource `cloudtemple_compute_iaas_opensource_virtual_disk`.
-  * Fixed a bug causing the cloud-init config drive (`XO CloudConfigDrive`) to be captured as a managed `os_disk` at creation on resource `cloudtemple_compute_iaas_opensource_virtual_machine`, producing a permanent removal drift.
 
 IMPROVEMENTS :
 
   * Added automatic power cycling for `cloudtemple_compute_iaas_opensource_virtual_machine` when CPU, memory, or cores per socket are updated on a running VM.
 
 BUG FIXES :
+
   * Fixed a bug in `cloudtemple_compute_iaas_opensource_virtual_disk` resource that prevented Terraform from recreating the resource when it was deleted outside of Terraform by properly setting the ID to empty when the resource is not found.
 
 ## 0.16.0 (February 18th, 2025)
 
 NEW FEATURES :
+
   * Added cloud-init to resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
   * Added ability to update the boot firmware of a `cloudtemple_compute_iaas_opensource_virtual_machine`.
 
 BUG FIXES :
+
   * Fixed a bug causing communications with the Backup module to crash.
 
 ## 0.15.2 (January 24th, 2025)
 
 MISCELLANEOUS :
+
   * Added examples and documentation about the new Open IaaS features.
   * Improved error handling of new Open IaaS datasources.
 
 ## 0.15.1 (January 23nd, 2025)
 
 BUG FIXES :
+
   * Fixed a bug causing provider plugin to crash when using a datasource from iaas opensource with an ID.
 
 NEW FEATURES :
+
   * Added ability to mount and unmount ISO files on `cloudtemple_compute_iaas_opensource_virtual_machine`.
 
 ## 0.15.0 (December 20th, 2024)
 
 NEW FEATURES :
+
   * The following resources are now available :
     - `cloudtemple_compute_iaas_opensource_virtual_machine`
     - `cloudtemple_compute_iaas_opensource_virtual_disk`
     - `cloudtemple_compute_iaas_opensource_network_adapter`
+
   * The following datasource are now available :
     - `cloudtemple_compute_iaas_opensource_machine_manager`
     - `cloudtemple_compute_iaas_opensource_pool`
@@ -395,96 +416,116 @@ NEW FEATURES :
 ## 0.14.1 (November 28th, 2024)
 
 BUG FIXES:
+
   * Fixed `cloudtemple_virtual_machines` and `cloudtemple_compute_networks` datasources that were not working properly.
 
 ## 0.14.0 (October 31st, 2024)
 
 BUG FIXES:
+
   * Fixed a bug causing terraform plugin to fail when an alarm is triggered on a `cloudtemple_compute_virtual_machine`.
 
 MISCELLANEOUS:
+
   * Updated the role names in the documentations.
   * Cloud-init now doesn't force recreate when updated.
 
 ## 0.13.0-rc.1 (March 19th, 2024)
 
 NEW FEATURES:
+
   * Added the ability to create NVME controllers.
 
 BUG FIXES:
+
   * Fixed a bug causing `datastore_id` and `datastore_cluster_id` not to be imported in state when importing a `cloudtemple_compute_virtual_machine`
 
 ## 0.12.4-rc.3 (February 13th, 2024)
 
 BUG FIXES :
+
   * Fixed a bug causing tags deletion to fail the process.
   * Fixed a bug causing `cloudtemple_compute_virtual_disk` creation to fail.
 
 ## 0.12.4-rc.2 (February 8th, 2024)
 
 BUG FIXES :
+
   * Fixed a bug causing backup module not to find the virtual disk after running hypervisor inventory.
 
 ## 0.12.4-rc.1 (February 2nd, 2024)
 
 BUG FIXES :
+
   * Fixed a bug when retreiving datastore information due to API modification.
 
 ## 0.12.3 (November 29th, 2023)
 
 BUG FIXES :
+
   * Fixed a bug causing terraform to taint a healthy virtual_disk due to controller_id desynchronization in state.
 
 ## 0.12.2 (November 28th, 2023)
 
 BUG FIXES:
+
   * Fixed a bug causing plugin to crash when using the datasource cloudtemple_compute_content_library_items
 
 ## 0.12.1 (November 23rd, 2023)
 
 BUG FIXES:
+
   * Fixed a bug on newly released Virtual Machine Guest OS Customization feature.
 
 ## 0.12.0 (November 22nd, 2023)
 
 NEW FEATURES:
+
   * Guest OS of `cloudtemple_compute_virtual_machine` can now be customized using `customize` block.
 
 ## 0.11.0 (November 15th, 2023)
 
 NEW FEATURES:
+
   * Added a new parameter `expose_hardware_virtualization` on resource `cloudtemple_cirtual_machine` that enables nested hardware virtualization on the virtual machine.
 
 MISCELLANEOUS:
+
   * Changed the way URL are built in the Go Http client.
 
 BUG FIXES:
+
   * Fixed a bug on resource `cloudtemple_compute_virtual_disk` causing desynchronization between state and real configuration after an import.
   * Fixed a bug on resource `cloudtemple_compute_virtual_controller` causing desynchronization between state and real configuration after an import.
 
 ## 0.10.0-rc.2 (November 8th, 2023)
 
 NEW FEATURES:
+
   * Resource `cloudtemple_compute_virtual_disk` can now be imported into state.
 
 ## 0.10.0-rc.1 (November 7th, 2023)
 
 NEW FEATURES:
+
   * Added support of creation, management and deletion of virtual controllers through a new `cloudtemple_compute_virtual_controller` resource.
 
 ## 0.9.0-rc.1 (November 2nd, 2023)
 
 NEW FEATURES:
+
   * Boot options of a virtual machine can now be modified.
 
 ## 0.8.2 (October 11th, 2023)
 
 BUG FIXES :
+
   * Fixed a bug causing datasource `cloudtemple_compute_datastore_cluster` not to work.
 
 ## 0.8.1 (October 11th, 2023)
 
 IMPROVEMENTS:
+
   * Added filters on data source cloudtemple_compute_virtual_switchand cloudtemple_compute_virtual_switchs
   * Added filters on data source cloudtemple_compute_networkand cloudtemple_compute_networks
   * Updated datasource cloudtemple_compute_datastore_cluster to make the filter datacenter_id mandatory
@@ -492,29 +533,35 @@ IMPROVEMENTS:
 ## 0.8.0 (October 4th, 2023)
 
 NEW FEATURES:
+
   * Added a property `disks_provisioning_type` that overrides the provisioning types of disks present on a OVF deployed from content library.
 
 IMPROVEMENTS:
+  
   * Added `name` and `machine_manager` filters on datasource `cloudtemple_compute_content_library` and `cloudtemple_compute_content_libraries`
   * Added `name` and `content_library_id` filters on datasource `cloudtemple_compute_content_library_item` and `cloudtemple_compute_content_library_items`
 
 BUG FIXES:
+
   * Updated the CreateContext of resource cloudtemple_compute_virtual_machine to make it without timeout so it doesn't fails after 20 minutes.
   * Fixed a bug causing backup module not to find the virtual machine when trying to assign an SLA policy
 
 ## 0.7.0 (September 22, 2023)
 
 NEW FEATURES:
+
   * Added cloud-init support
 
 ## 0.6.1 (June 19, 2023)
 
 BUG FIXES:
+
   * Fixed mistyped property on newly added 'backup_virtual_machine' controller causes virtual machines struggling to power on.
 
 ## 0.6.0 (June 16, 2023)
 
 BUG FIXES:
+
   * Fixed a bug causing crashes when trying to start a `cloudtemple_compute_virtual_machine` because it has pending recommendation(s) on VMWare side.
   * Fixed wrong backup job running after `cloudtemple_compute_virtual_machine` create or update.
   * Fixed a bug causing fails when trying to create a resource `cloudtemple_compute_virtual_machine`.
@@ -525,6 +572,7 @@ BUG FIXES:
   * Fixed a bug causing preventing resource `cloudtemple_compute_virtual_machine` to be inventoried when property `backup_sla_policies` is set after creation.
 
 IMPROVEMENTS:
+
   * Added property `backup_sla_policies` to resource `cloudtemple_compute_virtual_machine`, so that it can be created and started in an SNC environment.
   * `datastore_cluster_id` and `datastore_id` now conflicts each other on resource `cloudtemple_compute_virtual_disk` and at least one of them is now required.
   * Resource `cloudtemple_compute_network_adapter` is now importable.
@@ -549,11 +597,13 @@ IMPROVEMENTS:
 ## 0.6.0-rc.2 (May 24, 2023)
 
 BUG FIXES:
+
   * Fixed tfstate incorrectly refreshing when updating property `backup_sla_policies` of `cloudtemple_compute_virtual_machine` from outside the provider.
   * Fixed empty recommendations causing `cloudtemple_compute_virtual_machine` not starting up.
   * Virtual machines are now inventoried by the backup server when they are created from clone or content library.
 
 IMPROVEMENTS:
+
   * Property `guest_operating_system_moref` on resource `cloudtemple_compute_virtual_machine` can now be computed.
   * Property `backup_sla_policies` of `cloudtemple_compute_virtual_machine` is now optional.
   * Renamed data source `cloudtemple_compute_worker` to `cloudtemple_compute_machine_manager`.
@@ -561,11 +611,13 @@ IMPROVEMENTS:
 ## 0.6.0-rc.1 (April 25, 2023)
 
 BUG FIXES:
+
   * Fixed a bug causing crashes when trying to start a `cloudtemple_compute_virtual_machine` because it has pending recommendation(s) on VMWare side.
   * Fixed wrong backup job running after `cloudtemple_compute_virtual_machine` create or update.
   * Fixed a bug causing fails when trying to create a resource `cloudtemple_compute_virtual_machine`.
 
 IMPROVEMENTS:
+
   * Added property `backup_sla_policies` to resource `cloudtemple_compute_virtual_machine`, so that it can be created and started in an SNC environment.
   * `datastore_cluster_id` and `datastore_id` now conflicts each other on resource `cloudtemple_compute_virtual_disk` and at least one of them is now required.
   * Resource `cloudtemple_compute_network_adapter` is now importable.
@@ -581,17 +633,21 @@ IMPROVEMENTS:
 ## 0.5.0 (March 16, 2023)
 
 BUG FIXES:
+
   * The `datacenter_id` replaces the `virtual_datacenter_id` argument in the `compute_virtual_machine` resource. `virtual_datacenter_id` was deprecated and has been removed.
+
   * The `datacenter_id` replaces the `virtual_datacenter_id` attribute in the `compute_virtual_machine` and `compute_virtual_machines` datasources. `virtual_datacenter_id` was deprecated and has been removed.
 
 ## 0.4.2 (February 3, 2023)
 
 BUG FIXES:
+
   * Fixed a panic occuring in `cloudtemple_compute_virtual_machine` when an error happened while reading a virtual machine information.
 
 ## 0.4.1 (December 22, 2022)
 
 BUG FIXES:
+
   * The `cloudtemple_compute_network_adapter` resource will now clean up broken network adapters when an error occurs while creating it.
   * The `cloudtemple_compute_virtual_disk` resource will now clean up broken virtual disks when an error occurs while creating it.
   * The `cloudtemple_compute_virtual_machine` resource will now clean up broken virtual machines when an error occurs while creating it.
@@ -599,50 +655,60 @@ BUG FIXES:
 ## 0.4.0 (December 18, 2022)
 
 IMPROVEMENTS:
+
   * The `cloudtemple_compute_virtual_machine` resource will now relocate the virtual machine when one of `virtual_datacenter_id`, `host_id`, `host_cluster_id`, `datastore_id` or `datastore_cluster_id` is changed instead of deleting and recreating it.
 
 ## 0.3.1 (December 13, 2022)
 
 IMPROVEMENTS:
+
   * The `cloudtemple_compute_virtual_machine` resource now can have additional `deploy_options` specified when deploying an item of a content library.
 
 ## 0.3.0 (December 12, 2022)
 
 NEW FEATURES:
+
   * The `cloudtemple_compute_content_library_item` datasource can now be used to read an item from the given content library.
   * The `cloudtemple_compute_content_library_items` datasource can now be used to read all items in a given content library.
   * The `cloudtemple_compute_virtual_machine` resource now supports deploying a new virtual machine from a content library item.
 
 IMPROVEMENTS:
+
   * The provider now periodically logs information regarding the state of the activity or job running while waiting for them to complete.
 
 ## 0.2.2 (November 24, 2022)
 
 IMPROVEMENTS:
+
   * Error messages returned while waiting for an activity to finish now give detailed information about the error.
   * The provider will now log HTTP requests and responses when [`TF_LOG`](https://developer.hashicorp.com/terraform/cli/config/environment-variables) is set to `DEBUG` or higher.
 
 ## 0.2.1 (November 24, 2022)
 
 BUG FIXES:
+
   * The `triggered_alarms` attribute of the `cloudtemple_compute_virtual_machine` resource is now a list of objects with `id` and `status` attributes.
   * The `triggered_alarms` attribute of the `cloudtemple_compute_virtual_machine` and `cloudtemple_compute_virtual_machines` datasources is now a list of objects with `id` and `status` attributes.
 
 IMPROVEMENTS:
+
   * The Go client used by the Terraform provider now automatically renew the API token before expiration.
 
 ## 0.2.0 (November 18, 2022)
 
 BUG FIXES:
+
   * The arguments `address` and `scheme` in the provider configuration are now used properly.
 
 NEW FEATURES:
+
   * The `cloudtemple_compute_virtual_machine` resource can now clone an already existing virtual machine using the `clone_virtual_machine_id` argument.
   * The `cloudtemple_backup_sla_policy_assignment` resource can now be used to associate SLA policies to a virtual machine.
 
 ## 0.1.0 (November 17, 2022)
 
 NEW FEATURES:
+
   * The following resources are now available:
     - `cloudtemple_compute_network_adapter`
     - `cloudtemple_compute_virtual_disk`
