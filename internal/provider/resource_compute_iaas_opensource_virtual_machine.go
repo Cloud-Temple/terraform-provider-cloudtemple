@@ -966,8 +966,12 @@ func diskPendingChanges(desired map[string]interface{}, actual *client.OpenIaaSV
 
 // adapterNeedsUpdate compares the desired os_network_adapter block against
 // the actual adapter returned by the API. An empty desired value never
-// triggers an update (an unset MAC must not be pushed).
-func adapterNeedsUpdate(desired map[string]interface{}, actual *client.OpenIaaSNetworkAdapter) bool {
+// triggers an update (an unset MAC must not be pushed). tx_checksumming is
+// Optional+Computed: the desired value coming from d.Get cannot distinguish
+// an explicit user choice from a value merely inherited from the live
+// adapter, so it only counts as a divergence when the block explicitly
+// configures it (txConfigured).
+func adapterNeedsUpdate(desired map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txConfigured bool) bool {
 	if actual == nil {
 		return true
 	}
@@ -977,10 +981,46 @@ func adapterNeedsUpdate(desired map[string]interface{}, actual *client.OpenIaaSN
 	if mac, ok := desired["mac_address"].(string); ok && mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
 		return true
 	}
-	if tx, ok := desired["tx_checksumming"].(bool); ok && tx != actual.TxChecksumming {
+	if tx, ok := desired["tx_checksumming"].(bool); ok && txConfigured && tx != actual.TxChecksumming {
 		return true
 	}
 	return false
+}
+
+// osAdapterTxConfigured returns, keyed by adapter id, whether the
+// os_network_adapter block at the same index explicitly sets
+// tx_checksumming in the user configuration. Like the standalone network
+// adapter resource, only an explicit configuration may produce a VIF PATCH:
+// pushing a value inherited through Computed would re-introduce the
+// unrequested VIF update this reconciliation removes (#246).
+func osAdapterTxConfigured(d *schema.ResourceData, adapters []interface{}) map[string]bool {
+	configured := map[string]bool{}
+	raw := d.GetRawConfig()
+	if raw.IsNull() {
+		return configured
+	}
+	rawAdapters := raw.GetAttr("os_network_adapter")
+	if rawAdapters.IsNull() || !rawAdapters.IsKnown() {
+		return configured
+	}
+	rawList := rawAdapters.AsValueSlice()
+	for i, adapter := range adapters {
+		if i >= len(rawList) {
+			break
+		}
+		desired, ok := adapter.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		id, _ := desired["id"].(string)
+		if id == "" {
+			continue
+		}
+		if v := rawList[i].GetAttr("tx_checksumming"); v.IsKnown() && !v.IsNull() {
+			configured[id] = true
+		}
+	}
+	return configured
 }
 
 func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.ResourceData, disks []map[string]interface{}, networkAdapters []map[string]interface{}) diag.Diagnostics {
@@ -1027,6 +1067,10 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		actualAdapters[adapter.ID] = adapter
 	}
 
+	// Indexes the raw configuration before the nil-filtered adapter slice is
+	// walked: the raw config list is aligned with the unfiltered d.Get list.
+	txConfigured := osAdapterTxConfigured(d, d.Get("os_network_adapter").([]interface{}))
+
 	pendingDisks := map[string]osDiskPendingChanges{}
 	for _, disk := range disks {
 		id, ok := disk["id"].(string)
@@ -1057,7 +1101,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		if !found {
 			return diag.Errorf("os_network_adapter %s is in the Terraform state but not returned by the API for virtual machine %s: refresh the state before updating", id, d.Id())
 		}
-		if adapterNeedsUpdate(networkAdapter, actual) {
+		if adapterNeedsUpdate(networkAdapter, actual, txConfigured[id]) {
 			pendingAdapters[id] = true
 			mac, _ := networkAdapter["mac_address"].(string)
 			if mac != "" && !strings.EqualFold(mac, actual.MacAddress) && vm.PowerState == "Running" {
@@ -1108,7 +1152,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		if !pendingAdapters[id] {
 			continue
 		}
-		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter, actualAdapters[id]); diags != nil {
+		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter, actualAdapters[id], txConfigured[id]); diags != nil {
 			return diags
 		}
 	}
@@ -1164,10 +1208,11 @@ func osDiskUpdate(ctx context.Context, c *client.Client, disk map[string]interfa
 	return nil
 }
 
-func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter) diag.Diagnostics {
+func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txConfigured bool) diag.Diagnostics {
 	// Payload limited to the fields that actually diverge from the live
 	// adapter: re-sending the current networkId/mac is rejected platform-side
-	// as a VPC Static IP self-conflict (#246).
+	// as a VPC Static IP self-conflict (#246). tx_checksumming is only sent
+	// when explicitly configured in the block (Computed values stay local).
 	req := &client.UpdateOpenIaasNetworkAdapterRequest{}
 	if networkID, _ := networkAdapter["network_id"].(string); networkID != "" && networkID != actual.Network.ID {
 		req.NetworkID = networkID
@@ -1175,7 +1220,7 @@ func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapte
 	if mac, _ := networkAdapter["mac_address"].(string); mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
 		req.MAC = mac
 	}
-	if tx, ok := networkAdapter["tx_checksumming"].(bool); ok && tx != actual.TxChecksumming {
+	if tx, ok := networkAdapter["tx_checksumming"].(bool); ok && txConfigured && tx != actual.TxChecksumming {
 		req.TxChecksumming = &tx
 	}
 	if req.NetworkID == "" && req.MAC == "" && req.TxChecksumming == nil {
