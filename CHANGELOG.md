@@ -8,6 +8,16 @@ SECURITY :
   * Updated `google.golang.org/grpc` to v1.79.3 (CVE-2026-33186), `golang.org/x/crypto` to v0.46.0 (CVE-2025-22869, CVE-2025-47914, CVE-2025-58181), `golang.org/x/net` to v0.48.0 (CVE-2025-22870, CVE-2025-22872) and `github.com/cloudflare/circl` to v1.6.3 (CVE-2025-8556, CVE-2026-1229).
   * The provider is now built with Go 1.24.
 
+BUG FIXES :
+
+  * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to push redundant network adapter and disk updates right after a marketplace deployment. OS devices are now reconciled against the live API state after creation and only real divergences are pushed.
+  * Fixed a bug causing an explicit `tx_checksumming = false` to never be sent to the API.
+  * Fixed a bug causing `tx_checksumming` to be pushed from resource `cloudtemple_compute_iaas_opensource_virtual_machine` when it was not explicitly configured.
+
+IMPROVEMENTS :
+
+  * Marketplace deployments now send `networkAdapterName` in the network data mapping (the deprecated `sourceNetworkName` is kept for compatibility).
+
 # 1.7.1 (April 15th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
