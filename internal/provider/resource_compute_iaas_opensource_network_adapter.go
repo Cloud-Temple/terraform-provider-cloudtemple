@@ -95,6 +95,9 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 	var activity *client.Activity
 	var err error
 	for attempt := 1; attempt <= maxTransientVIFAttempts; attempt++ {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return diag.Errorf("the network adapter could not be created (cancelled: %s)", ctxErr)
+		}
 		var activityId string
 		activityId, err = c.Compute().OpenIaaS().NetworkAdapter().Create(ctx, &client.CreateOpenIaasNetworkAdapterRequest{
 			VirtualMachineID: vmID,
@@ -105,25 +108,24 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 			return diag.Errorf("the network adapter could not be created: %s", err)
 		}
 		activity, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		if err == nil || !client.IsTransientActivityFailure(err) {
+		if err == nil {
 			break
 		}
-		// Anti-duplicate guard (#251): only delete the VIF referenced by the
-		// FAILED activity itself (ConcernedItems) — never by listing diff,
-		// another actor may legitimately create VIFs on the same VM in the
-		// meantime. A half-created VIF has an uncertain VPC registration:
-		// cleaning it is safer than adopting it. If the failed activity
-		// references no adapter, nothing is deleted and the retry may leave
-		// an orphan VIF platform-side: accepted trade-off — the platform did
-		// not report what it created, and a wrong deletion would be worse.
-		if activity != nil {
-			for _, item := range activity.ConcernedItems {
-				if item.Type == "network_adapter" && item.ID != "" {
-					if delActivity, derr := c.Compute().OpenIaaS().NetworkAdapter().Delete(ctx, item.ID); derr == nil {
-						_, _ = c.Activity().WaitForCompletion(ctx, delActivity, getWaiterOptions(ctx))
-					}
-				}
-			}
+		if !client.IsTransientActivityFailure(err) {
+			// A permanent failure never seeds the state: the failed
+			// activity's adapter id must not become the resource id.
+			return diag.Errorf("the network adapter could not be created: %s", err)
+		}
+		// Anti-duplicate guard (#251, hardened by FF-1): the retry is only
+		// allowed after a fully VERIFIED cleanup — the failed activity must
+		// report exactly one adapter, confirmed present on this VM by the
+		// strict listing, and its deletion must complete. Anything short of
+		// that (silent activity, unconfirmed reference, listing
+		// unavailable, delete refused or failed) aborts with an explicit
+		// error: an unverified half-created adapter could be duplicated by
+		// a new attempt.
+		if cleanupErr := cleanupHalfCreatedVIFs(ctx, c, activity, vmID); cleanupErr != nil {
+			return diag.Errorf("the network adapter creation failed transiently and the cleanup could not be confirmed, refusing to retry (check virtual machine %s manually): create failure: %s; cleanup failure: %s", vmID, err, cleanupErr)
 		}
 		if attempt == maxTransientVIFAttempts {
 			break
@@ -132,13 +134,22 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 			vmID, attempt, maxTransientVIFAttempts, err))
 		select {
 		case <-ctx.Done():
-			return diag.Errorf("the network adapter could not be created: %s", err)
+			return diag.Errorf("the network adapter could not be created (cancelled while retrying: %s): %s", ctx.Err(), err)
 		case <-time.After(time.Duration(attempt) * 10 * time.Second):
 		}
 	}
-	setIdFromActivityState(d, activity)
 	if err != nil {
+		// Final failure after a confirmed cleanup (or with no reported
+		// adapter): never seed the state from a failed activity — its id
+		// would point at an adapter that was just deleted (FF-1).
 		return diag.Errorf("the network adapter could not be created: %s", err)
+	}
+	setIdFromActivityState(d, activity)
+	if d.Id() == "" {
+		// setIdFromActivityState is silent on a malformed activity state:
+		// every post-create action below requires a real id (FF-1,
+		// invariant 5 — a Disconnect on an empty id must never be sent).
+		return diag.Errorf("the network adapter creation succeeded but the activity did not report the adapter id: refresh the state and import the adapter manually if needed")
 	}
 
 	if !d.Get("attached").(bool) {
@@ -271,6 +282,78 @@ func openIaasNetworkAdapterDelete(ctx context.Context, d *schema.ResourceData, m
 	}
 	if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
 		return diag.Errorf("failed to delete network adapter, %s", err)
+	}
+	return nil
+}
+
+// vifCleanupTargets partitions the adapter ids referenced by the failed
+// create activity: ids confirmed present on this VM by the strict listing
+// must be deleted; referenced ids ABSENT from the listing are UNCONFIRMED.
+// By attribution the ConcernedItems of OUR create activity are ours, so an
+// absence from the listing — which may lag the platform state right after
+// a transient incident — is an inconsistency, never a green light: an
+// unconfirmed id forbids the retry (fail closed, #275 doctrine).
+func vifCleanupTargets(failed *client.Activity, listedAdapterIDs map[string]bool) (toDelete []string, unconfirmed []string) {
+	if failed == nil {
+		return nil, nil
+	}
+	for _, item := range failed.ConcernedItems {
+		if item.Type != "network_adapter" || item.ID == "" {
+			continue
+		}
+		if listedAdapterIDs[item.ID] {
+			toDelete = append(toDelete, item.ID)
+		} else {
+			unconfirmed = append(unconfirmed, item.ID)
+		}
+	}
+	return toDelete, unconfirmed
+}
+
+// cleanupHalfCreatedVIFs deletes the adapter referenced by THIS create's
+// failed activity, under strict evidence, and returns an error whenever the
+// cleanup cannot be CONFIRMED: retrying after an unconfirmed cleanup could
+// duplicate the adapter on the VM (#251, FF-1). The retry is only allowed
+// when the platform reported what the failed create touched AND the
+// cleanup is fully verified — a silent activity forbids the retry: an
+// unreported half-created adapter could otherwise be duplicated.
+func cleanupHalfCreatedVIFs(ctx context.Context, c *client.Client, failed *client.Activity, vmID string) error {
+	if failed == nil {
+		return fmt.Errorf("the platform did not report the failed create activity: the cleanup cannot be verified")
+	}
+	adapters, err := c.Compute().OpenIaaS().NetworkAdapter().ListStrict(ctx, &client.OpenIaaSNetworkAdapterFilter{
+		VirtualMachineID: vmID,
+	})
+	if err != nil {
+		return fmt.Errorf("could not list the adapters of virtual machine %s to confirm the cleanup: %w", vmID, err)
+	}
+	listed := map[string]bool{}
+	for _, adapter := range adapters {
+		listed[adapter.ID] = true
+	}
+	toDelete, unconfirmed := vifCleanupTargets(failed, listed)
+	if len(unconfirmed) > 0 {
+		return fmt.Errorf("the failed activity references adapter(s) %s that the strict listing of virtual machine %s does not confirm: the cleanup cannot be verified", strings.Join(unconfirmed, ", "), vmID)
+	}
+	if len(toDelete) == 0 {
+		// No adapter reported at all: nothing can be safely cleaned up,
+		// and an unreported half-created adapter could be duplicated by a
+		// new attempt.
+		return fmt.Errorf("the failed activity reports no adapter on virtual machine %s: the cleanup cannot be verified", vmID)
+	}
+	if len(toDelete) > 1 {
+		// A create produces exactly one adapter: an activity referencing
+		// several confirmed adapters cannot be attributed safely.
+		return fmt.Errorf("the failed activity references %d adapters (%s) on virtual machine %s: the cleanup cannot be attributed to this create", len(toDelete), strings.Join(toDelete, ", "), vmID)
+	}
+	for _, id := range toDelete {
+		delActivity, err := c.Compute().OpenIaaS().NetworkAdapter().Delete(ctx, id)
+		if err != nil {
+			return fmt.Errorf("failed to delete the half-created adapter %s: %w", id, err)
+		}
+		if _, err := c.Activity().WaitForCompletion(ctx, delActivity, getWaiterOptions(ctx)); err != nil {
+			return fmt.Errorf("failed to confirm the deletion of the half-created adapter %s: %w", id, err)
+		}
 	}
 	return nil
 }

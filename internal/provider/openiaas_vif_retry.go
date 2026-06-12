@@ -63,6 +63,12 @@ func runVIFUpdateWithRetry(ctx context.Context, adapterID string, funcs vifUpdat
 
 	var lastErr error
 	for attempt := 1; attempt <= maxTransientVIFAttempts; attempt++ {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			if lastErr != nil {
+				return fmt.Errorf("cancelled while retrying: %w (last transient failure: %s)", ctxErr, lastErr)
+			}
+			return ctxErr
+		}
 		actual, err := funcs.read(ctx)
 		if err != nil {
 			return fmt.Errorf("failed to read network adapter %s: %w", adapterID, err)
@@ -97,8 +103,8 @@ func runVIFUpdateWithRetry(ctx context.Context, adapterID string, funcs vifUpdat
 		}
 		tflog.Warn(ctx, fmt.Sprintf("update network adapter %s: transient platform failure (attempt %d/%d), retrying: %s",
 			adapterID, attempt, maxTransientVIFAttempts, err))
-		if err := funcs.sleep(ctx, attempt); err != nil {
-			return lastErr
+		if sleepErr := funcs.sleep(ctx, attempt); sleepErr != nil {
+			return fmt.Errorf("cancelled while retrying: %w (last transient failure: %s)", sleepErr, lastErr)
 		}
 	}
 	return lastErr
