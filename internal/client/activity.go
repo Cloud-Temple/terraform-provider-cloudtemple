@@ -157,13 +157,33 @@ func (c *ActivityClient) WaitForCompletion(ctx context.Context, id string, optio
 	b := retry.NewFibonacci(1 * time.Second)
 	b = retry.WithCappedDuration(30*time.Second, b)
 
+	return waitForActivityCompletion(ctx, id, func(ctx context.Context) (*Activity, error) {
+		return c.Read(ctx, id)
+	}, b, options)
+}
+
+// activityReadFunc abstracts the activity read so the polling loop can be
+// unit tested without HTTP calls or sleeps.
+type activityReadFunc func(ctx context.Context) (*Activity, error)
+
+// waitForActivityCompletion is the polling loop behind WaitForCompletion,
+// with the read and the backoff injected. Invariants defended by the unit
+// tests (#245, #264 plan):
+//   - transient read failures (429/5xx/transport) are retried with a
+//     bounded CONSECUTIVE budget, reset by any successful read;
+//   - permanent read errors (4xx, decode, context cancellation) fail
+//     immediately;
+//   - a terminal "failed" activity is never retried;
+//   - an initial not-found is tolerated once (eventual consistency),
+//     a repeated not-found is permanent.
+func waitForActivityCompletion(ctx context.Context, id string, read activityReadFunc, b retry.Backoff, options *WaiterOptions) (*Activity, error) {
 	var res *Activity
 	var count int
 	var consecutiveReadFailures int
 
 	err := retry.Do(ctx, b, func(ctx context.Context) error {
 		count++
-		activity, err := c.Read(ctx, id)
+		activity, err := read(ctx)
 		if err != nil {
 			if isTransientAPIError(err) && consecutiveReadFailures < maxActivityReadRetries {
 				consecutiveReadFailures++
