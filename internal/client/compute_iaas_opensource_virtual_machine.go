@@ -128,13 +128,17 @@ func (v *OpenIaaSVirtualMachineClient) Read(ctx context.Context, id string) (*Op
 }
 
 type UpdateOpenIaasVirtualMachineRequest struct {
+	// All fields are optional (PATCH semantics): callers only set the
+	// fields that actually diverge from the live state. The booleans are
+	// pointers so an absent value is omitted from the payload while an
+	// explicit false stays expressible (#267).
 	Name              string `json:"name,omitempty"`
 	CPU               int    `json:"cpu,omitempty"`
 	NumCoresPerSocket int    `json:"numCoresPerSocket,omitempty"`
 	Memory            int    `json:"memory,omitempty"`
-	SecureBoot        bool   `json:"secureBoot"`
+	SecureBoot        *bool  `json:"secureBoot,omitempty"`
 	BootFirmware      string `json:"bootFirmware,omitempty"`
-	AutoPowerOn       bool   `json:"autoPowerOn"`
+	AutoPowerOn       *bool  `json:"autoPowerOn,omitempty"`
 	HighAvailability  string `json:"highAvailability,omitempty"`
 }
 

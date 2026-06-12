@@ -239,3 +239,170 @@ func TestOsNetworkAdapterUpdateSkipsUnconfiguredTx(t *testing.T) {
 		t.Fatalf("osNetworkAdapterUpdate() returned diagnostics for an equal explicit value: %v", diags)
 	}
 }
+
+func TestBuildOpenIaasVMPropertiesPatch(t *testing.T) {
+	live := &client.OpenIaaSVirtualMachine{
+		Name:              "vm-prod",
+		CPU:               4,
+		NumCoresPerSocket: 2,
+		Memory:            8589934592,
+		BootFirmware:      "uefi",
+		HighAvailability:  "disabled",
+		SecureBoot:        true,
+		AutoPowerOn:       true,
+	}
+	converged := openIaasVMDesiredProperties{
+		Name:              "vm-prod",
+		CPU:               4,
+		NumCoresPerSocket: 2,
+		Memory:            8589934592,
+		BootFirmware:      "uefi",
+		HighAvailability:  "disabled",
+		SecureBoot:        nil,
+		AutoPowerOn:       boolPtr(true),
+	}
+
+	t.Run("converged VM after create produces no PATCH", func(t *testing.T) {
+		_, changed, needsReboot := buildOpenIaasVMPropertiesPatch(live, converged)
+		if changed || needsReboot {
+			t.Fatalf("changed=%v needsReboot=%v, want false/false", changed, needsReboot)
+		}
+	})
+
+	t.Run("absent Computed values never overwrite live", func(t *testing.T) {
+		desired := converged
+		desired.BootFirmware = ""
+		desired.NumCoresPerSocket = 0
+		desired.HighAvailability = ""
+		req, changed, _ := buildOpenIaasVMPropertiesPatch(live, desired)
+		if changed {
+			t.Fatalf("changed=true for absent values, req=%+v", req)
+		}
+	})
+
+	t.Run("unconfigured secure_boot is never pushed even when diverging", func(t *testing.T) {
+		desired := converged
+		desired.SecureBoot = nil
+		liveDiverged := *live
+		liveDiverged.SecureBoot = false
+		req, changed, _ := buildOpenIaasVMPropertiesPatch(&liveDiverged, desired)
+		if changed || req.SecureBoot != nil {
+			t.Fatalf("unconfigured secure_boot produced a PATCH: %+v", req)
+		}
+	})
+
+	t.Run("explicit secure_boot=false diverging from live is pushed", func(t *testing.T) {
+		desired := converged
+		desired.SecureBoot = boolPtr(false)
+		req, changed, needsReboot := buildOpenIaasVMPropertiesPatch(live, desired)
+		if !changed || req.SecureBoot == nil || *req.SecureBoot != false {
+			t.Fatalf("explicit secure_boot=false not pushed: %+v", req)
+		}
+		if needsReboot {
+			t.Fatal("secure_boot change must not require a reboot")
+		}
+	})
+
+	t.Run("explicit secure_boot equal to live is a no-op", func(t *testing.T) {
+		desired := converged
+		desired.SecureBoot = boolPtr(true)
+		_, changed, _ := buildOpenIaasVMPropertiesPatch(live, desired)
+		if changed {
+			t.Fatal("equal explicit secure_boot must not produce a PATCH")
+		}
+	})
+
+	t.Run("cpu memory cores divergences require a reboot", func(t *testing.T) {
+		desired := converged
+		desired.CPU = 8
+		desired.Memory = 17179869184
+		req, changed, needsReboot := buildOpenIaasVMPropertiesPatch(live, desired)
+		if !changed || !needsReboot {
+			t.Fatalf("changed=%v needsReboot=%v, want true/true", changed, needsReboot)
+		}
+		if req.CPU != 8 || req.Memory != 17179869184 {
+			t.Fatalf("unexpected payload: %+v", req)
+		}
+		if req.Name != "" || req.BootFirmware != "" || req.SecureBoot != nil || req.AutoPowerOn != nil {
+			t.Fatalf("payload carries non-diverging fields: %+v", req)
+		}
+	})
+
+	t.Run("name change alone does not require a reboot", func(t *testing.T) {
+		desired := converged
+		desired.Name = "vm-renamed"
+		req, changed, needsReboot := buildOpenIaasVMPropertiesPatch(live, desired)
+		if !changed || needsReboot {
+			t.Fatalf("changed=%v needsReboot=%v, want true/false", changed, needsReboot)
+		}
+		if req.Name != "vm-renamed" || req.CPU != 0 {
+			t.Fatalf("unexpected payload: %+v", req)
+		}
+	})
+
+	t.Run("auto_power_on false diverging from live true is pushed", func(t *testing.T) {
+		desired := converged
+		desired.AutoPowerOn = boolPtr(false)
+		req, changed, _ := buildOpenIaasVMPropertiesPatch(live, desired)
+		if !changed || req.AutoPowerOn == nil || *req.AutoPowerOn != false {
+			t.Fatalf("diverging auto_power_on not pushed: %+v", req)
+		}
+	})
+}
+
+func TestBuildOpenIaasVIFPatch(t *testing.T) {
+	actual := &client.OpenIaaSNetworkAdapter{
+		MacAddress:     "aa:bb:cc:dd:ee:ff",
+		TxChecksumming: true,
+		Network:        client.BaseObject{ID: "net-1"},
+	}
+
+	t.Run("converged adapter returns nil", func(t *testing.T) {
+		adapter := map[string]interface{}{
+			"network_id":  "net-1",
+			"mac_address": "AA:BB:CC:DD:EE:FF",
+		}
+		if req := buildOpenIaasVIFPatch(adapter, actual, nil); req != nil {
+			t.Fatalf("converged adapter produced a PATCH: %+v", req)
+		}
+	})
+
+	t.Run("mac comparison is case-insensitive", func(t *testing.T) {
+		adapter := map[string]interface{}{"mac_address": "Aa:Bb:Cc:Dd:Ee:Ff"}
+		if req := buildOpenIaasVIFPatch(adapter, actual, nil); req != nil {
+			t.Fatalf("cosmetic mac case drift produced a PATCH: %+v", req)
+		}
+	})
+
+	t.Run("only diverging fields are carried", func(t *testing.T) {
+		adapter := map[string]interface{}{
+			"network_id":  "net-2",
+			"mac_address": "AA:BB:CC:DD:EE:FF",
+		}
+		req := buildOpenIaasVIFPatch(adapter, actual, nil)
+		if req == nil || req.NetworkID != "net-2" || req.MAC != "" || req.TxChecksumming != nil {
+			t.Fatalf("unexpected payload: %+v", req)
+		}
+	})
+
+	t.Run("explicit tx false diverging is carried alone", func(t *testing.T) {
+		adapter := map[string]interface{}{
+			"network_id":  "net-1",
+			"mac_address": "aa:bb:cc:dd:ee:ff",
+		}
+		req := buildOpenIaasVIFPatch(adapter, actual, boolPtr(false))
+		if req == nil || req.TxChecksumming == nil || *req.TxChecksumming != false {
+			t.Fatalf("explicit tx=false not carried: %+v", req)
+		}
+		if req.NetworkID != "" || req.MAC != "" {
+			t.Fatalf("payload carries converged fields: %+v", req)
+		}
+	})
+
+	t.Run("unconfigured tx diverging is not carried", func(t *testing.T) {
+		adapter := map[string]interface{}{"tx_checksumming": false}
+		if req := buildOpenIaasVIFPatch(adapter, actual, nil); req != nil {
+			t.Fatalf("unconfigured tx produced a PATCH: %+v", req)
+		}
+	})
+}
