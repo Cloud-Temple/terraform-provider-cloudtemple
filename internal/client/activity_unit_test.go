@@ -218,3 +218,32 @@ func TestIsTransientAPIError(t *testing.T) {
 		t.Fatal("wrapped transient StatusError must stay transient")
 	}
 }
+
+func TestIsTransientActivityFailure(t *testing.T) {
+	transient := &ActivityCompletionError{
+		activity: &Activity{State: map[string]ActivityState{
+			"failed": {Reason: "None of the workers were able to respond in time"},
+		}},
+	}
+	if !IsTransientActivityFailure(transient) {
+		t.Fatal("the known transient platform reason must be retryable")
+	}
+	if !IsTransientActivityFailure(fmt.Errorf("wrapped: %w", transient)) {
+		t.Fatal("a wrapped transient failure must stay transient")
+	}
+
+	permanent := &ActivityCompletionError{
+		activity: &Activity{State: map[string]ActivityState{
+			"failed": {Reason: "MAC address is already used by virtual machine vm-2"},
+		}},
+	}
+	if IsTransientActivityFailure(permanent) {
+		t.Fatal("an arbitrary failure reason must NOT be retryable (narrow matcher)")
+	}
+	if IsTransientActivityFailure(&ActivityCompletionError{}) {
+		t.Fatal("a completion error without activity must not be retryable")
+	}
+	if IsTransientActivityFailure(errors.New("plain error")) {
+		t.Fatal("a non-activity error must not be retryable")
+	}
+}

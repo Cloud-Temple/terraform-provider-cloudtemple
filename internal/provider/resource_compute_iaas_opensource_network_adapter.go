@@ -2,10 +2,13 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/terraform-plugin-log/tflog"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -87,16 +90,52 @@ func resourceOpenIaasNetworkAdapter() *schema.Resource {
 
 func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
+	vmID := d.Get("virtual_machine_id").(string)
 
-	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Create(ctx, &client.CreateOpenIaasNetworkAdapterRequest{
-		VirtualMachineID: d.Get("virtual_machine_id").(string),
-		NetworkID:        d.Get("network_id").(string),
-		MAC:              d.Get("mac_address").(string),
-	})
-	if err != nil {
-		return diag.Errorf("the network adapter could not be created: %s", err)
+	var activity *client.Activity
+	var err error
+	for attempt := 1; attempt <= maxTransientVIFAttempts; attempt++ {
+		var activityId string
+		activityId, err = c.Compute().OpenIaaS().NetworkAdapter().Create(ctx, &client.CreateOpenIaasNetworkAdapterRequest{
+			VirtualMachineID: vmID,
+			NetworkID:        d.Get("network_id").(string),
+			MAC:              d.Get("mac_address").(string),
+		})
+		if err != nil {
+			return diag.Errorf("the network adapter could not be created: %s", err)
+		}
+		activity, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+		if err == nil || !client.IsTransientActivityFailure(err) {
+			break
+		}
+		// Anti-duplicate guard (#251): only delete the VIF referenced by the
+		// FAILED activity itself (ConcernedItems) — never by listing diff,
+		// another actor may legitimately create VIFs on the same VM in the
+		// meantime. A half-created VIF has an uncertain VPC registration:
+		// cleaning it is safer than adopting it. If the failed activity
+		// references no adapter, nothing is deleted and the retry may leave
+		// an orphan VIF platform-side: accepted trade-off — the platform did
+		// not report what it created, and a wrong deletion would be worse.
+		if activity != nil {
+			for _, item := range activity.ConcernedItems {
+				if item.Type == "network_adapter" && item.ID != "" {
+					if delActivity, derr := c.Compute().OpenIaaS().NetworkAdapter().Delete(ctx, item.ID); derr == nil {
+						_, _ = c.Activity().WaitForCompletion(ctx, delActivity, getWaiterOptions(ctx))
+					}
+				}
+			}
+		}
+		if attempt == maxTransientVIFAttempts {
+			break
+		}
+		tflog.Warn(ctx, fmt.Sprintf("create network adapter on %s: transient platform failure (attempt %d/%d), retrying: %s",
+			vmID, attempt, maxTransientVIFAttempts, err))
+		select {
+		case <-ctx.Done():
+			return diag.Errorf("the network adapter could not be created: %s", err)
+		case <-time.After(time.Duration(attempt) * 10 * time.Second):
+		}
 	}
-	activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions((ctx)))
 	setIdFromActivityState(d, activity)
 	if err != nil {
 		return diag.Errorf("the network adapter could not be created: %s", err)
@@ -171,25 +210,30 @@ func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, m
 				txConfigured = true
 			}
 		}
-		// Payload limite aux champs reellement divergents : renvoyer le
-		// networkId/mac courants declenche le self-conflict VPC (#246).
-		req := &client.UpdateOpenIaasNetworkAdapterRequest{}
-		if networkID != "" && networkID != adapter.Network.ID {
-			req.NetworkID = networkID
-		}
-		if mac != "" && !strings.EqualFold(mac, adapter.MacAddress) {
-			req.MAC = mac
-		}
-		if txConfigured && txChecksumming != adapter.TxChecksumming {
-			req.TxChecksumming = &txChecksumming
-		}
-		if req.NetworkID != "" || req.MAC != "" || req.TxChecksumming != nil {
-			activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, d.Id(), req)
-			if err != nil {
-				return diag.Errorf("the network adapter could not be updated: %s", err)
+		// Payload limited to the fields that actually diverge from the live
+		// adapter: re-sending the current networkId/mac is rejected
+		// platform-side as a VPC Static IP self-conflict (#246). The builder
+		// is re-evaluated against a fresh read before every retry attempt.
+		buildPatch := func(actual *client.OpenIaaSNetworkAdapter) *client.UpdateOpenIaasNetworkAdapterRequest {
+			req := &client.UpdateOpenIaasNetworkAdapterRequest{}
+			if networkID != "" && networkID != actual.Network.ID {
+				req.NetworkID = networkID
 			}
-			if _, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
-				return diag.Errorf("failed to update network adapter, %s", err)
+			if mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
+				req.MAC = mac
+			}
+			if txConfigured && txChecksumming != actual.TxChecksumming {
+				req.TxChecksumming = &txChecksumming
+			}
+			if req.NetworkID == "" && req.MAC == "" && req.TxChecksumming == nil {
+				return nil
+			}
+			return req
+		}
+		if buildPatch(adapter) != nil {
+			// Bounded retry on transient platform failures (#251).
+			if err := runVIFUpdateWithRetry(ctx, d.Id(), clientVIFUpdateFuncs(c, d.Id(), getWaiterOptions(ctx)), buildPatch); err != nil {
+				return diag.Errorf("the network adapter could not be updated: %s", err)
 			}
 		}
 	}
