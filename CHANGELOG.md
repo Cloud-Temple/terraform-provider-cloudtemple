@@ -21,6 +21,7 @@ BUG FIXES :
   * Fixed resource `cloudtemple_compute_virtual_machine` re-sending the full `boot_options` block (including values merely inherited from the live state) on every update. The block is now only sent when explicitly configured, and its booleans only when explicitly set.
   * Fixed resource `cloudtemple_iam_personal_access_token` erasing `secret_id` from the state on refresh (the API only returns the secret at creation).
   * Fixed resources `cloudtemple_compute_iaas_opensource_replication_policy` and `cloudtemple_compute_iaas_opensource_virtual_disk` being dropped from the Terraform state when a transient API error occurred during refresh, which made the next apply create a duplicate.
+  * Fixed OpenIaaS network adapter operations failing permanently when the platform reported a transient failure ("None of the workers were able to respond"): such operations are now retried with a bounded budget (3 attempts). The update payload is rebuilt against the live adapter before every retry, and a failed create cleans up the half-created adapter it references before retrying.
 
 IMPROVEMENTS :
 
