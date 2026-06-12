@@ -10,7 +10,7 @@ resources of your [Cloud Temple](https://www.cloud-temple.com) account.
 ## Requirements
 
 - [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 0.13.x
-- [Go](https://golang.org/doc/install) >= 1.22 (to build the provider)
+- [Go](https://golang.org/doc/install) >= 1.24 (to build the provider)
 
 ## Using the provider
 
