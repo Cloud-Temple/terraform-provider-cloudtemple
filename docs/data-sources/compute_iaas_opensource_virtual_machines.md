@@ -67,16 +67,19 @@ Read-Only:
 - `boot_order` (List of String)
 - `cpu` (Number)
 - `dvd_drive` (List of Object) (see [below for nested schema](#nestedobjatt--virtual_machines--dvd_drive))
+- `high_availability` (String)
 - `host_id` (String)
 - `id` (String)
 - `internal_id` (String)
 - `machine_manager_id` (String)
+- `management_agent` (List of Object) (see [below for nested schema](#nestedobjatt--virtual_machines--management_agent))
 - `memory` (Number)
 - `name` (String)
 - `num_cores_per_socket` (Number)
 - `operating_system_name` (String)
 - `pool_id` (String)
 - `power_state` (String)
+- `pv_drivers` (List of Object) (see [below for nested schema](#nestedobjatt--virtual_machines--pv_drivers))
 - `secure_boot` (Boolean)
 - `tools` (List of Object) (see [below for nested schema](#nestedobjatt--virtual_machines--tools))
 
@@ -96,6 +99,24 @@ Read-Only:
 
 - `attached` (Boolean)
 - `name` (String)
+
+
+<a id="nestedobjatt--virtual_machines--management_agent"></a>
+### Nested Schema for `virtual_machines.management_agent`
+
+Read-Only:
+
+- `detected` (Boolean)
+
+
+<a id="nestedobjatt--virtual_machines--pv_drivers"></a>
+### Nested Schema for `virtual_machines.pv_drivers`
+
+Read-Only:
+
+- `are_up_to_date` (Boolean)
+- `detected` (Boolean)
+- `version` (String)
 
 
 <a id="nestedobjatt--virtual_machines--tools"></a>

@@ -123,8 +123,8 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 		BootOptions: &clientpkg.BootOptions{
 			BootDelay:        0,
 			BootRetryDelay:   10000,
-			BootRetryEnabled: false,
-			EnterBIOSSetup:   false,
+			BootRetryEnabled: boolPtr(false),
+			EnterBIOSSetup:   boolPtr(false),
 			Firmware:         "bios",
 		},
 	})
@@ -301,3 +301,5 @@ func TestVirtualMachineClient_Guest(t *testing.T) {
 	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }
+
+func boolPtr(b bool) *bool { return &b }
