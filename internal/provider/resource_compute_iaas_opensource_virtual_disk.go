@@ -191,7 +191,41 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 		return diag.Errorf("failed to read virtual disk: %s", err)
 	}
 	if virtualDisk == nil {
-		// The virtual disk no longer exists: remove it from the state.
+		// The API answers 403 for unknown AND forbidden ids alike, and the
+		// client maps both to nil: a deletion is only accepted under
+		// strict listing evidence — and a disk absent from the VM-scoped
+		// listing may have been DETACHED or MOVED, which is drift, never a
+		// deletion (#275 doctrine, FF-5).
+		vmID := d.Get("virtual_machine_id").(string)
+		scoped, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{
+			VirtualMachineID: vmID,
+		})
+		if err != nil {
+			return diag.Errorf("virtual disk %s could not be read and its deletion could not be confirmed: %s", d.Id(), err)
+		}
+		tenant, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{})
+		if err != nil {
+			return diag.Errorf("virtual disk %s could not be read and its deletion could not be confirmed: %s", d.Id(), err)
+		}
+		scopedIDs := map[string]bool{}
+		for _, disk := range scoped {
+			if disk != nil {
+				scopedIDs[disk.ID] = true
+			}
+		}
+		tenantIDs := map[string]bool{}
+		for _, disk := range tenant {
+			if disk != nil {
+				tenantIDs[disk.ID] = true
+			}
+		}
+		switch classifyMissingDevice(d.Id(), scopedIDs, tenantIDs) {
+		case deviceStillInScope:
+			return diag.Errorf("virtual disk %s could not be read but is still listed on virtual machine %s: refusing to drop it from the state (possible access restriction)", d.Id(), vmID)
+		case deviceExistsOutOfScope:
+			return diag.Errorf("virtual disk %s could not be read and is no longer attached to virtual machine %s but still exists platform-side (detached or moved): refusing to treat this drift as a deletion — refresh or import after fixing the attachment", d.Id(), vmID)
+		}
+		// Deletion confirmed by independent strict reads.
 		d.SetId("")
 		return nil
 	}

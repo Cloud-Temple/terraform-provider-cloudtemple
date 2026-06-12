@@ -87,7 +87,8 @@ func (v *OpenIaaSVirtualDiskClient) ListStrict(ctx context.Context, filter *Open
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	// Strictly 200: a 206 partial listing cannot prove an absence.
+	if err := requireHttpCodes(resp, 200); err != nil {
 		return nil, err
 	}
 
