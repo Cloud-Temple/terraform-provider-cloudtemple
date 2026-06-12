@@ -121,8 +121,8 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 	activityId, err = client.Compute().VirtualMachine().Update(ctx, &clientpkg.UpdateVirtualMachineRequest{
 		Id: instanceId,
 		BootOptions: &clientpkg.BootOptions{
-			BootDelay:        0,
-			BootRetryDelay:   10000,
+			BootDelay:        intPtr(0),
+			BootRetryDelay:   intPtr(10000),
 			BootRetryEnabled: boolPtr(false),
 			EnterBIOSSetup:   boolPtr(false),
 			Firmware:         "bios",
@@ -303,3 +303,5 @@ func TestVirtualMachineClient_Guest(t *testing.T) {
 }
 
 func boolPtr(b bool) *bool { return &b }
+
+func intPtr(i int) *int { return &i }

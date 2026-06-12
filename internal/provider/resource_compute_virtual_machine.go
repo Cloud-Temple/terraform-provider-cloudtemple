@@ -556,10 +556,11 @@ Independent persistent: Changes are immediately and permanently written to the v
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"firmware": {
-							Type:        schema.TypeString,
-							Optional:    true,
-							Computed:    true,
-							Description: "Firmware type. (BIOS or EFI)",
+							Type:         schema.TypeString,
+							Optional:     true,
+							Computed:     true,
+							ValidateFunc: validation.StringInSlice([]string{"bios", "efi"}, true),
+							Description:  "Firmware type. (BIOS or EFI)",
 						},
 						"boot_delay": {
 							Type:        schema.TypeInt,
@@ -1197,20 +1198,35 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 // them: a value merged through Computed is not write intent (#246 class,
 // #264 plan Lot D).
 func buildVMwareBootOptionsFromRaw(rawBlock cty.Value, block map[string]interface{}) *client.BootOptions {
-	opts := &client.BootOptions{
-		BootDelay:      block["boot_delay"].(int),
-		BootRetryDelay: block["boot_retry_delay"].(int),
-		Firmware:       strings.ToLower(block["firmware"].(string)),
-	}
-	setIfConfigured := func(attr string, target **bool) {
+	opts := &client.BootOptions{}
+	setBoolIfConfigured := func(attr string, target **bool) {
 		if v := rawBlock.GetAttr(attr); v.IsKnown() && !v.IsNull() {
 			b := v.True()
 			*target = &b
 		}
 	}
-	setIfConfigured("boot_retry_enabled", &opts.BootRetryEnabled)
-	setIfConfigured("enter_bios_setup", &opts.EnterBIOSSetup)
-	setIfConfigured("efi_secure_boot_enabled", &opts.EFISecureBootEnabled)
+	setIntIfConfigured := func(attr string, target **int) {
+		if v := rawBlock.GetAttr(attr); v.IsKnown() && !v.IsNull() {
+			big, _ := v.AsBigFloat().Int64()
+			i := int(big)
+			*target = &i
+		}
+	}
+	setIntIfConfigured("boot_delay", &opts.BootDelay)
+	setIntIfConfigured("boot_retry_delay", &opts.BootRetryDelay)
+	setBoolIfConfigured("boot_retry_enabled", &opts.BootRetryEnabled)
+	setBoolIfConfigured("enter_bios_setup", &opts.EnterBIOSSetup)
+	setBoolIfConfigured("efi_secure_boot_enabled", &opts.EFISecureBootEnabled)
+	if v := rawBlock.GetAttr("firmware"); v.IsKnown() && !v.IsNull() {
+		opts.Firmware = strings.ToLower(v.AsString())
+	}
+	if opts.BootDelay == nil && opts.BootRetryDelay == nil && opts.BootRetryEnabled == nil &&
+		opts.EnterBIOSSetup == nil && opts.EFISecureBootEnabled == nil && opts.Firmware == "" {
+		// A present block with no configured attribute carries no write
+		// intent: sending an empty bootOptions object could reset live
+		// values platform-side (FF-4).
+		return nil
+	}
 	return opts
 }
 

@@ -93,15 +93,16 @@ type VirtualMachineBootOptions struct {
 }
 
 type BootOptions struct {
-	// The booleans are pointers so an absent value is omitted from the
-	// payload while an explicit false stays expressible: the matching
-	// schema attributes are Optional+Computed and a merged value is not
-	// write intent (#264 plan, Lot D).
-	BootDelay            int    `json:"bootDelay"`
-	BootRetryDelay       int    `json:"bootRetryDelay"`
+	// Every attribute is a pointer or omitempty: the matching schema
+	// attributes are Optional+Computed, so only an explicitly configured
+	// value is write intent — an absent value is omitted from the payload
+	// while explicit zero values (boot_delay = 0, booleans false) stay
+	// expressible (#264 plan, Lot D + FF-4).
+	BootDelay            *int   `json:"bootDelay,omitempty"`
+	BootRetryDelay       *int   `json:"bootRetryDelay,omitempty"`
 	BootRetryEnabled     *bool  `json:"bootRetryEnabled,omitempty"`
 	EnterBIOSSetup       *bool  `json:"enterBIOSSetup,omitempty"`
-	Firmware             string `json:"firmware"`
+	Firmware             string `json:"firmware,omitempty"`
 	EFISecureBootEnabled *bool  `json:"efiSecureBootEnabled,omitempty"`
 }
 
