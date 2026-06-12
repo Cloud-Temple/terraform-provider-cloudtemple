@@ -624,6 +624,30 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 	// Map the data using the helper function
 	vmData := helpers.FlattenOpenIaaSVirtualMachine(vm)
 
+	// Lazy, single fetch of the VM-scoped device lists: a nil per-id
+	// answer is only treated as a deletion after a second independent
+	// evidence, because the OpenIaaS API answers 403 for unknown AND
+	// forbidden ids alike and the client maps both to nil — a permission
+	// hiccup must never silently shrink the state (#273).
+	var listedDiskIDs map[string]bool
+	confirmDiskGone := func(id string) (bool, error) {
+		if listedDiskIDs == nil {
+			// ListStrict: an access-denied listing must fail closed, not
+			// masquerade as an empty list (the regular List maps 403 to nil).
+			diskList, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{
+				VirtualMachineID: d.Id(),
+			})
+			if err != nil {
+				return false, err
+			}
+			listedDiskIDs = map[string]bool{}
+			for _, disk := range diskList {
+				listedDiskIDs[disk.ID] = true
+			}
+		}
+		return deviceConfirmedGone(listedDiskIDs, id), nil
+	}
+
 	// Get the OS disks
 	osDisks := []interface{}{}
 	for _, osDisk := range d.Get("os_disk").([]interface{}) {
@@ -642,8 +666,16 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		case osDiskReadKeep:
 			osDisks = append(osDisks, helpers.FlattenOpenIaaSOSDiskData(disk, d.Id()))
 		case osDiskReadDropGone:
-			// The disk no longer exists platform-side: reflect reality in
-			// the state instead of crashing on the stale entry (#234 class).
+			gone, err := confirmDiskGone(osDiskId)
+			if err != nil {
+				return diag.Errorf("failed to confirm the deletion of os disk %s: %s", osDiskId, err)
+			}
+			if !gone {
+				return diag.Errorf("os disk %s could not be read but is still attached to virtual machine %s: refusing to drop it from the state (possible access restriction)", osDiskId, d.Id())
+			}
+			// Deletion confirmed by two independent reads: reflect reality
+			// in the state instead of crashing on the stale entry (#234
+			// class).
 		case osDiskReadDropPlatformManaged:
 			// Legacy state pollution (#255): pre-1.8.0 creations could
 			// capture the cloud-init config drive as a managed os_disk,
@@ -663,6 +695,7 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 	vmData["os_disk"] = osDisks
 
 	// Get the OS network adapters
+	var listedAdapterIDs map[string]bool
 	osNetworkAdapters := []interface{}{}
 	for _, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
 		if osNetworkAdapter == nil {
@@ -677,7 +710,24 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 			return diag.Errorf("failed to read os network adapter: %s", err)
 		}
 		if networkAdapter == nil {
-			// The adapter no longer exists platform-side: reflect reality
+			if listedAdapterIDs == nil {
+				// ListStrict: an access-denied listing must fail closed,
+				// not masquerade as an empty list.
+				adapterList, err := c.Compute().OpenIaaS().NetworkAdapter().ListStrict(ctx, &client.OpenIaaSNetworkAdapterFilter{
+					VirtualMachineID: d.Id(),
+				})
+				if err != nil {
+					return diag.Errorf("failed to confirm the deletion of os network adapter %s: %s", osNetworkAdapterId, err)
+				}
+				listedAdapterIDs = map[string]bool{}
+				for _, adapter := range adapterList {
+					listedAdapterIDs[adapter.ID] = true
+				}
+			}
+			if !deviceConfirmedGone(listedAdapterIDs, osNetworkAdapterId) {
+				return diag.Errorf("os network adapter %s could not be read but is still attached to virtual machine %s: refusing to drop it from the state (possible access restriction)", osNetworkAdapterId, d.Id())
+			}
+			// Deletion confirmed by two independent reads: reflect reality
 			// instead of crashing on the stale entry (#234 class).
 			continue
 		}
@@ -1018,6 +1068,13 @@ func classifyOSDiskOnRead(disk *client.OpenIaaSVirtualDisk, virtualMachineID str
 		return osDiskReadDropPlatformManaged
 	}
 	return osDiskReadKeep
+}
+
+// deviceConfirmedGone reports whether a device id absent from the per-id
+// read is also absent from the VM-scoped listing — the second independent
+// evidence required before dropping a state entry (#273).
+func deviceConfirmedGone(listedIDs map[string]bool, id string) bool {
+	return !listedIDs[id]
 }
 
 // openIaasVMDesiredProperties carries the desired VM properties from the

@@ -75,6 +75,30 @@ type OpenIaaSVirtualDiskFilter struct {
 	StorageRepositoryID string `filter:"storageRepositoryId"`
 }
 
+// ListStrict behaves like List but treats an access-denied answer as an
+// error instead of an empty result: callers using the listing as EVIDENCE
+// for state-shrinking decisions must fail closed (#273). The regular List
+// maps 403 to an empty result like the rest of the API surface.
+func (v *OpenIaaSVirtualDiskClient) ListStrict(ctx context.Context, filter *OpenIaaSVirtualDiskFilter) ([]*OpenIaaSVirtualDisk, error) {
+	r := v.c.newRequest("GET", "/compute/v1/open_iaas/virtual_disks")
+	r.addFilter(filter)
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireOK(resp); err != nil {
+		return nil, err
+	}
+
+	var out []*OpenIaaSVirtualDisk
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (v *OpenIaaSVirtualDiskClient) List(ctx context.Context, filter *OpenIaaSVirtualDiskFilter) ([]*OpenIaaSVirtualDisk, error) {
 	r := v.c.newRequest("GET", "/compute/v1/open_iaas/virtual_disks")
 	r.addFilter(filter)
