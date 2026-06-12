@@ -76,11 +76,20 @@ const cloudConfigDriveName = "XO CloudConfigDrive"
 // (cloud-init config drive, attached read-only by XO at deploy time) and must
 // never be reconciled as an os_disk: capturing it — which is timing dependent
 // at create — produces a permanent removal drift in every subsequent plan.
-// Deliberately restricted to the exact XO naming: a broader criterion (e.g.
-// any read-only VBD) could silently drop legitimate disks without a formal
-// API invariant.
+// Both discriminators are required: the exact XO naming alone could hide a
+// legitimate user disk carrying the same name, and a read-only criterion
+// alone could drop legitimate read-only disks without a formal API
+// invariant. Only a disk attached read-only to this VM under the exact XO
+// platform naming is excluded; when the VBD is absent Find returns a zero
+// value, so the default stays fail-safe (the disk remains managed).
 func isPlatformManagedDisk(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) bool {
-	return osDisk.Name == cloudConfigDriveName
+	if osDisk.Name != cloudConfigDriveName {
+		return false
+	}
+	vbd := Find(osDisk.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
+		return virtualMachine.ID == virtualMachineId
+	})
+	return vbd.ReadOnly
 }
 
 func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMachineId string) []interface{} {
