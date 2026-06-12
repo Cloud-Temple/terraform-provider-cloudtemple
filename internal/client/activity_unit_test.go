@@ -247,3 +247,38 @@ func TestIsTransientActivityFailure(t *testing.T) {
 		t.Fatal("a non-activity error must not be retryable")
 	}
 }
+
+func TestActivityWaitNotFoundToleranceSurvivesTransientBlips(t *testing.T) {
+	// FF-3 finding: the one-time not-found tolerance was consumed by any
+	// prior attempt (total counter), so a transient blip BEFORE the
+	// activity became visible turned the first legitimate not-found into
+	// a permanent failure.
+	calls := 0
+	read := scriptedReads(&calls,
+		readOutcome{err: StatusError{Code: http.StatusInternalServerError}},
+		readOutcome{}, // first not-found: must be tolerated once
+		readOutcome{activity: completedActivity()},
+	)
+	activity, err := waitForActivityCompletion(context.Background(), "act-1", read, immediateBackoff(20), nil)
+	if err != nil || activity == nil {
+		t.Fatalf("a transient blip before the first not-found must not consume the tolerance, got err=%v", err)
+	}
+	if calls != 3 {
+		t.Fatalf("calls=%d, want 3", calls)
+	}
+}
+
+func TestActivityWaitDisappearedActivityIsPermanent(t *testing.T) {
+	calls := 0
+	read := scriptedReads(&calls,
+		readOutcome{activity: pendingActivity()},
+		readOutcome{}, // the activity was seen, then vanished: permanent
+	)
+	_, err := waitForActivityCompletion(context.Background(), "act-1", read, immediateBackoff(20), nil)
+	if err == nil {
+		t.Fatal("an activity that was seen and vanished must fail permanently")
+	}
+	if calls != 2 {
+		t.Fatalf("calls=%d, want 2 (no retry after disappearance)", calls)
+	}
+}

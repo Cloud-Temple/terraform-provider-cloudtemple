@@ -204,11 +204,16 @@ type activityReadFunc func(ctx context.Context) (*Activity, error)
 //     a repeated not-found is permanent.
 func waitForActivityCompletion(ctx context.Context, id string, read activityReadFunc, b retry.Backoff, options *WaiterOptions) (*Activity, error) {
 	var res *Activity
-	var count int
 	var consecutiveReadFailures int
+	// The one-time not-found tolerance (eventual consistency right after
+	// the activity is started) is tracked independently from the transient
+	// read budget: a 429/5xx/transport blip before the first successful
+	// read must not consume it (FF-3). The disappearance of an activity
+	// that was already seen stays permanent.
+	var notFoundTolerated bool
+	var activitySeen bool
 
 	err := retry.Do(ctx, b, func(ctx context.Context) error {
-		count++
 		activity, err := read(ctx)
 		if err != nil {
 			if isTransientAPIError(err) && consecutiveReadFailures < maxActivityReadRetries {
@@ -228,11 +233,17 @@ func waitForActivityCompletion(ctx context.Context, id string, read activityRead
 			err := &ActivityCompletionError{
 				message: fmt.Sprintf("the activity %q could not be found", id),
 			}
-			if count == 1 {
+			if activitySeen {
+				// An activity that was visible and vanished is permanent.
+				return options.error(err)
+			}
+			if !notFoundTolerated {
+				notFoundTolerated = true
 				return options.retryableError(err)
 			}
 			return options.error(err)
 		}
+		activitySeen = true
 		if len(activity.State) != 1 {
 			return options.retryableError(&ActivityCompletionError{
 				message: fmt.Sprintf("unexpected state for activity %q: %v", id, activity.State),
