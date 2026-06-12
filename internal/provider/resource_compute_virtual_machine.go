@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -1190,6 +1191,49 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 	return diags
 }
 
+// buildVMwareBootOptionsFromRaw builds the boot options payload from the
+// merged block values and the raw-config block. The three Optional+Computed
+// booleans are only carried when the raw configuration explicitly sets
+// them: a value merged through Computed is not write intent (#246 class,
+// #264 plan Lot D).
+func buildVMwareBootOptionsFromRaw(rawBlock cty.Value, block map[string]interface{}) *client.BootOptions {
+	opts := &client.BootOptions{
+		BootDelay:      block["boot_delay"].(int),
+		BootRetryDelay: block["boot_retry_delay"].(int),
+		Firmware:       strings.ToLower(block["firmware"].(string)),
+	}
+	setIfConfigured := func(attr string, target **bool) {
+		if v := rawBlock.GetAttr(attr); v.IsKnown() && !v.IsNull() {
+			b := v.True()
+			*target = &b
+		}
+	}
+	setIfConfigured("boot_retry_enabled", &opts.BootRetryEnabled)
+	setIfConfigured("enter_bios_setup", &opts.EnterBIOSSetup)
+	setIfConfigured("efi_secure_boot_enabled", &opts.EFISecureBootEnabled)
+	return opts
+}
+
+// buildVMwareBootOptions returns the boot options payload only when the
+// boot_options block is explicitly present in the raw configuration: the
+// block is Optional+Computed, so the merged d.Get value re-pushed live
+// values on every update (the create chains into update).
+func buildVMwareBootOptions(d *schema.ResourceData) *client.BootOptions {
+	raw := d.GetRawConfig()
+	if raw.IsNull() || !raw.IsKnown() {
+		return nil
+	}
+	rawList := raw.GetAttr("boot_options")
+	if rawList.IsNull() || !rawList.IsKnown() || rawList.LengthInt() == 0 {
+		return nil
+	}
+	merged := d.Get("boot_options").([]interface{})
+	if len(merged) == 0 || merged[0] == nil {
+		return nil
+	}
+	return buildVMwareBootOptionsFromRaw(rawList.Index(cty.NumberIntVal(0)), merged[0].(map[string]interface{}))
+}
+
 func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	return updateVirtualMachine(ctx, d, meta, d.HasChange("power_state"), false)
 }
@@ -1209,17 +1253,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		ExposeHardwareVirtualization: d.Get("expose_hardware_virtualization").(bool),
 	}
 
-	if len(d.Get("boot_options").([]interface{})) > 0 {
-		bootOptions := d.Get("boot_options").([]interface{})[0]
-		req.BootOptions = &client.BootOptions{
-			BootDelay:            bootOptions.(map[string]interface{})["boot_delay"].(int),
-			BootRetryDelay:       bootOptions.(map[string]interface{})["boot_retry_delay"].(int),
-			BootRetryEnabled:     bootOptions.(map[string]interface{})["boot_retry_enabled"].(bool),
-			EnterBIOSSetup:       bootOptions.(map[string]interface{})["enter_bios_setup"].(bool),
-			Firmware:             strings.ToLower(bootOptions.(map[string]interface{})["firmware"].(string)),
-			EFISecureBootEnabled: bootOptions.(map[string]interface{})["efi_secure_boot_enabled"].(bool),
-		}
-	}
+	req.BootOptions = buildVMwareBootOptions(d)
 
 	activityId, err := c.Compute().VirtualMachine().Update(ctx, req)
 	if err != nil {
