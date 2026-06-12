@@ -101,6 +101,7 @@ Read-Only:
 
 Read-Only:
 
+- `connected` (Boolean)
 - `id` (String)
 - `name` (String)
 - `read_only` (Boolean)

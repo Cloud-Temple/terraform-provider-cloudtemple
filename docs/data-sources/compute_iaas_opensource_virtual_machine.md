@@ -64,11 +64,13 @@ output "virtual_machine-2" {
 - `high_availability` (String) High Availability configuration for the virtual machine (Default: disabled). Possible values are: 'disabled', 'restart' and 'best-effort'. For more informations, refer to the documentation : https://docs.cloud-temple.com/iaas_opensource/concepts#haute-disponibilit%C3%A9
 - `host_id` (String) The ID of the host the virtual machine is running on.
 - `internal_id` (String) The internal identifier of the virtual machine in the Open IaaS system.
+- `management_agent` (List of Object) Information about the management agent of the virtual machine. (see [below for nested schema](#nestedatt--management_agent))
 - `memory` (Number) The amount of memory allocated to the virtual machine in Bytes.
 - `num_cores_per_socket` (Number) The number of cores per CPU socket in the virtual machine.
 - `operating_system_name` (String) The name of the operating system installed on the virtual machine.
 - `pool_id` (String) The ID of the resource pool the virtual machine belongs to.
 - `power_state` (String) The current power state of the virtual machine (e.g., Running, Halted, Paused, etc...).
+- `pv_drivers` (List of Object) Information about the paravirtualization drivers of the virtual machine. (see [below for nested schema](#nestedatt--pv_drivers))
 - `secure_boot` (Boolean) Whether secure boot is enabled for the virtual machine.
 - `tools` (List of Object) Information about the virtualization tools installed in the virtual machine. (see [below for nested schema](#nestedatt--tools))
 
@@ -88,6 +90,24 @@ Read-Only:
 
 - `attached` (Boolean)
 - `name` (String)
+
+
+<a id="nestedatt--management_agent"></a>
+### Nested Schema for `management_agent`
+
+Read-Only:
+
+- `detected` (Boolean)
+
+
+<a id="nestedatt--pv_drivers"></a>
+### Nested Schema for `pv_drivers`
+
+Read-Only:
+
+- `are_up_to_date` (Boolean)
+- `detected` (Boolean)
+- `version` (String)
 
 
 <a id="nestedatt--tools"></a>
