@@ -6,26 +6,32 @@ SECURITY :
 
   * Replaced the archived `github.com/dgrijalva/jwt-go` dependency with the maintained fork `github.com/golang-jwt/jwt/v4` (CVE-2020-26160).
   * Updated `google.golang.org/grpc` to v1.79.3 (CVE-2026-33186), `golang.org/x/crypto` to v0.46.0 (CVE-2025-22869, CVE-2025-47914, CVE-2025-58181), `golang.org/x/net` to v0.48.0 (CVE-2025-22870, CVE-2025-22872) and `github.com/cloudflare/circl` to v1.6.3 (CVE-2025-8556, CVE-2026-1229).
-  * The provider is now built with Go 1.24.
 
 BUG FIXES :
 
   * Fixed a permanent plan drift (`uefi -> null`) on `boot_firmware` for marketplace virtual machines: the property is now `Computed` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
   * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to push redundant network adapter and disk updates right after a marketplace deployment. OS devices are now reconciled against the live API state after creation and only real divergences are pushed.
-  * Fixed a bug causing an explicit `tx_checksumming = false` to never be sent to the API.
+  * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to send an unconditional full-properties update on every apply. Properties are now only patched when they actually diverge from the live API state, and `secure_boot` is only sent when explicitly configured.
+  * Fixed a bug causing an explicit `tx_checksumming = false` to never be sent to the API on resources `cloudtemple_compute_iaas_opensource_virtual_machine` and `cloudtemple_compute_iaas_opensource_network_adapter`.
   * Fixed a bug causing `tx_checksumming` to be pushed from resource `cloudtemple_compute_iaas_opensource_virtual_machine` when it was not explicitly configured.
   * Fixed a bug causing the cloud-init config drive (`XO CloudConfigDrive`) to be captured as a managed `os_disk` at creation on resource `cloudtemple_compute_iaas_opensource_virtual_machine`, producing a permanent removal drift.
-  * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to send an unconditional full-properties update on every apply. Properties are now only patched when they actually diverge from the live API state, and `secure_boot` is only sent when explicitly configured.
-  * Fixed a bug causing an in-progress operation to be reported as failed when a transient error (429, 5xx or a transport failure) occurred while polling its activity status. Transient read failures are now retried with a bounded consecutive budget.
-  * Fixed datasources `cloudtemple_compute_iaas_opensource_pools`, `cloudtemple_compute_iaas_opensource_virtual_machine`, `cloudtemple_compute_iaas_opensource_virtual_machines`, `cloudtemple_compute_iaas_opensource_virtual_disk` and `cloudtemple_compute_iaas_opensource_virtual_disks` failing at read time with an `Invalid address to set` error: the schemas now declare every attribute emitted by the flatten helpers.
-  * Fixed resource `cloudtemple_compute_virtual_machine` re-sending the full `boot_options` block (including values merely inherited from the live state) on every update. The block is now only sent when explicitly configured, and its booleans only when explicitly set.
-  * Fixed resource `cloudtemple_iam_personal_access_token` erasing `secret_id` from the state on refresh (the API only returns the secret at creation).
-  * Fixed resources `cloudtemple_compute_iaas_opensource_replication_policy` and `cloudtemple_compute_iaas_opensource_virtual_disk` being dropped from the Terraform state when a transient API error occurred during refresh, which made the next apply create a duplicate.
   * Fixed OpenIaaS network adapter operations failing permanently when the platform reported a transient failure ("None of the workers were able to respond"): such operations are now retried with a bounded budget (3 attempts). The update payload is rebuilt against the live adapter before every retry, and a failed create cleans up the half-created adapter it references before retrying.
+  * Fixed a bug causing an in-progress operation to be reported as failed when a transient error (429, 5xx or a transport failure) occurred while polling its activity status. Transient read failures are now retried with a bounded consecutive budget.
+  * Fixed resources `cloudtemple_compute_iaas_opensource_replication_policy` and `cloudtemple_compute_iaas_opensource_virtual_disk` being dropped from the Terraform state when a transient API error occurred during refresh, which made the next apply create a duplicate.
+  * Fixed resource `cloudtemple_iam_personal_access_token` erasing `secret_id` from the state on refresh (the API only returns the secret at creation).
+  * Fixed resource `cloudtemple_compute_virtual_machine` re-sending the full `boot_options` block (including values merely inherited from the live state) on every update. The block is now only sent when explicitly configured, and its booleans only when explicitly set.
+  * Fixed datasources `cloudtemple_compute_iaas_opensource_pools`, `cloudtemple_compute_iaas_opensource_virtual_machine`, `cloudtemple_compute_iaas_opensource_virtual_machines`, `cloudtemple_compute_iaas_opensource_virtual_disk` and `cloudtemple_compute_iaas_opensource_virtual_disks` failing at read time with an `Invalid address to set` error: the schemas now declare every attribute emitted by the flatten helpers.
 
 IMPROVEMENTS :
 
   * Marketplace deployments now send `networkAdapterName` in the network data mapping (the deprecated `sourceNetworkName` is kept for compatibility).
+
+MISCELLANEOUS :
+
+  * The provider is now built with Go 1.24 (required by the updated dependencies).
+  * The continuous integration now runs a platform-independent safety net on every pull request: formatting and static-analysis checks, the state-safety unit-test suites, a datasource schema-vs-flatten validation and a write-guard registry for the `Optional`+`Computed` booleans.
+  * Refreshed the repository README (build requirements, Terraform Registry links, usage example).
+  * Removed a broken CI workflow left over from the provider template.
 
 # 1.7.1 (April 15th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
