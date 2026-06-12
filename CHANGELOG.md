@@ -1,5 +1,17 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.8.0 (Unreleased)
+
+BUG FIXES :
+
+  * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to push redundant network adapter and disk updates right after a marketplace deployment. OS devices are now reconciled against the live API state after creation and only real divergences are pushed.
+  * Fixed a bug causing an explicit `tx_checksumming = false` to never be sent to the API.
+  * Fixed a bug causing `tx_checksumming` to be pushed from resource `cloudtemple_compute_iaas_opensource_virtual_machine` when it was not explicitly configured.
+
+IMPROVEMENTS :
+
+  * Marketplace deployments now send `networkAdapterName` in the network data mapping (the deprecated `sourceNetworkName` is kept for compatibility).
+
 # 1.7.1 (April 15th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
