@@ -968,11 +968,11 @@ func diskPendingChanges(desired map[string]interface{}, actual *client.OpenIaaSV
 // adapterNeedsUpdate compares the desired os_network_adapter block against
 // the actual adapter returned by the API. An empty desired value never
 // triggers an update (an unset MAC must not be pushed). tx_checksumming is
-// Optional+Computed: the desired value coming from d.Get cannot distinguish
-// an explicit user choice from a value merely inherited from the live
-// adapter, so it only counts as a divergence when the block explicitly
-// configures it (txConfigured).
-func adapterNeedsUpdate(desired map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txConfigured bool) bool {
+// Optional+Computed and the post-create state merge does not retain
+// explicit false booleans, so the desired map cannot be trusted for it:
+// the divergence is evaluated against the explicitly configured raw value
+// (txWant, nil when the block does not configure it).
+func adapterNeedsUpdate(desired map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool) bool {
 	if actual == nil {
 		return true
 	}
@@ -982,23 +982,25 @@ func adapterNeedsUpdate(desired map[string]interface{}, actual *client.OpenIaaSN
 	if mac, ok := desired["mac_address"].(string); ok && mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
 		return true
 	}
-	if tx, ok := desired["tx_checksumming"].(bool); ok && txConfigured && tx != actual.TxChecksumming {
+	if txWant != nil && *txWant != actual.TxChecksumming {
 		return true
 	}
 	return false
 }
 
-// osAdapterTxConfigured returns, keyed by adapter id, whether the
-// os_network_adapter block at the same index explicitly sets
-// tx_checksumming in the raw user configuration (raw is d.GetRawConfig()).
-// Like the standalone network adapter resource, only an explicit
-// configuration may produce a VIF PATCH (null = not configured, same
-// IsNull-only semantics): pushing a value inherited through Computed would
-// re-introduce the unrequested VIF update this reconciliation removes
-// (#246). The raw config list is aligned by index with the unfiltered
-// d.Get("os_network_adapter") list.
-func osAdapterTxConfigured(raw cty.Value, adapters []interface{}) map[string]bool {
-	configured := map[string]bool{}
+// osAdapterTxConfigured returns, keyed by adapter id, the tx_checksumming
+// value explicitly set by the os_network_adapter block at the same index in
+// the raw user configuration (raw is d.GetRawConfig()); absent ids mean the
+// block does not configure it. The raw value is authoritative: the merged
+// desired map seeds tx_checksumming from the live adapter (Computed) and
+// the state merge swallows explicit false values, which would either push
+// an unrequested VIF PATCH (#246) or skip a requested one on first apply.
+// The raw config list is aligned by index with the unfiltered
+// d.Get("os_network_adapter") list. An unknown raw value cannot occur
+// during apply and has no concrete value to push: it stays unconfigured
+// (fail-safe, no PATCH).
+func osAdapterTxConfigured(raw cty.Value, adapters []interface{}) map[string]*bool {
+	configured := map[string]*bool{}
 	if raw.IsNull() || !raw.IsKnown() {
 		return configured
 	}
@@ -1019,8 +1021,9 @@ func osAdapterTxConfigured(raw cty.Value, adapters []interface{}) map[string]boo
 		if id == "" {
 			continue
 		}
-		if v := rawList[i].GetAttr("tx_checksumming"); !v.IsNull() {
-			configured[id] = true
+		if v := rawList[i].GetAttr("tx_checksumming"); !v.IsNull() && v.IsKnown() {
+			tx := v.True()
+			configured[id] = &tx
 		}
 	}
 	return configured
@@ -1211,11 +1214,12 @@ func osDiskUpdate(ctx context.Context, c *client.Client, disk map[string]interfa
 	return nil
 }
 
-func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txConfigured bool) diag.Diagnostics {
+func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool) diag.Diagnostics {
 	// Payload limited to the fields that actually diverge from the live
 	// adapter: re-sending the current networkId/mac is rejected platform-side
 	// as a VPC Static IP self-conflict (#246). tx_checksumming is only sent
-	// when explicitly configured in the block (Computed values stay local).
+	// when explicitly configured in the block, using the raw config value
+	// (the merged map swallows explicit false on first apply).
 	req := &client.UpdateOpenIaasNetworkAdapterRequest{}
 	if networkID, _ := networkAdapter["network_id"].(string); networkID != "" && networkID != actual.Network.ID {
 		req.NetworkID = networkID
@@ -1223,8 +1227,8 @@ func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapte
 	if mac, _ := networkAdapter["mac_address"].(string); mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
 		req.MAC = mac
 	}
-	if tx, ok := networkAdapter["tx_checksumming"].(bool); ok && txConfigured && tx != actual.TxChecksumming {
-		req.TxChecksumming = &tx
+	if txWant != nil && *txWant != actual.TxChecksumming {
+		req.TxChecksumming = txWant
 	}
 	if req.NetworkID == "" && req.MAC == "" && req.TxChecksumming == nil {
 		return nil
