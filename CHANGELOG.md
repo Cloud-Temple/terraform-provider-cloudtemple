@@ -1,5 +1,11 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.8.0 (Unreleased)
+
+BUG FIXES :
+
+  * Fixed a permanent plan drift (`uefi -> null`) on `boot_firmware` for marketplace virtual machines: the property is now `Computed` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
+
 # 1.7.1 (April 15th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
