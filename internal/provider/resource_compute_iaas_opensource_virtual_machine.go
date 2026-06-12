@@ -69,10 +69,11 @@ func resourceOpenIaasVirtualMachine() *schema.Resource {
 				Required:    true,
 			},
 			"num_cores_per_socket": {
-				Type:        schema.TypeInt,
-				Description: "The number of cores per socket. Note: Changing this value for a running VM will cause it to be powered off and back on.",
-				Optional:    true,
-				Computed:    true,
+				Type:         schema.TypeInt,
+				Description:  "The number of cores per socket. Note: Changing this value for a running VM will cause it to be powered off and back on.",
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validation.IntAtLeast(1),
 			},
 			"memory": {
 				Type:        schema.TypeInt,
@@ -842,12 +843,16 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 					PowerState: "off",
 					Force:      !vm.PVDrivers.Detected,
 				})
-				if err != nil {
-					return diag.Errorf("failed to power off virtual machine: %s", err)
+				if err == nil {
+					_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 				}
-				_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 				if err != nil {
-					return diag.Errorf("failed to power off virtual machine: %s", err)
+					// The power-off outcome is uncertain: try to restore
+					// (the helper reads the live state first).
+					if restoreErr := powerOnBestEffort(ctx, c, d.Id(), vm.Host.ID); restoreErr != nil {
+						return diag.Errorf("failed to power off virtual machine: %s (WARNING: its power state could not be restored: %s)", err, restoreErr)
+					}
+					return diag.Errorf("failed to power off virtual machine: %s (the virtual machine is running)", err)
 				}
 			} else {
 				return diag.Errorf("The virtual machine %s (%s) needs to be powered off to apply changes to cpu, memory or num_cores_per_socket. Please set allow_vm_restart to true to allow the provider to power off and on the VM if necessary.", vm.Name, d.Id())
@@ -856,12 +861,19 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 
 		// Update the VM properties
 		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Update(ctx, d.Id(), patch)
-		if err != nil {
-			return diag.Errorf("failed to update virtual machine: %s", err)
+		if err == nil {
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
-			return diag.Errorf("failed to update virtual machine, %s", err)
+			// The power-off was provider-initiated: never leave the VM
+			// halted because the PATCH failed (FF-2).
+			if wasRunning {
+				if restoreErr := powerOnBestEffort(ctx, c, d.Id(), vm.Host.ID); restoreErr != nil {
+					return diag.Errorf("failed to update virtual machine: %s (WARNING: the virtual machine was powered off for this update and could not be powered back on: %s)", err, restoreErr)
+				}
+				return diag.Errorf("failed to update virtual machine: %s (the virtual machine was powered back on)", err)
+			}
+			return diag.Errorf("failed to update virtual machine: %s", err)
 		}
 	}
 
@@ -1070,6 +1082,34 @@ func classifyOSDiskOnRead(disk *client.OpenIaaSVirtualDisk, virtualMachineID str
 	return osDiskReadKeep
 }
 
+// powerOnBestEffort powers the VM back on after a failed operation that
+// required a provider-initiated power-off: leaving the VM halted because
+// the operation failed would turn a failed update into an outage (FF-2).
+// It reads the live power state first, so it is safe to call when the
+// power-off outcome is uncertain: an already-running VM is a success and
+// no second power-on is sent.
+func powerOnBestEffort(ctx context.Context, c *client.Client, vmID string, hostID string) error {
+	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, vmID)
+	if err != nil {
+		return fmt.Errorf("could not read the power state: %s", err)
+	}
+	if vm == nil {
+		return fmt.Errorf("virtual machine %s not found", vmID)
+	}
+	if vm.PowerState == "Running" {
+		return nil
+	}
+	activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, vmID, &client.UpdateOpenIaasVirtualMachinePowerRequest{
+		PowerState: "on",
+		HostId:     hostID,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	return err
+}
+
 // deviceConfirmedGone reports whether a device id absent from the per-id
 // read is also absent from the VM-scoped listing — the second independent
 // evidence required before dropping a state entry (#273).
@@ -1078,32 +1118,33 @@ func deviceConfirmedGone(listedIDs map[string]bool, id string) bool {
 }
 
 // openIaasVMDesiredProperties carries the desired VM properties from the
-// plan. SecureBoot holds raw-config evidence: the attribute is
-// Optional+Computed, so the merged plan value is not write intent — nil
-// means "not explicitly configured, never push". AutoPowerOn is a plain
-// Optional boolean: its plan value is authoritative (absent means false by
-// the Terraform contract) and it is always set.
+// plan. The Optional+Computed attributes (SecureBoot, NumCoresPerSocket,
+// BootFirmware) hold raw-config evidence: the merged plan value is not
+// write intent, so nil means "not explicitly configured, never push" —
+// even when the state-merged value diverges from the live one (a stale
+// state must not overwrite a live setting, #246 class / FF-2). AutoPowerOn
+// is a plain Optional boolean: its plan value is authoritative (absent
+// means false by the Terraform contract) and it is always set.
 type openIaasVMDesiredProperties struct {
 	Name              string
 	CPU               int
-	NumCoresPerSocket int
 	Memory            int
-	BootFirmware      string
 	HighAvailability  string
+	NumCoresPerSocket *int
+	BootFirmware      *string
 	SecureBoot        *bool
 	AutoPowerOn       *bool
 }
 
 // openIaasVMDesiredPropertiesFromResourceData extracts the desired VM
-// properties and the raw-config evidence for secure_boot.
+// properties and the raw-config evidence for the Optional+Computed
+// attributes.
 func openIaasVMDesiredPropertiesFromResourceData(d *schema.ResourceData) openIaasVMDesiredProperties {
 	desired := openIaasVMDesiredProperties{
-		Name:              d.Get("name").(string),
-		CPU:               d.Get("cpu").(int),
-		NumCoresPerSocket: d.Get("num_cores_per_socket").(int),
-		Memory:            d.Get("memory").(int),
-		BootFirmware:      d.Get("boot_firmware").(string),
-		HighAvailability:  d.Get("high_availability").(string),
+		Name:             d.Get("name").(string),
+		CPU:              d.Get("cpu").(int),
+		Memory:           d.Get("memory").(int),
+		HighAvailability: d.Get("high_availability").(string),
 	}
 	autoPowerOn := d.Get("auto_power_on").(bool)
 	desired.AutoPowerOn = &autoPowerOn
@@ -1111,6 +1152,15 @@ func openIaasVMDesiredPropertiesFromResourceData(d *schema.ResourceData) openIaa
 		if v := raw.GetAttr("secure_boot"); !v.IsNull() && v.IsKnown() {
 			secureBoot := v.True()
 			desired.SecureBoot = &secureBoot
+		}
+		if v := raw.GetAttr("num_cores_per_socket"); !v.IsNull() && v.IsKnown() {
+			cores, _ := v.AsBigFloat().Int64()
+			coresInt := int(cores)
+			desired.NumCoresPerSocket = &coresInt
+		}
+		if v := raw.GetAttr("boot_firmware"); !v.IsNull() && v.IsKnown() {
+			firmware := v.AsString()
+			desired.BootFirmware = &firmware
 		}
 	}
 	return desired
@@ -1137,8 +1187,8 @@ func buildOpenIaasVMPropertiesPatch(live *client.OpenIaaSVirtualMachine, desired
 		changed = true
 		needsReboot = true
 	}
-	if desired.NumCoresPerSocket != 0 && desired.NumCoresPerSocket != live.NumCoresPerSocket {
-		req.NumCoresPerSocket = desired.NumCoresPerSocket
+	if desired.NumCoresPerSocket != nil && *desired.NumCoresPerSocket != 0 && *desired.NumCoresPerSocket != live.NumCoresPerSocket {
+		req.NumCoresPerSocket = *desired.NumCoresPerSocket
 		changed = true
 		needsReboot = true
 	}
@@ -1147,8 +1197,8 @@ func buildOpenIaasVMPropertiesPatch(live *client.OpenIaaSVirtualMachine, desired
 		changed = true
 		needsReboot = true
 	}
-	if desired.BootFirmware != "" && desired.BootFirmware != live.BootFirmware {
-		req.BootFirmware = desired.BootFirmware
+	if desired.BootFirmware != nil && *desired.BootFirmware != "" && *desired.BootFirmware != live.BootFirmware {
+		req.BootFirmware = *desired.BootFirmware
 		changed = true
 	}
 	if desired.HighAvailability != "" && desired.HighAvailability != live.HighAvailability {
@@ -1327,42 +1377,88 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		return diag.Errorf("The virtual machine %s (%s) needs to be powered off to apply changes to the os_disks/os_network_adapters. Please set allow_vm_restart to true to allow the provider to power off and on the VM if necessary.", vm.Name, d.Id())
 	}
 
+	poweredOff := false
 	if needsReboot && d.Get("allow_vm_restart").(bool) {
 		// Power off the VM
 		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
 			PowerState: "off",
 			Force:      !vm.PVDrivers.Detected, // If PV drivers are not detected, force shutdown to avoid communication issues with the VM, otherwise do a soft shutdown.
 		})
-		if err != nil {
-			return diag.Errorf("failed to power off virtual machine: %s", err)
+		if err == nil {
+			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		}
-		_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		if err != nil {
-			return diag.Errorf("failed to power off virtual machine: %s", err)
+			// The power-off outcome is uncertain: try to restore (the
+			// helper reads the live state first).
+			if restoreErr := powerOnBestEffort(ctx, c, d.Id(), vm.Host.ID); restoreErr != nil {
+				return diag.Errorf("failed to power off virtual machine: %s (WARNING: its power state could not be restored: %s)", err, restoreErr)
+			}
+			return diag.Errorf("failed to power off virtual machine: %s (the virtual machine is running)", err)
 		}
+		poweredOff = true
 	}
 
-	// Apply modifications to the disks that actually diverge from the API
-	for _, disk := range disks {
-		id, _ := disk["id"].(string)
-		changes, pending := pendingDisks[id]
-		if !pending {
-			continue
+	// Apply the divergences; on any failure after a provider-initiated
+	// power-off, power the VM back on before surfacing the error (FF-2).
+	applyDiags := func() diag.Diagnostics {
+		// Apply modifications to the disks that actually diverge from the API
+		for _, disk := range disks {
+			id, _ := disk["id"].(string)
+			changes, pending := pendingDisks[id]
+			if !pending {
+				continue
+			}
+			if diags := osDiskUpdate(ctx, c, disk, changes); diags != nil {
+				return diags
+			}
 		}
-		if diags := osDiskUpdate(ctx, c, disk, changes); diags != nil {
-			return diags
+		return nil
+	}()
+	if applyDiags != nil {
+		if poweredOff {
+			if restoreErr := powerOnBestEffort(ctx, c, d.Id(), vm.Host.ID); restoreErr != nil {
+				return append(applyDiags, diag.Diagnostic{
+					Severity: diag.Error,
+					Summary:  "Virtual machine left powered off",
+					Detail:   fmt.Sprintf("The virtual machine %s was powered off for this update and could not be powered back on: %s", d.Id(), restoreErr),
+				})
+			}
+			return append(applyDiags, diag.Diagnostic{
+				Severity: diag.Warning,
+				Summary:  "Virtual machine powered back on after a failed update",
+			})
 		}
+		return applyDiags
 	}
 
 	// Apply modifications to the network adapters that actually diverge
-	for _, networkAdapter := range networkAdapters {
-		id, _ := networkAdapter["id"].(string)
-		if !pendingAdapters[id] {
-			continue
+	adapterDiags := func() diag.Diagnostics {
+		for _, networkAdapter := range networkAdapters {
+			id, _ := networkAdapter["id"].(string)
+			if !pendingAdapters[id] {
+				continue
+			}
+			if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter, actualAdapters[id], txConfigured[id]); diags != nil {
+				return diags
+			}
 		}
-		if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter, actualAdapters[id], txConfigured[id]); diags != nil {
-			return diags
+		return nil
+	}()
+	if adapterDiags != nil {
+		if poweredOff {
+			if restoreErr := powerOnBestEffort(ctx, c, d.Id(), vm.Host.ID); restoreErr != nil {
+				return append(adapterDiags, diag.Diagnostic{
+					Severity: diag.Error,
+					Summary:  "Virtual machine left powered off",
+					Detail:   fmt.Sprintf("The virtual machine %s was powered off for this update and could not be powered back on: %s", d.Id(), restoreErr),
+				})
+			}
+			return append(adapterDiags, diag.Diagnostic{
+				Severity: diag.Warning,
+				Summary:  "Virtual machine powered back on after a failed update",
+			})
 		}
+		return adapterDiags
 	}
 
 	// Power on the VM if it was powered off for the update
