@@ -1,59 +1,97 @@
-# Terraform Provider Cloud-Temple
+# Terraform Provider for Cloud Temple
+
+The official [Terraform](https://www.terraform.io) provider to manage the
+resources of your [Cloud Temple](https://www.cloud-temple.com) account.
+
+- Terraform Registry: [Cloud-Temple/cloudtemple](https://registry.terraform.io/providers/Cloud-Temple/cloudtemple/latest)
+- Provider documentation: [registry.terraform.io/providers/Cloud-Temple/cloudtemple/latest/docs](https://registry.terraform.io/providers/Cloud-Temple/cloudtemple/latest/docs)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
 
 ## Requirements
 
--	[Terraform](https://www.terraform.io/downloads.html) >= 0.13.x
--	[Go](https://golang.org/doc/install) >= 1.18
-
+- [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 0.13.x
+- [Go](https://golang.org/doc/install) >= 1.22 (to build the provider)
 
 ## Using the provider
 
 ```terraform
-provider "cloudtemple" {
-  # Can also be set as the CLOUDTEMPLE_CLIENT_ID environment variable
-  client_id = "2f31d624-e4b5-43a5-a41f-10abe0267400"
+terraform {
+  required_providers {
+    cloudtemple = {
+      source  = "Cloud-Temple/cloudtemple"
+      version = "~> 1.7"
+    }
+  }
+}
 
-  # Can also be set as the CLOUDTEMPLE_SECRET_ID environment variable
-  secret_id = "45f25b78-ae4f-4146-85e0-6627ab91047d"
+provider "cloudtemple" {
+  # Can also be set with the CLOUDTEMPLE_CLIENT_ID environment variable
+  client_id = "12345678-1234-1234-1234-123456789abc"
+
+  # Can also be set with the CLOUDTEMPLE_SECRET_ID environment variable
+  secret_id = "12345678-1234-1234-1234-123456789abc"
 }
 ```
 
-- `address` (String) The HTTP address to connect to the API. Defaults to `shiva.cloud-temple.com`. Can also be specified with the environment variable `CLOUDTEMPLE_HTTP_ADDR`.
-- `client_id` (String) The client ID to login to the API with. Can also be specified with the environment variable `CLOUDTEMPLE_CLIENT_ID`.
-- `scheme` (String) The URL scheme to used to connect to the API. Default to `https`. Can also be specified with the environment variable `CLOUDTEMPLE_HTTP_SCHEME`.
-- `secret_id` (String, Sensitive) The secret ID to login to the API with. Can also be specified with the environment variable `CLOUDTEMPLE_SECRET_ID`.
+### Provider arguments
 
+- `client_id` (String, Required) The client ID to login to the API with. Can also be specified with the environment variable `CLOUDTEMPLE_CLIENT_ID`.
+- `secret_id` (String, Sensitive, Required) The secret ID to login to the API with. Can also be specified with the environment variable `CLOUDTEMPLE_SECRET_ID`.
+- `address` (String, Optional) The HTTP address to connect to the API. Defaults to `shiva.cloud-temple.com`. Can also be specified with the environment variable `CLOUDTEMPLE_HTTP_ADDR`.
+- `scheme` (String, Optional) The URL scheme used to connect to the API. Defaults to `https`. Can also be specified with the environment variable `CLOUDTEMPLE_HTTP_SCHEME`.
+- `api_suffix` (Boolean, Optional) Specify whether it is necessary to use an `/api` suffix after the address. (Used for development purposes only.)
 
-## Developing the Provider
+See the [provider documentation](https://registry.terraform.io/providers/Cloud-Temple/cloudtemple/latest/docs)
+for the full list of resources and data sources, and for logging options.
 
-If you wish to work on the provider, you'll first need [Go](http://www.golang.org) installed on your machine (see [Requirements](#requirements) above).
+## Developing the provider
 
-To compile the provider, run `go install`. This will build the provider and put the provider binary in the `$GOPATH/bin` directory.
+If you wish to work on the provider, you'll first need [Go](http://www.golang.org)
+installed on your machine (see [Requirements](#requirements) above).
 
-To generate or update documentation, run `go generate`.
-
-## Acceptance tests
-
-In order to run the tests suite, rename .env.test.dist to .env.test in root directory. Fill the ENV vars with existing correct data from the Shiva instance you whant to work. Use the shiva interface or the api to get the data or contact a project administrator for information.
-
-
-To run client tests
+To compile the provider, run `go install`. This will build the provider and put
+the provider binary in the `$GOPATH/bin` directory. You can also use:
 
 ```sh
-$ make testclient
+make build
 ```
 
-To run provider tests
+To generate or update the documentation, run:
 
 ```sh
-$ make testprovider
+make generate
 ```
 
-To run full acceptance testes
+## Tests
+
+In order to run the test suite, rename `.env.test.dist` to `.env.test` in the
+root directory and fill the environment variables with existing, correct data
+from the Shiva instance you want to work with. Use the Shiva console or the API
+to get the data, or contact a project administrator for more information.
+
+To run the Go client tests:
 
 ```sh
-$ make testacc
+make testclient
 ```
-See GNUmakefile in root directory to more test cases.
 
-*Note:* Acceptance tests create real resources, and often cost money to run according on the shiva instance where you lunch them.
+To run the provider unit tests:
+
+```sh
+make testprovider
+```
+
+To run the full acceptance tests:
+
+```sh
+make testacc
+```
+
+See the `GNUmakefile` in the root directory for more test targets.
+
+*Note:* acceptance tests create real resources, and often cost money to run
+depending on the Shiva instance where you launch them.
+
+## License
+
+This provider is distributed under the [Mozilla Public License 2.0](LICENSE).
