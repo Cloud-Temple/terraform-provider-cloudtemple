@@ -1326,15 +1326,15 @@ func buildOpenIaasVIFPatch(networkAdapter map[string]interface{}, actual *client
 }
 
 func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool) diag.Diagnostics {
-	req := buildOpenIaasVIFPatch(networkAdapter, actual, txWant)
-	if req == nil {
+	if buildOpenIaasVIFPatch(networkAdapter, actual, txWant) == nil {
 		return nil
 	}
-	activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, networkAdapter["id"].(string), req)
-	if err != nil {
-		return diag.Errorf("failed to update os network adapter: %s", err)
-	}
-	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	adapterID := networkAdapter["id"].(string)
+	// Bounded retry on transient platform failures, rebuilding the payload
+	// against a freshly read live adapter before every attempt (#251).
+	err := runVIFUpdateWithRetry(ctx, adapterID, clientVIFUpdateFuncs(c, adapterID, getWaiterOptions(ctx)), func(actual *client.OpenIaaSNetworkAdapter) *client.UpdateOpenIaasNetworkAdapterRequest {
+		return buildOpenIaasVIFPatch(networkAdapter, actual, txWant)
+	})
 	if err != nil {
 		return diag.Errorf("failed to update os network adapter: %s", err)
 	}

@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
@@ -527,43 +526,6 @@ func getWaiterOptions(ctx context.Context) *client.WaiterOptions {
 			tflog.Debug(ctx, msg)
 		},
 	}
-}
-
-// maxTransientActivityAttempts bounds the retries of an operation whose
-// activity failed for a transient platform reason (#251).
-const maxTransientActivityAttempts = 3
-
-// runActivityWithRetry starts an asynchronous operation (start returns the
-// activity id), waits for its completion and retries the WHOLE operation when
-// the activity fails for a transient platform reason ("None of the workers
-// were able to respond", #251). Permanent failures are returned immediately.
-// Only safe for operations that are idempotent or whose partial effects are
-// handled by the caller.
-func runActivityWithRetry(ctx context.Context, c *client.Client, description string, start func() (string, error)) (*client.Activity, error) {
-	var activity *client.Activity
-	var err error
-	for attempt := 1; attempt <= maxTransientActivityAttempts; attempt++ {
-		var activityId string
-		activityId, err = start()
-		if err != nil {
-			return nil, err
-		}
-		activity, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-		if err == nil || !client.IsTransientActivityFailure(err) {
-			return activity, err
-		}
-		if attempt == maxTransientActivityAttempts {
-			break
-		}
-		tflog.Warn(ctx, fmt.Sprintf("%s: transient platform failure (attempt %d/%d), retrying: %s",
-			description, attempt, maxTransientActivityAttempts, err))
-		select {
-		case <-ctx.Done():
-			return activity, err
-		case <-time.After(time.Duration(attempt) * 10 * time.Second):
-		}
-	}
-	return activity, err
 }
 
 func setIdFromActivityState(d *schema.ResourceData, activity *client.Activity) {

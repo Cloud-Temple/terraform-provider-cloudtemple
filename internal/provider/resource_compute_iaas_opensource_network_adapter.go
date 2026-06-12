@@ -94,7 +94,7 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 
 	var activity *client.Activity
 	var err error
-	for attempt := 1; attempt <= maxTransientActivityAttempts; attempt++ {
+	for attempt := 1; attempt <= maxTransientVIFAttempts; attempt++ {
 		var activityId string
 		activityId, err = c.Compute().OpenIaaS().NetworkAdapter().Create(ctx, &client.CreateOpenIaasNetworkAdapterRequest{
 			VirtualMachineID: vmID,
@@ -125,11 +125,11 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 				}
 			}
 		}
-		if attempt == maxTransientActivityAttempts {
+		if attempt == maxTransientVIFAttempts {
 			break
 		}
 		tflog.Warn(ctx, fmt.Sprintf("create network adapter on %s: transient platform failure (attempt %d/%d), retrying: %s",
-			vmID, attempt, maxTransientActivityAttempts, err))
+			vmID, attempt, maxTransientVIFAttempts, err))
 		select {
 		case <-ctx.Done():
 			return diag.Errorf("the network adapter could not be created: %s", err)
@@ -210,23 +210,29 @@ func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, m
 				txConfigured = true
 			}
 		}
-		// Payload limite aux champs reellement divergents : renvoyer le
-		// networkId/mac courants declenche le self-conflict VPC (#246).
-		req := &client.UpdateOpenIaasNetworkAdapterRequest{}
-		if networkID != "" && networkID != adapter.Network.ID {
-			req.NetworkID = networkID
+		// Payload limited to the fields that actually diverge from the live
+		// adapter: re-sending the current networkId/mac is rejected
+		// platform-side as a VPC Static IP self-conflict (#246). The builder
+		// is re-evaluated against a fresh read before every retry attempt.
+		buildPatch := func(actual *client.OpenIaaSNetworkAdapter) *client.UpdateOpenIaasNetworkAdapterRequest {
+			req := &client.UpdateOpenIaasNetworkAdapterRequest{}
+			if networkID != "" && networkID != actual.Network.ID {
+				req.NetworkID = networkID
+			}
+			if mac != "" && !strings.EqualFold(mac, actual.MacAddress) {
+				req.MAC = mac
+			}
+			if txConfigured && txChecksumming != actual.TxChecksumming {
+				req.TxChecksumming = &txChecksumming
+			}
+			if req.NetworkID == "" && req.MAC == "" && req.TxChecksumming == nil {
+				return nil
+			}
+			return req
 		}
-		if mac != "" && !strings.EqualFold(mac, adapter.MacAddress) {
-			req.MAC = mac
-		}
-		if txConfigured && txChecksumming != adapter.TxChecksumming {
-			req.TxChecksumming = &txChecksumming
-		}
-		if req.NetworkID != "" || req.MAC != "" || req.TxChecksumming != nil {
-			// PATCH idempotent : retry borne sur echec transitoire (#251).
-			if _, err := runActivityWithRetry(ctx, c, fmt.Sprintf("update network adapter %s", d.Id()), func() (string, error) {
-				return c.Compute().OpenIaaS().NetworkAdapter().Update(ctx, d.Id(), req)
-			}); err != nil {
+		if buildPatch(adapter) != nil {
+			// Bounded retry on transient platform failures (#251).
+			if err := runVIFUpdateWithRetry(ctx, d.Id(), clientVIFUpdateFuncs(c, d.Id(), getWaiterOptions(ctx)), buildPatch); err != nil {
 				return diag.Errorf("the network adapter could not be updated: %s", err)
 			}
 		}
