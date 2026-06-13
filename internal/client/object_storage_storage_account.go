@@ -42,6 +42,30 @@ func (c *StorageAccountClient) List(ctx context.Context) ([]*StorageAccount, err
 	return out, nil
 }
 
+// ListStrict behaves like List but requires a complete HTTP 200 answer: 206 is
+// a partial listing and cannot prove an absence, and any other code (including
+// 403) is an error rather than being mapped to an empty result. Callers using
+// the listing as state-safety evidence must fail closed on anything else
+// (#281).
+func (c *StorageAccountClient) ListStrict(ctx context.Context) ([]*StorageAccount, error) {
+	r := c.c.newRequest("GET", "/storage/object/v1/storage_accounts")
+	resp, err := c.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireHttpCodes(resp, 200); err != nil {
+		return nil, err
+	}
+
+	var out []*StorageAccount
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (c *StorageAccountClient) Read(ctx context.Context, name string) (*StorageAccount, error) {
 	r := c.c.newRequest("GET", "/storage/object/v1/storage_accounts/%s", name)
 	resp, err := c.c.doRequest(ctx, r)

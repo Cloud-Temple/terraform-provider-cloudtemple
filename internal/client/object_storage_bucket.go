@@ -47,6 +47,30 @@ func (c *BucketClient) List(ctx context.Context) ([]*Bucket, error) {
 	return out, nil
 }
 
+// ListStrict behaves like List but requires a complete HTTP 200 answer: 206 is
+// a partial listing and cannot prove an absence, and any other code (including
+// 403) is an error rather than being mapped to an empty result. Callers using
+// the listing as state-safety evidence must fail closed on anything else
+// (#281).
+func (c *BucketClient) ListStrict(ctx context.Context) ([]*Bucket, error) {
+	r := c.c.newRequest("GET", "/storage/object/v1/buckets")
+	resp, err := c.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireHttpCodes(resp, 200); err != nil {
+		return nil, err
+	}
+
+	var out []*Bucket
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (c *BucketClient) Read(ctx context.Context, name string) (*Bucket, error) {
 	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s", name)
 	resp, err := c.c.doRequest(ctx, r)
