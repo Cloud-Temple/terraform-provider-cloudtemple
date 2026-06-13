@@ -10,8 +10,7 @@ import (
 // strict, scoped listing. It NEVER concludes a deletion: a nil per-id read on a
 // VMware resource is ambiguous (the client maps HTTP 403 to nil), and the
 // scoped listing is not provably complete tenant-wide, so absence is not
-// deletion evidence. The caller keeps the resource in the state in every case
-// except a confirmed liveness (#281).
+// deletion evidence. The caller never drops the resource on this signal (#281).
 //
 // Empty ids in the listing are skipped; matching is on the exact id.
 func confirmVMwareDeviceLiveness(ctx context.Context, id string, listScoped func(ctx context.Context) ([]string, error)) (bool, error) {
@@ -28,12 +27,19 @@ func confirmVMwareDeviceLiveness(ctx context.Context, id string, listScoped func
 }
 
 // confirmVMwareDeviceOrKeep handles the nil-read branch of a VMware resource's
-// Read. It returns diagnostics but NEVER touches the ResourceData, so it is
-// structurally incapable of dropping the resource from the state: the resource
-// is kept in every inconclusive case. It returns nil diagnostics only when the
-// device's liveness is confirmed by the scoped listing (the per-id read was a
-// transient or permission blip), in which case the caller keeps the existing
-// state untouched.
+// Read. It ALWAYS returns an error diagnostic and NEVER touches the
+// ResourceData, so it is structurally incapable of dropping the resource: the
+// resource is kept in the state in every case, and the read never succeeds on
+// an unreadable resource.
+//
+// A nil per-id read is inconclusive (the client maps HTTP 403 to nil). The
+// resource is never auto-removed; but it is also never reported as a SUCCESSFUL
+// refresh, because the attributes could not be re-read and the state may be
+// stale — silently succeeding would make Terraform treat unrefreshed,
+// potentially drifted state as converged. So the read fails closed with an
+// actionable diagnostic, mirroring the OpenIaaS "still listed -> refuse and
+// error" behavior. The scoped listing only sharpens the diagnostic (still
+// listed = likely transient/permission; absent = possibly deleted).
 //
 // kind is the human label of the resource (e.g. "virtual disk"); scopeLabel is
 // the label of the scoping parent (e.g. "virtual machine"); scopeID is its id
@@ -42,7 +48,7 @@ func confirmVMwareDeviceLiveness(ctx context.Context, id string, listScoped func
 func confirmVMwareDeviceOrKeep(ctx context.Context, id, kind, scopeLabel, scopeID string, listScoped func(ctx context.Context) ([]string, error)) diag.Diagnostics {
 	if scopeID == "" {
 		return diag.Errorf(
-			"%s %s could not be read and its existence could not be confirmed because the %s id is missing from the state; the resource is kept in the state to avoid a wrong deletion. Refresh or re-import it once it is readable again.",
+			"%s %s could not be read and its existence could not be confirmed because the %s id is missing from the state; the resource is kept in the state to avoid a wrong deletion. Resolve the read error, then refresh or re-import it.",
 			kind, id, scopeLabel,
 		)
 	}
@@ -53,15 +59,19 @@ func confirmVMwareDeviceOrKeep(ctx context.Context, id, kind, scopeLabel, scopeI
 			kind, id, err,
 		)
 	}
-	if !present {
+	if present {
+		// Liveness confirmed but the per-id read failed: the resource still
+		// exists (likely a transient error or an access restriction), so we
+		// refuse to drop it. We also refuse to report a successful refresh,
+		// because the attributes could not be re-read and the state may be
+		// stale. Fail closed with an error; the next refresh re-reads it.
 		return diag.Errorf(
-			"%s %s is no longer returned by the API and is not listed under %s %s; its deletion could not be confirmed (it may have been deleted, detached or moved, or your access may have changed). The resource is kept in the state. If you removed it intentionally, run `terraform state rm` on it.",
+			"%s %s could not be read but is still listed under %s %s; the resource is kept in the state (refusing to drop it on a likely transient error or access restriction). Its attributes could not be refreshed — retry once the read succeeds.",
 			kind, id, scopeLabel, scopeID,
 		)
 	}
-	// Liveness confirmed: the per-id read was a transient or permission blip.
-	// Keep the existing state untouched — we do not repopulate from the scoped
-	// listing (the next successful per-id read does that), which also avoids
-	// trusting the listing payload for this resource's attributes.
-	return nil
+	return diag.Errorf(
+		"%s %s is no longer returned by the API and is not listed under %s %s; its deletion could not be confirmed (it may have been deleted, detached or moved, or your access may have changed). The resource is kept in the state. If you removed it intentionally, run `terraform state rm` on it.",
+		kind, id, scopeLabel, scopeID,
+	)
 }

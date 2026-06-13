@@ -71,11 +71,11 @@ func TestConfirmVMwareDeviceLiveness(t *testing.T) {
 	})
 }
 
-// TestConfirmVMwareDeviceOrKeep pins the nil-read handler. It returns
-// diagnostics but never receives the ResourceData, so it is structurally
-// incapable of dropping the resource: every inconclusive branch is an error
-// that keeps the state, and only a confirmed liveness returns no diagnostics
-// (#281).
+// TestConfirmVMwareDeviceOrKeep pins the nil-read handler. It NEVER receives the
+// ResourceData (so it is structurally incapable of dropping the resource) and
+// ALWAYS returns an error: every inconclusive branch — including a confirmed
+// liveness whose per-id read failed — fails closed, keeping the state but never
+// reporting a successful refresh of unread (possibly stale) attributes (#281).
 func TestConfirmVMwareDeviceOrKeep(t *testing.T) {
 	ctx := context.Background()
 
@@ -100,13 +100,14 @@ func TestConfirmVMwareDeviceOrKeep(t *testing.T) {
 		}
 	})
 
-	t.Run("a confirmed liveness returns no diagnostics", func(t *testing.T) {
+	t.Run("a confirmed liveness fails closed too (no silent stale-state success)", func(t *testing.T) {
+		// The resource still exists, but the per-id read failed: the attributes
+		// could not be refreshed. Reporting success would let Terraform treat
+		// unread, possibly drifted state as converged, so this must error while
+		// keeping the resource in the state.
 		diags := confirmVMwareDeviceOrKeep(ctx, "x", "virtual disk", "virtual machine", "vm-1", vmwareLister([]string{"x"}, nil))
-		if diags.HasError() {
-			t.Fatalf("a confirmed liveness must not error: %v", diags)
-		}
-		if len(diags) != 0 {
-			t.Fatalf("a confirmed liveness must return no diagnostics, got %v", diags)
+		if !diags.HasError() {
+			t.Fatal("a confirmed liveness with a failed per-id read must fail closed (no successful refresh of stale state)")
 		}
 	})
 }
