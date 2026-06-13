@@ -73,9 +73,13 @@ jobs:
           exit 1
         fi
 
-    - name: Vet (platform-independent packages)
+    - name: Vet (whole module — compiles every _test.go without running it)
       run: |
-        go vet ./internal/client ./internal/provider ./internal/provider/helpers
+        # `go vet ./...` type-checks and compiles every package, including the
+        # acceptance-test packages (internal/client/tests, internal/provider/tests).
+        # It does NOT execute the tests, so no live Cloud Temple platform is needed.
+        # This is what catches client/test signature drift that the build job misses.
+        go vet ./...
 
     - name: Unit tests (platform-independent packages)
       run: |
