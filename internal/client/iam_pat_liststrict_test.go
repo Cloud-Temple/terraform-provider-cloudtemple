@@ -34,8 +34,11 @@ func newPATTestClient(t *testing.T, handler http.HandlerFunc) *Client {
 func TestPATListStrict(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("200 returns the parsed tokens", func(t *testing.T) {
+	t.Run("200 hits the right endpoint and returns the parsed tokens", func(t *testing.T) {
 		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodGet || r.URL.Path != "/iam/v2/personal_access_tokens" {
+				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			}
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"pat-1","name":"a"},{"id":"pat-2","name":"b"}]`))
 		})
@@ -55,6 +58,26 @@ func TestPATListStrict(t *testing.T) {
 		})
 		if _, err := c.IAM().PAT().ListStrict(ctx); err == nil {
 			t.Fatal("a malformed 200 body must return a decode error")
+		}
+	})
+
+	t.Run("200 with an empty body errors", func(t *testing.T) {
+		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			// no body
+		})
+		if _, err := c.IAM().PAT().ListStrict(ctx); err == nil {
+			t.Fatal("an empty 200 body must fail closed (decode error), not be read as an empty listing")
+		}
+	})
+
+	t.Run("200 with the wrong JSON shape errors", func(t *testing.T) {
+		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"id":"pat-1"}`)) // object instead of array
+		})
+		if _, err := c.IAM().PAT().ListStrict(ctx); err == nil {
+			t.Fatal("a 200 that is not a token array must return a decode error")
 		}
 	})
 
