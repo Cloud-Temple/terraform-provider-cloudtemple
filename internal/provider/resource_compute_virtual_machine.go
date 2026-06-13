@@ -1099,8 +1099,25 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 		return diag.Errorf("the virtual machine could not be read: %s", err)
 	}
 	if vm == nil {
-		d.SetId("") // La VM n'existe plus, marquer la ressource comme supprimée
-		return nil
+		// A nil read is NOT a deletion: the client maps HTTP 403 to nil, so a
+		// permission/scope blip would silently shrink the state. We never
+		// auto-remove the resource; we confirm liveness against a strict
+		// machine-manager-scoped listing and otherwise fail closed (#281).
+		mmID := d.Get("machine_manager_id").(string)
+		return confirmVMwareDeviceOrKeep(ctx, id, "virtual machine", "machine manager", mmID,
+			func(ctx context.Context) ([]string, error) {
+				vms, err := c.Compute().VirtualMachine().ListStrict(ctx, &client.VirtualMachineFilter{MachineManagerID: mmID})
+				if err != nil {
+					return nil, err
+				}
+				ids := make([]string, 0, len(vms))
+				for _, m := range vms {
+					if m != nil {
+						ids = append(ids, m.ID)
+					}
+				}
+				return ids, nil
+			})
 	}
 
 	// Normaliser le power state pour qu'il soit cohérent avec l'entrée

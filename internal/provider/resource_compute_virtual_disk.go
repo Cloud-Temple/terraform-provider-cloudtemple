@@ -227,8 +227,25 @@ func computeVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta an
 		return diag.Errorf("the virtual machine could not be read: %s", err)
 	}
 	if disk == nil {
-		d.SetId("") // Le disque n'existe plus, marquer la ressource comme supprimée
-		return nil
+		// A nil read is NOT a deletion: the client maps HTTP 403 to nil, so a
+		// permission/scope blip would silently shrink the state. We never
+		// auto-remove the resource; we confirm liveness against a strict
+		// VM-scoped listing and otherwise fail closed (#281).
+		vmID := d.Get("virtual_machine_id").(string)
+		return confirmVMwareDeviceOrKeep(ctx, id, "virtual disk", "virtual machine", vmID,
+			func(ctx context.Context) ([]string, error) {
+				disks, err := c.Compute().VirtualDisk().ListStrict(ctx, &client.VirtualDiskFilter{VirtualMachineID: vmID})
+				if err != nil {
+					return nil, err
+				}
+				ids := make([]string, 0, len(disks))
+				for _, dsk := range disks {
+					if dsk != nil {
+						ids = append(ids, dsk.ID)
+					}
+				}
+				return ids, nil
+			})
 	}
 
 	// Normalize the backup_sla_policies
