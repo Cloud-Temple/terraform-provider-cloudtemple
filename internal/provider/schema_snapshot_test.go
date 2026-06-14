@@ -97,11 +97,15 @@ type attributeSnapshot struct {
 	ConfigMode string `json:"config_mode,omitempty"`
 
 	// Default carries the literal value for primitive defaults (string/bool/
-	// int/float). HasDefaultFunc is set instead when a DefaultFunc is present or
-	// the default is non-primitive. A *value* change here is breaking, so it is
-	// recorded verbatim.
-	Default        interface{} `json:"default,omitempty"`
-	HasDefaultFunc bool        `json:"has_default_func,omitempty"`
+	// int/float); a *value* change here is breaking, so it is recorded verbatim.
+	// Default and DefaultFunc are INDEPENDENT: the SDK's DefaultValue() prefers
+	// Default over DefaultFunc, so an attribute can carry both (e.g. provider
+	// api_suffix). Each is captured separately so a literal-default change is
+	// never hidden by the presence of a DefaultFunc. HasNonPrimitiveDefault
+	// records a non-serializable literal default by presence only.
+	Default                interface{} `json:"default,omitempty"`
+	HasDefaultFunc         bool        `json:"has_default_func,omitempty"`
+	HasNonPrimitiveDefault bool        `json:"has_non_primitive_default,omitempty"`
 
 	// Function PRESENCE only — never bodies, pointers or addresses.
 	HasStateFunc          bool `json:"has_state_func,omitempty"`
@@ -171,17 +175,21 @@ func serializeAttribute(s *schema.Schema) attributeSnapshot {
 		RequiredWith:          sortedCopy(s.RequiredWith),
 	}
 
-	// Default: literal value for primitives, otherwise presence-only.
-	if s.DefaultFunc != nil {
-		a.HasDefaultFunc = true
-	} else if s.Default != nil {
+	// Default and DefaultFunc are independent (DefaultValue() prefers Default),
+	// so capture each on its own: a primitive Default literal must stay visible
+	// even when a DefaultFunc also exists, or a default-value change slips past
+	// the gate (provider api_suffix carries both).
+	if s.Default != nil {
 		if isPrimitiveDefault(s.Default) {
 			a.Default = s.Default
 		} else {
 			// Non-primitive literal default (rare): record presence, never the
 			// value, to avoid serializing an opaque structure non-deterministically.
-			a.HasDefaultFunc = true
+			a.HasNonPrimitiveDefault = true
 		}
+	}
+	if s.DefaultFunc != nil {
+		a.HasDefaultFunc = true
 	}
 
 	// Elem made explicit.

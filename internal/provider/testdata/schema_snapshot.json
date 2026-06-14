@@ -9,6 +9,7 @@
     "api_suffix": {
       "type": "TypeBool",
       "optional": true,
+      "default": true,
       "has_default_func": true,
       "elem_kind": "nil"
     },
