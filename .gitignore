@@ -82,6 +82,7 @@ terraform.rc
 
 .env
 .env.test
+.env.recette
 .vscode/
 
 # Local-only internal audit subtree (kept on workstation, never published to
