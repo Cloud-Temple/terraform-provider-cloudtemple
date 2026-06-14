@@ -1,0 +1,6 @@
+# Per-package statement-coverage floor (percent) for the pure packages.
+# Raised as coverage improves (scripts/coverage_ratchet.sh --update);
+# CI fails if coverage drops below these values. Never lower by hand.
+internal/client 10.8
+internal/provider 8.5
+internal/provider/helpers 12.9

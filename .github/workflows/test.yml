@@ -89,12 +89,15 @@ jobs:
         # dead stores and suspicious constructs that build/vet miss (#264).
         go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
 
-    - name: Unit tests (platform-independent packages)
+    - name: Unit tests + coverage ratchet (platform-independent packages)
       run: |
+        # Runs the pure packages under -race with coverage and fails if any
+        # package drops below its recorded floor (scripts/coverage_floor.txt).
         # -race future-proofs the pure packages (token cache, httptest servers,
-        # timers); it is a guard, not state-safety coverage. CGO is available on
-        # the GitHub ubuntu runners.
-        go test -race -count=1 -cover ./internal/client ./internal/provider ./internal/provider/helpers
+        # timers); the ratchet makes "tests where they are missing" a systemic
+        # guard, not a discretionary habit (#264, #293). CGO is available on the
+        # GitHub ubuntu runners.
+        ./scripts/coverage_ratchet.sh
 
   generate:
     runs-on: ubuntu-latest
