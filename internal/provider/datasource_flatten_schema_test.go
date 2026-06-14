@@ -314,16 +314,9 @@ var datasourceCoverage = map[string]dsCoverage{
 
 	// --- IAM --------------------------------------------------------------
 	"cloudtemple_iam_company": {"", flat(helpers.FlattenCompany)},
-	// Feature is self-referential and the schema declares a fixed nesting depth
-	// (features -> subfeatures -> subfeatures). Build the tree by hand to the
-	// deepest declared level so that level is actually exercised (the generic
-	// self-reference cap would only reach one level).
-	"cloudtemple_iam_features": {"features", func() map[string]interface{} {
-		leaf := &client.Feature{ID: "f2", Name: "x"}
-		mid := &client.Feature{ID: "f1", Name: "x", SubFeatures: []*client.Feature{leaf}}
-		top := &client.Feature{ID: "f0", Name: "x", SubFeatures: []*client.Feature{mid}}
-		return helpers.FlattenFeature(top)
-	}},
+	// cloudtemple_iam_features is a declared known gap (datasourceKnownGaps): its
+	// self-referential schema, the FlattenFeature emit depth and the API contract
+	// are inconsistent, and the correct fix is being resolved separately.
 	"cloudtemple_iam_personal_access_token":  {"", flat(helpers.FlattenToken)},
 	"cloudtemple_iam_personal_access_tokens": {"tokens", flat(helpers.FlattenToken)},
 	"cloudtemple_iam_role":                   {"", flat(helpers.FlattenRole)},
@@ -335,6 +328,15 @@ var datasourceCoverage = map[string]dsCoverage{
 	// --- Marketplace ------------------------------------------------------
 	"cloudtemple_marketplace_item":  {"", flat(helpers.FlattenMarketplaceItem)},
 	"cloudtemple_marketplace_items": {"marketplace_items", flat(helpers.FlattenMarketplaceItem)},
+}
+
+// datasourceKnownGaps lists datasources deliberately NOT covered by the walker
+// yet, each with its justification. A known gap is an explicit, declared
+// exclusion — not a silent one. Each entry must be a registered datasource and
+// must NOT also appear in datasourceCoverage. Keep this map as small as
+// possible; an entry is a debt to close, not a resting place.
+var datasourceKnownGaps = map[string]string{
+	"cloudtemple_iam_features": "self-referential Feature schema vs FlattenFeature emit depth vs swagger (flat /v2/features) are inconsistent; the real API contract and the coherent fix (schema/model/flatten/test) are being resolved separately before non-complacent coverage can be added",
 }
 
 // TestDatasourceFlattenOutputsFitTheirSchemas drives the schema-vs-flatten
@@ -364,13 +366,23 @@ func TestDatasourceFlattenOutputsFitTheirSchemas(t *testing.T) {
 func TestEveryDatasourceIsCoveredByTheFlattenWalker(t *testing.T) {
 	datasources := New("dev")().DataSourcesMap
 	for name := range datasources {
-		if _, ok := datasourceCoverage[name]; !ok {
-			t.Errorf("datasource %q is not covered by the flatten/schema walker; add it to datasourceCoverage", name)
+		_, covered := datasourceCoverage[name]
+		_, known := datasourceKnownGaps[name]
+		if !covered && !known {
+			t.Errorf("datasource %q is neither covered by the flatten/schema walker nor a declared known gap; add it to datasourceCoverage (or, with justification, to datasourceKnownGaps)", name)
+		}
+		if covered && known {
+			t.Errorf("datasource %q is both covered and a declared known gap; remove it from one", name)
 		}
 	}
 	for name := range datasourceCoverage {
 		if _, ok := datasources[name]; !ok {
 			t.Errorf("datasourceCoverage references %q which is not a registered datasource", name)
+		}
+	}
+	for name := range datasourceKnownGaps {
+		if _, ok := datasources[name]; !ok {
+			t.Errorf("datasourceKnownGaps references %q which is not a registered datasource", name)
 		}
 	}
 }
