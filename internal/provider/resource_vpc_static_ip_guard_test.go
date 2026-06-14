@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -91,41 +92,46 @@ func TestStaticIPDeleteErrorDetail(t *testing.T) {
 	})
 }
 
-// TestUpdateStaticIPRequestJSONFieldSet pins that the PATCH body can NEVER carry
-// ipAddress (the swagger UpdateStaticIpPayload does not allow it) — only
-// macAddress and resourceDescription, and only when set.
-func TestUpdateStaticIPRequestJSONFieldSet(t *testing.T) {
-	mac := "00:50:56:ab:cd:ef"
-	desc := "d"
-	cases := map[string]struct {
-		req  client.UpdateStaticIPRequest
-		keys []string
-	}{
-		"mac only":         {client.UpdateStaticIPRequest{MacAddress: &mac}, []string{"macAddress"}},
-		"description only": {client.UpdateStaticIPRequest{ResourceDescription: &desc}, []string{"resourceDescription"}},
-		"both":             {client.UpdateStaticIPRequest{MacAddress: &mac, ResourceDescription: &desc}, []string{"macAddress", "resourceDescription"}},
+// TestUpdateStaticIPRequestFieldSet pins, STRUCTURALLY, that the PATCH body type
+// carries ONLY resourceDescription and macAddress — and can NEVER carry ipAddress
+// (the swagger UpdateStaticIpPayload). The reflection check fails if ANY field is
+// added, including an `omitempty` one, so it is NOT complacent against a future
+// ipAddress field (which a marshal-only test would miss when the field is unset).
+// The marshaling check additionally pins the diff-driven (omitempty) body.
+func TestUpdateStaticIPRequestFieldSet(t *testing.T) {
+	want := map[string]bool{"resourceDescription": true, "macAddress": true}
+	typ := reflect.TypeOf(client.UpdateStaticIPRequest{})
+	got := map[string]bool{}
+	for i := 0; i < typ.NumField(); i++ {
+		name := strings.Split(typ.Field(i).Tag.Get("json"), ",")[0]
+		if name == "ipAddress" {
+			t.Fatal("UpdateStaticIPRequest must never carry ipAddress (not in UpdateStaticIpPayload)")
+		}
+		got[name] = true
 	}
-	for name, tc := range cases {
-		t.Run(name, func(t *testing.T) {
-			b, err := json.Marshal(tc.req)
-			if err != nil {
-				t.Fatalf("marshal: %v", err)
-			}
-			var m map[string]json.RawMessage
-			if err := json.Unmarshal(b, &m); err != nil {
-				t.Fatalf("unmarshal: %v", err)
-			}
-			if _, bad := m["ipAddress"]; bad {
-				t.Fatalf("the PATCH body must NEVER contain ipAddress, got %s", b)
-			}
-			if len(m) != len(tc.keys) {
-				t.Fatalf("unexpected key set %s, want %v", b, tc.keys)
-			}
-			for _, k := range tc.keys {
-				if _, ok := m[k]; !ok {
-					t.Fatalf("missing key %q in %s", k, b)
-				}
-			}
-		})
+	if len(got) != len(want) {
+		t.Fatalf("UpdateStaticIPRequest json field set = %v, want exactly %v (any added field is forbidden)", got, want)
+	}
+	for k := range want {
+		if !got[k] {
+			t.Fatalf("missing json field %q", k)
+		}
+	}
+
+	// Runtime: a diff-driven (omitempty) body emits only the set fields, never ipAddress.
+	mac := "00:50:56:ab:cd:ef"
+	b, err := json.Marshal(client.UpdateStaticIPRequest{MacAddress: &mac})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if _, bad := m["ipAddress"]; bad {
+		t.Fatalf("the PATCH body must NEVER contain ipAddress, got %s", b)
+	}
+	if len(m) != 1 || m["macAddress"] == nil {
+		t.Fatalf("a mac-only PATCH body must be exactly {macAddress}, got %s", b)
 	}
 }
