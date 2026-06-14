@@ -37,6 +37,7 @@ MISCELLANEOUS :
 
   * The provider is now built with Go 1.24 (required by the updated dependencies).
   * The continuous integration now runs a platform-independent safety net on every pull request: formatting and static-analysis checks, the state-safety unit-test suites, a datasource schema-vs-flatten validation and a write-guard registry for the `Optional`+`Computed` booleans.
+  * The datasource schema-vs-flatten CI validation now covers every datasource except `cloudtemple_iam_features` (a self-referential schema whose API contract is being resolved separately). It is driven by a reflection-based non-zero object filler and a coverage registry checked against the provider's datasource map: a newly added datasource must be either covered or explicitly listed as a known gap, so the read-breaking class behind #241/#243 cannot silently regain ground.
   * Refreshed the repository README (build requirements, Terraform Registry links, usage example).
   * Removed a broken CI workflow left over from the provider template.
 
