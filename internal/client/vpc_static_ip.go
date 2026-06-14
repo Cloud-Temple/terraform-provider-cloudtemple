@@ -71,7 +71,7 @@ func (s *VPCStaticIPClient) Read(ctx context.Context, id string) (*StaticIP, err
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 404)
+	found, err := requireNotFoundOrOK(resp, 403)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (s *VPCStaticIPClient) ReadByMAC(ctx context.Context, mac string) (*StaticI
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 404)
+	found, err := requireNotFoundOrOK(resp, 403)
 	if err != nil || !found {
 		return nil, err
 	}
