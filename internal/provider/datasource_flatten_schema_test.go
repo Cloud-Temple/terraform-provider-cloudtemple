@@ -314,9 +314,20 @@ var datasourceCoverage = map[string]dsCoverage{
 
 	// --- IAM --------------------------------------------------------------
 	"cloudtemple_iam_company": {"", flat(helpers.FlattenCompany)},
-	// cloudtemple_iam_features is a declared known gap (datasourceKnownGaps): its
-	// self-referential schema, the FlattenFeature emit depth and the API contract
-	// are inconsistent, and the correct fix is being resolved separately.
+	// Feature is self-referential and the schema declares a fixed nesting depth
+	// (features -> subfeatures -> subfeatures). The generic filler stops one
+	// level deep, so build a depth-4 tree by hand: a node AT the deepest declared
+	// level (level 2) that itself has a child. A correct FlattenFeature must
+	// truncate it so the flatten output still fits the schema; an unbounded one
+	// emits an undeclared "subfeatures" key and d.Set fails (#243 class). See
+	// TestIAMFeaturesFlattenIsDepthBounded for the non-complacent proof.
+	"cloudtemple_iam_features": {"features", func() map[string]interface{} {
+		l3 := &client.Feature{ID: "f3", Name: "x"}
+		l2 := &client.Feature{ID: "f2", Name: "x", SubFeatures: []*client.Feature{l3}}
+		l1 := &client.Feature{ID: "f1", Name: "x", SubFeatures: []*client.Feature{l2}}
+		l0 := &client.Feature{ID: "f0", Name: "x", SubFeatures: []*client.Feature{l1}}
+		return helpers.FlattenFeature(l0)
+	}},
 	"cloudtemple_iam_personal_access_token":  {"", flat(helpers.FlattenToken)},
 	"cloudtemple_iam_personal_access_tokens": {"tokens", flat(helpers.FlattenToken)},
 	"cloudtemple_iam_role":                   {"", flat(helpers.FlattenRole)},
@@ -336,7 +347,9 @@ var datasourceCoverage = map[string]dsCoverage{
 // must NOT also appear in datasourceCoverage. Keep this map as small as
 // possible; an entry is a debt to close, not a resting place.
 var datasourceKnownGaps = map[string]string{
-	"cloudtemple_iam_features": "self-referential Feature schema vs FlattenFeature emit depth vs swagger (flat /v2/features) are inconsistent; the real API contract and the coherent fix (schema/model/flatten/test) are being resolved separately before non-complacent coverage can be added",
+	// Empty: every registered datasource is covered by datasourceCoverage.
+	// cloudtemple_iam_features graduated from a known gap to full coverage once
+	// FlattenFeature was made depth-bounded (see TestIAMFeaturesFlattenIsDepthBounded).
 }
 
 // TestDatasourceFlattenOutputsFitTheirSchemas drives the schema-vs-flatten
@@ -384,5 +397,117 @@ func TestEveryDatasourceIsCoveredByTheFlattenWalker(t *testing.T) {
 		if _, ok := datasources[name]; !ok {
 			t.Errorf("datasourceKnownGaps references %q which is not a registered datasource", name)
 		}
+	}
+}
+
+// TestIAMFeaturesFlattenIsDepthBounded proves FlattenFeature never breaks the
+// cloudtemple_iam_features read, even when the feature tree is deeper than the
+// schema declares. The schema declares "subfeatures" at two nesting levels; its
+// deepest element declares only {id,name}. An unbounded flatten (the historical
+// helper) emits a "subfeatures" key on a node at that deepest level as soon as
+// the node has children, and d.Set then fails with "Invalid address to set"
+// (#243 class), making the WHOLE datasource unusable.
+//
+// Depth 4 is the first discriminating case: at depth 3 the deepest node is a
+// leaf and the historical helper only writes an empty list under the undeclared
+// key, which the SDK writer tolerates; depth 4 forces a NON-empty list there.
+// This test fails (panics/errors in d.Set) with an unbounded FlattenFeature and
+// passes with the depth-bounded one.
+func TestIAMFeaturesFlattenIsDepthBounded(t *testing.T) {
+	// root -> child -> grandchild -> great-grandchild (4 node levels).
+	l3 := &client.Feature{ID: "f3", Name: "great-grandchild"}
+	l2 := &client.Feature{ID: "f2", Name: "grandchild", SubFeatures: []*client.Feature{l3}}
+	l1 := &client.Feature{ID: "f1", Name: "child", SubFeatures: []*client.Feature{l2}}
+	l0 := &client.Feature{ID: "f0", Name: "root", SubFeatures: []*client.Feature{l1}}
+
+	flattened := helpers.FlattenFeature(l0)
+
+	// (1) The flatten output must fit the real schema (no read-breaking crash).
+	d := schema.TestResourceDataRaw(t, dataSourceFeatures().Schema, map[string]interface{}{})
+	if err := d.Set("features", []interface{}{flattened}); err != nil {
+		t.Fatalf("depth-4 flatten output does not fit the iam_features schema: %s", err)
+	}
+
+	// (2) Every representable level (0, 1, 2) is preserved.
+	for path, want := range map[string]string{
+		"features.0.id":                             "f0",
+		"features.0.subfeatures.0.id":               "f1",
+		"features.0.subfeatures.0.subfeatures.0.id": "f2",
+	} {
+		if got := d.Get(path); got != want {
+			t.Errorf("%s = %v, want %q", path, got, want)
+		}
+	}
+
+	// (3) The deepest declared level must NOT carry a "subfeatures" key: the
+	// great-grandchild (level 3) is truncated. Emitting it is exactly the bug.
+	level1 := flattened["subfeatures"].([]map[string]interface{})[0]
+	level2 := level1["subfeatures"].([]map[string]interface{})[0]
+	if _, present := level2["subfeatures"]; present {
+		t.Errorf("level-2 node must not carry a 'subfeatures' key (it would break d.Set); got %#v", level2)
+	}
+}
+
+// schemaSubfeatureNesting returns how many nested "subfeatures" levels the
+// cloudtemple_iam_features schema declares under "features".
+func schemaSubfeatureNesting(res *schema.Resource) int {
+	depth := 0
+	cur := res.Schema["features"]
+	for cur != nil {
+		elem, ok := cur.Elem.(*schema.Resource)
+		if !ok {
+			break
+		}
+		sub, ok := elem.Schema["subfeatures"]
+		if !ok {
+			break
+		}
+		depth++
+		cur = sub
+	}
+	return depth
+}
+
+// TestIAMFeaturesSchemaAndFlattenDepthAgree ties the FlattenFeature emission
+// depth to the SCHEMA itself (introspected), not to a hardcoded constant. If a
+// future change extends the schema's "subfeatures" nesting without bumping the
+// flatten bound (or the reverse), the flatten would silently truncate too early
+// or overflow and crash; this test catches that drift instead of letting the
+// hand-maintained coupling rot.
+func TestIAMFeaturesSchemaAndFlattenDepthAgree(t *testing.T) {
+	schemaDepth := schemaSubfeatureNesting(dataSourceFeatures())
+	if schemaDepth < 1 {
+		t.Fatalf("expected the iam_features schema to declare nested subfeatures, got depth %d", schemaDepth)
+	}
+
+	// A chain deeper than the schema, so the flatten bound is what limits it.
+	var build func(n int) *client.Feature
+	build = func(n int) *client.Feature {
+		f := &client.Feature{ID: "x", Name: "x"}
+		if n > 0 {
+			f.SubFeatures = []*client.Feature{build(n - 1)}
+		}
+		return f
+	}
+	flattened := helpers.FlattenFeature(build(schemaDepth + 2))
+
+	// Count the "subfeatures" levels the flatten actually emits.
+	emitted := 0
+	for node := flattened; ; {
+		subs, ok := node["subfeatures"].([]map[string]interface{})
+		if !ok || len(subs) == 0 {
+			break
+		}
+		emitted++
+		node = subs[0]
+	}
+	if emitted != schemaDepth {
+		t.Errorf("flatten emits subfeatures at %d levels but the schema declares %d; the flatten bound (maxFeatureSubNesting) and the schema disagree", emitted, schemaDepth)
+	}
+
+	// The deep flatten must also fit the schema without crashing.
+	d := schema.TestResourceDataRaw(t, dataSourceFeatures().Schema, map[string]interface{}{})
+	if err := d.Set("features", []interface{}{flattened}); err != nil {
+		t.Errorf("deep flatten output does not fit the iam_features schema: %s", err)
 	}
 }
