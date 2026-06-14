@@ -27,8 +27,8 @@ func TestAccDataSourceGuestOperatingSystem(t *testing.T) {
 				),
 			},
 			{
-				Config:      fmt.Sprintf(testAccDataSourceGuestOperatingSystemMissing),
-				ExpectError: regexp.MustCompile("Access denied: 403 Forbidden"),
+				Config:      testAccDataSourceGuestOperatingSystemMissing,
+				ExpectError: regexp.MustCompile("access denied: 403 Forbidden"),
 			},
 		},
 	})

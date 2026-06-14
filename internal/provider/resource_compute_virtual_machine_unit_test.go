@@ -6,15 +6,6 @@ import (
 	"github.com/hashicorp/go-cty/cty"
 )
 
-var bootOptionsRawType = cty.Object(map[string]cty.Type{
-	"boot_delay":              cty.Number,
-	"boot_retry_delay":        cty.Number,
-	"boot_retry_enabled":      cty.Bool,
-	"enter_bios_setup":        cty.Bool,
-	"firmware":                cty.String,
-	"efi_secure_boot_enabled": cty.Bool,
-})
-
 func TestBuildVMwareBootOptionsFromRaw(t *testing.T) {
 	merged := map[string]interface{}{
 		"boot_delay":              5,

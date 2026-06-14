@@ -255,20 +255,6 @@ func getClient(meta any) *client.Client {
 	return meta.(*client.Client)
 }
 
-func getUserID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, error) {
-	userID, ok := d.Get("user_id").(string)
-	if ok && userID != "" {
-		return userID, nil
-	}
-
-	l, err := client.Token(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get token: %s", err)
-	}
-
-	return l.UserID(), nil
-}
-
 func getTenantID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, error) {
 	userID, ok := d.Get("tenant_id").(string)
 	if ok && userID != "" {
