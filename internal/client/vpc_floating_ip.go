@@ -56,7 +56,7 @@ func (f *VPCFloatingIPClient) List(ctx context.Context, filter *FloatingIPFilter
 }
 
 // Read retrieves a single floating IP by ID. It returns (nil, nil) when the
-// floating IP does not exist (404).
+// floating IP does not exist (403; the API returns 403 for an absent resource).
 func (f *VPCFloatingIPClient) Read(ctx context.Context, id string) (*FloatingIP, error) {
 	r := f.c.newRequest("GET", "/vpc/v1/floating_ips/%s", id)
 	resp, err := f.c.doRequest(ctx, r)
