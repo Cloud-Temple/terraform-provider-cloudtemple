@@ -29,6 +29,16 @@ func TestIAM_Features(t *testing.T) {
 	require.Equal(t, os.Getenv(FeatureName), rtms.Name)
 	require.Equal(t, os.Getenv(FeatureId), rtms.ID)
 	require.Len(t, rtms.SubFeatures, 2)
+
+	// The sub-features of rtms are leaves: the real IAM feature tree depth is 2.
+	// This locks the depth assumption the datasource schema/flatten rely on
+	// (see internal/provider/helpers/helper_iam_feature.go). If the platform
+	// ever nests sub-features deeper, this fails loudly so the schema depth is
+	// revisited before a deeper tree silently gets truncated.
+	for _, sf := range rtms.SubFeatures {
+		require.NotNil(t, sf)
+		require.Empty(t, sf.SubFeatures, "sub-feature %q is expected to be a leaf (observed IAM feature tree depth is 2)", sf.Name)
+	}
 }
 
 func TestIAM_FeatureAssignments(t *testing.T) {

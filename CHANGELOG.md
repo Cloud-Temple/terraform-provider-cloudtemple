@@ -28,6 +28,7 @@ BUG FIXES :
   * Fixed error paths that could leave a virtual machine powered off after a provider-initiated shutdown on resource `cloudtemple_compute_iaas_opensource_virtual_machine`: the provider now restores the power state on failure (best effort, targeting the pre-shutdown host) and reports the outcome in the error.
   * Fixed Terraform states polluted by pre-1.8.0 creations that captured the cloud-init config drive (`XO CloudConfigDrive`) as a managed `os_disk`: the refresh now drops the drive from the state — with an explicit warning and only under strict live evidence (exact XO name and read-only attachment to this virtual machine) — which stops the permanent removal drift for existing clients. Ambiguous disks stay in the state. No platform-side change is ever made.
   * Fixed a crash (nil dereference) during refresh when an `os_disk` or `os_network_adapter` referenced in the state no longer exists platform-side: the deleted device is now dropped from the state so the next plan reflects reality. The deletion is confirmed by a second independent read (the VM-scoped device listing) before any state entry is dropped, so an access-denied answer can never silently shrink the state.
+  * Fixed datasource `cloudtemple_iam_features` being able to fail at read time with an `Invalid address to set` error, which would make the whole datasource unusable, if the feature tree were ever nested deeper than the schema declares (a sub-feature below the deepest declared level emitting a `subfeatures` key the schema does not declare). The flatten is now bounded to the schema's declared nesting depth: any deeper sub-features are truncated — the datasource stays readable — and a warning is emitted, instead of breaking the read. The real feature catalog is only two levels deep, so current outputs are unchanged.
 
 IMPROVEMENTS :
 
@@ -37,7 +38,7 @@ MISCELLANEOUS :
 
   * The provider is now built with Go 1.24 (required by the updated dependencies).
   * The continuous integration now runs a platform-independent safety net on every pull request: formatting and static-analysis checks, the state-safety unit-test suites, a datasource schema-vs-flatten validation and a write-guard registry for the `Optional`+`Computed` booleans.
-  * The datasource schema-vs-flatten CI validation now covers every datasource except `cloudtemple_iam_features` (a self-referential schema whose API contract is being resolved separately). It is driven by a reflection-based non-zero object filler and a coverage registry checked against the provider's datasource map: a newly added datasource must be either covered or explicitly listed as a known gap, so the read-breaking class behind #241/#243 cannot silently regain ground.
+  * The datasource schema-vs-flatten CI validation now covers every datasource. It is driven by a reflection-based non-zero object filler and a coverage registry checked against the provider's datasource map: a newly added datasource must be either covered or explicitly listed as a known gap, so the read-breaking class behind #241/#243 cannot silently regain ground.
   * Refreshed the repository README (build requirements, Terraform Registry links, usage example).
   * Removed a broken CI workflow left over from the provider template.
 

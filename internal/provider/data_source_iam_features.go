@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -95,10 +96,26 @@ func dataSourceFeaturesRead(ctx context.Context, d *schema.ResourceData, meta an
 	// Définir l'ID de la datasource
 	d.SetId("features")
 
-	// Mapper les données en utilisant la fonction helper
-	tfFeatures := make([]map[string]interface{}, len(features))
-	for i, feature := range features {
-		tfFeatures[i] = helpers.FlattenFeature(feature)
+	// Mapper les données en utilisant la fonction helper. La forme imbriquée des
+	// sous-features est bornée à la profondeur déclarée par le schéma ci-dessus
+	// (cf. helpers.FlattenFeature) : un arbre plus profond est tronqué — la
+	// datasource reste lisible — et signalé par un warning, plutôt que de casser
+	// la lecture avec "Invalid address to set" (classe #243).
+	tfFeatures := make([]map[string]interface{}, 0, len(features))
+	for _, feature := range features {
+		if feature == nil {
+			continue // un élément null renvoyé par l'API ne doit pas faire paniquer le flatten
+		}
+		tfFeatures = append(tfFeatures, helpers.FlattenFeature(feature))
+		if helpers.FeatureExceedsDeclaredDepth(feature) {
+			diags = append(diags, diag.Diagnostic{
+				Severity: diag.Warning,
+				Summary:  "Feature sub-tree deeper than the schema can represent; truncated",
+				Detail: fmt.Sprintf(
+					"Feature %q (id %s) has sub-features nested deeper than the cloudtemple_iam_features schema represents; the deepest levels were truncated from the datasource output. Please report this to the provider maintainers so the schema can be extended.",
+					feature.Name, feature.ID),
+			})
+		}
 	}
 
 	// Définir les données dans le state
