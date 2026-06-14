@@ -9,6 +9,10 @@
 # must never be lowered by hand. This makes "add tests where they are missing"
 # a systemic CI guard rather than a discretionary habit (issue #293).
 #
+# A package listed below with NO recorded floor is a FAIL in gate mode (a
+# missing/typo'd floor line must not silently disable the gate); use --update
+# to bootstrap it deliberately.
+#
 # Usage:
 #   scripts/coverage_ratchet.sh            # run + gate (used by CI)
 #   scripts/coverage_ratchet.sh --update   # run + rewrite the floor to current
@@ -24,9 +28,13 @@ PKGS="internal/client internal/provider internal/provider/helpers"
 # Tolerance (percentage points) absorbing float-formatting noise only.
 EPS="0.05"
 
+UPDATE=0
+[[ "${1:-}" == "--update" ]] && UPDATE=1
+
+# Prints the recorded floor for a package, or nothing if absent.
 floor_for() {
-  [[ -f "$FLOOR_FILE" ]] || { echo "0"; return; }
-  awk -v p="$1" '$1==p {print $2; found=1} END {if (!found) print "0"}' "$FLOOR_FILE"
+  [[ -f "$FLOOR_FILE" ]] || return 0
+  awk -v p="$1" '$1==p {print $2}' "$FLOOR_FILE"
 }
 
 fail=0
@@ -44,7 +52,18 @@ for pkg in $PKGS; do
   pct="$(go tool cover -func="$prof" | tail -1 | awk '{print $NF}' | tr -d '%')"
   rm -f "$prof"
   printf '%s %s\n' "$pkg" "$pct" >> "$tmp_floor"
+
   floor="$(floor_for "$pkg")"
+  if [[ -z "$floor" ]]; then
+    if [[ "$UPDATE" -eq 1 ]]; then
+      floor="0"
+    else
+      printf 'RATCHET FAIL  %-32s no recorded floor (bootstrap with --update)\n' "$pkg"
+      fail=1
+      continue
+    fi
+  fi
+
   if awk -v p="$pct" -v f="$floor" -v e="$EPS" 'BEGIN{exit !(p + e < f)}'; then
     printf 'RATCHET FAIL  %-32s %s%% < floor %s%%\n' "$pkg" "$pct" "$floor"
     fail=1
@@ -53,7 +72,7 @@ for pkg in $PKGS; do
   fi
 done
 
-if [[ "${1:-}" == "--update" ]]; then
+if [[ "$UPDATE" -eq 1 ]]; then
   mv "$tmp_floor" "$FLOOR_FILE"
   echo "floor updated -> $FLOOR_FILE"
 else
