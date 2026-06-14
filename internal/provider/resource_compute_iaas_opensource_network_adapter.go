@@ -84,6 +84,41 @@ func resourceOpenIaasNetworkAdapter() *schema.Resource {
 				Description: "The MTU of the network adapter.",
 				Computed:    true,
 			},
+			"ipv4_address": {
+				Type:        schema.TypeString,
+				Description: "The IPv4 address of the network adapter.",
+				Computed:    true,
+			},
+			"ipv6_address": {
+				Type:        schema.TypeString,
+				Description: "The IPv6 address of the network adapter.",
+				Computed:    true,
+			},
+			"vpc_id": {
+				Type:        schema.TypeString,
+				Description: "The ID of the VPC the network adapter is associated with, or an empty string when the adapter is not on a VPC network.",
+				Computed:    true,
+			},
+			"vpc_name": {
+				Type:        schema.TypeString,
+				Description: "The name of the VPC the network adapter is associated with, or an empty string when the adapter is not on a VPC network.",
+				Computed:    true,
+			},
+			"private_network_id": {
+				Type:        schema.TypeString,
+				Description: "The ID of the VPC private network the network adapter is associated with, or an empty string when the adapter is not on a VPC network.",
+				Computed:    true,
+			},
+			"private_network_name": {
+				Type:        schema.TypeString,
+				Description: "The name of the VPC private network the network adapter is associated with, or an empty string when the adapter is not on a VPC network.",
+				Computed:    true,
+			},
+			"static_ip_address": {
+				Type:        schema.TypeString,
+				Description: "The static IP address assigned to the network adapter on its VPC, or an empty string when the adapter is not on a VPC network.",
+				Computed:    true,
+			},
 		},
 	}
 }

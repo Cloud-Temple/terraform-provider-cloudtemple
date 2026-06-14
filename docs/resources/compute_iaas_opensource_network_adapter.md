@@ -58,9 +58,16 @@ resource "cloudtemple_compute_iaas_opensource_network_adapter" "VIF-1" {
 
 - `id` (String) The ID of the network adapter.
 - `internal_id` (String) The internal ID of the network adapter.
+- `ipv4_address` (String) The IPv4 address of the network adapter.
+- `ipv6_address` (String) The IPv6 address of the network adapter.
 - `machine_manager_id` (String) The ID of the machine manager of the network adapter.
 - `mtu` (Number) The MTU of the network adapter.
 - `name` (String) The name of the network adapter.
+- `private_network_id` (String) The ID of the VPC private network the network adapter is associated with, or an empty string when the adapter is not on a VPC network.
+- `private_network_name` (String) The name of the VPC private network the network adapter is associated with, or an empty string when the adapter is not on a VPC network.
+- `static_ip_address` (String) The static IP address assigned to the network adapter on its VPC, or an empty string when the adapter is not on a VPC network.
+- `vpc_id` (String) The ID of the VPC the network adapter is associated with, or an empty string when the adapter is not on a VPC network.
+- `vpc_name` (String) The name of the VPC the network adapter is associated with, or an empty string when the adapter is not on a VPC network.
 
 ## Import
 

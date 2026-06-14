@@ -52,6 +52,16 @@
           "computed": true,
           "elem_kind": "nil"
         },
+        "ipv4_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "ipv6_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
         "mac_address": {
           "type": "TypeString",
           "optional": true,
@@ -79,6 +89,21 @@
           "has_validate_func": true,
           "elem_kind": "nil"
         },
+        "private_network_id": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "private_network_name": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "static_ip_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
         "tx_checksumming": {
           "type": "TypeBool",
           "optional": true,
@@ -90,6 +115,16 @@
           "required": true,
           "force_new": true,
           "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "vpc_id": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "vpc_name": {
+          "type": "TypeString",
+          "computed": true,
           "elem_kind": "nil"
         }
       }
@@ -5312,6 +5347,16 @@
           "computed": true,
           "elem_kind": "nil"
         },
+        "ipv4_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "ipv6_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
         "mac_address": {
           "type": "TypeString",
           "computed": true,
@@ -5344,6 +5389,21 @@
           "computed": true,
           "elem_kind": "nil"
         },
+        "private_network_id": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "private_network_name": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "static_ip_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
         "tx_checksumming": {
           "type": "TypeBool",
           "computed": true,
@@ -5359,6 +5419,16 @@
           "required_with": [
             "name"
           ],
+          "elem_kind": "nil"
+        },
+        "vpc_id": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "vpc_name": {
+          "type": "TypeString",
+          "computed": true,
           "elem_kind": "nil"
         }
       }
@@ -5381,6 +5451,16 @@
               "elem_kind": "nil"
             },
             "internal_id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "ipv4_address": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "ipv6_address": {
               "type": "TypeString",
               "computed": true,
               "elem_kind": "nil"
@@ -5410,12 +5490,37 @@
               "computed": true,
               "elem_kind": "nil"
             },
+            "private_network_id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "private_network_name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "static_ip_address": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
             "tx_checksumming": {
               "type": "TypeBool",
               "computed": true,
               "elem_kind": "nil"
             },
             "virtual_machine_id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "vpc_id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "vpc_name": {
               "type": "TypeString",
               "computed": true,
               "elem_kind": "nil"
