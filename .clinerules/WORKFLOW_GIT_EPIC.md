@@ -81,6 +81,10 @@ Rules:
 - use `Refs #N` in feature PRs targeting the RC branch; reserve the `Closes #N`
   keywords for the RC -> `main` PR, except for a direct hotfix to `main`
   explicitly approved;
+- track an issue whose fix is merged into the RC but not yet released with the
+  `Awaiting release` Project status (see "Project statuses"); it leaves
+  `In Progress` once nothing is being worked on, and moves to `Done` only when
+  the RC -> `main` PR closes it;
 - forbid GitHub closing keywords (`Closes`, `Fixes`, `Resolves`) in commit
   messages of feature PRs targeting the RC branch;
 - then open an RC -> `main` PR on GitHub;
@@ -337,6 +341,35 @@ Put in `Blocked` when the item cannot move forward without an external event:
 - external quota/tooling temporarily blocking.
 
 The blocking must be explicit in the issue, the PR, or the governance item.
+
+### `Awaiting release`
+
+Put in `Awaiting release` an issue whose fix is **already merged into the RC
+branch** and for which **no code work remains**, but which is not yet released
+because the RC -> `main` merge has not happened.
+
+This status exists because of the RC flow: feature PRs merge into `rc/vX.Y.Z`
+with `Refs #N`, which does not close the issue. The issue therefore cannot be
+`Done` (it is neither closed nor on `main`), yet it is no longer `In Progress`
+(nothing is being worked on). `Awaiting release` removes this ambiguity:
+
+- `In Progress` keeps its strict meaning: work actually under way;
+- `Awaiting release` means: done in the RC, blocked only on the human RC ->
+  `main` decision;
+- `Done` stays reserved for an issue really closed, usually after the RC ->
+  `main` PR carries its `Closes #N`.
+
+Rules:
+- move an issue to `Awaiting release` only once its fix is merged into the RC
+  branch and verified (CI green on the RC);
+- do not use `Awaiting release` for a partially fixed issue: if code work
+  remains, the issue stays `In Progress` (example: an issue whose minimal fix
+  landed but whose increments are still open);
+- the issue moves from `Awaiting release` to `Done` only when the RC -> `main`
+  PR closes it, per the RC flow;
+- a PR item is never `Awaiting release`: once merged, a PR item goes to `Done`.
+  Only the source issue uses `Awaiting release`, because only the issue carries
+  the problem that stays open until release.
 
 ### `Done`
 
