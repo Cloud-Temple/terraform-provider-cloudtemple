@@ -126,6 +126,10 @@ func fillNonZero(v reflect.Value, depth int, seen map[reflect.Type]int) {
 		s := reflect.MakeSlice(v.Type(), 1, 1)
 		fillNonZero(s.Index(0), depth+1, seen)
 		v.Set(s)
+	case reflect.Array:
+		for i := 0; i < v.Len(); i++ {
+			fillNonZero(v.Index(i), depth+1, seen)
+		}
 	case reflect.Map:
 		m := reflect.MakeMapWithSize(v.Type(), 1)
 		k := reflect.New(v.Type().Key()).Elem()
@@ -172,7 +176,12 @@ func flatID[T any](flatten func(*T) map[string]interface{}) func() map[string]in
 	return func() map[string]interface{} {
 		v := filled[T]()
 		m := flatten(v)
-		m["id"] = reflect.ValueOf(v).Elem().FieldByName("ID").String()
+		// The plural Reads inject the object id; mirror that. Guard the field so
+		// a future misuse on a struct without a string ID fails loudly rather
+		// than panicking inside reflection.
+		if f := reflect.ValueOf(v).Elem().FieldByName("ID"); f.IsValid() && f.Kind() == reflect.String {
+			m["id"] = f.String()
+		}
 		return m
 	}
 }
@@ -302,8 +311,17 @@ var datasourceCoverage = map[string]dsCoverage{
 	"cloudtemple_object_storage_roles":            {"roles", flat(helpers.FlattenObjectStorageRole)},
 
 	// --- IAM --------------------------------------------------------------
-	"cloudtemple_iam_company":                {"", flat(helpers.FlattenCompany)},
-	"cloudtemple_iam_features":               {"features", flat(helpers.FlattenFeature)},
+	"cloudtemple_iam_company": {"", flat(helpers.FlattenCompany)},
+	// Feature is self-referential and the schema declares a fixed nesting depth
+	// (features -> subfeatures -> subfeatures). Build the tree by hand to the
+	// deepest declared level so that level is actually exercised (the generic
+	// self-reference cap would only reach one level).
+	"cloudtemple_iam_features": {"features", func() map[string]interface{} {
+		leaf := &client.Feature{ID: "f2", Name: "x"}
+		mid := &client.Feature{ID: "f1", Name: "x", SubFeatures: []*client.Feature{leaf}}
+		top := &client.Feature{ID: "f0", Name: "x", SubFeatures: []*client.Feature{mid}}
+		return helpers.FlattenFeature(top)
+	}},
 	"cloudtemple_iam_personal_access_token":  {"", flat(helpers.FlattenToken)},
 	"cloudtemple_iam_personal_access_tokens": {"tokens", flat(helpers.FlattenToken)},
 	"cloudtemple_iam_role":                   {"", flat(helpers.FlattenRole)},
