@@ -63,7 +63,7 @@ func (s *VPCStaticIPClient) List(ctx context.Context, privateNetworkID string, f
 }
 
 // Read retrieves a single static IP by ID. It returns (nil, nil) when the
-// static IP does not exist (404).
+// static IP does not exist (403; the API returns 403 for an absent resource).
 func (s *VPCStaticIPClient) Read(ctx context.Context, id string) (*StaticIP, error) {
 	r := s.c.newRequest("GET", "/vpc/v1/static_ips/%s", id)
 	resp, err := s.c.doRequest(ctx, r)
@@ -71,7 +71,7 @@ func (s *VPCStaticIPClient) Read(ctx context.Context, id string) (*StaticIP, err
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 404)
+	found, err := requireNotFoundOrOK(resp, 403)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -85,7 +85,7 @@ func (s *VPCStaticIPClient) Read(ctx context.Context, id string) (*StaticIP, err
 }
 
 // ReadByMAC retrieves a single static IP by MAC address. It returns (nil, nil)
-// when no static IP matches the MAC (404).
+// when no static IP matches the MAC (403; the API returns 403 for an absent resource).
 func (s *VPCStaticIPClient) ReadByMAC(ctx context.Context, mac string) (*StaticIP, error) {
 	r := s.c.newRequest("GET", "/vpc/v1/static_ips/mac/%s", mac)
 	resp, err := s.c.doRequest(ctx, r)
@@ -93,7 +93,7 @@ func (s *VPCStaticIPClient) ReadByMAC(ctx context.Context, mac string) (*StaticI
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 404)
+	found, err := requireNotFoundOrOK(resp, 403)
 	if err != nil || !found {
 		return nil, err
 	}
