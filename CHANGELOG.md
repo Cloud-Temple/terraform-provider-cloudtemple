@@ -41,6 +41,7 @@ MISCELLANEOUS :
   * The datasource schema-vs-flatten CI validation now covers every datasource. It is driven by a reflection-based non-zero object filler and a coverage registry checked against the provider's datasource map: a newly added datasource must be either covered or explicitly listed as a known gap, so the read-breaking class behind #241/#243 cannot silently regain ground.
   * Refreshed the repository README (build requirements, Terraform Registry links, usage example).
   * Removed a broken CI workflow left over from the provider template.
+  * Added a schema golden gate: a committed, deterministic snapshot of the full declared provider schema contract (every resource and datasource, recursively into nested blocks: types, `Required`/`Optional`/`Computed`/`ForceNew`/`Sensitive`, `MinItems`/`MaxItems`/`ConfigMode`, primitive `Default` values, the presence of state/normalization functions and validators, plan constraints, the explicit `Elem` kind, `SchemaVersion`, `StateUpgrader` versions and types, and `CustomizeDiff` presence) checked by a CI test that fails on any divergence. Any change to the contract that an existing client's Terraform state depends on must be seen and explicitly justified by a human before the golden is regenerated; the regenerate path is refused in CI. This freezes the declared contract; runtime behaviour and the live API shape stay covered by the other test layers.
 
 # 1.7.1 (April 15th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
