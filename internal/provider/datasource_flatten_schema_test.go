@@ -1,7 +1,9 @@
 package provider
 
 import (
+	"reflect"
 	"testing"
+	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -11,9 +13,8 @@ import (
 // datasourceFlattenCheck registers a datasource whose flatten output must
 // fit its declared schema. When a flatten helper emits a key the schema
 // does not declare (or with an incompatible shape), d.Set fails at runtime
-// with "Invalid address to set" and the datasource becomes unusable — the
-// #243 class. Adding an entry here is a one-liner: coverage must grow with
-// every new datasource.
+// with "Invalid address to set" (#243 class) or "source data must be an
+// array or slice, got map" (#241 class) and the datasource becomes unusable.
 type datasourceFlattenCheck struct {
 	name       string
 	datasource *schema.Resource
@@ -51,387 +52,305 @@ func assertFlattenFitsSchema(t *testing.T, check datasourceFlattenCheck) {
 	}
 }
 
-// Fully-populated client fixtures: every field carries a non-zero value so
-// that type and shape mismatches cannot hide behind zero values.
+// --- Non-zero reflection filler -------------------------------------------
+//
+// fillNonZero populates every settable field of a value with a non-zero,
+// type-plausible value, recursing into pointers, structs (including embedded
+// and anonymous ones), slices and maps. This guarantees the flatten output is
+// exercised on a fully-populated client object so that a type/shape mismatch
+// between a flatten helper and a datasource schema cannot hide behind a zero
+// value. Coverage therefore grows automatically when a client struct gains a
+// field — the opposite of hand-written fixtures, which silently leave new
+// fields at zero. Validation is never triggered: d.Set on a Computed
+// datasource attribute does not run ValidateFunc, so arbitrary good-typed
+// values are safe for a shape test.
+//
+// The recursion is bounded by an absolute depth and by a self-reference cap:
+// a struct type may appear at most selfRefCap times along the current path. A
+// self-referential container (e.g. iam Feature.SubFeatures []*Feature) is left
+// empty once its element type is already nested selfRefCap deep, producing a
+// finite shape that fits the schema's declared nesting instead of an unbounded
+// tree, while still exercising one level of nesting.
+const selfRefCap = 2
 
-func fixtureOpenIaasPool() *client.OpenIaasPool {
-	pool := &client.OpenIaasPool{
-		ID:                      "pool-1",
-		MachineManager:          client.BaseObject{ID: "mm-1", Name: "xoa"},
-		InternalID:              "internal-1",
-		Name:                    "pool-name",
-		Label:                   "pool-label",
-		HighAvailabilityEnabled: true,
-		Master:                  "host-master",
-		Hosts:                   []string{"host-1", "host-2"},
+// baseStruct unwraps pointers and returns the underlying struct type, or nil.
+func baseStruct(t reflect.Type) reflect.Type {
+	for t.Kind() == reflect.Ptr {
+		t = t.Elem()
 	}
-	pool.Memory.Usage = 10
-	pool.Memory.Size = 100
-	pool.Cpu.Cores = 8
-	pool.Cpu.Sockets = 2
-	pool.Type.Key = "xcp-ng"
-	pool.Type.Description = "XCP-ng pool"
-	return pool
+	if t.Kind() == reflect.Struct {
+		return t
+	}
+	return nil
 }
 
-func fixtureOpenIaasHost() *client.OpenIaaSHost {
-	host := &client.OpenIaaSHost{
-		ID:              "host-1",
-		MachineManager:  client.BaseObject{ID: "mm-1", Name: "xoa"},
-		InternalId:      "internal-1",
-		Name:            "host-name",
-		Master:          true,
-		Uptime:          3600,
-		PowerState:      "Running",
-		RebootRequired:  true,
-		VirtualMachines: []string{"vm-1"},
+func fillNonZero(v reflect.Value, depth int, seen map[reflect.Type]int) {
+	if depth > 16 {
+		return
 	}
-	host.Pool.ID = "pool-1"
-	host.Pool.Name = "pool-name"
-	host.Pool.Type.Key = "xcp-ng"
-	host.Pool.Type.Description = "XCP-ng pool"
-	host.UpdateData.MaintenanceMode = true
-	host.UpdateData.Status = "ok"
-	host.Metrics.XOA.Version = "5.0"
-	host.Metrics.XOA.FullName = "XOA 5.0"
-	host.Metrics.XOA.Build = "build-1"
-	host.Metrics.Memory.Usage = 10
-	host.Metrics.Memory.Size = 100
-	host.Metrics.Cpu.Sockets = 2
-	host.Metrics.Cpu.Cores = 8
-	host.Metrics.Cpu.Model = "EPYC"
-	host.Metrics.Cpu.ModelName = "AMD EPYC"
-	return host
-}
-
-func fixtureOpenIaasNetwork() *client.OpenIaaSNetwork {
-	return &client.OpenIaaSNetwork{
-		ID:                         "net-1",
-		MachineManager:             client.BaseObject{ID: "mm-1", Name: "xoa"},
-		InternalID:                 "internal-1",
-		Name:                       "net-name",
-		Pool:                       client.BaseObject{ID: "pool-1", Name: "pool-name"},
-		MaximumTransmissionUnit:    1500,
-		NetworkAdapters:            []string{"vif-1"},
-		NetworkBlockDevice:         true,
-		InsecureNetworkBlockDevice: true,
-	}
-}
-
-func fixtureOpenIaasNetworkAdapter() *client.OpenIaaSNetworkAdapter {
-	return &client.OpenIaaSNetworkAdapter{
-		ID:               "vif-1",
-		Name:             "vif-name",
-		InternalID:       "internal-1",
-		VirtualMachineID: "vm-1",
-		MacAddress:       "aa:bb:cc:dd:ee:ff",
-		MTU:              1500,
-		Attached:         true,
-		TxChecksumming:   true,
-		Network:          client.BaseObject{ID: "net-1", Name: "net-name"},
-		MachineManager:   client.BaseObject{ID: "mm-1", Name: "xoa"},
-	}
-}
-
-func fixtureOpenIaasSnapshot() *client.OpenIaaSSnapshot {
-	return &client.OpenIaaSSnapshot{
-		ID:               "snap-1",
-		Description:      "snapshot description",
-		VirtualMachineID: "vm-1",
-		Name:             "snap-name",
-		CreateTime:       1700000000,
-	}
-}
-
-func fixtureOpenIaasReplicationPolicy() *client.OpenIaaSReplicationPolicy {
-	policy := &client.OpenIaaSReplicationPolicy{
-		ID:   "rp-1",
-		Name: "rp-name",
-	}
-	policy.StorageRepository.ID = "sr-1"
-	policy.StorageRepository.Name = "sr-name"
-	policy.Pool.ID = "pool-1"
-	policy.Pool.Name = "pool-name"
-	policy.Pool.Label = "pool-label"
-	policy.MachineManager.ID = "mm-1"
-	policy.MachineManager.Name = "xoa"
-	policy.LastRun.Start = 1700000000
-	policy.LastRun.End = 1700000100
-	policy.LastRun.Status = "success"
-	policy.Interval.Hours = 1
-	policy.Interval.Minutes = 30
-	return policy
-}
-
-func fixtureOpenIaasStorageRepository() *client.OpenIaaSStorageRepository {
-	return &client.OpenIaaSStorageRepository{
-		ID:              "sr-1",
-		InternalId:      "internal-1",
-		Name:            "sr-name",
-		Description:     "sr description",
-		MaintenanceMode: true,
-		MaxCapacity:     1000,
-		FreeCapacity:    500,
-		StorageType:     "lvm",
-		VirtualDisks:    []string{"disk-1"},
-		Shared:          true,
-		Accessible:      1,
-		Host:            client.BaseObject{ID: "host-1", Name: "host-name"},
-		Pool:            client.BaseObject{ID: "pool-1", Name: "pool-name"},
-		MachineManager:  client.BaseObject{ID: "mm-1", Name: "xoa"},
+	switch v.Kind() {
+	case reflect.Ptr:
+		if st := baseStruct(v.Type().Elem()); st != nil && seen[st] >= selfRefCap {
+			return // break a self-referential pointer chain: leave nil
+		}
+		if v.IsNil() {
+			if !v.CanSet() {
+				return
+			}
+			v.Set(reflect.New(v.Type().Elem()))
+		}
+		fillNonZero(v.Elem(), depth+1, seen)
+	case reflect.Struct:
+		// time.Time is a struct with unexported fields; set a fixed instant.
+		if v.Type() == reflect.TypeOf(time.Time{}) {
+			if v.CanSet() {
+				v.Set(reflect.ValueOf(time.Unix(1700000000, 0).UTC()))
+			}
+			return
+		}
+		t := v.Type()
+		seen[t]++
+		for i := 0; i < v.NumField(); i++ {
+			f := v.Field(i)
+			if !f.CanSet() { // unexported field
+				continue
+			}
+			fillNonZero(f, depth+1, seen)
+		}
+		seen[t]--
+	case reflect.Slice:
+		if st := baseStruct(v.Type().Elem()); st != nil && seen[st] >= selfRefCap {
+			v.Set(reflect.MakeSlice(v.Type(), 0, 0)) // break self-reference: empty
+			return
+		}
+		s := reflect.MakeSlice(v.Type(), 1, 1)
+		fillNonZero(s.Index(0), depth+1, seen)
+		v.Set(s)
+	case reflect.Map:
+		m := reflect.MakeMapWithSize(v.Type(), 1)
+		k := reflect.New(v.Type().Key()).Elem()
+		fillNonZero(k, depth+1, seen)
+		val := reflect.New(v.Type().Elem()).Elem()
+		fillNonZero(val, depth+1, seen)
+		m.SetMapIndex(k, val)
+		v.Set(m)
+	case reflect.String:
+		v.SetString("x")
+	case reflect.Bool:
+		v.SetBool(true)
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		v.SetInt(1)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		v.SetUint(1)
+	case reflect.Float32, reflect.Float64:
+		v.SetFloat(1)
+	case reflect.Interface:
+		if v.IsNil() && v.CanSet() {
+			v.Set(reflect.ValueOf("x"))
+		}
 	}
 }
 
-func fixtureOpenIaasTemplate() *client.OpenIaasTemplate {
-	return &client.OpenIaasTemplate{
-		ID:                "tpl-1",
-		MachineManager:    client.BaseObject{ID: "mm-1", Name: "xoa"},
-		InternalID:        "internal-1",
-		Name:              "tpl-name",
-		CPU:               4,
-		NumCoresPerSocket: 2,
-		Memory:            8589934592,
-		PowerState:        "Halted",
-		Snapshots:         []string{"snap-1"},
-		SLAPolicies:       []string{"sla-1"},
-		Disks: []client.TemplateDisk{{
-			ID:                "disk-1",
-			Name:              "disk-name",
-			Description:       "disk description",
-			Size:              1024,
-			StorageRepository: client.BaseObject{ID: "sr-1", Name: "sr-name"},
-		}},
-		NetworkAdapters: []client.TemplateNetworkAdapter{{
-			Name:       "vif-name",
-			MacAddress: "aa:bb:cc:dd:ee:ff",
-			MTU:        1500,
-			Attached:   true,
-			Network:    client.BaseObject{ID: "net-1", Name: "net-name"},
-		}},
+// filled returns a pointer to a fully-populated value of type T.
+func filled[T any]() *T {
+	var v T
+	fillNonZero(reflect.ValueOf(&v).Elem(), 0, map[reflect.Type]int{})
+	return &v
+}
+
+// flat builds the flatten output of a single-argument flatten helper applied
+// to a fully-populated client object.
+func flat[T any](flatten func(*T) map[string]interface{}) func() map[string]interface{} {
+	return func() map[string]interface{} {
+		return flatten(filled[T]())
 	}
 }
 
-func fixtureOpenIaasVirtualDisk() *client.OpenIaaSVirtualDisk {
-	disk := &client.OpenIaaSVirtualDisk{
-		ID:          "disk-1",
-		InternalID:  "internal-1",
-		Name:        "disk-name",
-		Description: "disk description",
-		Size:        1024,
-		Usage:       512,
-		IsSnapshot:  true,
-		StorageRepository: client.BaseObject{
-			ID:   "sr-1",
-			Name: "sr-name",
-		},
-		VirtualMachines: []client.OpenIaaSVirtualDiskConnection{{
-			ID:        "vm-1",
-			Name:      "vm-name",
-			ReadOnly:  true,
-			Connected: true,
-		}},
-	}
-	disk.Templates = append(disk.Templates, struct {
-		ID       string
-		Name     string
-		ReadOnly bool
-	}{ID: "tpl-1", Name: "tpl-name", ReadOnly: true})
-	return disk
-}
-
-func fixtureOpenIaasVirtualMachine() *client.OpenIaaSVirtualMachine {
-	vm := &client.OpenIaaSVirtualMachine{
-		ID:                  "vm-1",
-		Name:                "vm-name",
-		InternalID:          "internal-1",
-		PowerState:          "Running",
-		SecureBoot:          true,
-		HighAvailability:    "restart",
-		BootFirmware:        "uefi",
-		AutoPowerOn:         true,
-		BootOrder:           []string{"Hard-Drive"},
-		OperatingSystemName: "Ubuntu",
-		CPU:                 4,
-		NumCoresPerSocket:   2,
-		Memory:              8589934592,
-		MachineManager:      client.BaseObject{ID: "mm-1", Name: "xoa"},
-		Host:                client.BaseObject{ID: "host-1", Name: "host-name"},
-		Pool:                client.BaseObject{ID: "pool-1", Name: "pool-name"},
-	}
-	vm.DvdDrive.Name = "dvd-1"
-	vm.DvdDrive.Attached = true
-	vm.Tools.Detected = true
-	vm.Tools.Version = "1.0"
-	vm.PVDrivers.Detected = true
-	vm.PVDrivers.Version = "1.0"
-	vm.PVDrivers.AreUpToDate = true
-	vm.ManagementAgent.Detected = true
-	vm.Addresses.IPv6 = "fe80::1"
-	vm.Addresses.IPv4 = "10.0.0.1"
-	return vm
-}
-
-func fixtureOpenIaasMachineManager() *client.OpenIaaSMachineManager {
-	return &client.OpenIaaSMachineManager{
-		ID:        "mm-1",
-		Name:      "xoa",
-		OSVersion: "8.3",
-		OSName:    "XCP-ng",
+// flatID is like flat but mirrors the plural datasource Read paths that inject
+// the object id onto each flattened element after flattening.
+func flatID[T any](flatten func(*T) map[string]interface{}) func() map[string]interface{} {
+	return func() map[string]interface{} {
+		v := filled[T]()
+		m := flatten(v)
+		m["id"] = reflect.ValueOf(v).Elem().FieldByName("ID").String()
+		return m
 	}
 }
 
-func fixtureBackupOpenIaasBackup() *client.Backup {
-	return &client.Backup{
-		ID:                      "backup-1",
-		InternalID:              "internal-1",
-		Mode:                    "delta",
-		IsVirtualMachineDeleted: true,
-		Size:                    2048,
-		Timestamp:               1700000000,
-		VirtualMachine:          client.BaseObject{ID: "vm-1", Name: "vm-name"},
-		Policy:                  client.BaseObject{ID: "policy-1", Name: "policy-name"},
-	}
+// dsCoverage describes how a registered datasource is exercised by the walker:
+// the flatten payload its Read produces, and the computed root list key (empty
+// for single-object datasources whose Read sets the flatten map per key).
+type dsCoverage struct {
+	rootKey string
+	build   func() map[string]interface{}
 }
 
-func fixtureBackupOpenIaasPolicy() *client.BackupOpenIaasPolicy {
-	policy := &client.BackupOpenIaasPolicy{
-		ID:              "policy-1",
-		Name:            "policy-name",
-		InternalID:      "internal-1",
-		Running:         true,
-		Mode:            "delta",
-		MachineManager:  client.BaseObject{ID: "mm-1", Name: "xoa"},
-		VirtualMachines: []string{"vm-1"},
-	}
-	policy.Schedulers = append(policy.Schedulers, struct {
-		TemporarilyDisabled bool
-		Retention           int
-		Cron                string
-		Timezone            string
-	}{TemporarilyDisabled: true, Retention: 7, Cron: "0 2 * * *", Timezone: "Europe/Paris"})
-	return policy
+// datasourceCoverage maps every registered datasource to its flatten payload.
+// The walker asserts the payload fits the real schema. The companion
+// TestEveryDatasourceIsCoveredByTheFlattenWalker test fails if a registered
+// datasource is missing here, so coverage cannot silently fall behind a newly
+// added datasource. rootKey and any injected key (e.g. "id") mirror the real
+// Read exactly.
+var datasourceCoverage = map[string]dsCoverage{
+	// --- VMware compute (vCenter) -----------------------------------------
+	"cloudtemple_compute_content_libraries":       {"content_libraries", flat(helpers.FlattenContentLibrary)},
+	"cloudtemple_compute_content_library":         {"", flat(helpers.FlattenContentLibrary)},
+	"cloudtemple_compute_content_library_item":    {"", flat(helpers.FlattenContentLibraryItem)},
+	"cloudtemple_compute_content_library_items":   {"content_library_items", flat(helpers.FlattenContentLibraryItem)},
+	"cloudtemple_compute_datastore_cluster":       {"", flat(helpers.FlattenDatastoreCluster)},
+	"cloudtemple_compute_datastore_clusters":      {"datastore_clusters", flat(helpers.FlattenDatastoreCluster)},
+	"cloudtemple_compute_datastore":               {"", flat(helpers.FlattenDatastore)},
+	"cloudtemple_compute_datastores":              {"datastores", flat(helpers.FlattenDatastore)},
+	"cloudtemple_compute_folder":                  {"", flat(helpers.FlattenFolder)},
+	"cloudtemple_compute_folders":                 {"folders", flat(helpers.FlattenFolder)},
+	"cloudtemple_compute_guest_operating_system":  {"", flat(helpers.FlattenGuestOperatingSystem)},
+	"cloudtemple_compute_guest_operating_systems": {"guest_operating_systems", flat(helpers.FlattenGuestOperatingSystem)},
+	"cloudtemple_compute_host_cluster":            {"", flat(helpers.FlattenHostCluster)},
+	"cloudtemple_compute_host_clusters":           {"host_clusters", flat(helpers.FlattenHostCluster)},
+	"cloudtemple_compute_host":                    {"", flat(helpers.FlattenHost)},
+	"cloudtemple_compute_hosts":                   {"hosts", flat(helpers.FlattenHost)},
+	"cloudtemple_compute_network_adapter":         {"", flat(helpers.FlattenNetworkAdapter)},
+	"cloudtemple_compute_network_adapters":        {"network_adapters", flatID(helpers.FlattenNetworkAdapter)},
+	"cloudtemple_compute_network":                 {"", flat(helpers.FlattenNetwork)},
+	"cloudtemple_compute_networks":                {"networks", flat(helpers.FlattenNetwork)},
+	"cloudtemple_compute_resource_pool":           {"", flat(helpers.FlattenResourcePool)},
+	"cloudtemple_compute_resource_pools":          {"resource_pools", flat(helpers.FlattenResourcePool)},
+	"cloudtemple_compute_snapshots":               {"snapshots", flat(helpers.FlattenSnapshot)},
+	"cloudtemple_compute_virtual_controllers":     {"virtual_controllers", flatID(helpers.FlattenVirtualController)},
+	"cloudtemple_compute_virtual_datacenter":      {"", flat(helpers.FlattenVirtualDatacenter)},
+	"cloudtemple_compute_virtual_datacenters":     {"virtual_datacenters", flat(helpers.FlattenVirtualDatacenter)},
+	"cloudtemple_compute_virtual_disk":            {"", flat(helpers.FlattenVirtualDisk)},
+	"cloudtemple_compute_virtual_disks":           {"virtual_disks", flatID(helpers.FlattenVirtualDisk)},
+	"cloudtemple_compute_virtual_machine":         {"", flat(helpers.FlattenVirtualMachine)},
+	"cloudtemple_compute_virtual_machines":        {"virtual_machines", flatID(helpers.FlattenVirtualMachine)},
+	"cloudtemple_compute_virtual_switch":          {"", flat(helpers.FlattenVirtualSwitch)},
+	"cloudtemple_compute_virtual_switchs":         {"virtual_switchs", flat(helpers.FlattenVirtualSwitch)},
+	"cloudtemple_compute_machine_manager":         {"", flat(helpers.FlattenWorker)},
+	"cloudtemple_compute_machine_managers":        {"machine_managers", flat(helpers.FlattenWorker)},
+
+	// --- Backup (SPP) -----------------------------------------------------
+	"cloudtemple_backup_job_sessions": {"job_sessions", flat(helpers.FlattenBackupJobSession)},
+	"cloudtemple_backup_job":          {"", flat(helpers.FlattenBackupJob)},
+	"cloudtemple_backup_jobs":         {"jobs", flat(helpers.FlattenBackupJob)},
+	"cloudtemple_backup_sites":        {"sites", flat(helpers.FlattenBackupSite)},
+	"cloudtemple_backup_sla_policies": {"sla_policies", flat(helpers.FlattenBackupSLAPolicy)},
+	"cloudtemple_backup_sla_policy":   {"", flat(helpers.FlattenBackupSLAPolicy)},
+	"cloudtemple_backup_spp_server":   {"", flat(helpers.FlattenBackupSPPServer)},
+	"cloudtemple_backup_spp_servers":  {"spp_servers", flat(helpers.FlattenBackupSPPServer)},
+	"cloudtemple_backup_storages":     {"storages", flat(helpers.FlattenBackupStorage)},
+	"cloudtemple_backup_vcenters":     {"vcenters", flat(helpers.FlattenBackupVCenter)},
+	// backup_metrics aggregates several flatten sections into distinct
+	// top-level computed attributes (no single root list); mirror its Read.
+	"cloudtemple_backup_metrics": {"", func() map[string]interface{} {
+		return map[string]interface{}{
+			"coverage":         []interface{}{helpers.FlattenBackupMetricsCoverage(filled[client.BackupMetricsCoverage]())},
+			"history":          []interface{}{helpers.FlattenBackupMetricsHistory(filled[client.BackupMetricsHistory]())},
+			"platform":         []interface{}{helpers.FlattenBackupMetricsPlatform(filled[client.BackupMetricsPlatform]())},
+			"platform_cpu":     []interface{}{helpers.FlattenBackupMetricsPlatformCPU(filled[client.BackupMetricsPlatformCPU]())},
+			"policies":         []interface{}{helpers.FlattenBackupMetricsPolicy(filled[client.BackupMetricsPolicies]())},
+			"virtual_machines": []interface{}{helpers.FlattenBackupMetricsVirtualMachines(filled[client.BackupMetricsVirtualMachines]())},
+		}
+	}},
+
+	// --- Backup (OpenIaaS) ------------------------------------------------
+	"cloudtemple_backup_iaas_opensource_policy":   {"", flat(helpers.FlattenBackupOpenIaasPolicy)},
+	"cloudtemple_backup_iaas_opensource_policies": {"policies", flat(helpers.FlattenBackupOpenIaasPolicy)},
+	"cloudtemple_backup_iaas_opensource_backup":   {"", flat(helpers.FlattenBackupOpenIaasBackup)},
+	"cloudtemple_backup_iaas_opensource_backups":  {"backups", flat(helpers.FlattenBackupOpenIaasBackup)},
+
+	// --- Compute (OpenIaaS) -----------------------------------------------
+	"cloudtemple_compute_iaas_opensource_host":                 {"", flat(helpers.FlattenOpenIaaSHost)},
+	"cloudtemple_compute_iaas_opensource_hosts":                {"hosts", flat(helpers.FlattenOpenIaaSHost)},
+	"cloudtemple_compute_iaas_opensource_storage_repository":   {"", flat(helpers.FlattenOpenIaaSStorageRepository)},
+	"cloudtemple_compute_iaas_opensource_storage_repositories": {"storage_repositories", flat(helpers.FlattenOpenIaaSStorageRepository)},
+	"cloudtemple_compute_iaas_opensource_pool":                 {"", flat(helpers.FlattenOpenIaaSPool)},
+	"cloudtemple_compute_iaas_opensource_pools":                {"pools", flat(helpers.FlattenOpenIaaSPool)},
+	"cloudtemple_compute_iaas_opensource_template":             {"", flat(helpers.FlattenOpenIaaSTemplate)},
+	"cloudtemple_compute_iaas_opensource_templates":            {"templates", flatID(helpers.FlattenOpenIaaSTemplate)},
+	"cloudtemple_compute_iaas_opensource_network":              {"", flat(helpers.FlattenOpenIaaSNetwork)},
+	"cloudtemple_compute_iaas_opensource_networks":             {"networks", flat(helpers.FlattenOpenIaaSNetwork)},
+	"cloudtemple_compute_iaas_opensource_virtual_machine":      {"", flat(helpers.FlattenOpenIaaSVirtualMachine)},
+	"cloudtemple_compute_iaas_opensource_virtual_machines":     {"virtual_machines", flatID(helpers.FlattenOpenIaaSVirtualMachine)},
+	"cloudtemple_compute_iaas_opensource_snapshot":             {"", flat(helpers.FlattenOpenIaaSSnapshot)},
+	"cloudtemple_compute_iaas_opensource_snapshots":            {"snapshots", flat(helpers.FlattenOpenIaaSSnapshot)},
+	"cloudtemple_compute_iaas_opensource_availability_zone":    {"", flat(helpers.FlattenOpenIaaSMachineManager)},
+	"cloudtemple_compute_iaas_opensource_availability_zones":   {"availability_zones", flat(helpers.FlattenOpenIaaSMachineManager)},
+	"cloudtemple_compute_iaas_opensource_replication_policy":   {"", flat(helpers.FlattenOpenIaaSReplicationPolicy)},
+	"cloudtemple_compute_iaas_opensource_replication_policies": {"policies", flat(helpers.FlattenOpenIaaSReplicationPolicy)},
+	"cloudtemple_compute_iaas_opensource_network_adapter":      {"", flat(helpers.FlattenOpenIaaSNetworkAdapter)},
+	"cloudtemple_compute_iaas_opensource_network_adapters":     {"network_adapters", flatID(helpers.FlattenOpenIaaSNetworkAdapter)},
+	// Both Reads pass an empty vmID (the connection-state top-level keys are a
+	// resource-only path); mirror that exactly.
+	"cloudtemple_compute_iaas_opensource_virtual_disk": {"", func() map[string]interface{} {
+		return helpers.FlattenOpenIaaSVirtualDisk(filled[client.OpenIaaSVirtualDisk](), "")
+	}},
+	"cloudtemple_compute_iaas_opensource_virtual_disks": {"virtual_disks", func() map[string]interface{} {
+		d := filled[client.OpenIaaSVirtualDisk]()
+		m := helpers.FlattenOpenIaaSVirtualDisk(d, "")
+		m["id"] = d.ID
+		return m
+	}},
+
+	// --- Object storage ---------------------------------------------------
+	"cloudtemple_object_storage_bucket":           {"", flat(helpers.FlattenBucket)},
+	"cloudtemple_object_storage_buckets":          {"buckets", flat(helpers.FlattenBucket)},
+	"cloudtemple_object_storage_bucket_files":     {"files", flat(helpers.FlattenBucketFile)},
+	"cloudtemple_object_storage_storage_account":  {"", flat(helpers.FlattenStorageAccount)},
+	"cloudtemple_object_storage_storage_accounts": {"storage_accounts", flat(helpers.FlattenStorageAccount)},
+	"cloudtemple_object_storage_acl":              {"acls", flat(helpers.FlattenACL)},
+	"cloudtemple_object_storage_role":             {"", flat(helpers.FlattenObjectStorageRole)},
+	"cloudtemple_object_storage_roles":            {"roles", flat(helpers.FlattenObjectStorageRole)},
+
+	// --- IAM --------------------------------------------------------------
+	"cloudtemple_iam_company":                {"", flat(helpers.FlattenCompany)},
+	"cloudtemple_iam_features":               {"features", flat(helpers.FlattenFeature)},
+	"cloudtemple_iam_personal_access_token":  {"", flat(helpers.FlattenToken)},
+	"cloudtemple_iam_personal_access_tokens": {"tokens", flat(helpers.FlattenToken)},
+	"cloudtemple_iam_role":                   {"", flat(helpers.FlattenRole)},
+	"cloudtemple_iam_roles":                  {"roles", flat(helpers.FlattenRole)},
+	"cloudtemple_iam_tenants":                {"tenants", flat(helpers.FlattenTenant)},
+	"cloudtemple_iam_user":                   {"", flat(helpers.FlattenUser)},
+	"cloudtemple_iam_users":                  {"users", flat(helpers.FlattenUser)},
+
+	// --- Marketplace ------------------------------------------------------
+	"cloudtemple_marketplace_item":  {"", flat(helpers.FlattenMarketplaceItem)},
+	"cloudtemple_marketplace_items": {"marketplace_items", flat(helpers.FlattenMarketplaceItem)},
 }
 
-// fixtureVMwareVirtualMachine builds a fully-populated VMware VirtualMachine so
-// the flatten output exercises every nested shape (extra_config, replication
-// config, storage, boot options, triggered alarms). The flatten conditions in
-// FlattenVirtualMachine require VmReplicationId, Storage and BootOptions.Firmware
-// to be non-zero for those nested blocks to be emitted at all.
-func fixtureVMwareVirtualMachine() *client.VirtualMachine {
-	vm := &client.VirtualMachine{
-		ID:                             "vm-1",
-		Name:                           "vm-name",
-		Moref:                          "vm-42",
-		MachineManager:                 client.BaseObject{ID: "mm-1", Name: "vcenter"},
-		Datacenter:                     client.BaseObject{ID: "dc-1", Name: "dc-name"},
-		HostCluster:                    client.BaseObject{ID: "hc-1", Name: "hc-name"},
-		Datastore:                      client.BaseObject{ID: "ds-1", Name: "ds-name"},
-		DatastoreCluster:               client.BaseObject{ID: "dsc-1", Name: "dsc-name"},
-		ConsolidationNeeded:            true,
-		Template:                       false,
-		PowerState:                     "running",
-		HardwareVersion:                "vmx-19",
-		NumCoresPerSocket:              2,
-		OperatingSystemMoref:           "ubuntu64Guest",
-		Cpu:                            4,
-		CpuHotAddEnabled:               true,
-		CpuHotRemoveEnabled:            true,
-		MemoryHotAddEnabled:            true,
-		Memory:                         8589934592,
-		CpuUsage:                       10,
-		MemoryUsage:                    20,
-		Tools:                          "toolsOk",
-		ToolsVersion:                   12345,
-		DistributedVirtualPortGroupIds: []string{"dvpg-1"},
-		SppMode:                        "spp",
-		Snapshoted:                     true,
-		TriggeredAlarms:                []client.VirtualMachineTriggeredAlarm{{ID: "alarm-1", Status: "red"}},
-		ExtraConfig: []client.VirtualMachineExtraConfig{
-			{Key: "disk.enableUUID", Value: "TRUE"},
-			{Key: "stealclock.enable", Value: "TRUE"},
-		},
-		ExposeHardwareVirtualization: true,
-	}
-	vm.OperatingSystem.Name = "Ubuntu Linux (64-bit)"
-	vm.ReplicationConfig = client.VirtualMachineReplicationConfig{
-		Generation:            1,
-		VmReplicationId:       "repl-1",
-		Rpo:                   3600,
-		QuiesceGuestEnabled:   true,
-		Paused:                false,
-		OppUpdatesEnabled:     true,
-		NetCompressionEnabled: true,
-		NetEncryptionEnabled:  true,
-		EncryptionDestination: true,
-		Disk:                  []client.VirtualMachineDisk{{Key: 2000, DiskReplicationId: "drepl-1"}},
-	}
-	vm.Storage = client.VirtualMachineStorage{Committed: 1024, Uncommitted: 512}
-	vm.BootOptions = client.VirtualMachineBootOptions{
-		Firmware:             "bios",
-		BootDelay:            1000,
-		EnterBIOSSetup:       true,
-		BootRetryEnabled:     true,
-		BootRetryDelay:       2000,
-		EFISecureBootEnabled: false,
-	}
-	return vm
-}
-
-// flattenedVMwareVM mirrors the singular datasource Read, which sets the raw
-// flatten map per key.
-func flattenedVMwareVM() map[string]interface{} {
-	return helpers.FlattenVirtualMachine(fixtureVMwareVirtualMachine())
-}
-
-// flattenedVMwareVMList mirrors the plural datasource Read, which sets vm.ID
-// onto each flattened element before writing the computed list.
-func flattenedVMwareVMList() map[string]interface{} {
-	vm := fixtureVMwareVirtualMachine()
-	flat := helpers.FlattenVirtualMachine(vm)
-	flat["id"] = vm.ID
-	return flat
-}
-
+// TestDatasourceFlattenOutputsFitTheirSchemas drives the schema-vs-flatten
+// walker over every registered datasource.
 func TestDatasourceFlattenOutputsFitTheirSchemas(t *testing.T) {
-	checks := []datasourceFlattenCheck{
-		// VMware VM datasources (the shared FlattenVirtualMachine output must fit
-		// both datasource schemas — the #241 class).
-		{"compute_virtual_machine", dataSourceVirtualMachine(), "", flattenedVMwareVM()},
-		{"compute_virtual_machines", dataSourceVirtualMachines(), "virtual_machines", flattenedVMwareVMList()},
-
-		// OpenIaaS singles (Read sets the flatten map per key)
-		{"iaas_opensource_pool", dataSourceOpenIaasPool(), "", helpers.FlattenOpenIaaSPool(fixtureOpenIaasPool())},
-		{"iaas_opensource_host", dataSourceOpenIaasHost(), "", helpers.FlattenOpenIaaSHost(fixtureOpenIaasHost())},
-		{"iaas_opensource_network", dataSourceOpenIaasNetwork(), "", helpers.FlattenOpenIaaSNetwork(fixtureOpenIaasNetwork())},
-		{"iaas_opensource_network_adapter", dataSourceOpenIaasNetworkAdapter(), "", helpers.FlattenOpenIaaSNetworkAdapter(fixtureOpenIaasNetworkAdapter())},
-		{"iaas_opensource_snapshot", dataSourceOpenIaasSnapshot(), "", helpers.FlattenOpenIaaSSnapshot(fixtureOpenIaasSnapshot())},
-		{"iaas_opensource_replication_policy", dataSourceOpenIaasReplicationPolicy(), "", helpers.FlattenOpenIaaSReplicationPolicy(fixtureOpenIaasReplicationPolicy())},
-		{"iaas_opensource_storage_repository", dataSourceOpenIaasStorageRepository(), "", helpers.FlattenOpenIaaSStorageRepository(fixtureOpenIaasStorageRepository())},
-		{"iaas_opensource_template", dataSourceOpenIaasTemplate(), "", helpers.FlattenOpenIaaSTemplate(fixtureOpenIaasTemplate())},
-		{"iaas_opensource_virtual_disk", dataSourceOpenIaasVirtualDisk(), "", helpers.FlattenOpenIaaSVirtualDisk(fixtureOpenIaasVirtualDisk(), "")},
-		{"iaas_opensource_virtual_machine", dataSourceOpenIaasVirtualMachine(), "", helpers.FlattenOpenIaaSVirtualMachine(fixtureOpenIaasVirtualMachine())},
-		{"iaas_opensource_availability_zone", dataSourceOpenIaasMachineManager(), "", helpers.FlattenOpenIaaSMachineManager(fixtureOpenIaasMachineManager())},
-		{"backup_iaas_opensource_backup", dataSourceOpenIaasBackup(), "", helpers.FlattenBackupOpenIaasBackup(fixtureBackupOpenIaasBackup())},
-		{"backup_iaas_opensource_policy", dataSourceOpenIaasBackupPolicy(), "", helpers.FlattenBackupOpenIaasPolicy(fixtureBackupOpenIaasPolicy())},
-
-		// OpenIaaS lists (Read sets one computed root list)
-		{"iaas_opensource_pools", dataSourceOpenIaasPools(), "pools", helpers.FlattenOpenIaaSPool(fixtureOpenIaasPool())},
-		{"iaas_opensource_hosts", dataSourceOpenIaasHosts(), "hosts", helpers.FlattenOpenIaaSHost(fixtureOpenIaasHost())},
-		{"iaas_opensource_networks", dataSourceOpenIaasNetworks(), "networks", helpers.FlattenOpenIaaSNetwork(fixtureOpenIaasNetwork())},
-		{"iaas_opensource_network_adapters", dataSourceOpenIaasNetworkAdapters(), "network_adapters", helpers.FlattenOpenIaaSNetworkAdapter(fixtureOpenIaasNetworkAdapter())},
-		{"iaas_opensource_snapshots", dataSourceOpenIaasSnapshots(), "snapshots", helpers.FlattenOpenIaaSSnapshot(fixtureOpenIaasSnapshot())},
-		{"iaas_opensource_replication_policies", dataSourceOpenIaasReplicationPolicies(), "policies", helpers.FlattenOpenIaaSReplicationPolicy(fixtureOpenIaasReplicationPolicy())},
-		{"iaas_opensource_storage_repositories", dataSourceOpenIaasStorageRepositories(), "storage_repositories", helpers.FlattenOpenIaaSStorageRepository(fixtureOpenIaasStorageRepository())},
-		{"iaas_opensource_templates", dataSourceOpenIaasTemplates(), "templates", helpers.FlattenOpenIaaSTemplate(fixtureOpenIaasTemplate())},
-		{"iaas_opensource_virtual_disks", dataSourceOpenIaasVirtualDisks(), "virtual_disks", helpers.FlattenOpenIaaSVirtualDisk(fixtureOpenIaasVirtualDisk(), "")},
-		{"iaas_opensource_virtual_machines", dataSourceOpenIaasVirtualMachines(), "virtual_machines", helpers.FlattenOpenIaaSVirtualMachine(fixtureOpenIaasVirtualMachine())},
-		{"backup_iaas_opensource_backups", dataSourceOpenIaasBackups(), "backups", helpers.FlattenBackupOpenIaasBackup(fixtureBackupOpenIaasBackup())},
-		{"backup_iaas_opensource_policies", dataSourceOpenIaasBackupPolicies(), "policies", helpers.FlattenBackupOpenIaasPolicy(fixtureBackupOpenIaasPolicy())},
-	}
-
-	for _, check := range checks {
-		t.Run(check.name, func(t *testing.T) {
-			assertFlattenFitsSchema(t, check)
+	datasources := New("dev")().DataSourcesMap
+	for name, res := range datasources {
+		cov, ok := datasourceCoverage[name]
+		if !ok {
+			continue // reported by TestEveryDatasourceIsCoveredByTheFlattenWalker
+		}
+		t.Run(name, func(t *testing.T) {
+			assertFlattenFitsSchema(t, datasourceFlattenCheck{
+				name:       name,
+				datasource: res,
+				rootKey:    cov.rootKey,
+				flattened:  cov.build(),
+			})
 		})
+	}
+}
+
+// TestEveryDatasourceIsCoveredByTheFlattenWalker fails if a registered
+// datasource is missing from datasourceCoverage (coverage must grow with every
+// new datasource), or if the registry references a datasource that is no longer
+// registered.
+func TestEveryDatasourceIsCoveredByTheFlattenWalker(t *testing.T) {
+	datasources := New("dev")().DataSourcesMap
+	for name := range datasources {
+		if _, ok := datasourceCoverage[name]; !ok {
+			t.Errorf("datasource %q is not covered by the flatten/schema walker; add it to datasourceCoverage", name)
+		}
+	}
+	for name := range datasourceCoverage {
+		if _, ok := datasources[name]; !ok {
+			t.Errorf("datasourceCoverage references %q which is not a registered datasource", name)
+		}
 	}
 }
