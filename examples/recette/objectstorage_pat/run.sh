@@ -14,7 +14,20 @@
 #     object-storage secretAccessKey, so DEBUG logs can leak the storage secret.
 #   - Fail-closed tenant guard BEFORE apply: a non-mutating Go pre-flight
 #     authenticates and asserts the tenant equals CLOUDTEMPLE_RECETTE_TENANT_ID.
+#     The pre-flight runs ONLY the guard (TestRecetteLiveGuardOnly); the recette
+#     TestMain has no auto-cleanup, so this pre-flight creates and destroys
+#     nothing — the "no mutation" label below is literally true.
 #   - trap on EXIT runs `terraform destroy` on success, failure, or Ctrl-C.
+#
+# This script NEVER sweeps. If you want a clean slate before the apply, run the
+# explicit, DESTRUCTIVE sweep yourself, on purpose, BEFORE invoking this script:
+#
+#     TF_ACC=1 go test ./internal/provider/tests/recette/... \
+#       -sweep=recette -sweep-allow-failures
+#
+# That -sweep deletes recette-scoped objects (it re-asserts the tenant guard
+# first). It is intentionally NOT auto-run here: a destructive delete must be an
+# explicit operator decision, never a hidden side effect of a guarded pre-flight.
 #
 # Credentials and the tenant allowlist are injected via the environment (sourced
 # from a gitignored .env.recette or CI environment secrets). This script never
@@ -34,7 +47,9 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 
 # --- Fail-closed tenant guard pre-flight (mutates nothing) ------------------
 # Reuses the exact same guard as the Go harness. Aborts here if the authenticated
-# tenant does not match the allowlist, BEFORE any terraform apply.
+# tenant does not match the allowlist, BEFORE any terraform apply. The recette
+# TestMain runs ONLY the guard (no auto-sweep), so this pre-flight truly mutates
+# nothing: it creates and destroys no resource.
 echo "Running tenant guard pre-flight (no mutation)..."
 TF_ACC=1 go test "${REPO_ROOT}/internal/provider/tests/recette/" \
   -run '^TestRecetteLiveGuardOnly$' -count=1 -v

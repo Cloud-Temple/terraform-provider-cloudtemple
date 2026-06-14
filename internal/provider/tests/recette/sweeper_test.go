@@ -41,9 +41,10 @@ func init() {
 	})
 }
 
-// sweepRecette is the single guarded teardown body. It is called BOTH from the
-// recette TestMain at start-of-run (clean slate) and from the registered bucket
-// sweeper under -sweep. It is idempotent and re-asserts the tenant guard first.
+// sweepRecette is the single guarded teardown body. It is the EXPLICIT
+// destructive cleanup: it runs ONLY from the registered bucket sweeper under the
+// -sweep flag — never automatically from TestMain. It is idempotent and
+// re-asserts the tenant guard first.
 //
 // Scope discipline:
 //   - buckets / storage accounts: deleted only if the name has the recette
@@ -59,8 +60,8 @@ func init() {
 // a level that could leak; errors reference resource NAMES only, which are
 // recette-prefixed by construction.
 func sweepRecette(ctx context.Context) error {
-	// Re-assert the guard: -sweep bypasses the TestCase PreCheck, and the
-	// start-of-run call must never trust an unverified tenant.
+	// Re-assert the guard: -sweep bypasses the TestCase PreCheck, so this
+	// destructive sweep must never trust an unverified tenant.
 	if err := guardLiveTenant(ctx); err != nil {
 		return err
 	}

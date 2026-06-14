@@ -66,15 +66,14 @@ allowlisted recette tenant — and abort hard otherwise.*
 ## Teardown layering
 
 1. **SDK auto-destroy** per TestCase (primary), even on a failed step.
-2. **Guarded start-of-run cleanup**: the recette `TestMain` calls an explicit,
-   tenant-guarded cleanup at the start of a live run (clean slate). This is **not**
-   `AddTestSweepers` (which only fires under `-sweep`); the cleanup body is shared
-   with the registered sweeper via one function.
-3. **Manual `-sweep` orphan cleanup** (documented below). Sweepers do **not**
-   auto-run; they fire only with the `-sweep` flag, and each re-asserts the tenant
-   guard before deleting anything. Deletes are scoped to the `test-terraform*`
-   name prefix / `created_by=Terraform` tag; PAT deletes are additionally filtered
-   to the principal's own `UserId` + `TenantId`.
+2. **Explicit `-sweep` clean slate / orphan cleanup** (documented below). There is
+   **no** automatic start-of-run cleanup: the recette `TestMain` mutates nothing on
+   its own (it only runs the tenant guard). A clean slate is obtained by running
+   the explicit, destructive `-sweep` **before** a run — never automatically.
+   Sweepers do **not** auto-run; they fire only with the `-sweep` flag, and each
+   re-asserts the tenant guard before deleting anything. Deletes are scoped to the
+   `test-terraform*` name prefix / `created_by=Terraform` tag; PAT deletes are
+   additionally filtered to the principal's own `UserId` + `TenantId`.
 
 ## How to run (each live step needs explicit human GO)
 
@@ -109,10 +108,15 @@ second plan, lets you inspect, and **always destroys on exit**):
 ./examples/recette/objectstorage_pat/run.sh
 ```
 
-### Orphan cleanup (belt-and-braces)
+### Explicit `-sweep` (clean slate before a run / orphan cleanup after)
+
+This is the **only** automatic-mutation-free destructive step, and it is fully
+**opt-in**: nothing sweeps unless you pass `-sweep`. Run it **before** a run to
+get a clean slate, or **after** a run to clear orphans. It re-asserts the tenant
+guard, then deletes only recette-scoped objects.
 
 ```sh
-# Re-asserts the tenant guard, then deletes only recette-scoped objects.
+# DESTRUCTIVE — run on purpose, never automatic.
 TF_ACC=1 go test ./internal/provider/tests/recette/... -sweep=recette -sweep-allow-failures
 ```
 

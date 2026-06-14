@@ -3,7 +3,6 @@ package recette
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"testing"
 
@@ -38,17 +37,26 @@ func liveEnabled() bool {
 	return os.Getenv(resource.EnvTfAcc) != ""
 }
 
-// TestMain is the un-skippable safety core of the recette harness.
+// TestMain is the un-skippable safety core of the recette harness. On its own it
+// MUTATES NOTHING: it only authenticates and asserts the tenant, then delegates.
 //
 //   - In live mode (TF_ACC) OR sweep mode (-sweep): it runs the tenant guard +
-//     auth assertion FIRST and aborts fatally (mutating nothing) on any mismatch,
-//     then runs the guarded start-of-run cleanup for a clean slate.
+//     auth assertion FIRST and aborts fatally on any mismatch. This is a pure
+//     auth + tenant assertion; it creates and destroys nothing.
 //   - In the default path (no TF_ACC, no -sweep): the guard is skipped entirely;
 //     the pure unit tests run WITHOUT credentials and without any network call.
 //
+// There is NO automatic start-of-run cleanup. A clean slate is an EXPLICIT,
+// destructive step the operator runs on purpose via the -sweep flag (below);
+// never a side effect of a live test run. Removing the auto-sweep keeps the
+// principle of least surprise: invoking TestMain in live mode — as the run.sh
+// guard pre-flight and TestRecetteLiveGuardOnly do — deletes nothing.
+//
 // In every case it DELEGATES to resource.TestMain(m): that helper runs the
 // registered sweepers when -sweep is set, otherwise it calls m.Run(). We never
-// call a bare m.Run() — that would silently break -sweep.
+// call a bare m.Run() — that would silently break -sweep. The ONLY destructive
+// path is the explicit -sweep, where resource.TestMain fires the registered
+// sweepers (each re-asserting the tenant guard via sweepRecette before deleting).
 func TestMain(m *testing.M) {
 	// Parse flags so -sweep is observable before we branch. resource.TestMain
 	// calls flag.Parse() again, which is idempotent.
@@ -58,22 +66,10 @@ func TestMain(m *testing.M) {
 		ctx := context.Background()
 
 		// Fail-closed un-skippable gate: prove the credentials point at the
-		// allowlisted recette tenant BEFORE anything mutating runs.
+		// allowlisted recette tenant BEFORE anything mutating runs. This is the
+		// only thing TestMain does in live/sweep mode; it mutates nothing.
 		if err := guardLiveTenant(ctx); err != nil {
 			abortRedacted(err)
-		}
-
-		// Belt-and-braces start-of-run cleanup (clean slate), itself guarded.
-		// This is the explicit cleanup hook described in D3(b): it is NOT
-		// wired through AddTestSweepers (which only fires under -sweep), so it
-		// runs at the start of any live run too. It is intentionally skipped
-		// under -sweep, where resource.TestMain runs the registered sweepers
-		// (which share the same body via sweepRecette).
-		if liveEnabled() && !sweepEnabled() {
-			if err := sweepRecette(ctx); err != nil {
-				fmt.Fprintf(os.Stderr, "recette start-of-run cleanup failed: %s\n", err.Error())
-				os.Exit(1)
-			}
 		}
 	}
 
