@@ -160,10 +160,11 @@ func TestVPCStaticIPCreate(t *testing.T) {
 		}
 	})
 
-	// A matching custom entry WITHOUT an id must also error: a nil-error return of
-	// an empty id would orphan the created static IP (SetId("")). Non-complacent: a
-	// guard of only `match == nil` reds this case.
-	t.Run("a 201 empty body matching a custom entry with no id is an error", func(t *testing.T) {
+	// A listing entry WITHOUT an id must error rather than resolve to an empty id
+	// (which would orphan the created static IP via SetId("")). This is now caught
+	// upstream by ListStrict's structural guard (an id-less entry makes the whole
+	// listing untrusted); Create keeps a defensive match.ID=="" check too.
+	t.Run("a 201 empty body whose listing has an id-less entry is an error", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
 				w.WriteHeader(http.StatusCreated) // empty body
@@ -354,6 +355,56 @@ func TestVPCStaticIPListStrict(t *testing.T) {
 		})
 		if _, err := c.VPC().StaticIP().ListStrict(ctx, "pn-1"); err == nil {
 			t.Fatal("a malformed 200 body must return a decode error")
+		}
+	})
+
+	// A 200 "null" body decodes to an empty slice with json.Decoder — it would be
+	// a FALSE "empty network" and could drop state. It must fail closed.
+	// Non-complacent: the old decodeBody path accepted it as an empty listing.
+	t.Run("200 with a null body is rejected (not a provable empty listing)", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`null`))
+		})
+		if _, err := c.VPC().StaticIP().ListStrict(ctx, "pn-1"); err == nil {
+			t.Fatal("a 200 null body must be rejected, never read as an empty (absent) network")
+		}
+	})
+
+	t.Run("200 with a JSON object (not an array) is rejected", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"static_ips":[]}`))
+		})
+		if _, err := c.VPC().StaticIP().ListStrict(ctx, "pn-1"); err == nil {
+			t.Fatal("a 200 object body must be rejected: only a JSON array can prove completeness")
+		}
+	})
+
+	// An entry without an id makes id-matching unreliable: our static IP could be
+	// the malformed entry and be wrongly judged absent. Fail closed.
+	// Non-complacent: without the per-entry id check this listing is accepted.
+	t.Run("200 with an entry missing its id is rejected (structurally incomplete)", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[{"id":"si-1"},{"macAddress":"00:50:56:ab:cd:ff"}]`))
+		})
+		if _, err := c.VPC().StaticIP().ListStrict(ctx, "pn-1"); err == nil {
+			t.Fatal("a listing with an id-less entry must be rejected as structurally incomplete")
+		}
+	})
+
+	t.Run("200 with an empty JSON array is a valid (genuinely empty) listing", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[]`))
+		})
+		list, err := c.VPC().StaticIP().ListStrict(ctx, "pn-1")
+		if err != nil {
+			t.Fatalf("an empty JSON array is a provably empty listing, must not error: %v", err)
+		}
+		if len(list) != 0 {
+			t.Fatalf("expected an empty list, got %d entries", len(list))
 		}
 	})
 

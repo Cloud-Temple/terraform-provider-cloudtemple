@@ -1,8 +1,11 @@
 package client
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -67,14 +70,24 @@ func (s *VPCStaticIPClient) List(ctx context.Context, privateNetworkID string, f
 }
 
 // ListStrict retrieves the static IP mappings of a private network and accepts
-// ONLY a complete HTTP 200 listing. Unlike List (which uses requireOK and would
-// accept a 206 partial page), ListStrict is the deletion-evidence channel: a
-// partial 206 — or any non-200 (201/403/5xx) — cannot prove that a static IP is
-// absent from the private network, so it must FAIL CLOSED rather than be read as
-// "not present" (#275/#281). The per-private-network scope makes a complete 200
-// a provable snapshot of the network's static IPs, which is what lets the
-// resource Read confirm a deletion. No VirtualMachineID filter is applied: the
-// confirmation must see every static IP on the network, not a VM-scoped subset.
+// ONLY a complete, structurally valid HTTP 200 listing. Unlike List (which uses
+// requireOK and would accept a 206 partial page), ListStrict is the
+// deletion-evidence channel: it is what lets Read confirm a deletion and what
+// lets Delete confirm a 403-absence, so it must prove completeness or FAIL
+// CLOSED — a listing that cannot prove "every static IP on this network" must
+// never be read as "the static IP is not present" (#275/#281).
+//
+// "Provably complete" is enforced beyond the 200 status:
+//   - a partial 206 — or any non-200 (201/403/5xx) — is rejected;
+//   - the body MUST be a JSON ARRAY. A 200 whose body is "null", empty, or a
+//     JSON object is NOT a list and cannot prove absence (json.Decoder would
+//     silently turn "null" into an empty slice, i.e. a false "empty network");
+//   - every entry MUST carry a non-empty id. An entry without an id means the
+//     response is structurally incomplete, so id-matching against it is
+//     unreliable and the listing cannot be trusted as evidence.
+//
+// No VirtualMachineID filter is applied: the confirmation must see every static
+// IP on the network, not a VM-scoped subset.
 func (s *VPCStaticIPClient) ListStrict(ctx context.Context, privateNetworkID string) ([]*StaticIP, error) {
 	r := s.c.newRequest("GET", "/vpc/v1/private_networks/%s/static_ips", privateNetworkID)
 	resp, err := s.c.doRequest(ctx, r)
@@ -86,9 +99,27 @@ func (s *VPCStaticIPClient) ListStrict(ctx context.Context, privateNetworkID str
 		return nil, err
 	}
 
-	var out []*StaticIP
-	if err := decodeBody(resp, &out); err != nil {
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return nil, err
+	}
+	// The body must be a real JSON array. Reject "null"/empty/object outright:
+	// they are not a provable listing and must not be read as an empty network.
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) == 0 || trimmed[0] != '[' {
+		return nil, fmt.Errorf("strict static IP listing of private network %s returned a 200 that is not a JSON array, so it cannot prove completeness: %.64s", privateNetworkID, string(trimmed))
+	}
+
+	var out []*StaticIP
+	if err := json.Unmarshal(trimmed, &out); err != nil {
+		return nil, err
+	}
+	// A complete listing has a usable id for every entry. A missing id makes the
+	// snapshot structurally incomplete, so it cannot prove presence/absence.
+	for i, si := range out {
+		if si == nil || si.ID == "" {
+			return nil, fmt.Errorf("strict static IP listing of private network %s has an entry (index %d) without an id; refusing to use a structurally incomplete listing as deletion evidence", privateNetworkID, i)
+		}
 	}
 
 	return out, nil
