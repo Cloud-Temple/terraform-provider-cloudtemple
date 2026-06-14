@@ -41,10 +41,14 @@ type OpenIaaSVirtualMachine struct {
 	ManagementAgent struct {
 		Detected bool
 	}
-	Addresses struct {
-		IPv6 string
-		IPv4 string
-	}
+	// Addresses is an OBJECT with COMPOSITE keys of the form
+	// "<device>/<family>/<index>" (e.g. "0/ipv4/0", "0/ipv6/0"), per the
+	// compute API contract (swagger.comput.yml openIaasVirtualMachine). The
+	// previous flat {IPv4, IPv6} struct bound NO key, so addresses were always
+	// empty in state. Decoding into a map captures every composite key without
+	// loss; the device-0 primary IPv4/IPv6 are projected back to the existing
+	// {ipv4, ipv6} state block by FlattenOpenIaaSVirtualMachine (#238).
+	Addresses      map[string]string `json:"addresses"`
 	MachineManager BaseObject
 	Host           BaseObject
 	Pool           BaseObject
