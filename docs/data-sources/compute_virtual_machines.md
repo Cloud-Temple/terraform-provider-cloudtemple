@@ -54,7 +54,7 @@ Read-Only:
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
 - `expose_hardware_virtualization` (Boolean)
-- `extra_config` (Map of String) Extra configuration parameters for the virtual machine, as a map of key to value.
+- `extra_config` (Map of String)
 - `guest_operating_system_moref` (String)
 - `hardware_version` (String)
 - `host_cluster_id` (String)
