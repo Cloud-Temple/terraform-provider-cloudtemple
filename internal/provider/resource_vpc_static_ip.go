@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -199,6 +200,19 @@ func readVPCStaticIPInto(ctx context.Context, d *schema.ResourceData, read vpcSt
 		return nil
 	}
 
+	// Source guard (#311): this resource manages only CUSTOM static IPs — the ones
+	// it allocates via POST. A platform-managed static IP (e.g. source "xoa",
+	// auto-created when an adapter is attached to a VPC network) CANNOT be deleted
+	// through the API, so Terraform must never adopt one: it would create a
+	// resource it cannot destroy. Rejecting it here makes `terraform import` of a
+	// non-custom static IP fail, and also surfaces a wrongly-adopted state on refresh.
+	if staticIP.Source != "" && staticIP.Source != "custom" {
+		return diag.Errorf(
+			"VPC static IP %s has source %q; only \"custom\" static IPs (allocated by this resource) can be managed by Terraform. A platform-managed static IP cannot be deleted via the API — remove it from the state with `terraform state rm`.",
+			id, staticIP.Source,
+		)
+	}
+
 	sw := newStateWriter(d)
 	for k, v := range helpers.FlattenStaticIP(staticIP) {
 		sw.set(k, v)
@@ -244,51 +258,52 @@ func resourceVPCStaticIPUpdate(ctx context.Context, d *schema.ResourceData, meta
 func resourceVPCStaticIPDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
-	// Delete is ASYNCHRONOUS: the DELETE returns an activity (Location). A 404
-	// (already gone) is success (idempotent).
+	// Preflight (#311): only CUSTOM static IPs are deletable via the API. If the
+	// state already knows this is a platform-managed one (e.g. source "xoa"),
+	// surface an actionable diagnostic instead of issuing a doomed delete. Import
+	// is rejected in Read, so a TF-created resource is always custom; this is
+	// defence in depth.
+	if src, ok := d.Get("source").(string); ok && src != "" && src != "custom" {
+		return diag.Errorf(
+			"VPC static IP %s has source %q and cannot be deleted via the API (only \"custom\" static IPs are deletable). Remove it from the state with `terraform state rm`, or release it platform-side.",
+			d.Id(), src,
+		)
+	}
+
+	// Delete is ASYNCHRONOUS: DELETE returns an activity (Location). Deletion is
+	// confirmed by the COMPLETED activity — the established async-delete evidence
+	// pattern (VMs, disks, buckets); no extra listing is needed. An already-absent
+	// static IP is idempotent success: the VPC API reports absence as 404 OR 403
+	// (the #303 403-as-not-found convention), so a delete hitting either is
+	// "already gone".
 	activityID, err := c.VPC().StaticIP().Delete(ctx, d.Id())
 	if err != nil {
-		if isNotFoundStatus(err) {
+		if isVPCStaticIPAbsent(err) {
 			return nil
 		}
-		return diag.Errorf("failed to delete VPC static IP %s: %s", d.Id(), err)
+		return diag.Errorf("failed to delete VPC static IP %s: %s", d.Id(), staticIPDeleteErrorDetail(err))
 	}
 	if _, err := c.Activity().WaitForCompletion(ctx, activityID, getWaiterOptions(ctx)); err != nil {
-		if isNotFoundStatus(err) {
-			return nil
-		}
-		return diag.Errorf("failed to delete VPC static IP %s: %s", d.Id(), err)
+		return diag.Errorf("failed to delete VPC static IP %s: %s", d.Id(), staticIPDeleteErrorDetail(err))
 	}
-
-	// Confirm absence via a strict, complete (200-only) listing of the private
-	// network before returning. If the listing fails (non-200, transport), we do
-	// not block the delete on an unprovable signal, but a still-present id is a
-	// real failure that must surface.
-	privateNetworkID := d.Get("private_network_id").(string)
-	if privateNetworkID == "" {
-		return nil
-	}
-	list, lerr := c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
-	if lerr != nil {
-		// The delete activity already completed; an unprovable listing must not
-		// resurrect the resource. The completed activity is the primary signal.
-		return nil
-	}
-	for _, si := range list {
-		if si != nil && si.ID == d.Id() {
-			return diag.Errorf(
-				"VPC static IP %s is still listed on private network %s after its delete activity completed; the deletion could not be confirmed.",
-				d.Id(), privateNetworkID,
-			)
-		}
-	}
-
 	return nil
 }
 
-// isNotFoundStatus reports whether err is an HTTP 404 from the API, used to make
-// the delete idempotent.
-func isNotFoundStatus(err error) bool {
+// isVPCStaticIPAbsent reports whether err indicates the static IP is already
+// absent. The VPC API reports absence as 404 OR 403 (the #303 403-as-not-found
+// convention: the API conflates absent with forbidden), so a delete that hits
+// either is idempotent success.
+func isVPCStaticIPAbsent(err error) bool {
 	var statusErr client.StatusError
-	return errors.As(err, &statusErr) && statusErr.Code == http.StatusNotFound
+	return errors.As(err, &statusErr) &&
+		(statusErr.Code == http.StatusNotFound || statusErr.Code == http.StatusForbidden)
+}
+
+// staticIPDeleteErrorDetail turns the platform's "not a custom static IP"
+// refusal into an actionable message; otherwise it returns the raw error text.
+func staticIPDeleteErrorDetail(err error) string {
+	if strings.Contains(err.Error(), "not a custom static IP") {
+		return "the platform refuses the delete because it is not a \"custom\" static IP (it is platform-managed, e.g. source \"xoa\"); remove it from the state with `terraform state rm` or release it platform-side"
+	}
+	return err.Error()
 }
