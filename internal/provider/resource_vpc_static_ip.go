@@ -200,6 +200,18 @@ func readVPCStaticIPInto(ctx context.Context, d *schema.ResourceData, read vpcSt
 		return nil
 	}
 
+	// Id-consistency guard: this was a by-id read (GET /static_ips/{id}), so the
+	// returned object MUST carry exactly this id. An empty id, or a different id,
+	// is a malformed/inconsistent response — trusting it would let FlattenStaticIP
+	// write id="" (a drop) or rebind the state to the wrong static IP (an orphan).
+	// Fail closed and keep the resource unchanged rather than refresh from it.
+	if staticIP.ID != id {
+		return diag.Errorf(
+			"VPC static IP %s read returned a mismatched or empty id %q; refusing to refresh state on an inconsistent read (the resource is kept unchanged — retry once the read is consistent).",
+			id, staticIP.ID,
+		)
+	}
+
 	// Source guard (#311): this resource manages only CUSTOM static IPs — the ones
 	// it allocates via POST. A platform-managed static IP (e.g. source "xoa",
 	// auto-created when an adapter is attached to a VPC network) CANNOT be deleted

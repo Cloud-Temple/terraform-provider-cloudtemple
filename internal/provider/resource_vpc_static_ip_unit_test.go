@@ -83,6 +83,29 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 		assertStaticIPStatePreserved(t, d)
 	})
 
+	t.Run("a read returning a mismatched id fails closed (never rebinds state)", func(t *testing.T) {
+		d := newStaticIPState(t)
+		// A by-id read that comes back with a DIFFERENT id must not be trusted.
+		diags := readVPCStaticIPInto(ctx, d,
+			siRead(&client.StaticIP{ID: "someone-else", Source: "custom", PrivateNetwork: client.BaseObject{ID: "pn-1"}}, nil),
+			siListStrictErr(errors.New("listing must not be reached on a mismatched-id read")))
+		if !diags.HasError() {
+			t.Fatal("a read returning a different id must fail closed, never rebind the state")
+		}
+		assertStaticIPStatePreserved(t, d)
+	})
+
+	t.Run("a read returning an empty id fails closed (never drops state)", func(t *testing.T) {
+		d := newStaticIPState(t)
+		diags := readVPCStaticIPInto(ctx, d,
+			siRead(&client.StaticIP{ID: "", Source: "custom", PrivateNetwork: client.BaseObject{ID: "pn-1"}}, nil),
+			siListStrictErr(errors.New("listing must not be reached on an empty-id read")))
+		if !diags.HasError() {
+			t.Fatal("a read returning an empty id must fail closed, never write id=\"\" into the state")
+		}
+		assertStaticIPStatePreserved(t, d)
+	})
+
 	t.Run("an inconclusive read with a failing strict listing fails closed", func(t *testing.T) {
 		d := newStaticIPState(t)
 		// A 206/403/5xx is surfaced by ListStrict as an error -> cannot prove
