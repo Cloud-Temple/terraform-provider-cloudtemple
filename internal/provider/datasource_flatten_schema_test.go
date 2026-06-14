@@ -176,12 +176,14 @@ func flatID[T any](flatten func(*T) map[string]interface{}) func() map[string]in
 	return func() map[string]interface{} {
 		v := filled[T]()
 		m := flatten(v)
-		// The plural Reads inject the object id; mirror that. Guard the field so
-		// a future misuse on a struct without a string ID fails loudly rather
-		// than panicking inside reflection.
-		if f := reflect.ValueOf(v).Elem().FieldByName("ID"); f.IsValid() && f.Kind() == reflect.String {
-			m["id"] = f.String()
+		// The plural Reads inject the object id; mirror that. Fail loudly if this
+		// helper is ever reused on a type without a string ID field, rather than
+		// silently omitting the key and weakening the check.
+		f := reflect.ValueOf(v).Elem().FieldByName("ID")
+		if !f.IsValid() || f.Kind() != reflect.String {
+			panic("flatID: type has no string ID field; use a custom builder")
 		}
+		m["id"] = f.String()
 		return m
 	}
 }
