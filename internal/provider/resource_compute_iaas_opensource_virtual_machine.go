@@ -575,25 +575,43 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 
-	// Assign SLA policies to the virtual machine
+	// Assign the requested SLA policies. Skipped entirely when none are
+	// requested: a freshly created VM has nothing to assign or clear, and an
+	// empty-list assign creates a backup "assign job" activity that the
+	// platform can leave stuck in "Waiting" indefinitely, hanging the Create
+	// until timeout (live-confirmed on the recette tenant, #306). The VM id is
+	// already committed via setIdFromActivityState above, before this step.
 	slaPolicies := []string{}
 	for _, policy := range d.Get("backup_sla_policies").(*schema.Set).List() {
 		slaPolicies = append(slaPolicies, policy.(string))
 	}
-	activityId, err := c.Backup().OpenIaaS().Policy().Assign(ctx, &client.BackupOpenIaasAssignPolicyRequest{
-		VirtualMachineId: d.Id(),
-		PolicyIds:        slaPolicies,
-	})
-	if err != nil {
-		return diag.Errorf("failed to assign policies to virtual machine, %s", err)
-	}
-
-	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-	if err != nil {
+	if err := assignBackupSLAPoliciesIfAny(ctx, c, d.Id(), slaPolicies); err != nil {
 		return diag.Errorf("failed to assign policies to virtual machine, %s", err)
 	}
 
 	return openIaasVirtualMachineUpdate(ctx, d, meta)
+}
+
+// assignBackupSLAPoliciesIfAny assigns the given backup SLA policies to the
+// virtual machine and waits for the assign activity to complete. It is a NO-OP
+// when policies is empty: assigning an empty list to a freshly created VM has
+// no effect, and the platform can leave such an activity stuck in "Waiting",
+// which previously hung the Create until timeout — and, if hard-cancelled,
+// could leave a VM created platform-side but absent from the Terraform state
+// (#306). Callers must commit the VM id before invoking it.
+func assignBackupSLAPoliciesIfAny(ctx context.Context, c *client.Client, virtualMachineID string, policies []string) error {
+	if len(policies) == 0 {
+		return nil
+	}
+	activityId, err := c.Backup().OpenIaaS().Policy().Assign(ctx, &client.BackupOpenIaasAssignPolicyRequest{
+		VirtualMachineId: virtualMachineID,
+		PolicyIds:        policies,
+	})
+	if err != nil {
+		return err
+	}
+	_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
+	return err
 }
 
 func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
