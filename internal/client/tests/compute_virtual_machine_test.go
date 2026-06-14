@@ -108,7 +108,7 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 	_, err = client.Backup().Job().WaitForCompletion(ctx, jobs[0].ID, nil)
 	require.NoError(t, err)
 
-	activityId, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &clientpkg.BackupAssignVirtualMachineRequest{
+	_, err = client.Backup().SLAPolicy().AssignVirtualMachine(ctx, &clientpkg.BackupAssignVirtualMachineRequest{
 		VirtualMachineIds: []string{instanceId},
 		SLAPolicies:       []string{os.Getenv(PolicyId)},
 	})

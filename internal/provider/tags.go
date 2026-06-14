@@ -8,19 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
-func readTags(ctx context.Context, sw *stateWriter, client *client.Client, id string) {
-	tags, err := client.Tag().Resource().Read(ctx, id)
-	if err != nil {
-		sw.diags = append(sw.diags, diag.Errorf("failed to read resource %q tags: %s", id, err)...)
-	}
-
-	mTags := map[string]interface{}{}
-	for _, tag := range tags {
-		mTags[tag.Key] = tag.Value
-	}
-	sw.set("tags", mTags)
-}
-
 func updateTags(ctx context.Context, c *client.Client, d *schema.ResourceData, id, typ, source string) diag.Diagnostics {
 	if !d.HasChange("tags") {
 		return nil

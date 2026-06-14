@@ -81,9 +81,20 @@ jobs:
         # This is what catches client/test signature drift that the build job misses.
         go vet ./...
 
+    - name: Static analysis (staticcheck)
+      run: |
+        # Pinned staticcheck (supports Go 1.24). Analyses the whole module,
+        # including the acceptance-test packages — which are compiled but not
+        # run — without any live Cloud Temple platform. Catches unused code,
+        # dead stores and suspicious constructs that build/vet miss (#264).
+        go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
+
     - name: Unit tests (platform-independent packages)
       run: |
-        go test -count=1 -cover ./internal/client ./internal/provider ./internal/provider/helpers
+        # -race future-proofs the pure packages (token cache, httptest servers,
+        # timers); it is a guard, not state-safety coverage. CGO is available on
+        # the GitHub ubuntu runners.
+        go test -race -count=1 -cover ./internal/client ./internal/provider ./internal/provider/helpers
 
   generate:
     runs-on: ubuntu-latest
