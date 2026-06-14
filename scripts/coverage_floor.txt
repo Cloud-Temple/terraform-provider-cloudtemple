@@ -2,5 +2,5 @@
 # Raised as coverage improves (scripts/coverage_ratchet.sh --update);
 # CI fails if coverage drops below these values. Never lower by hand.
 internal/client 16.1
-internal/provider 9.3
+internal/provider 9.8
 internal/provider/helpers 65.4

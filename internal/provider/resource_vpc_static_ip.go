@@ -257,7 +257,46 @@ func resourceVPCStaticIPUpdate(ctx context.Context, d *schema.ResourceData, meta
 
 func resourceVPCStaticIPDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
+	return deleteVPCStaticIPWith(
+		ctx, d,
+		c.VPC().StaticIP().Delete,
+		func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+			return c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
+		},
+		func(ctx context.Context, activityID string) error {
+			_, err := c.Activity().WaitForCompletion(ctx, activityID, getWaiterOptions(ctx))
+			return err
+		},
+	)
+}
 
+// vpcStaticIPDeleteFunc and vpcActivityWaitFunc abstract the static IP delete API
+// surface used by deleteVPCStaticIPWith so the delete logic is unit tested
+// without HTTP calls.
+type vpcStaticIPDeleteFunc func(ctx context.Context, id string) (activityID string, err error)
+type vpcActivityWaitFunc func(ctx context.Context, activityID string) error
+
+// deleteVPCStaticIPWith holds the testable delete logic. State safety is the
+// overriding invariant: the resource is NEVER dropped from the state without
+// positive evidence that the static IP is gone.
+//
+// Delete is ASYNCHRONOUS: a successful DELETE returns an activity (Location) and
+// the COMPLETED activity is the deletion evidence (the established async-delete
+// pattern: VMs, disks, buckets).
+//
+// The idempotency (already-absent) path is the delicate one. The VPC API reports
+// absence ambiguously, so the two codes are NOT treated alike:
+//
+//   - 404 is UNAMBIGUOUS ("the resource you are deleting does not exist") -> the
+//     static IP is already gone -> idempotent success.
+//   - 403 is AMBIGUOUS: under the #303 convention the VPC API conflates "absent"
+//     with "forbidden", so a 403 may be a genuine permission failure on a static
+//     IP that still exists. Treating it as "absent" would SILENTLY DROP the
+//     resource from the state on an authorization error — exactly the failure the
+//     Read path refuses (it never drops on a 403/nil read without confirmation).
+//     So a 403 is confirmed via a strict, complete (200-only) listing before the
+//     delete is accepted; anything inconclusive FAILS CLOSED.
+func deleteVPCStaticIPWith(ctx context.Context, d *schema.ResourceData, del vpcStaticIPDeleteFunc, listStrict vpcStaticIPListStrictFunc, wait vpcActivityWaitFunc) diag.Diagnostics {
 	// Preflight (#311): only CUSTOM static IPs are deletable via the API. If the
 	// state already knows this is a platform-managed one (e.g. source "xoa"),
 	// surface an actionable diagnostic instead of issuing a doomed delete. Import
@@ -270,33 +309,64 @@ func resourceVPCStaticIPDelete(ctx context.Context, d *schema.ResourceData, meta
 		)
 	}
 
-	// Delete is ASYNCHRONOUS: DELETE returns an activity (Location). Deletion is
-	// confirmed by the COMPLETED activity — the established async-delete evidence
-	// pattern (VMs, disks, buckets); no extra listing is needed. An already-absent
-	// static IP is idempotent success: the VPC API reports absence as 404 OR 403
-	// (the #303 403-as-not-found convention), so a delete hitting either is
-	// "already gone".
-	activityID, err := c.VPC().StaticIP().Delete(ctx, d.Id())
+	activityID, err := del(ctx, d.Id())
 	if err != nil {
-		if isVPCStaticIPAbsent(err) {
+		// 404: unambiguous absence -> idempotent success.
+		if isVPCStatusCode(err, http.StatusNotFound) {
 			return nil
+		}
+		// 403: ambiguous (#303). Confirm absence before accepting the delete, so a
+		// genuine permission error never silently drops the resource from the state.
+		if isVPCStatusCode(err, http.StatusForbidden) {
+			return confirmStaticIPDeleted(ctx, d, listStrict, err)
 		}
 		return diag.Errorf("failed to delete VPC static IP %s: %s", d.Id(), staticIPDeleteErrorDetail(err))
 	}
-	if _, err := c.Activity().WaitForCompletion(ctx, activityID, getWaiterOptions(ctx)); err != nil {
+
+	if err := wait(ctx, activityID); err != nil {
 		return diag.Errorf("failed to delete VPC static IP %s: %s", d.Id(), staticIPDeleteErrorDetail(err))
 	}
 	return nil
 }
 
-// isVPCStaticIPAbsent reports whether err indicates the static IP is already
-// absent. The VPC API reports absence as 404 OR 403 (the #303 403-as-not-found
-// convention: the API conflates absent with forbidden), so a delete that hits
-// either is idempotent success.
-func isVPCStaticIPAbsent(err error) bool {
+// confirmStaticIPDeleted is the 403-on-delete path. It accepts the delete as an
+// idempotent success ONLY when a strict, complete (200-only) listing of the
+// private network proves the static IP is absent. A still-present static IP, an
+// inconclusive listing (any non-200 surfaced as an error by ListStrict), or a
+// missing private_network_id scope all FAIL CLOSED with a diagnostic, so a
+// forbidden delete can never silently remove the resource from the state.
+func confirmStaticIPDeleted(ctx context.Context, d *schema.ResourceData, listStrict vpcStaticIPListStrictFunc, deleteErr error) diag.Diagnostics {
+	privateNetworkID := d.Get("private_network_id").(string)
+	if privateNetworkID == "" {
+		return diag.Errorf(
+			"VPC static IP %s delete returned 403 and its absence could not be confirmed because the private_network_id is missing from the state; the resource is kept to avoid a wrong removal. Resolve the access error, then retry. Original error: %s",
+			d.Id(), deleteErr,
+		)
+	}
+	list, lerr := listStrict(ctx, privateNetworkID)
+	if lerr != nil {
+		return diag.Errorf(
+			"VPC static IP %s delete returned 403 and its absence could not be confirmed (the strict listing of private network %s failed); the resource is kept in the state: %s (original delete error: %s)",
+			d.Id(), privateNetworkID, lerr, deleteErr,
+		)
+	}
+	for _, si := range list {
+		if si != nil && si.ID == d.Id() {
+			return diag.Errorf(
+				"VPC static IP %s could not be deleted (the API returned 403) and it is still present on private network %s; the resource is kept in the state. This is an authorization failure, not a deletion — check the token's permissions and retry.",
+				d.Id(), privateNetworkID,
+			)
+		}
+	}
+	// Confirmed absent from a complete 200 listing of its own private network:
+	// genuine idempotent success.
+	return nil
+}
+
+// isVPCStatusCode reports whether err is a client.StatusError with the given code.
+func isVPCStatusCode(err error, code int) bool {
 	var statusErr client.StatusError
-	return errors.As(err, &statusErr) &&
-		(statusErr.Code == http.StatusNotFound || statusErr.Code == http.StatusForbidden)
+	return errors.As(err, &statusErr) && statusErr.Code == code
 }
 
 // staticIPDeleteErrorDetail turns the platform's "not a custom static IP"

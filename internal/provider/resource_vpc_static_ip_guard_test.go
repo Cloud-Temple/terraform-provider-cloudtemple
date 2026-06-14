@@ -53,27 +53,134 @@ func TestVPCStaticIPSourceGuard(t *testing.T) {
 	})
 }
 
-// TestIsVPCStaticIPAbsent pins the idempotent-delete predicate: the VPC API
-// reports absence as 404 OR 403 (#303 403-as-not-found), so both make delete
-// idempotent. Non-complacent: a 404-only implementation reds the 403 case.
-func TestIsVPCStaticIPAbsent(t *testing.T) {
+// TestIsVPCStatusCode pins the status-code predicate used by delete to route
+// 404 (unambiguous absence) and 403 (ambiguous, must be confirmed) differently.
+func TestIsVPCStatusCode(t *testing.T) {
 	cases := []struct {
 		name string
 		err  error
+		code int
 		want bool
 	}{
-		{"404 is absent", client.StatusError{Code: http.StatusNotFound}, true},
-		{"403 is absent (VPC 403-as-not-found, #303)", client.StatusError{Code: http.StatusForbidden}, true},
-		{"500 is not absent", client.StatusError{Code: http.StatusInternalServerError}, false},
-		{"a non-status error is not absent", errors.New("boom"), false},
+		{"404 matches 404", client.StatusError{Code: http.StatusNotFound}, http.StatusNotFound, true},
+		{"403 matches 403", client.StatusError{Code: http.StatusForbidden}, http.StatusForbidden, true},
+		{"403 does NOT match 404 (the two codes must not be conflated)", client.StatusError{Code: http.StatusForbidden}, http.StatusNotFound, false},
+		{"500 matches neither", client.StatusError{Code: http.StatusInternalServerError}, http.StatusNotFound, false},
+		{"a non-status error never matches", errors.New("boom"), http.StatusForbidden, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := isVPCStaticIPAbsent(tc.err); got != tc.want {
-				t.Fatalf("isVPCStaticIPAbsent(%v) = %v, want %v", tc.err, got, tc.want)
+			if got := isVPCStatusCode(tc.err, tc.code); got != tc.want {
+				t.Fatalf("isVPCStatusCode(%v, %d) = %v, want %v", tc.err, tc.code, got, tc.want)
 			}
 		})
 	}
+}
+
+// TestDeleteVPCStaticIPWith pins the delete state-safety contract. The overriding
+// invariant: the resource is NEVER dropped without positive evidence the static
+// IP is gone. In particular a 403 (ambiguous under #303) must be CONFIRMED via a
+// strict listing — a permission failure must fail closed, not silently drop the
+// state. Non-complacent: a 403-as-absent shortcut reds the "still listed",
+// "listing fails" and "missing scope" cases below.
+func TestDeleteVPCStaticIPWith(t *testing.T) {
+	ctx := context.Background()
+	okWait := func(ctx context.Context, activityID string) error { return nil }
+	noDelete := func(ctx context.Context, id string) (string, error) {
+		return "", errors.New("delete must not be called")
+	}
+	noList := func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+		return nil, errors.New("listing must not be reached")
+	}
+	noWait := func(ctx context.Context, activityID string) error {
+		return errors.New("wait must not be reached")
+	}
+	delErr := func(err error) vpcStaticIPDeleteFunc {
+		return func(ctx context.Context, id string) (string, error) { return "", err }
+	}
+
+	t.Run("a completed activity deletes cleanly", func(t *testing.T) {
+		d := newStaticIPState(t)
+		del := func(ctx context.Context, id string) (string, error) { return "act-1", nil }
+		diags := deleteVPCStaticIPWith(ctx, d, del, noList, okWait)
+		if diags.HasError() {
+			t.Fatalf("a completed delete activity must succeed, got: %v", diags)
+		}
+	})
+
+	t.Run("a 404 is an idempotent success (already gone)", func(t *testing.T) {
+		d := newStaticIPState(t)
+		diags := deleteVPCStaticIPWith(ctx, d, delErr(client.StatusError{Code: http.StatusNotFound}), noList, noWait)
+		if diags.HasError() {
+			t.Fatalf("a 404 delete must be idempotent success, got: %v", diags)
+		}
+	})
+
+	t.Run("a 403 confirmed absent by a strict listing is an idempotent success", func(t *testing.T) {
+		d := newStaticIPState(t)
+		list := siListStrict(&client.StaticIP{ID: "other"}) // si-1 absent
+		diags := deleteVPCStaticIPWith(ctx, d, delErr(client.StatusError{Code: http.StatusForbidden}), list, noWait)
+		if diags.HasError() {
+			t.Fatalf("a 403 whose absence is confirmed must succeed, got: %v", diags)
+		}
+	})
+
+	t.Run("a 403 but STILL LISTED fails closed (a forbidden delete must not drop state)", func(t *testing.T) {
+		d := newStaticIPState(t)
+		list := siListStrict(&client.StaticIP{ID: "si-1"}, &client.StaticIP{ID: "other"})
+		diags := deleteVPCStaticIPWith(ctx, d, delErr(client.StatusError{Code: http.StatusForbidden}), list, noWait)
+		if !diags.HasError() {
+			t.Fatal("a 403 on a still-present static IP must fail closed, never be read as a deletion")
+		}
+	})
+
+	t.Run("a 403 with a failing strict listing fails closed", func(t *testing.T) {
+		d := newStaticIPState(t)
+		diags := deleteVPCStaticIPWith(ctx, d, delErr(client.StatusError{Code: http.StatusForbidden}), siListStrictErr(errors.New("403")), noWait)
+		if !diags.HasError() {
+			t.Fatal("a 403 with an inconclusive listing must fail closed")
+		}
+	})
+
+	t.Run("a 403 with a missing private_network_id fails closed", func(t *testing.T) {
+		d := newStaticIPState(t)
+		if err := d.Set("private_network_id", ""); err != nil {
+			t.Fatalf("clearing private_network_id: %v", err)
+		}
+		diags := deleteVPCStaticIPWith(ctx, d, delErr(client.StatusError{Code: http.StatusForbidden}), noList, noWait)
+		if !diags.HasError() {
+			t.Fatal("a 403 without a scope to confirm absence must fail closed")
+		}
+	})
+
+	t.Run("a 500 delete is an error", func(t *testing.T) {
+		d := newStaticIPState(t)
+		diags := deleteVPCStaticIPWith(ctx, d, delErr(client.StatusError{Code: http.StatusInternalServerError}), noList, noWait)
+		if !diags.HasError() {
+			t.Fatal("a 500 must surface as a delete error")
+		}
+	})
+
+	t.Run("a failed delete activity is an error (a failed activity is not deletion evidence)", func(t *testing.T) {
+		d := newStaticIPState(t)
+		del := func(ctx context.Context, id string) (string, error) { return "act-1", nil }
+		failWait := func(ctx context.Context, activityID string) error { return errors.New("activity failed") }
+		diags := deleteVPCStaticIPWith(ctx, d, del, noList, failWait)
+		if !diags.HasError() {
+			t.Fatal("a failed delete activity must surface as an error, not a silent success")
+		}
+	})
+
+	t.Run("a non-custom source is rejected before any API call", func(t *testing.T) {
+		d := newStaticIPState(t)
+		if err := d.Set("source", "xoa"); err != nil {
+			t.Fatalf("seeding source: %v", err)
+		}
+		diags := deleteVPCStaticIPWith(ctx, d, noDelete, noList, noWait)
+		if !diags.HasError() {
+			t.Fatal("a non-custom static IP must be rejected by the delete preflight")
+		}
+	})
 }
 
 // TestStaticIPDeleteErrorDetail pins that the platform's "not a custom static IP"
