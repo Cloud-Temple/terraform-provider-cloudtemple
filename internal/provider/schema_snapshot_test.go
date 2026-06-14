@@ -13,8 +13,9 @@ package provider
 // What the snapshot captures, per attribute (recursively, into every nested
 // Elem block): the sorted key, the Type string, Required/Optional/Computed/
 // ForceNew/Sensitive, MinItems/MaxItems/ConfigMode, the literal Default value
-// for primitives (or has_default_func for DefaultFunc/non-primitive), the
-// PRESENCE booleans has_state_func / has_diff_suppress_func /
+// for primitives (has_non_primitive_default otherwise) recorded independently
+// of has_default_func (an attribute can carry both — DefaultValue() prefers the
+// literal), the PRESENCE booleans has_state_func / has_diff_suppress_func /
 // diff_suppress_on_refresh / has_validate_func (ValidateFunc OR ValidateDiagFunc,
 // including in a scalar Elem) / has_set_func (custom TypeSet hash), the sorted
 // plan-constraint lists ConflictsWith/ExactlyOneOf/AtLeastOneOf/RequiredWith,
@@ -300,7 +301,7 @@ func configModeString(m schema.SchemaConfigMode) string {
 }
 
 // isPrimitiveDefault reports whether a Default value is a JSON-stable primitive
-// whose literal we record. Anything else is recorded as has_default_func.
+// whose literal we record. Anything else is recorded as has_non_primitive_default.
 func isPrimitiveDefault(v interface{}) bool {
 	switch reflect.ValueOf(v).Kind() {
 	case reflect.String, reflect.Bool,
