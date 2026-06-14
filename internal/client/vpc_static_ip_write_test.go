@@ -108,6 +108,24 @@ func TestVPCStaticIPCreate(t *testing.T) {
 		}
 	})
 
+	// A 200 ReadByMAC that decodes to an object WITHOUT an id must also error: a
+	// nil-error return of an empty id would orphan the created static IP
+	// (SetId("")). Non-complacent: a guard of only `si == nil` reds this case.
+	t.Run("a 201 empty body whose MAC resolves to an object with no id is an error", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				w.WriteHeader(http.StatusCreated) // empty body
+				return
+			}
+			// 200 but the resolved object carries no id (e.g. partial/odd payload).
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"macAddress":"00:50:56:ab:cd:ef","source":"custom"}`))
+		})
+		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
+			t.Fatal("a by-MAC resolution without an id must error, not return an empty id with nil error")
+		}
+	})
+
 	t.Run("a non-201 status is an error", func(t *testing.T) {
 		for _, code := range []int{http.StatusOK, http.StatusBadRequest, http.StatusForbidden, http.StatusInternalServerError} {
 			c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {

@@ -166,7 +166,11 @@ func (s *VPCStaticIPClient) Create(ctx context.Context, privateNetworkID string,
 	if err != nil {
 		return "", fmt.Errorf("static IP created on private network %s but resolving its id by MAC failed: %w", privateNetworkID, err)
 	}
-	if si == nil {
+	// si.ID == "" must fail just like si == nil: returning an empty id with a nil
+	// error would make the resource SetId("") and orphan the created static IP
+	// (created platform-side but absent from the Terraform state). Never return a
+	// successful create without a usable id.
+	if si == nil || si.ID == "" {
 		return "", fmt.Errorf("static IP created on private network %s but could not be resolved by its MAC", privateNetworkID)
 	}
 	return si.ID, nil
