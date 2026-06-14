@@ -1,10 +1,100 @@
 package helpers
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 )
+
+// addressBlock extracts the single {ipv4, ipv6} map the VM flatten emits under
+// the "addresses" key, failing loudly on any shape drift so the assertion can
+// never pass vacuously.
+func addressBlock(t *testing.T, flat map[string]interface{}) map[string]interface{} {
+	t.Helper()
+	raw, ok := flat["addresses"]
+	if !ok {
+		t.Fatalf("flatten output has no %q key", "addresses")
+	}
+	list, ok := raw.([]map[string]interface{})
+	if !ok || len(list) != 1 {
+		t.Fatalf("addresses block = %#v, want a 1-element []map[string]interface{}", raw)
+	}
+	return list[0]
+}
+
+// TestFlattenOpenIaaSVirtualMachineAddressesCompositeKeys is the real proof for
+// the Volet A fix (#238): it decodes a REAL API-shaped payload whose addresses
+// object is keyed by the composite "<device>/<family>/<index>" form
+// ("0/ipv4/0", "0/ipv6/0") into the client struct, then flattens it and asserts
+// the {ipv4, ipv6} state block is POPULATED with those exact values.
+//
+// RED EVIDENCE (documented, not committed): against the OLD client decode —
+//
+//	Addresses struct { IPv6 string; IPv4 string }
+//
+// the composite JSON keys bind to NO field, so vm.Addresses is the zero struct
+// and the flatten emits ipv4="" / ipv6="". Both assertions below then fail:
+//
+//	ipv4 = "", want "10.0.0.5"
+//	ipv6 = "", want "fe80::1"
+//
+// A test that hand-built the new map[string]string would NOT exercise the
+// decode and would be complacent; this one starts from the wire bytes.
+func TestFlattenOpenIaaSVirtualMachineAddressesCompositeKeys(t *testing.T) {
+	const payload = `{
+		"name": "vm-prod",
+		"addresses": {
+			"0/ipv4/0": "10.0.0.5",
+			"0/ipv6/0": "fe80::1"
+		}
+	}`
+
+	var vm client.OpenIaaSVirtualMachine
+	if err := json.Unmarshal([]byte(payload), &vm); err != nil {
+		t.Fatalf("decoding the API payload failed: %s", err)
+	}
+
+	got := addressBlock(t, FlattenOpenIaaSVirtualMachine(&vm))
+	assertEq(t, "ipv4", got["ipv4"], "10.0.0.5")
+	assertEq(t, "ipv6", got["ipv6"], "fe80::1")
+}
+
+// TestFlattenOpenIaaSVirtualMachineAddressesEmpty pins the nil/empty-map case:
+// a VM with no addresses must flatten to ipv4="" / ipv6="" WITHOUT panicking.
+func TestFlattenOpenIaaSVirtualMachineAddressesEmpty(t *testing.T) {
+	// nil map (zero-valued struct path).
+	got := addressBlock(t, FlattenOpenIaaSVirtualMachine(&client.OpenIaaSVirtualMachine{}))
+	assertEq(t, "ipv4", got["ipv4"], "")
+	assertEq(t, "ipv6", got["ipv6"], "")
+
+	// explicitly empty map.
+	got = addressBlock(t, FlattenOpenIaaSVirtualMachine(&client.OpenIaaSVirtualMachine{
+		Addresses: map[string]string{},
+	}))
+	assertEq(t, "ipv4", got["ipv4"], "")
+	assertEq(t, "ipv6", got["ipv6"], "")
+}
+
+// TestFlattenOpenIaaSVirtualMachineAddressesFallback pins the fallback path:
+// when the exact "0/<family>/0" key is absent, the FIRST "*/<family>/*" key in
+// LEXICAL order is used (deterministic, never map-iteration-order dependent),
+// and a family with no matching key collapses to "".
+func TestFlattenOpenIaaSVirtualMachineAddressesFallback(t *testing.T) {
+	// No "0/ipv4/0", but two ipv4 keys on other devices/indices. Sorted
+	// lexically, "1/ipv4/0" < "2/ipv4/0", so the .9 address must win.
+	// ipv6 has no key at all and must be "".
+	got := addressBlock(t, FlattenOpenIaaSVirtualMachine(&client.OpenIaaSVirtualMachine{
+		Addresses: map[string]string{
+			"2/ipv4/0": "10.0.0.20",
+			"1/ipv4/0": "10.0.0.9",
+		},
+	}))
+	// Mutation proof: relying on Go's randomized map order (no sort) makes this
+	// flake; dropping the fallback entirely makes it RED with "".
+	assertEq(t, "ipv4", got["ipv4"], "10.0.0.9")
+	assertEq(t, "ipv6", got["ipv6"], "")
+}
 
 func TestIsPlatformManagedDisk(t *testing.T) {
 	const vmID = "vm-1"
