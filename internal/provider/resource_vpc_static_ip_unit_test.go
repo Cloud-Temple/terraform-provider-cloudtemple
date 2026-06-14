@@ -201,7 +201,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 			ID:             "si-1",
 			IPAddress:      "10.0.1.99",
 			MacAddress:     "00:50:56:aa:bb:cc",
-			Source:         "vmware",
+			Source:         "custom", // a TF-managed static IP is always custom (#311 guard)
 			VPC:            client.BaseObject{ID: "vpc-1"},
 			PrivateNetwork: client.BaseObject{ID: "pn-1"},
 			// VirtualMachine, NetworkAdapter, ResourceDescription, FloatingIP all nil.

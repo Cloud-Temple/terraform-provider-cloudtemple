@@ -2,6 +2,10 @@
 
 # 1.8.0 (Unreleased)
 
+NEW FEATURES :
+
+  * Added resource `cloudtemple_vpc_static_ip` to allocate a VPC static IP on a private network, bound to a network-adapter MAC address (the VPC↔VM association). The IP can be auto-assigned or explicitly requested (`ip_address` forces replacement); `mac_address` and `resource_description` are updatable in place. Only `custom` static IPs — those this resource allocates — are managed: a platform-managed static IP (e.g. `source = "xoa"`, auto-created when an adapter is attached to a VPC network) is rejected, because it cannot be deleted via the API. Wire `mac_address` from your network-adapter resource so Terraform removes the static IP association before destroying the VM/adapter (avoiding an orphaned IP).
+
 SECURITY :
 
   * Replaced the archived `github.com/dgrijalva/jwt-go` dependency with the maintained fork `github.com/golang-jwt/jwt/v4` (CVE-2020-26160).

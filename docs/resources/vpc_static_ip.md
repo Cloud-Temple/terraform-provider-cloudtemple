@@ -29,6 +29,15 @@ resource "cloudtemple_vpc_static_ip" "auto" {
   mac_address        = "00:50:56:ab:cd:ef"
 }
 
+# RECOMMENDED: wire mac_address from the VM's network adapter. This makes the
+# static IP depend on the adapter, so `terraform destroy` removes the IP
+# association BEFORE it destroys the VM/adapter — which avoids leaving an
+# orphaned static IP on the private network.
+resource "cloudtemple_vpc_static_ip" "vm" {
+  private_network_id = "b2c3d4e5-f678-9012-3456-7890abcdef12"
+  mac_address        = cloudtemple_compute_iaas_opensource_network_adapter.example.mac_address
+}
+
 # Allocate a static IP with an explicit desired address and a description.
 resource "cloudtemple_vpc_static_ip" "explicit" {
   private_network_id   = "b2c3d4e5-f678-9012-3456-7890abcdef12"
