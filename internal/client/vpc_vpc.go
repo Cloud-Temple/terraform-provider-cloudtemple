@@ -50,7 +50,7 @@ func (v *VPCVPCClient) Read(ctx context.Context, id string) (*VPC, error) {
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

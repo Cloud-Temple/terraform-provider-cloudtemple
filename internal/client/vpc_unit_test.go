@@ -90,6 +90,19 @@ func TestVPCVPCListAndRead(t *testing.T) {
 			t.Fatalf("404 must yield (nil,nil); got vpc=%+v err=%v", vpc, err)
 		}
 	})
+
+	t.Run("Read surfaces 403 as an access error (forbidden is not not-found)", func(t *testing.T) {
+		// The VPC swagger separates 403 (Forbidden) from 404 (not found). A 403
+		// must surface as a clear access error, never be swallowed as not-found
+		// (which would mask a missing vpc_read permission as "resource absent").
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusForbidden)
+		})
+		vpc, err := c.VPC().VPC().Read(ctx, "denied")
+		if err == nil {
+			t.Fatalf("403 must surface as an access error, not be swallowed as not-found; got vpc=%+v err=nil", vpc)
+		}
+	})
 }
 
 // --- PrivateNetwork -------------------------------------------------------
