@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"strings"
 )
 
 // VPCStaticIPClient handles read operations on VPC static IPs.
@@ -154,7 +155,7 @@ func (s *VPCStaticIPClient) Create(ctx context.Context, privateNetworkID string,
 	// The swagger documents a 201 body {success, message, static_ip_id}, but the
 	// live API returns 201 with an EMPTY body. The create is synchronous (the
 	// static IP exists immediately), so when the id is absent from the body we
-	// resolve it by its MAC. Returning an error on an empty body would be wrong:
+	// resolve it ourselves. Returning an error on an empty body would be wrong:
 	// the static IP IS created, so the caller would orphan it — created
 	// platform-side but absent from the Terraform state.
 	var out createStaticIPResponse
@@ -162,18 +163,42 @@ func (s *VPCStaticIPClient) Create(ctx context.Context, privateNetworkID string,
 		return out.StaticIPID, nil
 	}
 
-	si, err := s.ReadByMAC(ctx, req.MacAddress)
-	if err != nil {
-		return "", fmt.Errorf("static IP created on private network %s but resolving its id by MAC failed: %w", privateNetworkID, err)
+	// Resolve the id from a COMPLETE listing of the private network, matching the
+	// requested MAC AND source=="custom". A by-MAC GET is NOT enough: when a
+	// network adapter is attached to a VPC network the platform auto-creates an
+	// "xoa" static IP for the SAME MAC (#311), so a MAC-only lookup can resolve to
+	// that co-resident platform-managed IP instead of the custom one we just
+	// created — which would bind the state to the wrong id and orphan ours. The
+	// per-network listing lets us pick the custom IP unambiguously, and the create
+	// always produces a "custom" static IP.
+	list, lerr := s.ListStrict(ctx, privateNetworkID)
+	if lerr != nil {
+		return "", fmt.Errorf("static IP created on private network %s but resolving its id by listing failed: %w", privateNetworkID, lerr)
 	}
-	// si.ID == "" must fail just like si == nil: returning an empty id with a nil
-	// error would make the resource SetId("") and orphan the created static IP
-	// (created platform-side but absent from the Terraform state). Never return a
-	// successful create without a usable id.
-	if si == nil || si.ID == "" {
-		return "", fmt.Errorf("static IP created on private network %s but could not be resolved by its MAC", privateNetworkID)
+	want := normalizeMAC(req.MacAddress)
+	var match *StaticIP
+	for _, si := range list {
+		if si == nil || si.Source != "custom" || normalizeMAC(si.MacAddress) != want {
+			continue
+		}
+		if match != nil {
+			return "", fmt.Errorf("static IP created on private network %s but its id is ambiguous: several custom static IPs carry MAC %s", privateNetworkID, req.MacAddress)
+		}
+		match = si
 	}
-	return si.ID, nil
+	// match.ID == "" must fail just like match == nil: returning an empty id with a
+	// nil error would make the resource SetId("") and orphan the created static IP.
+	if match == nil || match.ID == "" {
+		return "", fmt.Errorf("static IP created on private network %s but could not be resolved among the network's custom static IPs by MAC %s", privateNetworkID, req.MacAddress)
+	}
+	return match.ID, nil
+}
+
+// normalizeMAC canonicalises a MAC address for comparison: lowercase and
+// ":"-separated (the swagger pattern also tolerates "-"). It lets the created
+// static IP be matched against the requested MAC regardless of input formatting.
+func normalizeMAC(mac string) string {
+	return strings.ToLower(strings.ReplaceAll(mac, "-", ":"))
 }
 
 // UpdateStaticIPRequest is the body of PATCH /vpc/v1/static_ips/{id} (schema

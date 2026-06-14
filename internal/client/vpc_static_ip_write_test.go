@@ -6,7 +6,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"strings"
 	"testing"
 )
 
@@ -67,19 +66,31 @@ func TestVPCStaticIPCreate(t *testing.T) {
 	})
 
 	// The LIVE API returns 201 with an EMPTY body (the swagger's static_ip_id is
-	// not actually sent). The create is synchronous, so the id MUST be resolved by
-	// MAC rather than treated as a failure — a failure would orphan the created
-	// static IP (created platform-side but absent from the Terraform state).
-	// Non-complacent: the pre-fix code returned an error on an empty body, so this
-	// goes RED without the by-MAC fallback.
-	t.Run("a 201 with an empty body resolves the id by MAC (live API shape)", func(t *testing.T) {
+	// not actually sent). The create is synchronous, so the id MUST be resolved
+	// from a complete listing of the private network rather than treated as a
+	// failure — a failure would orphan the created static IP (created
+	// platform-side but absent from the Terraform state). The resolution matches
+	// the requested MAC AND source=="custom".
+	//
+	// Non-complacent on TWO axes: (1) the pre-fix code returned an error on an
+	// empty body, so an empty-body success goes RED without the fallback; (2) an
+	// "xoa" static IP shares the SAME MAC (the #311 platform auto-creation), and
+	// it is listed FIRST — without the source=="custom" filter the resolution
+	// would match both and either pick xoa or fail ambiguous, never returning the
+	// custom id this assertion demands.
+	t.Run("a 201 empty body resolves the id from the listing, picking the custom IP over a co-resident xoa one", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			switch {
 			case r.Method == http.MethodPost:
 				w.WriteHeader(http.StatusCreated) // empty body, like the live API
-			case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/static_ips/mac/"):
+			case r.Method == http.MethodGet && r.URL.Path == "/vpc/v1/private_networks/pn-1/static_ips":
 				w.WriteHeader(http.StatusOK)
-				_, _ = w.Write([]byte(`{"id":"si-bymac","macAddress":"00:50:56:ab:cd:ef","source":"custom"}`))
+				// xoa first (same MAC, #311 co-residence), then our custom one.
+				_, _ = w.Write([]byte(`[
+					{"id":"si-xoa","macAddress":"00:50:56:AB:CD:EF","source":"xoa"},
+					{"id":"si-custom","macAddress":"00:50:56:ab:cd:ef","source":"custom"},
+					{"id":"si-other","macAddress":"00:50:56:11:22:33","source":"custom"}
+				]`))
 			default:
 				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -87,42 +98,99 @@ func TestVPCStaticIPCreate(t *testing.T) {
 		})
 		id, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"})
 		if err != nil {
-			t.Fatalf("an empty 201 body must resolve the id by MAC, not fail: %v", err)
+			t.Fatalf("an empty 201 body must resolve the id from the listing, not fail: %v", err)
 		}
-		if id != "si-bymac" {
-			t.Fatalf("the id must be resolved by MAC, got %q", id)
+		if id != "si-custom" {
+			t.Fatalf("the id must resolve to the CUSTOM static IP for the MAC, got %q (a %q here means the xoa co-resident IP was wrongly picked)", id, "si-xoa")
 		}
 	})
 
-	t.Run("a 201 empty body whose MAC cannot be resolved is an error (never a silent success)", func(t *testing.T) {
+	// The API may format the returned MAC differently from the request (the
+	// swagger pattern tolerates "-" and any case). Resolution must normalise both
+	// sides, or a well-created static IP returned as "00-50-56-AB-CD-EF" would not
+	// match the requested "00:50:56:ab:cd:ef" and would be orphaned.
+	// Non-complacent: a raw == comparison reds this case.
+	t.Run("a 201 empty body matches the custom IP across MAC case/separator differences", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
 				w.WriteHeader(http.StatusCreated) // empty body
 				return
 			}
-			// MAC lookup not found (VPC 403-as-not-found) -> ReadByMAC returns nil.
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[{"id":"si-fmt","macAddress":"00-50-56-AB-CD-EF","source":"custom"}]`))
+		})
+		id, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"})
+		if err != nil {
+			t.Fatalf("MAC formatting differences must be normalised, not fail: %v", err)
+		}
+		if id != "si-fmt" {
+			t.Fatalf("the id must resolve across MAC formatting, got %q", id)
+		}
+	})
+
+	t.Run("a 201 empty body with no matching custom IP in the listing is an error (never a silent success)", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				w.WriteHeader(http.StatusCreated) // empty body
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			// Only a co-resident xoa IP for the MAC, plus an unrelated custom one.
+			_, _ = w.Write([]byte(`[
+				{"id":"si-xoa","macAddress":"00:50:56:ab:cd:ef","source":"xoa"},
+				{"id":"si-other","macAddress":"00:50:56:11:22:33","source":"custom"}
+			]`))
+		})
+		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
+			t.Fatal("no matching custom IP must error, not silently succeed (or bind to the xoa one)")
+		}
+	})
+
+	t.Run("a 201 empty body with a failing strict listing is an error", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				w.WriteHeader(http.StatusCreated) // empty body
+				return
+			}
+			// A 206/403/5xx is rejected by ListStrict -> cannot resolve -> error.
 			w.WriteHeader(http.StatusForbidden)
 		})
 		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
-			t.Fatal("an empty body whose MAC cannot be resolved must error, not silently succeed")
+			t.Fatal("an empty body whose listing fails must error, not silently succeed")
 		}
 	})
 
-	// A 200 ReadByMAC that decodes to an object WITHOUT an id must also error: a
-	// nil-error return of an empty id would orphan the created static IP
-	// (SetId("")). Non-complacent: a guard of only `si == nil` reds this case.
-	t.Run("a 201 empty body whose MAC resolves to an object with no id is an error", func(t *testing.T) {
+	// A matching custom entry WITHOUT an id must also error: a nil-error return of
+	// an empty id would orphan the created static IP (SetId("")). Non-complacent: a
+	// guard of only `match == nil` reds this case.
+	t.Run("a 201 empty body matching a custom entry with no id is an error", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodPost {
 				w.WriteHeader(http.StatusCreated) // empty body
 				return
 			}
-			// 200 but the resolved object carries no id (e.g. partial/odd payload).
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"macAddress":"00:50:56:ab:cd:ef","source":"custom"}`))
+			_, _ = w.Write([]byte(`[{"macAddress":"00:50:56:ab:cd:ef","source":"custom"}]`)) // no id
 		})
 		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
-			t.Fatal("a by-MAC resolution without an id must error, not return an empty id with nil error")
+			t.Fatal("a matched custom entry without an id must error, not return an empty id with nil error")
+		}
+	})
+
+	t.Run("a 201 empty body with two custom IPs sharing the MAC is an ambiguity error", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost {
+				w.WriteHeader(http.StatusCreated) // empty body
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[
+				{"id":"si-a","macAddress":"00:50:56:ab:cd:ef","source":"custom"},
+				{"id":"si-b","macAddress":"00:50:56:ab:cd:ef","source":"custom"}
+			]`))
+		})
+		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
+			t.Fatal("two custom IPs sharing the MAC must be an ambiguity error, not a silent pick")
 		}
 	})
 
