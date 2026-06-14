@@ -21,6 +21,29 @@ type OpenIaaSNetworkAdapter struct {
 	TxChecksumming   bool
 	Network          BaseObject
 	MachineManager   BaseObject
+	// IPv4Address / IPv6Address are the adapter's IP addresses as reported by
+	// the platform (swagger.comput.yml openIaasNetworkAdapter). They are
+	// READ-ONLY: the provider never writes them.
+	IPv4Address string `json:"ipv4Address"`
+	IPv6Address string `json:"ipv6Address"`
+	// VPC carries the VPC association of the adapter. It is a POINTER because
+	// the API only emits the `vpc` object when the adapter is on a VPC
+	// network; an adapter on a plain network decodes it to nil (#238).
+	VPC *OpenIaaSNetworkAdapterVPC `json:"vpc"`
+}
+
+// OpenIaaSNetworkAdapterVPC mirrors the API `vpcDetails` schema attached to an
+// OpenIaaS network adapter (swagger.comput.yml). Only the NON-deprecated
+// nested privateNetwork{id,name} is decoded; the deprecated top-level
+// privateNetworkId / privateNetworkName are intentionally ignored (#238).
+type OpenIaaSNetworkAdapterVPC struct {
+	ID             string `json:"id"`
+	Name           string `json:"name"`
+	PrivateNetwork struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	} `json:"privateNetwork"`
+	StaticIPAddress string `json:"staticIpAddress"`
 }
 
 type CreateOpenIaasNetworkAdapterRequest struct {
