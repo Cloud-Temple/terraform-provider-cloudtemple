@@ -312,8 +312,93 @@ func fixtureBackupOpenIaasPolicy() *client.BackupOpenIaasPolicy {
 	return policy
 }
 
+// fixtureVMwareVirtualMachine builds a fully-populated VMware VirtualMachine so
+// the flatten output exercises every nested shape (extra_config, replication
+// config, storage, boot options, triggered alarms). The flatten conditions in
+// FlattenVirtualMachine require VmReplicationId, Storage and BootOptions.Firmware
+// to be non-zero for those nested blocks to be emitted at all.
+func fixtureVMwareVirtualMachine() *client.VirtualMachine {
+	vm := &client.VirtualMachine{
+		ID:                             "vm-1",
+		Name:                           "vm-name",
+		Moref:                          "vm-42",
+		MachineManager:                 client.BaseObject{ID: "mm-1", Name: "vcenter"},
+		Datacenter:                     client.BaseObject{ID: "dc-1", Name: "dc-name"},
+		HostCluster:                    client.BaseObject{ID: "hc-1", Name: "hc-name"},
+		Datastore:                      client.BaseObject{ID: "ds-1", Name: "ds-name"},
+		DatastoreCluster:               client.BaseObject{ID: "dsc-1", Name: "dsc-name"},
+		ConsolidationNeeded:            true,
+		Template:                       false,
+		PowerState:                     "running",
+		HardwareVersion:                "vmx-19",
+		NumCoresPerSocket:              2,
+		OperatingSystemMoref:           "ubuntu64Guest",
+		Cpu:                            4,
+		CpuHotAddEnabled:               true,
+		CpuHotRemoveEnabled:            true,
+		MemoryHotAddEnabled:            true,
+		Memory:                         8589934592,
+		CpuUsage:                       10,
+		MemoryUsage:                    20,
+		Tools:                          "toolsOk",
+		ToolsVersion:                   12345,
+		DistributedVirtualPortGroupIds: []string{"dvpg-1"},
+		SppMode:                        "spp",
+		Snapshoted:                     true,
+		TriggeredAlarms:                []client.VirtualMachineTriggeredAlarm{{ID: "alarm-1", Status: "red"}},
+		ExtraConfig: []client.VirtualMachineExtraConfig{
+			{Key: "disk.enableUUID", Value: "TRUE"},
+			{Key: "stealclock.enable", Value: "TRUE"},
+		},
+		ExposeHardwareVirtualization: true,
+	}
+	vm.OperatingSystem.Name = "Ubuntu Linux (64-bit)"
+	vm.ReplicationConfig = client.VirtualMachineReplicationConfig{
+		Generation:            1,
+		VmReplicationId:       "repl-1",
+		Rpo:                   3600,
+		QuiesceGuestEnabled:   true,
+		Paused:                false,
+		OppUpdatesEnabled:     true,
+		NetCompressionEnabled: true,
+		NetEncryptionEnabled:  true,
+		EncryptionDestination: true,
+		Disk:                  []client.VirtualMachineDisk{{Key: 2000, DiskReplicationId: "drepl-1"}},
+	}
+	vm.Storage = client.VirtualMachineStorage{Committed: 1024, Uncommitted: 512}
+	vm.BootOptions = client.VirtualMachineBootOptions{
+		Firmware:             "bios",
+		BootDelay:            1000,
+		EnterBIOSSetup:       true,
+		BootRetryEnabled:     true,
+		BootRetryDelay:       2000,
+		EFISecureBootEnabled: false,
+	}
+	return vm
+}
+
+// flattenedVMwareVM mirrors the singular datasource Read, which sets the raw
+// flatten map per key.
+func flattenedVMwareVM() map[string]interface{} {
+	return helpers.FlattenVirtualMachine(fixtureVMwareVirtualMachine())
+}
+
+// flattenedVMwareVMList mirrors the plural datasource Read, which sets vm.ID
+// onto each flattened element before writing the computed list.
+func flattenedVMwareVMList() map[string]interface{} {
+	vm := fixtureVMwareVirtualMachine()
+	flat := helpers.FlattenVirtualMachine(vm)
+	flat["id"] = vm.ID
+	return flat
+}
+
 func TestDatasourceFlattenOutputsFitTheirSchemas(t *testing.T) {
 	checks := []datasourceFlattenCheck{
+		// VMware VM datasources (the shared FlattenVirtualMachine output must fit
+		// both datasource schemas — the #241 class).
+		{"compute_virtual_machine", dataSourceVirtualMachine(), "", flattenedVMwareVM()},
+		{"compute_virtual_machines", dataSourceVirtualMachines(), "virtual_machines", flattenedVMwareVMList()},
+
 		// OpenIaaS singles (Read sets the flatten map per key)
 		{"iaas_opensource_pool", dataSourceOpenIaasPool(), "", helpers.FlattenOpenIaaSPool(fixtureOpenIaasPool())},
 		{"iaas_opensource_host", dataSourceOpenIaasHost(), "", helpers.FlattenOpenIaaSHost(fixtureOpenIaasHost())},

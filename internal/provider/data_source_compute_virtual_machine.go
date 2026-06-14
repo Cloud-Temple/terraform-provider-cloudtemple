@@ -279,23 +279,11 @@ func dataSourceVirtualMachine() *schema.Resource {
 				},
 			},
 			"extra_config": {
-				Type:        schema.TypeList,
+				Type:        schema.TypeMap,
 				Computed:    true,
-				Description: "Extra configuration parameters for the virtual machine.",
-
-				Elem: &schema.Resource{
-					Schema: map[string]*schema.Schema{
-						"key": {
-							Type:        schema.TypeString,
-							Computed:    true,
-							Description: "The key of the configuration parameter.",
-						},
-						"value": {
-							Type:        schema.TypeString,
-							Computed:    true,
-							Description: "The value of the configuration parameter.",
-						},
-					},
+				Description: "Extra configuration parameters for the virtual machine, as a map of key to value.",
+				Elem: &schema.Schema{
+					Type: schema.TypeString,
 				},
 			},
 			"storage": {
