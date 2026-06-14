@@ -151,15 +151,25 @@ func (s *VPCStaticIPClient) Create(ctx context.Context, privateNetworkID string,
 		return "", err
 	}
 
+	// The swagger documents a 201 body {success, message, static_ip_id}, but the
+	// live API returns 201 with an EMPTY body. The create is synchronous (the
+	// static IP exists immediately), so when the id is absent from the body we
+	// resolve it by its MAC. Returning an error on an empty body would be wrong:
+	// the static IP IS created, so the caller would orphan it — created
+	// platform-side but absent from the Terraform state.
 	var out createStaticIPResponse
-	if err := decodeBody(resp, &out); err != nil {
-		return "", err
-	}
-	if out.StaticIPID == "" {
-		return "", fmt.Errorf("static IP created but the response carried no static_ip_id")
+	if err := decodeBody(resp, &out); err == nil && out.StaticIPID != "" {
+		return out.StaticIPID, nil
 	}
 
-	return out.StaticIPID, nil
+	si, err := s.ReadByMAC(ctx, req.MacAddress)
+	if err != nil {
+		return "", fmt.Errorf("static IP created on private network %s but resolving its id by MAC failed: %w", privateNetworkID, err)
+	}
+	if si == nil {
+		return "", fmt.Errorf("static IP created on private network %s but could not be resolved by its MAC", privateNetworkID)
+	}
+	return si.ID, nil
 }
 
 // UpdateStaticIPRequest is the body of PATCH /vpc/v1/static_ips/{id} (schema

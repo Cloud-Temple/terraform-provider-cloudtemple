@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -65,23 +66,45 @@ func TestVPCStaticIPCreate(t *testing.T) {
 		}
 	})
 
-	t.Run("a 201 with no static_ip_id is an error", func(t *testing.T) {
+	// The LIVE API returns 201 with an EMPTY body (the swagger's static_ip_id is
+	// not actually sent). The create is synchronous, so the id MUST be resolved by
+	// MAC rather than treated as a failure — a failure would orphan the created
+	// static IP (created platform-side but absent from the Terraform state).
+	// Non-complacent: the pre-fix code returned an error on an empty body, so this
+	// goes RED without the by-MAC fallback.
+	t.Run("a 201 with an empty body resolves the id by MAC (live API shape)", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"success":true,"message":"ok"}`))
+			switch {
+			case r.Method == http.MethodPost:
+				w.WriteHeader(http.StatusCreated) // empty body, like the live API
+			case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/static_ips/mac/"):
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{"id":"si-bymac","macAddress":"00:50:56:ab:cd:ef","source":"custom"}`))
+			default:
+				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+				w.WriteHeader(http.StatusInternalServerError)
+			}
 		})
-		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
-			t.Fatal("a 201 with an empty static_ip_id must be an error")
+		id, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"})
+		if err != nil {
+			t.Fatalf("an empty 201 body must resolve the id by MAC, not fail: %v", err)
+		}
+		if id != "si-bymac" {
+			t.Fatalf("the id must be resolved by MAC, got %q", id)
 		}
 	})
 
-	t.Run("an empty static_ip_id is an error", func(t *testing.T) {
+	t.Run("a 201 empty body whose MAC cannot be resolved is an error (never a silent success)", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"static_ip_id":""}`))
+			if r.Method == http.MethodPost {
+				w.WriteHeader(http.StatusCreated) // empty body
+				return
+			}
+			// MAC lookup not found (VPC 403-as-not-found) -> ReadByMAC returns nil.
+			w.WriteHeader(http.StatusForbidden)
 		})
 		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
-			t.Fatal("an empty static_ip_id must be an error")
+			t.Fatal("an empty body whose MAC cannot be resolved must error, not silently succeed")
 		}
 	})
 
