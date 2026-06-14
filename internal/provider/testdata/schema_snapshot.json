@@ -1906,6 +1906,70 @@
           }
         }
       }
+    },
+    "cloudtemple_vpc_static_ip": {
+      "schema": {
+        "floating_ip_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "floating_ip_id": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "id": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "ip_address": {
+          "type": "TypeString",
+          "optional": true,
+          "computed": true,
+          "force_new": true,
+          "elem_kind": "nil"
+        },
+        "mac_address": {
+          "type": "TypeString",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "network_adapter_id": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "private_network_id": {
+          "type": "TypeString",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "resource_description": {
+          "type": "TypeString",
+          "optional": true,
+          "elem_kind": "nil"
+        },
+        "source": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "virtual_machine_id": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "vpc_id": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        }
+      }
     }
   },
   "data_sources": {
