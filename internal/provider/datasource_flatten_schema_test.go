@@ -67,10 +67,10 @@ func assertFlattenFitsSchema(t *testing.T, check datasourceFlattenCheck) {
 //
 // The recursion is bounded by an absolute depth and by a self-reference cap:
 // a struct type may appear at most selfRefCap times along the current path. A
-// self-referential container (e.g. iam Feature.SubFeatures []*Feature) is left
-// empty once its element type is already nested selfRefCap deep, producing a
-// finite shape that fits the schema's declared nesting instead of an unbounded
-// tree, while still exercising one level of nesting.
+// self-referential container (a struct holding a slice or pointer of its own
+// type) is left empty once its element type is already nested selfRefCap deep,
+// producing a finite shape instead of an unbounded tree while still exercising
+// one level of nesting.
 const selfRefCap = 2
 
 // baseStruct unwraps pointers and returns the underlying struct type, or nil.
