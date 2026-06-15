@@ -69,20 +69,25 @@ func FlattenOpenIaaSVirtualMachine(vm *client.OpenIaaSVirtualMachine) map[string
 }
 
 func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMachineId string) []interface{} {
-	if osDisks != nil {
-		disks := make([]interface{}, len(osDisks))
-
-		for i, osDisk := range osDisks {
-			disks[i] = FlattenOpenIaaSOSDiskData(osDisk, virtualMachineId)
+	disks := make([]interface{}, 0, len(osDisks))
+	for _, osDisk := range osDisks {
+		// Skip a nil disk (the API maps a deleted/forbidden disk to nil): it
+		// must never be dereferenced nor appended as a nil entry (#320).
+		if osDisk == nil {
+			continue
 		}
-
-		return disks
+		disks = append(disks, FlattenOpenIaaSOSDiskData(osDisk, virtualMachineId))
 	}
-
-	return make([]interface{}, 0)
+	return disks
 }
 
 func FlattenOpenIaaSOSDiskData(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) interface{} {
+	if osDisk == nil {
+		// The API maps a deleted/forbidden disk to a nil read (403 -> nil).
+		// Dereferencing it while refreshing a VM whose OS disk disappeared
+		// out-of-band panics (#320). Return nil; callers skip a nil entry.
+		return nil
+	}
 	vbd := Find(osDisk.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
 		return virtualMachine.ID == virtualMachineId
 	})
