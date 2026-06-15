@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 	"testing"
+
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 )
 
 // --- recording fake seams (offline, no client) ---
@@ -231,6 +233,69 @@ func TestOpenIaaSVMCreateReqUsesSelectedTemplateSizing(t *testing.T) {
 	floorReq := openIaaSVMCreateReq("ct-validate-vm", "tmpl-zero", 0, 0)
 	if floorReq.CPU != clVMCPU || floorReq.Memory != clVMMemory {
 		t.Fatalf("a 0 template must fall back to the floor, got cpu=%d mem=%d", floorReq.CPU, floorReq.Memory)
+	}
+}
+
+// TestSelectOpenIaaSDiskSR pins the disk-SR selection that fixes the live
+// "could not find storage repository" failure: a SHARED SR in the VM's pool is
+// preferred; a non-shared SR is only chosen when it is LOCAL to the VM's host;
+// SRs in another pool, in maintenance, inaccessible, or too small are rejected;
+// none-fits yields "". Mutation: ignore pool/host (return the first usable) → the
+// wrong-pool SR is chosen → RED.
+func TestSelectOpenIaaSDiskSR(t *testing.T) {
+	const need = 1073741824
+	bo := func(id string) client.BaseObject { return client.BaseObject{ID: id} }
+	srs := []*client.OpenIaaSStorageRepository{
+		{ID: "sr-othpool", Shared: true, Accessible: 1, FreeCapacity: 10 * need, Pool: bo("pool-OTHER")}, // shared but wrong pool
+		{ID: "sr-maint", Shared: true, MaintenanceMode: true, Accessible: 1, FreeCapacity: 10 * need, Pool: bo("pool-A")},
+		{ID: "sr-small", Shared: true, Accessible: 1, FreeCapacity: need / 2, Pool: bo("pool-A")},   // too small
+		{ID: "sr-shared", Shared: true, Accessible: 1, FreeCapacity: 10 * need, Pool: bo("pool-A")}, // the right one
+		{ID: "sr-local", Shared: false, Accessible: 1, FreeCapacity: 10 * need, Host: bo("host-1")},
+	}
+	if got := selectOpenIaaSDiskSR(srs, "pool-A", "host-1", need); got != "sr-shared" {
+		t.Fatalf("must pick the SHARED SR in the VM's pool, got %q", got)
+	}
+	// No shared SR in the pool → fall back to a local SR on the VM's host.
+	noShared := []*client.OpenIaaSStorageRepository{
+		{ID: "sr-othpool", Shared: true, Accessible: 1, FreeCapacity: 10 * need, Pool: bo("pool-OTHER")},
+		{ID: "sr-local", Shared: false, Accessible: 1, FreeCapacity: 10 * need, Host: bo("host-1")},
+	}
+	if got := selectOpenIaaSDiskSR(noShared, "pool-A", "host-1", need); got != "sr-local" {
+		t.Fatalf("must fall back to a host-local SR, got %q", got)
+	}
+	// Nothing in the VM's pool/host → "" (the cycle then surfaces it, not silent).
+	if got := selectOpenIaaSDiskSR(srs, "pool-NONE", "host-NONE", need); got != "" {
+		t.Fatalf("no reachable SR must yield \"\", got %q", got)
+	}
+	// VM read yielded no pool/host (empty) → "" even with otherwise-valid SRs (we
+	// must NOT fall back to an arbitrary SR — that is the original bug).
+	if got := selectOpenIaaSDiskSR(srs, "", "", need); got != "" {
+		t.Fatalf("an unknown VM pool/host must yield \"\" (no blind pick), got %q", got)
+	}
+	// An inaccessible shared SR in the pool is skipped in favour of the next valid one.
+	inacc := []*client.OpenIaaSStorageRepository{
+		{ID: "sr-inacc", Shared: true, Accessible: 0, FreeCapacity: 10 * need, Pool: bo("pool-A")}, // accessible=0 → rejected
+		{ID: "sr-ok", Shared: true, Accessible: 1, FreeCapacity: 10 * need, Pool: bo("pool-A")},
+	}
+	if got := selectOpenIaaSDiskSR(inacc, "pool-A", "host-1", need); got != "sr-ok" {
+		t.Fatalf("an inaccessible SR must be skipped for the next valid one, got %q", got)
+	}
+	// Host-local fallback must match the VM's OWN host, not another host's local SR.
+	hosts := []*client.OpenIaaSStorageRepository{
+		{ID: "sr-otherhost", Shared: false, Accessible: 1, FreeCapacity: 10 * need, Host: bo("host-2")},
+		{ID: "sr-myhost", Shared: false, Accessible: 1, FreeCapacity: 10 * need, Host: bo("host-1")},
+	}
+	if got := selectOpenIaaSDiskSR(hosts, "pool-A", "host-1", need); got != "sr-myhost" {
+		t.Fatalf("host-local fallback must match the VM's own host, got %q", got)
+	}
+	// A host-local SR appearing BEFORE a shared-in-pool SR must NOT win: shared-in-pool
+	// is always preferred regardless of list order.
+	order := []*client.OpenIaaSStorageRepository{
+		{ID: "sr-local-first", Shared: false, Accessible: 1, FreeCapacity: 10 * need, Host: bo("host-1")},
+		{ID: "sr-shared-later", Shared: true, Accessible: 1, FreeCapacity: 10 * need, Pool: bo("pool-A")},
+	}
+	if got := selectOpenIaaSDiskSR(order, "pool-A", "host-1", need); got != "sr-shared-later" {
+		t.Fatalf("shared-in-pool must win over an earlier host-local SR, got %q", got)
 	}
 }
 

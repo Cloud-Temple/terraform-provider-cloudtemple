@@ -24,8 +24,9 @@ func newRunToken() (string, error) {
 }
 
 // computeLifecycleCycle is the end-to-end OpenIaaS compute WRITE business cycle:
-// create a VM from a template, attach a user data disk, attach + connect a user
-// network adapter, then deprovision the whole stack leaves-first. It is the
+// create a VM from a template, attach a user data disk (on an SR in the VM's
+// pool), attach a user network adapter, then deprovision the whole stack
+// leaves-first. It is the
 // realization of the #316 TODO and the cycle to replay (with -runs/-concurrency)
 // for a BOUNDED, breaker-guarded load probe ("how far does it hold").
 //
@@ -66,6 +67,29 @@ func vmSize(floor, fromTemplate int) int {
 // "not below the template" constraint. Kept as a pure builder so a test can pin
 // that the SELECTED template's sizing actually reaches the create request (not the
 // bare floor constants).
+// selectOpenIaaSDiskSR picks a storage repository usable for a data disk on a VM
+// in the given pool/host. The disk-create rejects an SR the VM cannot reach
+// ("could not find storage repository with uuid …"), so the SR must be in the
+// VM's pool: a SHARED SR (reachable from any host in the pool) is preferred,
+// otherwise a non-shared SR LOCAL to the VM's host. Only accessible, non-
+// maintenance SRs with room for the disk qualify. Returns "" when none fits (the
+// disk sub-step is then skipped — not a failure).
+func selectOpenIaaSDiskSR(srs []*client.OpenIaaSStorageRepository, vmPoolID, vmHostID string, minFree int) string {
+	var hostLocal string
+	for _, sr := range srs {
+		if sr == nil || sr.ID == "" || sr.MaintenanceMode || sr.Accessible == 0 || sr.FreeCapacity < minFree {
+			continue
+		}
+		if sr.Shared && vmPoolID != "" && sr.Pool.ID == vmPoolID {
+			return sr.ID // shared SR in the VM's pool — reachable from its host
+		}
+		if !sr.Shared && vmHostID != "" && sr.Host.ID == vmHostID && hostLocal == "" {
+			hostLocal = sr.ID // fallback: a local SR on the VM's own host
+		}
+	}
+	return hostLocal
+}
+
 func openIaaSVMCreateReq(name, templateID string, tmplCPU, tmplMem int) *client.CreateOpenIaasVirtualMachineRequest {
 	return &client.CreateOpenIaasVirtualMachineRequest{
 		Name:       name,
@@ -149,7 +173,6 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 		"compute.openiaas.virtual_machine.create",
 		"compute.openiaas.virtual_disk.create",
 		"compute.openiaas.network_adapter.create",
-		"compute.openiaas.network_adapter.connect",
 		"compute.openiaas.virtual_machine.read",
 		"compute.openiaas.network_adapter.delete",
 		"compute.openiaas.virtual_disk.disconnect",
@@ -187,20 +210,15 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 	})
 
 	// A storage repository and a network are OPTIONAL: without them the disk and
-	// adapter sub-steps are skipped, but the VM create+delete still run.
-	var srID string
+	// adapter sub-steps are skipped, but the VM create+delete still run. The SR is
+	// SELECTED later (after the VM is created), once the VM's pool/host is known —
+	// the disk-create rejects an SR the VM cannot reach ("could not find storage
+	// repository"), so a usable SR must be in the VM's pool, not just any SR.
+	var srs []*client.OpenIaaSStorageRepository
 	_ = r.op(cyc, "compute.openiaas.storage_repositories.list", func() error {
-		srs, err := oi.StorageRepository().List(ctx, &client.StorageRepositoryFilter{MachineManagerId: mmID})
-		if err != nil {
-			return err
-		}
-		for _, sr := range srs {
-			if sr != nil && sr.ID != "" && !sr.MaintenanceMode {
-				srID = sr.ID
-				break
-			}
-		}
-		return nil
+		var err error
+		srs, err = oi.StorageRepository().List(ctx, &client.StorageRepositoryFilter{MachineManagerId: mmID})
+		return err
 	})
 	var networkID string
 	_ = r.op(cyc, "compute.openiaas.networks.list", func() error {
@@ -243,7 +261,7 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 		// name) sweeps it. Nothing further to provision/deprovision explicitly.
 		for _, ep := range []string{
 			"compute.openiaas.virtual_disk.create", "compute.openiaas.network_adapter.create",
-			"compute.openiaas.network_adapter.connect", "compute.openiaas.virtual_machine.read",
+			"compute.openiaas.virtual_machine.read",
 			"compute.openiaas.network_adapter.delete", "compute.openiaas.virtual_disk.disconnect",
 			"compute.openiaas.virtual_disk.delete", "compute.openiaas.virtual_machine.delete",
 		} {
@@ -253,7 +271,23 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 	}
 	vmRef.ID, vmRef.Resolved = vmID, true
 
+	// Read the created VM to learn its pool/host (doubles as the observational read
+	// of the VM). The disk-create rejects an SR the VM cannot reach, so the SR is
+	// selected against the VM's pool/host below — not blindly from the list.
+	var vmPoolID, vmHostID string
+	_ = r.op(cyc, "compute.openiaas.virtual_machine.read", func() error {
+		vm, err := oi.VirtualMachine().Read(ctx, vmID)
+		if err != nil {
+			return err
+		}
+		if vm != nil {
+			vmPoolID, vmHostID = vm.Pool.ID, vm.Host.ID
+		}
+		return nil
+	})
+
 	// --- PHASE 2: storage variation — attach a user data disk (optional) ---
+	srID := selectOpenIaaSDiskSR(srs, vmPoolID, vmHostID, clDiskSize)
 	var diskID string
 	if srID != "" {
 		diskRef := &diskTeardownRef{Name: name + "-data", VMID: vmID}
@@ -279,11 +313,26 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 		if diskID != "" {
 			diskRef.ID, diskRef.Resolved = diskID, true
 		}
-	} else {
+	} else if len(srs) == 0 {
+		// No storage repository at all on the tenant → nothing to exercise.
 		r.skip(cyc, "compute.openiaas.virtual_disk.create")
+	} else {
+		// Candidate SRs EXIST but none is reachable for this VM (none shared in its
+		// pool, none local to its host, or the VM read did not yield a pool/host).
+		// Surface it as a recorded FAILURE rather than a silent skip: for a validation
+		// tool, a green run that quietly never exercised the disk path is worse, and
+		// the pool/host detail lets the reachability rule be refined.
+		_ = r.op(cyc, "compute.openiaas.virtual_disk.create", func() error {
+			return fmt.Errorf("no storage repository reachable for the VM (pool=%q host=%q; %d listed SR(s), none shared-in-pool nor host-local with >= %d bytes free)",
+				vmPoolID, vmHostID, len(srs), clDiskSize)
+		})
 	}
 
-	// --- PHASE 3: network connection — attach + connect a user adapter (optional) ---
+	// --- PHASE 3: network connection — attach a user adapter (optional) ---------
+	// The Create attaches the adapter to the network. No explicit Connect: bringing
+	// the link up requires a RUNNING VM ("VM state is halted but should be running"),
+	// and this lean cycle keeps the VM halted — the network attachment at provision
+	// time is what we exercise (mirrors the VMware cycle).
 	var adapterID string
 	if networkID != "" {
 		adapterRef := &adapterTeardownRef{VMID: vmID}
@@ -306,27 +355,10 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 		})
 		if adapterID != "" {
 			adapterRef.ID, adapterRef.Resolved = adapterID, true
-			_ = r.op(cyc, "compute.openiaas.network_adapter.connect", func() error {
-				activityID, err := oi.NetworkAdapter().Connect(ctx, adapterID)
-				if err != nil {
-					return err
-				}
-				_, werr := c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
-				return werr
-			})
-		} else {
-			r.skip(cyc, "compute.openiaas.network_adapter.connect")
 		}
 	} else {
 		r.skip(cyc, "compute.openiaas.network_adapter.create")
-		r.skip(cyc, "compute.openiaas.network_adapter.connect")
 	}
-
-	// Observational read of the assembled VM.
-	_ = r.op(cyc, "compute.openiaas.virtual_machine.read", func() error {
-		_, err := oi.VirtualMachine().Read(ctx, vmID)
-		return err
-	})
 
 	// --- PHASE 4: deprovision (explicit + recorded; leaves-first). Overlaps the
 	// deferred teardowns by design — idempotent (404-only), so a double delete is
