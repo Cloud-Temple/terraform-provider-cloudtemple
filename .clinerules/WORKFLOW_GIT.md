@@ -26,9 +26,12 @@ details must be carried by the repository-specific or EPIC-specific rules.
 For this provider, the normative rule lives in `WORKFLOW_GIT_EPIC.md`.
 
 Generic guardrails:
-- no direct merge of automation commits into `main`;
+- no merge into `main` outside the human-reviewed GitHub PR process (no local or
+  unreviewed merge; an automation agent merges only under an explicit, per-action
+  human authorization, never on its own initiative);
 - no tag, GitHub release or publication from an RC branch;
-- final merge into `main` on GitHub only, by human review;
+- the final merge into `main` happens on GitHub only and requires mandatory human
+  review;
 - a mandatory RC validation step between the RC branch and `main`.
 
 ### Nominal cycle

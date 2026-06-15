@@ -92,17 +92,22 @@ Rules:
   branch and the merge into `main`;
 - the RC -> `main` PR carries the English release notes, the upgrade risks,
   and the `Closes #N` keywords of the included issues;
-- the RC -> `main` merge is a human decision: a human reviewer must validate
-  and merge on GitHub, never an automation agent;
+- the RC -> `main` merge is a human decision: a human reviewer must validate and
+  approve it on GitHub; the merge is then performed by an authorized human by
+  default, or by an automation agent only under an explicit, per-action human
+  authorization (never presumed, never a standing delegation);
 - `main` must be the repo's default branch; the RC branch must never become
   the default branch;
-- `main` must be protected: human review required, merge/push rights reserved
-  to authorized humans, and no automation token may merge the RC -> `main` PR;
+- `main` must be protected: human review required, merge/push rights reserved to
+  authorized humans; an automation agent may merge the RC -> `main` PR only under
+  an explicit, per-action human authorization (never a standing token-based
+  delegation);
 - the provider repo must disable `Rebase and merge`, or make it unavailable
   for the RC -> `main` PR through an equivalent protection;
-- release tags `v*` must be protected: creation reserved to authorized humans,
-  signed tag when the repo requires it, and the tagged commit present in
-  `main`;
+- release tags `v*` must be protected: creation (and any resulting release
+  publication) reserved to authorized humans — or to an automation agent only
+  under an explicit, per-action human authorization — with a signed tag when the
+  repo requires it, and the tagged commit present in `main`;
 - the provider release workflow must refuse any publication if the targeted
   commit is not reachable from `main`.
 
@@ -173,7 +178,10 @@ Conditions:
 - GitHub comment `HOTFIX-APPROVED: <issue>` posted by an authorized human
   before merge;
 - mandatory human review;
-- merge on GitHub by a human, never by an automation agent.
+- merge on GitHub by an authorized human by default, or by an automation agent
+  only under an explicit, per-action human authorization (never presumed). The
+  `HOTFIX-APPROVED` approval and the mandatory human review above remain required
+  regardless of who performs the merge.
 
 After the hotfix merge:
 - create the tag or release only from the hotfix commit present in `main`, if
