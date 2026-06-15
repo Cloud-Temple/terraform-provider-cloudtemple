@@ -36,6 +36,7 @@ func buildRegistry() *Registry {
 		readonlyCycle{},
 		backupCycle{},
 		computeOpenIaaSCycle{},
+		machineManagersCycle{},
 		computeLifecycleCycle{},
 		computeVMwareLifecycleCycle{},
 		vpcCycle{},
