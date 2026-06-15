@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -78,18 +79,76 @@ func (r *Run) op(c Cycle, endpoint string, fn func() error) error {
 	err := fn()
 	latency := time.Since(start)
 	cat := categorize(err)
+	detail := ""
+	if cat != CategoryOK && err != nil {
+		// Keep the failure reason (e.g. the 4xx/5xx body) so the report can show
+		// WHY it squeaked. Redact obvious secret carriers FIRST (defence-in-depth
+		// for a report that may be shared), then bound it so a huge body cannot
+		// bloat the recording.
+		detail = truncate(redactSecrets(err.Error()), 300)
+	}
 	r.Recorder.Record(Op{
 		Cycle:    c.Name(),
 		Endpoint: endpoint,
 		OK:       cat == CategoryOK,
 		Latency:  latency,
 		Category: cat,
+		Detail:   detail,
 	})
 	// The breaker trips on DISTRESS only (5xx, 502, timeout, transient, 429),
 	// NOT on deterministic client errors (4xx): a 4xx is recorded as a failure
 	// in the report but must not latch the breaker and mask the rest of the map.
 	r.Breaker.Record(cat.isDistress())
 	return err
+}
+
+// secret-bearing patterns scrubbed from recorded error text before it is stored
+// or printed. The PAT travels in the Authorization header and is not normally
+// echoed in an API response body, but a proxy/debug body could reflect request
+// metadata — so mask the obvious carriers rather than trust that it never will.
+var (
+	// An Authorization value of ANY scheme (Bearer/Basic/Token/ApiKey/…): mask the
+	// WHOLE value (scheme AND credential) up to a value delimiter. A scheme alone
+	// (e.g. "Basic") must never leave the credential after it exposed.
+	authHeaderRe = regexp.MustCompile(`(?i)authorization\s*["']?\s*[:=]\s*["']?[^\r\n"',}&]*`)
+	// A bare bearer token not preceded by an Authorization key.
+	bearerTokenRe = regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9._~+/=-]+`)
+	// Named secret carriers; the value may be a quoted string (spaces allowed) or a
+	// single delimiter-bounded token. Names cover the common OAuth/secret variants.
+	kvSecretRe = regexp.MustCompile(`(?i)\b(password|passwd|secret|client_secret|access_token|refresh_token|id_token|token|api[_-]?key|apikey|signature|credential)\b(\s*["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s"',}&]+)`)
+	// The catch-all: any LONG opaque run (base64/hex/JWT-like, >=20 chars) is
+	// credential material regardless of surrounding key/scheme/format — mask it.
+	// Ordinary error words are far shorter, so this rarely touches useful text;
+	// when in doubt it OVER-redacts, which is the safe direction.
+	opaqueTokenRe = regexp.MustCompile(`[A-Za-z0-9+/=_~.-]{20,}`)
+)
+
+// redactSecrets scrubs credential material from text that may be recorded or
+// printed (an API error body). It layers an Authorization-value mask, a bare
+// bearer mask, named secret carriers (quoted or single-token), and finally a
+// catch-all long-opaque-token mask — so no credential survives regardless of
+// format. It deliberately errs toward OVER-redaction over leaking.
+func redactSecrets(s string) string {
+	s = authHeaderRe.ReplaceAllString(s, "Authorization: ***REDACTED***")
+	s = bearerTokenRe.ReplaceAllString(s, "Bearer ***REDACTED***")
+	s = kvSecretRe.ReplaceAllString(s, "${1}=***REDACTED***")
+	s = opaqueTokenRe.ReplaceAllString(s, "***REDACTED***")
+	return s
+}
+
+// truncate collapses newlines (so a recorded error stays one readable line) and
+// bounds the result to n runes PLUS a trailing ellipsis when it had to cut. n<=0
+// yields an empty string (defensive; call sites pass a positive bound).
+func truncate(s string, n int) string {
+	if n <= 0 {
+		return ""
+	}
+	s = strings.ReplaceAll(strings.ReplaceAll(s, "\n", " "), "\r", " ")
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	return string(r[:n]) + "…"
 }
 
 // skip records an endpoint as deliberately skipped (no attempt made). It never
