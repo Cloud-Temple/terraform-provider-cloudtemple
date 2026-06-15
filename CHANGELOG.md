@@ -1,7 +1,13 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.7.1 (April 15th, 2026)
+# 1.7.2 (June 15th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+BUG FIXES :
+
+  * Fixed a remaining nil pointer crash during `terraform plan` when refreshing a `cloudtemple_compute_iaas_opensource_virtual_machine` whose OS disk was deleted or became forbidden out-of-band (the disk reads back as nil). Completes the partial 1.7.1 fix. (#320)
+
+# 1.7.1 (April 15th, 2026)
 
 BUG FIXES :
 

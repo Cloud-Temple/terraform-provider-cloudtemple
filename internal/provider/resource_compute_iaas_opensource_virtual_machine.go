@@ -628,6 +628,12 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 			if err != nil {
 				return diag.Errorf("failed to read os disk: %s", err)
 			}
+			if disk == nil {
+				// A disk that read back nil (the API maps 403/absent to nil) is
+				// skipped rather than dereferenced — refreshing a VM whose OS disk
+				// disappeared out-of-band must not panic (#320).
+				continue
+			}
 			osDisks = append(osDisks, helpers.FlattenOpenIaaSOSDiskData(disk, d.Id()))
 		}
 	}
