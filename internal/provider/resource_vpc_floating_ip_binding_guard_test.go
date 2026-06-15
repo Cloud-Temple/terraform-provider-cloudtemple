@@ -107,6 +107,32 @@ func TestImportVPCFloatingIPBinding(t *testing.T) {
 			t.Fatal("a read error during import must be surfaced")
 		}
 	})
+
+	// F2 — a per-id read whose body has a MISMATCHED id must fail the import (no
+	// phantom). The body claims to be bound to OUR static IP, but its own id is a
+	// different FIP, so it cannot confirm fipID's binding. The id-match guard must
+	// reject it BEFORE the StaticIP check could spuriously pass.
+	t.Run("a MISMATCHED-id read fails the import (no phantom)", func(t *testing.T) {
+		d := newImportData(t, testBindID)
+		funcs := vpcFloatingIPBindingFuncs{
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) {
+				return mismatchedIDBoundFIP(), nil
+			},
+		}
+		if _, err := importVPCFloatingIPBinding(ctx, d, funcs); err == nil {
+			t.Fatal("a mismatched-id read must fail the import (its id does not match the requested FIP)")
+		}
+	})
+
+	t.Run("an EMPTY-id read fails the import (no phantom)", func(t *testing.T) {
+		d := newImportData(t, testBindID)
+		funcs := vpcFloatingIPBindingFuncs{
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) { return emptyIDBoundFIP(), nil },
+		}
+		if _, err := importVPCFloatingIPBinding(ctx, d, funcs); err == nil {
+			t.Fatal("an empty-id read must fail the import (it cannot confirm the requested FIP)")
+		}
+	})
 }
 
 // TestVPCFloatingIPBindingSchemaKeyset pins the resource schema's exact keyset.

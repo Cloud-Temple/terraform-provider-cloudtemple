@@ -151,7 +151,9 @@ func (f *VPCFloatingIPClient) ListStrict(ctx context.Context) ([]*FloatingIP, er
 //     A 409 returns an empty activity id with a nil error, so the resource layer
 //     confirms the actual relationship by a read (a 409 is NOT proof the pair is
 //     ours — only the read can establish that). A bind to a DIFFERENT static IP
-//     is rejected by the resource layer's pre-bind read, before Bind is called.
+//     is rejected by the resource layer BEFORE Bind is called: either the
+//     pre-bind per-id read, or, when that read is ambiguous, the strict-listing
+//     corroboration, which classifies "bound to other" and fails closed.
 func (f *VPCFloatingIPClient) Bind(ctx context.Context, fipID, staticID string) (string, error) {
 	r := f.c.newRequest("POST", "/vpc/v1/floating_ips/%s/bind/static_ips/%s", fipID, staticID)
 	activityID, err := f.c.doRequestAndReturnActivity(ctx, r)
@@ -200,13 +202,18 @@ const (
 	// is provably absent" — listing completeness for floating IPs is not proven
 	// live, so absence-from-listing is inconclusive, not negative evidence.
 	FloatingIPBindingInconclusive FloatingIPBindingState = iota
+	// FloatingIPBindingUnbound means the floating IP is present in the listing
+	// and is NOT bound to any static IP (staticIp nil). This is the only state
+	// that positively proves the FIP is FREE to bind to our target.
+	FloatingIPBindingUnbound
 	// FloatingIPBindingBoundToTarget means the floating IP is present and bound
 	// to the target static IP (positive same-pair corroboration).
 	FloatingIPBindingBoundToTarget
-	// FloatingIPBindingNotBoundToTarget means the floating IP is present and is
-	// either unbound or bound to a DIFFERENT static IP (positive
-	// not-our-pair corroboration).
-	FloatingIPBindingNotBoundToTarget
+	// FloatingIPBindingBoundToOther means the floating IP is present and bound to
+	// a DIFFERENT static IP. Binding our pair would clobber that out-of-band
+	// binding, so this is FAIL-CLOSED for create; for delete it means "no longer
+	// bound to OUR pair", i.e. our unbind took effect.
+	FloatingIPBindingBoundToOther
 )
 
 // CorroborateBinding strictly classifies the FIP/static relationship from a
@@ -214,7 +221,11 @@ const (
 // "inconclusive": a listing that cannot prove the floating IP's state (null /
 // empty / non-array body, an id-less entry, or the FIP simply not present) is
 // NEVER read as negative evidence. Only a positively observed FIP yields a
-// definite present-and-(bound|not-bound)-to-target classification.
+// definite present-and-(unbound|bound-to-target|bound-to-other) classification.
+//
+// The four states are kept DISTINCT so the create path can never collapse
+// "present & unbound" (safe to bind) with "present & bound to a DIFFERENT static
+// IP" (must fail closed, never bind): that collapse was the anti-clobber defect.
 //
 // The "id" the live API returns inside FloatingIP.StaticIP is the static IP id
 // (FloatingIPStaticIP.ID), so the same-pair test compares fip.StaticIP.ID to the
@@ -228,11 +239,15 @@ func (f *VPCFloatingIPClient) CorroborateBinding(ctx context.Context, fipID, sta
 		if fip == nil || fip.ID != fipID {
 			continue
 		}
-		if fip.StaticIP != nil && fip.StaticIP.ID == staticID {
+		if fip.StaticIP == nil {
+			// Present and not bound to anything: provably free.
+			return FloatingIPBindingUnbound, nil
+		}
+		if fip.StaticIP.ID == staticID {
 			return FloatingIPBindingBoundToTarget, nil
 		}
-		// Present but unbound or bound to a different static IP.
-		return FloatingIPBindingNotBoundToTarget, nil
+		// Present and bound to a DIFFERENT static IP.
+		return FloatingIPBindingBoundToOther, nil
 	}
 	// The floating IP was not observed in the listing. Listing completeness is
 	// NOT proven for floating IPs, so this is inconclusive, never "absent".

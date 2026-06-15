@@ -77,6 +77,28 @@ func otherBoundFIP() *client.FloatingIP {
 	}
 }
 
+// mismatchedIDBoundFIP is a structurally inconsistent per-id read: a 200 body
+// that claims to be bound to OUR static IP but whose own id is a DIFFERENT
+// floating IP. Trusting it would let create/import/delete treat a wrong FIP as
+// positive evidence — the #312 R7 id-match guard must reject it.
+func mismatchedIDBoundFIP() *client.FloatingIP {
+	return &client.FloatingIP{
+		ID:        "fip-OTHER",
+		IPAddress: "198.51.100.1",
+		StaticIP:  &client.FloatingIPStaticIP{ID: testStaticID, Address: "10.0.1.5"},
+	}
+}
+
+// emptyIDBoundFIP is a per-id read with an EMPTY id but otherwise looking like
+// our pair. The id-match guard must reject an empty id as unusable evidence.
+func emptyIDBoundFIP() *client.FloatingIP {
+	return &client.FloatingIP{
+		ID:        "",
+		IPAddress: "198.51.100.1",
+		StaticIP:  &client.FloatingIPStaticIP{ID: testStaticID, Address: "10.0.1.5"},
+	}
+}
+
 // readSeq returns a read func that yields the supplied results in order, then
 // repeats the last one. It counts the number of calls.
 func readSeq(calls *int, results ...struct {
@@ -181,7 +203,7 @@ func TestCreateVPCFloatingIPBinding(t *testing.T) {
 		}
 	})
 
-	t.Run("pre-bind 403 but listing positively shows unbound -> bind proceeds and converges", func(t *testing.T) {
+	t.Run("pre-bind 403 but listing positively shows UNBOUND -> bind proceeds and converges", func(t *testing.T) {
 		d := emptyBindingState(t)
 		var bindCalls, readCalls int
 		funcs := vpcFloatingIPBindingFuncs{
@@ -191,7 +213,8 @@ func TestCreateVPCFloatingIPBinding(t *testing.T) {
 			bind: func(ctx context.Context, fipID, staticID string) (string, error) { bindCalls++; return "act", nil },
 			wait: okWait,
 			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
-				return client.FloatingIPBindingNotBoundToTarget, nil // present & unbound
+				// Genuinely UNBOUND (staticIp nil): the ONLY state that unlocks bind.
+				return client.FloatingIPBindingUnbound, nil
 			},
 			sleep: noSleep,
 		}
@@ -204,6 +227,60 @@ func TestCreateVPCFloatingIPBinding(t *testing.T) {
 		}
 		if d.Id() != testBindID {
 			t.Fatalf("the id must be set after a converged bind, got %q", d.Id())
+		}
+	})
+
+	t.Run("pre-bind 403 + listing shows the FIP bound to a DIFFERENT static IP -> anti-clobber error, NO id, ZERO bind POST", func(t *testing.T) {
+		// F1 CRITICAL: the forbidden bind-on-bound-elsewhere path. The per-id read
+		// is ambiguous (403/nil), and the strict listing positively shows the FIP
+		// is bound to a DIFFERENT static IP. Create MUST fail closed, set NO id, and
+		// emit ZERO bind POST — it must NOT rely on the API to reject the bind.
+		d := emptyBindingState(t)
+		var bindCalls int
+		funcs := vpcFloatingIPBindingFuncs{
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) { return nil, nil }, // 403/ambiguous
+			bind: func(ctx context.Context, fipID, staticID string) (string, error) { bindCalls++; return "act", nil },
+			wait: okWait,
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				return client.FloatingIPBindingBoundToOther, nil
+			},
+			sleep: noSleep,
+		}
+		diags := createVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("a FIP corroborated as bound to a DIFFERENT static IP must FAIL CLOSED (anti-clobber)")
+		}
+		if bindCalls != 0 {
+			t.Fatalf("anti-clobber via the listing must NOT issue a bind POST, got %d bind calls", bindCalls)
+		}
+		if d.Id() != "" {
+			t.Fatalf("an anti-clobber create must not set the id, got %q", d.Id())
+		}
+	})
+
+	t.Run("pre-bind 403 + listing shows our pair (BoundToTarget) -> adopt, ZERO bind POST", func(t *testing.T) {
+		d := emptyBindingState(t)
+		var bindCalls, readCalls int
+		funcs := vpcFloatingIPBindingFuncs{
+			// Pre-bind read ambiguous (403/nil); then the confirmAndSet read (after
+			// the BoundToTarget corroboration) converges to our pair.
+			read: readSeq(&readCalls, readResult{nil, nil}, readResult{boundFIP(), nil}),
+			bind: func(ctx context.Context, fipID, staticID string) (string, error) { bindCalls++; return "act", nil },
+			wait: okWait,
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				return client.FloatingIPBindingBoundToTarget, nil
+			},
+			sleep: noSleep,
+		}
+		diags := createVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if diags.HasError() {
+			t.Fatalf("adopting via the listing (BoundToTarget) must succeed, got: %v", diags)
+		}
+		if bindCalls != 0 {
+			t.Fatalf("adoption via the listing must NOT issue a bind POST, got %d bind calls", bindCalls)
+		}
+		if d.Id() != testBindID {
+			t.Fatalf("the id must be set on adoption, got %q", d.Id())
 		}
 	})
 
@@ -287,6 +364,61 @@ func TestCreateVPCFloatingIPBinding(t *testing.T) {
 		}
 		if bindCalls != 0 {
 			t.Fatalf("a read error must NOT issue a bind POST, got %d bind calls", bindCalls)
+		}
+	})
+
+	// F2 — the per-id pre-bind read must carry EXACTLY fipID to be usable as
+	// evidence. A mismatched/empty-id 200 body must NOT be taken as adopt /
+	// anti-clobber / proceed-to-bind: it is routed like an ambiguous read (to the
+	// strict listing). With an Inconclusive listing the whole thing FAILS CLOSED
+	// with ZERO bind POST and NO id.
+	t.Run("pre-bind read with a MISMATCHED id is not usable evidence -> fail closed via listing (ZERO bind POST)", func(t *testing.T) {
+		d := emptyBindingState(t)
+		var bindCalls int
+		funcs := vpcFloatingIPBindingFuncs{
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) {
+				return mismatchedIDBoundFIP(), nil
+			},
+			bind: func(ctx context.Context, fipID, staticID string) (string, error) { bindCalls++; return "act", nil },
+			wait: okWait,
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				return client.FloatingIPBindingInconclusive, nil
+			},
+			sleep: noSleep,
+		}
+		diags := createVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("a mismatched-id pre-bind read must NOT be trusted; with an inconclusive listing it must FAIL CLOSED")
+		}
+		if bindCalls != 0 {
+			t.Fatalf("a mismatched-id read must NOT issue a bind POST, got %d bind calls", bindCalls)
+		}
+		if d.Id() != "" {
+			t.Fatalf("a fail-closed create must not set the id, got %q", d.Id())
+		}
+	})
+
+	t.Run("pre-bind read with an EMPTY id is not usable evidence -> fail closed via listing (ZERO bind POST)", func(t *testing.T) {
+		d := emptyBindingState(t)
+		var bindCalls int
+		funcs := vpcFloatingIPBindingFuncs{
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) { return emptyIDBoundFIP(), nil },
+			bind: func(ctx context.Context, fipID, staticID string) (string, error) { bindCalls++; return "act", nil },
+			wait: okWait,
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				return client.FloatingIPBindingInconclusive, nil
+			},
+			sleep: noSleep,
+		}
+		diags := createVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("an empty-id pre-bind read must NOT be trusted; with an inconclusive listing it must FAIL CLOSED")
+		}
+		if bindCalls != 0 {
+			t.Fatalf("an empty-id read must NOT issue a bind POST, got %d bind calls", bindCalls)
+		}
+		if d.Id() != "" {
+			t.Fatalf("a fail-closed create must not set the id, got %q", d.Id())
 		}
 	})
 }
@@ -404,6 +536,44 @@ func TestReadVPCFloatingIPBinding(t *testing.T) {
 			t.Fatalf("a hard read error must keep the id, got %q", d.Id())
 		}
 	})
+
+	// F2 — a per-id read with a MISMATCHED id (a 200 body for a different FIP that
+	// happens to look unbound, or even claims our pair) must NOT be trusted as
+	// evidence. In particular it must NEVER trigger SetId("") — it is treated like
+	// an ambiguous read and the binding is kept.
+	t.Run("a MISMATCHED-id read NEVER drops the binding (treated as ambiguous)", func(t *testing.T) {
+		d := bindingState(t)
+		funcs := vpcFloatingIPBindingFuncs{
+			// Body for a DIFFERENT FIP, unbound: a naive read would treat this as a
+			// stable negative for OUR FIP and drop. The guard must keep state.
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) {
+				return &client.FloatingIP{ID: "fip-OTHER"}, nil
+			},
+			sleep: noSleep,
+		}
+		diags := readVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if diags.HasError() {
+			t.Fatalf("a mismatched-id read must keep the state without error, got: %v", diags)
+		}
+		if d.Id() != testBindID {
+			t.Fatalf("a mismatched-id read must NEVER drop the binding, got id %q", d.Id())
+		}
+	})
+
+	t.Run("an EMPTY-id read NEVER drops the binding (treated as ambiguous)", func(t *testing.T) {
+		d := bindingState(t)
+		funcs := vpcFloatingIPBindingFuncs{
+			read:  func(ctx context.Context, fipID string) (*client.FloatingIP, error) { return emptyIDBoundFIP(), nil },
+			sleep: noSleep,
+		}
+		diags := readVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if diags.HasError() {
+			t.Fatalf("an empty-id read must keep the state without error, got: %v", diags)
+		}
+		if d.Id() != testBindID {
+			t.Fatalf("an empty-id read must NEVER drop the binding, got id %q", d.Id())
+		}
+	})
 }
 
 // --- Delete ---------------------------------------------------------------
@@ -433,20 +603,56 @@ func TestDeleteVPCFloatingIPBinding(t *testing.T) {
 		}
 	})
 
-	t.Run("unbind then read-403 + strict-List present-and-not-bound is a success", func(t *testing.T) {
+	t.Run("unbind then read-403 + strict-List UNBOUND is a success", func(t *testing.T) {
 		d := bindingState(t)
 		funcs := vpcFloatingIPBindingFuncs{
 			unbind: func(ctx context.Context, fipID, staticID string) (string, error) { return "act", nil },
 			wait:   okWait,
 			read:   func(ctx context.Context, fipID string) (*client.FloatingIP, error) { return nil, nil }, // 403/ambiguous
 			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
-				return client.FloatingIPBindingNotBoundToTarget, nil
+				return client.FloatingIPBindingUnbound, nil
 			},
 			sleep: noSleep,
 		}
 		diags := deleteVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
 		if diags.HasError() {
-			t.Fatalf("a 403 read corroborated by a present-and-not-bound listing must succeed, got: %v", diags)
+			t.Fatalf("a 403 read corroborated by an UNBOUND listing must succeed, got: %v", diags)
+		}
+	})
+
+	t.Run("unbind then read-403 + strict-List BoundToOther is a success (no longer OUR pair)", func(t *testing.T) {
+		// The FIP was re-bound elsewhere (or the listing shows a different static
+		// IP): it is no longer bound to OUR pair, so OUR unbind took effect.
+		d := bindingState(t)
+		funcs := vpcFloatingIPBindingFuncs{
+			unbind: func(ctx context.Context, fipID, staticID string) (string, error) { return "act", nil },
+			wait:   okWait,
+			read:   func(ctx context.Context, fipID string) (*client.FloatingIP, error) { return nil, nil }, // 403/ambiguous
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				return client.FloatingIPBindingBoundToOther, nil
+			},
+			sleep: noSleep,
+		}
+		diags := deleteVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if diags.HasError() {
+			t.Fatalf("a 403 read corroborated by a BoundToOther listing must succeed (no longer our pair), got: %v", diags)
+		}
+	})
+
+	t.Run("unbind then read-403 + strict-List BoundToTarget FAILS CLOSED (still our pair)", func(t *testing.T) {
+		d := bindingState(t)
+		funcs := vpcFloatingIPBindingFuncs{
+			unbind: func(ctx context.Context, fipID, staticID string) (string, error) { return "act", nil },
+			wait:   okWait,
+			read:   func(ctx context.Context, fipID string) (*client.FloatingIP, error) { return nil, nil }, // 403/ambiguous
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				return client.FloatingIPBindingBoundToTarget, nil
+			},
+			sleep: noSleep,
+		}
+		diags := deleteVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("a 403 read corroborated as STILL bound to our pair must FAIL CLOSED (keep state)")
 		}
 	})
 
@@ -496,6 +702,55 @@ func TestDeleteVPCFloatingIPBinding(t *testing.T) {
 		diags := deleteVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
 		if !diags.HasError() {
 			t.Fatal("an unbind whose read still shows our pair must FAIL CLOSED")
+		}
+	})
+
+	// F2 — a per-id read with a MISMATCHED id must NOT be accepted as "gone". A
+	// naive path would see a different-FIP body that is "not our pair" and treat
+	// the unbind as a success. The guard routes it to the strict listing; with an
+	// Inconclusive listing the delete FAILS CLOSED (keeps the binding).
+	t.Run("unbind then MISMATCHED-id read is NOT accepted as gone -> fail closed via listing", func(t *testing.T) {
+		d := bindingState(t)
+		funcs := vpcFloatingIPBindingFuncs{
+			unbind: func(ctx context.Context, fipID, staticID string) (string, error) { return "act", nil },
+			wait:   okWait,
+			// A 200 for a DIFFERENT FIP, unbound: must NOT be read as "our pair is gone".
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) {
+				return &client.FloatingIP{ID: "fip-OTHER"}, nil
+			},
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				return client.FloatingIPBindingInconclusive, nil
+			},
+			sleep: noSleep,
+		}
+		diags := deleteVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("a mismatched-id read must NOT be accepted as gone; with an inconclusive listing it must FAIL CLOSED")
+		}
+		if d.Id() != testBindID {
+			t.Fatalf("a fail-closed delete must keep the binding id, got %q", d.Id())
+		}
+	})
+
+	t.Run("unbind then EMPTY-id read is NOT accepted as gone -> fail closed via listing", func(t *testing.T) {
+		d := bindingState(t)
+		funcs := vpcFloatingIPBindingFuncs{
+			unbind: func(ctx context.Context, fipID, staticID string) (string, error) { return "act", nil },
+			wait:   okWait,
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) {
+				return &client.FloatingIP{ID: ""}, nil
+			},
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				return client.FloatingIPBindingInconclusive, nil
+			},
+			sleep: noSleep,
+		}
+		diags := deleteVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("an empty-id read must NOT be accepted as gone; with an inconclusive listing it must FAIL CLOSED")
+		}
+		if d.Id() != testBindID {
+			t.Fatalf("a fail-closed delete must keep the binding id, got %q", d.Id())
 		}
 	})
 

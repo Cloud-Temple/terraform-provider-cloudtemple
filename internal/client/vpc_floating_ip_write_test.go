@@ -254,10 +254,14 @@ func TestVPCFloatingIPListStrict(t *testing.T) {
 	}
 }
 
-// TestVPCFloatingIPCorroborateBinding pins the strict classification used by the
-// resource layer. The overriding invariant: only a POSITIVELY OBSERVED floating
-// IP yields a definite state; everything else is Inconclusive — a FIP simply
-// absent from the listing is NEVER negative evidence.
+// TestVPCFloatingIPCorroborateBinding pins the strict FOUR-STATE classification
+// used by the resource layer. The anti-clobber invariant is the whole point of
+// the four states: "present & unbound" (safe to bind) MUST be distinct from
+// "present & bound to a DIFFERENT static IP" (must fail closed, never bind). The
+// overriding state-safety invariant also holds: only a POSITIVELY OBSERVED
+// floating IP yields a definite state; everything structurally unprovable (FIP
+// absent from the listing, null/non-array/id-less body) is Inconclusive — never
+// negative evidence.
 func TestVPCFloatingIPCorroborateBinding(t *testing.T) {
 	ctx := context.Background()
 
@@ -275,7 +279,7 @@ func TestVPCFloatingIPCorroborateBinding(t *testing.T) {
 		}
 	})
 
-	t.Run("present but unbound -> NotBoundToTarget", func(t *testing.T) {
+	t.Run("present and UNBOUND (staticIp nil) -> Unbound (the only bind-unlocking state)", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"fip-1","staticIp":null}]`))
@@ -284,12 +288,12 @@ func TestVPCFloatingIPCorroborateBinding(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if state != FloatingIPBindingNotBoundToTarget {
-			t.Fatalf("a present unbound FIP must be NotBoundToTarget, got %v", state)
+		if state != FloatingIPBindingUnbound {
+			t.Fatalf("a present FIP with staticIp nil must be Unbound, got %v", state)
 		}
 	})
 
-	t.Run("present but bound to a DIFFERENT static IP -> NotBoundToTarget", func(t *testing.T) {
+	t.Run("present but bound to a DIFFERENT static IP -> BoundToOther (NOT Unbound)", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`[{"id":"fip-1","staticIp":{"id":"si-OTHER","address":"10.0.1.9"}}]`))
@@ -298,8 +302,13 @@ func TestVPCFloatingIPCorroborateBinding(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if state != FloatingIPBindingNotBoundToTarget {
-			t.Fatalf("a FIP bound to a different static IP must be NotBoundToTarget, got %v", state)
+		if state != FloatingIPBindingBoundToOther {
+			t.Fatalf("a FIP bound to a different static IP must be BoundToOther (never collapsed with Unbound), got %v", state)
+		}
+		// Anti-clobber contract: this state must be distinct from Unbound, so the
+		// create path can never bind on a FIP bound elsewhere.
+		if FloatingIPBindingBoundToOther == FloatingIPBindingUnbound {
+			t.Fatal("BoundToOther and Unbound must be DISTINCT states (anti-clobber)")
 		}
 	})
 
@@ -314,6 +323,48 @@ func TestVPCFloatingIPCorroborateBinding(t *testing.T) {
 		}
 		if state != FloatingIPBindingInconclusive {
 			t.Fatalf("a FIP absent from the listing must be Inconclusive, never read as absent/negative, got %v", state)
+		}
+	})
+
+	t.Run("a structurally incomplete (id-less entry) listing -> Inconclusive", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[{"id":"fip-1","staticIp":null},{"staticIp":null}]`))
+		})
+		state, err := c.VPC().FloatingIP().CorroborateBinding(ctx, "fip-1", "si-1")
+		if err == nil {
+			t.Fatal("a listing with an id-less entry must surface the ListStrict error")
+		}
+		if state != FloatingIPBindingInconclusive {
+			t.Fatalf("a structurally incomplete listing must classify as Inconclusive, got %v", state)
+		}
+	})
+
+	t.Run("a 200 null body -> Inconclusive (never a proven empty listing)", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`null`))
+		})
+		state, err := c.VPC().FloatingIP().CorroborateBinding(ctx, "fip-1", "si-1")
+		if err == nil {
+			t.Fatal("a 200 null body must surface the ListStrict error")
+		}
+		if state != FloatingIPBindingInconclusive {
+			t.Fatalf("a null body must classify as Inconclusive, got %v", state)
+		}
+	})
+
+	t.Run("a 200 JSON object (not an array) -> Inconclusive", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"floating_ips":[]}`))
+		})
+		state, err := c.VPC().FloatingIP().CorroborateBinding(ctx, "fip-1", "si-1")
+		if err == nil {
+			t.Fatal("a 200 object body must surface the ListStrict error")
+		}
+		if state != FloatingIPBindingInconclusive {
+			t.Fatalf("a non-array body must classify as Inconclusive, got %v", state)
 		}
 	})
 

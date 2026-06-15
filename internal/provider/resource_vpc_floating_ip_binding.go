@@ -87,6 +87,23 @@ type vpcFloatingIPBindingFuncs struct {
 	sleep func(ctx context.Context, attempt int) error
 }
 
+// usableFloatingIPRead applies the #312 R7 id-match guard to a per-id read
+// (GET /floating_ips/{fipID}): it returns the floating IP ONLY when the response
+// is a non-nil body carrying EXACTLY fipID. A nil read (absent/403/ambiguous), an
+// empty id, or a DIFFERENT id are all collapsed to (nil, false): such a body must
+// NEVER be used as positive evidence, because a structurally incomplete or
+// mismatched 200 would otherwise let create bind, read drop, delete accept "gone",
+// or import succeed on a body that does not actually describe fipID.
+//
+// Callers treat (nil, false) exactly like a nil/ambiguous read (fall to the
+// strict-listing corroboration, keep state, or fail closed — per their own rule).
+func usableFloatingIPRead(fip *client.FloatingIP, fipID string) (*client.FloatingIP, bool) {
+	if fip == nil || fip.ID == "" || fip.ID != fipID {
+		return nil, false
+	}
+	return fip, true
+}
+
 func defaultFloatingIPBindingSleep(ctx context.Context, attempt int) error {
 	select {
 	case <-ctx.Done():
@@ -162,12 +179,15 @@ func importVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fun
 		return nil, fmt.Errorf("invalid VPC floating IP binding id %q: %w (expected \"{floating_ip_id}%s{static_ip_id}\")", d.Id(), err, vpcFloatingIPBindingIDSeparator)
 	}
 
-	fip, err := funcs.read(ctx, fipID)
+	rawFip, err := funcs.read(ctx, fipID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read floating IP %s while importing the binding: %w", fipID, err)
 	}
-	if fip == nil {
-		return nil, fmt.Errorf("cannot import VPC floating IP binding %q: floating IP %s could not be read (absent or access denied)", d.Id(), fipID)
+	// The per-id read must carry EXACTLY fipID; a nil/403 or a mismatched/empty-id
+	// body cannot confirm the pair and must fail the import (no phantom) (#312 R7).
+	fip, ok := usableFloatingIPRead(rawFip, fipID)
+	if !ok {
+		return nil, fmt.Errorf("cannot import VPC floating IP binding %q: floating IP %s could not be read consistently (absent, access denied, or an id-inconsistent body)", d.Id(), fipID)
 	}
 	if fip.StaticIP == nil || fip.StaticIP.ID != staticID {
 		return nil, fmt.Errorf("cannot import VPC floating IP binding %q: floating IP %s is not bound to static IP %s", d.Id(), fipID, staticID)
@@ -191,12 +211,14 @@ func createVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fip
 		funcs.sleep = defaultFloatingIPBindingSleep
 	}
 
-	// 1. Pre-bind read. Mutate only on positive 200 evidence.
-	fip, err := funcs.read(ctx, fipID)
+	// 1. Pre-bind read. Mutate only on positive 200 evidence. The per-id read is
+	//    only usable as evidence when it carries EXACTLY fipID (#312 R7 guard); a
+	//    nil/403/mismatched-id read is routed like an ambiguous read.
+	rawFip, err := funcs.read(ctx, fipID)
 	if err != nil {
 		return diag.Errorf("failed to read floating IP %s before binding: %s", fipID, err)
 	}
-	if fip != nil {
+	if fip, ok := usableFloatingIPRead(rawFip, fipID); ok {
 		switch {
 		case fip.StaticIP != nil && fip.StaticIP.ID == staticID:
 			// Already bound to OUR static IP: ADOPT, do not re-bind.
@@ -204,7 +226,7 @@ func createVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fip
 			writeFloatingIPBindingComputed(d, fip)
 			return nil
 		case fip.StaticIP != nil && fip.StaticIP.ID != staticID:
-			// Bound to a DIFFERENT static IP: anti-clobber.
+			// Bound to a DIFFERENT static IP: anti-clobber, ZERO bind POST.
 			return diag.Errorf(
 				"floating IP %s is already bound to static IP %s; refusing to clobber it by binding it to %s. Unbind it first (or import the existing binding).",
 				fipID, fip.StaticIP.ID, staticID,
@@ -212,10 +234,11 @@ func createVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fip
 		}
 		// fip present and unbound -> fall through to bind (FIP provably free).
 	} else {
-		// nil/403/ambiguous: a single read cannot prove the FIP is free. A
-		// strict-200 listing MAY unlock the bind, but ONLY when it positively
-		// shows the FIP present-and-unbound, or already present-and-our-pair.
-		// "Absent"/inconclusive never unlocks the bind (fail-closed).
+		// nil/403/ambiguous OR a mismatched/empty-id body: a single read cannot
+		// prove the FIP is free. A strict-200 listing MAY unlock the bind, but
+		// ONLY when it positively shows the FIP present-and-UNBOUND, or already
+		// present-and-our-pair. "Bound to other" is FAIL-CLOSED anti-clobber with
+		// ZERO bind POST; "absent"/inconclusive never unlocks the bind.
 		state, cerr := funcs.corroborate(ctx, fipID, staticID)
 		if cerr != nil {
 			return diag.Errorf(
@@ -225,15 +248,22 @@ func createVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fip
 		}
 		switch state {
 		case client.FloatingIPBindingBoundToTarget:
-			// Already our pair (the read was a transient/permission blip): adopt.
+			// Already our pair (the read was a transient/permission blip): adopt
+			// by confirming + setting, no bind POST.
 			return confirmAndSetFloatingIPBinding(ctx, d, fipID, staticID, funcs)
-		case client.FloatingIPBindingNotBoundToTarget:
-			// Positively present and unbound (or bound elsewhere). If it is bound
-			// elsewhere the bind call will fail; if unbound the bind proceeds.
+		case client.FloatingIPBindingUnbound:
+			// Positively present and UNBOUND: the FIP is provably free.
 			// proceed to bind.
+		case client.FloatingIPBindingBoundToOther:
+			// Positively present and bound to a DIFFERENT static IP: anti-clobber,
+			// fail closed with ZERO bind POST (do NOT rely on the API to reject).
+			return diag.Errorf(
+				"floating IP %s could not be read directly, but the strict listing shows it is already bound to a different static IP; refusing to clobber that binding by binding it to %s. Unbind it first (or import the existing binding).",
+				fipID, staticID,
+			)
 		default:
 			return diag.Errorf(
-				"floating IP %s could not be read and the strict listing did not positively show it present; refusing to bind on inconclusive evidence to avoid clobbering an out-of-band binding. Resolve the access error, then retry.",
+				"floating IP %s could not be read and the strict listing did not positively show it present and unbound; refusing to bind on inconclusive evidence to avoid clobbering an out-of-band binding. Resolve the access error, then retry.",
 				fipID,
 			)
 		}
@@ -263,11 +293,13 @@ func confirmAndSetFloatingIPBinding(ctx context.Context, d *schema.ResourceData,
 		funcs.sleep = defaultFloatingIPBindingSleep
 	}
 	for attempt := 1; attempt <= maxFloatingIPBindingConfirmAttempts; attempt++ {
-		fip, err := funcs.read(ctx, fipID)
+		rawFip, err := funcs.read(ctx, fipID)
 		if err != nil {
 			return diag.Errorf("failed to confirm the binding of floating IP %s to static IP %s: %s", fipID, staticID, err)
 		}
-		if fip != nil && fip.StaticIP != nil && fip.StaticIP.ID == staticID {
+		// Convergence counts ONLY on a usable per-id read (carries EXACTLY fipID)
+		// that shows our pair. A nil/403/mismatched-id read is not convergence.
+		if fip, ok := usableFloatingIPRead(rawFip, fipID); ok && fip.StaticIP != nil && fip.StaticIP.ID == staticID {
 			d.SetId(makeFloatingIPBindingID(fipID, staticID))
 			writeFloatingIPBindingComputed(d, fip)
 			return nil
@@ -292,12 +324,15 @@ func readVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fipID
 		funcs.sleep = defaultFloatingIPBindingSleep
 	}
 
-	fip, err := funcs.read(ctx, fipID)
+	rawFip, err := funcs.read(ctx, fipID)
 	if err != nil {
 		return diag.Errorf("failed to read floating IP %s: %s", fipID, err)
 	}
 
-	if fip != nil {
+	// Only a usable per-id read (carries EXACTLY fipID) can be used as evidence; a
+	// mismatched/empty-id body is treated like a nil/ambiguous read and must NEVER
+	// trigger SetId("") (#312 R7 guard).
+	if fip, ok := usableFloatingIPRead(rawFip, fipID); ok {
 		if fip.StaticIP != nil && fip.StaticIP.ID == staticID {
 			// Present and still our pair: refresh.
 			writeFloatingIPBindingComputed(d, fip)
@@ -310,17 +345,18 @@ func readVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fipID
 			if serr := funcs.sleep(ctx, attempt); serr != nil {
 				return diag.Errorf("cancelled while confirming floating IP %s binding state: %s", fipID, serr)
 			}
-			fip, err = funcs.read(ctx, fipID)
+			rawFip, err = funcs.read(ctx, fipID)
 			if err != nil {
 				// An ambiguous read mid-retry must not drop: fail closed.
 				return diag.Errorf("failed to re-read floating IP %s while confirming its binding state: %s", fipID, err)
 			}
-			if fip != nil && fip.StaticIP != nil && fip.StaticIP.ID == staticID {
+			fip, ok = usableFloatingIPRead(rawFip, fipID)
+			if ok && fip.StaticIP != nil && fip.StaticIP.ID == staticID {
 				writeFloatingIPBindingComputed(d, fip)
 				return nil
 			}
-			if fip == nil {
-				// Became ambiguous: do not drop on a 403/absent; keep state.
+			if !ok {
+				// Became ambiguous (nil/403/mismatched-id): do not drop; keep state.
 				tflog.Warn(ctx, fmt.Sprintf("floating IP %s became unreadable while confirming its binding state; keeping the binding in state", fipID))
 				return nil
 			}
@@ -331,11 +367,11 @@ func readVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fipID
 		return nil
 	}
 
-	// nil/403-absent -> AMBIGUOUS. Never drop on a 403 alone. Keep the state and
-	// emit a diagnostic-as-warning so a permission blip cannot silently remove
-	// the binding.
+	// nil/403-absent or a mismatched-id body -> AMBIGUOUS. Never drop on ambiguity.
+	// Keep the state and emit a diagnostic-as-warning so a permission blip or an
+	// inconsistent read cannot silently remove the binding.
 	tflog.Warn(ctx, fmt.Sprintf(
-		"floating IP %s could not be read (absent or access denied); the binding is kept in the state to avoid a wrong removal on an ambiguous read",
+		"floating IP %s could not be read consistently (absent, access denied, or an id-inconsistent body); the binding is kept in the state to avoid a wrong removal on an ambiguous read",
 		fipID,
 	))
 	return nil
@@ -373,11 +409,14 @@ func deleteVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fip
 // A nil/403 read alone, or an inconclusive listing, FAILS CLOSED. There is NO
 // "the FIP is absent from the listing => success" path.
 func confirmFloatingIPUnbound(ctx context.Context, fipID, staticID string, funcs vpcFloatingIPBindingFuncs, unbindErr error) diag.Diagnostics {
-	fip, err := funcs.read(ctx, fipID)
+	rawFip, err := funcs.read(ctx, fipID)
 	if err != nil {
 		return diag.Errorf("failed to confirm the unbind of floating IP %s from static IP %s: %s", fipID, staticID, err)
 	}
-	if fip != nil {
+	// Only a usable per-id read (carries EXACTLY fipID) can prove the post-unbind
+	// shape. A mismatched/empty-id body must NOT be accepted as "gone": fall to the
+	// strict-listing corroboration just like a nil/ambiguous read (#312 R7 guard).
+	if fip, ok := usableFloatingIPRead(rawFip, fipID); ok {
 		if fip.StaticIP != nil && fip.StaticIP.ID == staticID {
 			// Still bound to our pair: the unbind did not take effect.
 			detail := ""
@@ -393,8 +432,11 @@ func confirmFloatingIPUnbound(ctx context.Context, fipID, staticID string, funcs
 		return nil
 	}
 
-	// Read is ambiguous (nil/403). Corroborate via the strict listing, accepting
-	// ONLY a positive "present & NOT bound to our static IP".
+	// Read is ambiguous (nil/403/mismatched-id). Corroborate via the strict
+	// listing. The unbind is accepted as successful on any state proving the FIP
+	// is no longer bound to OUR pair: Unbound (present, staticIp nil) OR
+	// BoundToOther (present, bound to a different static IP). BoundToTarget means
+	// still our pair (keep state); Inconclusive fails closed (keep state).
 	state, cerr := funcs.corroborate(ctx, fipID, staticID)
 	if cerr != nil {
 		return diag.Errorf(
@@ -402,19 +444,21 @@ func confirmFloatingIPUnbound(ctx context.Context, fipID, staticID string, funcs
 			fipID, cerr,
 		)
 	}
-	if state == client.FloatingIPBindingNotBoundToTarget {
+	switch state {
+	case client.FloatingIPBindingUnbound, client.FloatingIPBindingBoundToOther:
+		// No longer bound to OUR pair: the unbind took effect.
 		return nil
-	}
-	if state == client.FloatingIPBindingBoundToTarget {
+	case client.FloatingIPBindingBoundToTarget:
 		return diag.Errorf(
 			"floating IP %s is still bound to static IP %s after the unbind (confirmed by the strict listing); the binding is kept in the state. Retry once the unbind succeeds.",
 			fipID, staticID,
 		)
+	default:
+		return diag.Errorf(
+			"floating IP %s could not be read after the unbind and the strict listing did not positively show it unbound from static IP %s; the binding is kept in the state to avoid removing it on inconclusive evidence. Resolve the read error, then retry.",
+			fipID, staticID,
+		)
 	}
-	return diag.Errorf(
-		"floating IP %s could not be read after the unbind and the strict listing did not positively show it unbound from static IP %s; the binding is kept in the state to avoid removing it on inconclusive evidence. Resolve the read error, then retry.",
-		fipID, staticID,
-	)
 }
 
 // writeFloatingIPBindingComputed refreshes the read-only address attributes from
