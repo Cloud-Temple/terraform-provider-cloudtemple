@@ -116,23 +116,42 @@ var (
 	// Named secret carriers; the value may be a quoted string (spaces allowed) or a
 	// single delimiter-bounded token. Names cover the common OAuth/secret variants.
 	kvSecretRe = regexp.MustCompile(`(?i)\b(password|passwd|secret|client_secret|access_token|refresh_token|id_token|token|api[_-]?key|apikey|signature|credential)\b(\s*["']?\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s"',}&]+)`)
-	// The catch-all: any LONG opaque run (base64/hex/JWT-like, >=20 chars) is
-	// credential material regardless of surrounding key/scheme/format — mask it.
-	// Ordinary error words are far shorter, so this rarely touches useful text;
-	// when in doubt it OVER-redacts, which is the safe direction.
+	// The catch-all: a LONG opaque run (base64/hex/JWT-like, >=20 chars) is
+	// credential material regardless of surrounding key/scheme/format — mask it,
+	// with ONE narrow exception (reasonCodeRe below) so the catch-all does not
+	// swallow the diagnostic the report exists to surface.
 	opaqueTokenRe = regexp.MustCompile(`[A-Za-z0-9+/=_~.-]{20,}`)
+	// reasonCodeRe matches a SCREAMING_SNAKE_CASE error reason code: uppercase
+	// letters/digits in >=2 underscore-joined words, e.g. MEMORY_CONSTRAINT_VIOLATION_ORDER.
+	// opaqueTokenRe's class includes `_`, so such a code is captured as a SINGLE run
+	// and this exception un-masks it. A credential RARELY takes this exact shape —
+	// real tokens carry lowercase, base64 `+/=.` chars, or have no underscores — and
+	// keyed/scheme secrets are already masked by the earlier layers regardless. The
+	// exception is deliberately scoped to all-uppercase underscore-joined codes (the
+	// observed reason-code shape); a hypothetical bare uppercase_underscore secret in
+	// a body would be preserved, which is acceptable for observability redaction (a
+	// defence-in-depth scrub of response bodies, not a hard secret boundary).
+	reasonCodeRe = regexp.MustCompile(`^[A-Z0-9]+(?:_[A-Z0-9]+)+$`)
 )
 
 // redactSecrets scrubs credential material from text that may be recorded or
 // printed (an API error body). It layers an Authorization-value mask, a bare
 // bearer mask, named secret carriers (quoted or single-token), and finally a
 // catch-all long-opaque-token mask — so no credential survives regardless of
-// format. It deliberately errs toward OVER-redaction over leaking.
+// format. The catch-all masks EVERY long opaque run except a SCREAMING_SNAKE error
+// reason code (reasonCodeRe), which a credential never matches; that keeps the
+// diagnostic visible without leaking token-like material. It errs toward
+// OVER-redaction over leaking for anything else token-like.
 func redactSecrets(s string) string {
 	s = authHeaderRe.ReplaceAllString(s, "Authorization: ***REDACTED***")
 	s = bearerTokenRe.ReplaceAllString(s, "Bearer ***REDACTED***")
 	s = kvSecretRe.ReplaceAllString(s, "${1}=***REDACTED***")
-	s = opaqueTokenRe.ReplaceAllString(s, "***REDACTED***")
+	s = opaqueTokenRe.ReplaceAllStringFunc(s, func(m string) string {
+		if reasonCodeRe.MatchString(m) {
+			return m // an error reason code, not a credential
+		}
+		return "***REDACTED***"
+	})
 	return s
 }
 

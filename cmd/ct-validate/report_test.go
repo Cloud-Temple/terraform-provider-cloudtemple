@@ -152,6 +152,10 @@ func TestRedactSecretsMasksCredentials(t *testing.T) {
 		"password=\"correct horse battery staple\"":                  "battery",
 		"bearer eyJraw.token.here.long.enough.value":                 "eyJraw.token.here.long.enough.value",
 		"leaked raw blob 0123456789abcdef0123456789abcdef":           "0123456789abcdef0123456789abcdef",
+		// Digitless secrets must STILL be masked — the reason-code exception is narrow.
+		"Bearer AAAAAAAAAAAAAAAAAAAAAAAA":   "AAAAAAAAAAAAAAAAAAAAAAAA",
+		"token=ABCDEFGHIJKLMNOPQRSTUVWX":    "ABCDEFGHIJKLMNOPQRSTUVWX",
+		"opaque abcdefghijklmnopqrstuvwxyz": "abcdefghijklmnopqrstuvwxyz",
 	}
 	for in, leak := range cases {
 		out := redactSecrets(in)
@@ -169,6 +173,29 @@ func TestRedactSecretsMasksCredentials(t *testing.T) {
 	// An ordinary API error body must be left intact (no false redaction).
 	if got := redactSecrets("Unexpected response code: 403 (Forbidden.)"); got != "Unexpected response code: 403 (Forbidden.)" {
 		t.Fatalf("an ordinary body must be unchanged, got %q", got)
+	}
+}
+
+// TestRedactSecretsPreservesErrorReasonCodes pins that the catch-all opaque-token
+// mask does NOT swallow long all-letter/underscore error reason codes (no digit) —
+// those are the diagnostic the report exists to surface (a real run failed with
+// MEMORY_CONSTRAINT_VIOLATION_ORDER and the mask was hiding it). A token-like run
+// WITH a digit is still masked. Mutation: drop the digit requirement → the reason
+// code is masked → RED.
+func TestRedactSecretsPreservesErrorReasonCodes(t *testing.T) {
+	for _, keep := range []string{
+		"activity failed: MEMORY_CONSTRAINT_VIOLATION_ORDER",
+		"VM state is halted but should be paused, suspended, running",
+		"the virtual machine could not be created: INSUFFICIENT_RESOURCES_AVAILABLE",
+		"order rejected: ERROR_500_INTERNAL_FAILURE", // reason code WITH a digit segment
+	} {
+		if got := redactSecrets(keep); got != keep {
+			t.Fatalf("an all-letter error reason code must be preserved, got %q from %q", got, keep)
+		}
+	}
+	// A digit-bearing opaque blob (realistic credential material) is STILL masked.
+	if got := redactSecrets("dump 0123456789abcdef0123456789abcdef"); strings.Contains(got, "0123456789abcdef0123456789abcdef") {
+		t.Fatalf("a digit-bearing opaque blob must still be masked, got %q", got)
 	}
 }
 
