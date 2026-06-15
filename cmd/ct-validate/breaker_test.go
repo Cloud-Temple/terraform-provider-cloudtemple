@@ -131,6 +131,32 @@ func TestBreakerLatches(t *testing.T) {
 	}
 }
 
+// TestBreakerTripForcesOpen proves Trip() forces the breaker open regardless of
+// the rolling-window accounting (used for out-of-band failures like a panic),
+// latches the first reason, and is idempotent. A disabled breaker (no rules)
+// must still honour an explicit Trip.
+//
+// Mutation proof: make Trip a no-op (drop the `b.tripped = true`) → Allow stays
+// true → this test goes RED. Drop the `if b.tripped { return }` latch → the
+// second Trip overwrites the reason → the reason assertion goes RED.
+func TestBreakerTripForcesOpen(t *testing.T) {
+	b := NewBreaker(0, 0, 0) // all rules disabled: accounting would never trip
+	if b.Tripped() {
+		t.Fatal("setup: a disabled breaker must start untripped")
+	}
+	b.Trip("first reason")
+	if !b.Tripped() || b.Allow() {
+		t.Fatal("Trip must force the breaker open even with all rules disabled")
+	}
+	if b.Reason() != "first reason" {
+		t.Fatalf("reason = %q, want %q", b.Reason(), "first reason")
+	}
+	b.Trip("second reason") // latch: must not overwrite
+	if b.Reason() != "first reason" {
+		t.Fatalf("Trip must latch the first reason, got %q", b.Reason())
+	}
+}
+
 // TestBreakerDisabledRules proves a fully-disabled breaker never trips and is a
 // safe no-op guard.
 func TestBreakerDisabledRules(t *testing.T) {

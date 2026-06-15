@@ -196,3 +196,60 @@ func TestRunOpRecordsAndFeedsBreaker(t *testing.T) {
 		t.Fatalf("skip op recorded wrong: %+v", skip)
 	}
 }
+
+// TestRunOpGatesOnTrippedBreaker proves F1: once the breaker is tripped, op()
+// does NOT call fn — it records a skip and returns nil. This is what bounds the
+// hammering MID-CYCLE (a long cycle must not keep calling the API after an early
+// trip).
+//
+// Mutation proof: remove the `if r.Breaker != nil && !r.Breaker.Allow()` gate at
+// the top of Run.op → fn IS called → called becomes true → this test goes RED.
+func TestRunOpGatesOnTrippedBreaker(t *testing.T) {
+	rec := NewRecorder()
+	b := NewBreaker(1, 1.0, 100)
+	b.Trip("pre-tripped for test") // force the breaker open before any op
+	r := &Run{Recorder: rec, Breaker: b, Cleanup: NewCleanup()}
+	c := fakeCycle{"readonly", KindRead}
+
+	called := false
+	got := r.op(c, "x.list", func() error { called = true; return nil })
+
+	if called {
+		t.Fatal("op must NOT call fn once the breaker has tripped (mid-cycle gating)")
+	}
+	if got != nil {
+		t.Fatalf("a gated op must return nil, got %v", got)
+	}
+	ops := rec.Ops()
+	if len(ops) != 1 {
+		t.Fatalf("recorded %d ops, want exactly 1 (the skip)", len(ops))
+	}
+	o := ops[0]
+	if !o.Skipped || o.OK || o.Category != CategorySkipped || o.Endpoint != "x.list" {
+		t.Fatalf("gated op must be recorded as a skip, got %+v", o)
+	}
+}
+
+// TestRunOpSkipDoesNotFeedBreaker proves a gated skip does not feed the breaker
+// window: a tripped breaker stays tripped on the SAME reason, and the skip count
+// does not turn into a failure that would dilute accounting. (Belt-and-braces
+// over the Record contract, scoped to the gating path.)
+func TestRunOpSkipDoesNotFeedBreaker(t *testing.T) {
+	rec := NewRecorder()
+	b := NewBreaker(5, 1.0, 100)
+	b.Trip("forced")
+	r := &Run{Recorder: rec, Breaker: b, Cleanup: NewCleanup()}
+	c := fakeCycle{"readonly", KindRead}
+
+	for i := 0; i < 10; i++ {
+		_ = r.op(c, "x.list", func() error { return client.StatusError{Code: 500} })
+	}
+	if b.Reason() != "forced" {
+		t.Fatalf("gated skips must not re-feed the breaker; reason changed to %q", b.Reason())
+	}
+	for _, o := range rec.Ops() {
+		if !o.Skipped {
+			t.Fatalf("every op after a trip must be a skip, got %+v", o)
+		}
+	}
+}

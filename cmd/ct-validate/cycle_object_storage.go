@@ -25,6 +25,12 @@ func (oc objectStorageCycle) Run(ctx context.Context, c *client.Client, r *Run) 
 	// unique per (iteration, worker).
 	name := fmt.Sprintf("ct-validate-%d-%d", r.Iteration, r.Worker)
 
+	// F3: register "delete bucket by name if present" BEFORE the create, keyed by
+	// the deterministic name, so a created-but-unconfirmed bucket (create activity
+	// lost between server-side effect and confirmation) is still swept. Idempotent
+	// (absent bucket → success).
+	registerBucketTeardown(r.Cleanup, objectStorageBucketSeam{c}, name)
+
 	created := false
 	if err := r.op(oc, "object_storage.bucket.create", func() error {
 		activityID, cerr := c.ObjectStorage().Bucket().Create(ctx, &client.CreateBucketRequest{
@@ -44,19 +50,6 @@ func (oc objectStorageCycle) Run(ctx context.Context, c *client.Client, r *Run) 
 	}); err != nil || !created {
 		return err
 	}
-
-	// Register bucket teardown immediately.
-	r.Cleanup.Register(fmt.Sprintf("object_storage.bucket %s", name), func(tctx context.Context) error {
-		activityID, derr := c.ObjectStorage().Bucket().Delete(tctx, name)
-		if derr != nil {
-			return derr
-		}
-		if activityID == "" {
-			return nil
-		}
-		_, werr := c.Activity().WaitForCompletion(tctx, activityID, silentWaiter)
-		return werr
-	})
 
 	oc.aclSubCycle(ctx, c, r, name)
 
@@ -114,7 +107,11 @@ func (oc objectStorageCycle) aclSubCycle(ctx context.Context, c *client.Client, 
 	role := roles[0].Name
 	account := accounts[0].Name
 
-	granted := false
+	// F3: register revoke(role, account) BEFORE the grant, keyed by the
+	// deterministic (bucket, role, account) triple, so an ambiguous grant is
+	// still swept. Idempotent (absent grant → success).
+	registerACLTeardown(r.Cleanup, objectStorageACLSeam{c}, bucket, role, account)
+
 	if err := r.op(oc, "object_storage.acl.grant", func() error {
 		activityID, gerr := c.ObjectStorage().ACLEntry().Grant(ctx, bucket, role, account)
 		if gerr != nil {
@@ -125,26 +122,11 @@ func (oc objectStorageCycle) aclSubCycle(ctx context.Context, c *client.Client, 
 				return werr
 			}
 		}
-		granted = true
 		return nil
 	}); err != nil {
 		r.skip(oc, "object_storage.acl.read")
 		r.skip(oc, "object_storage.acl.revoke")
 		return
-	}
-
-	if granted {
-		r.Cleanup.Register(fmt.Sprintf("object_storage.acl revoke %s/%s/%s", bucket, role, account), func(tctx context.Context) error {
-			activityID, rerr := c.ObjectStorage().ACLEntry().Revoke(tctx, bucket, role, account)
-			if rerr != nil {
-				return rerr
-			}
-			if activityID == "" {
-				return nil
-			}
-			_, werr := c.Activity().WaitForCompletion(tctx, activityID, silentWaiter)
-			return werr
-		})
 	}
 
 	_ = r.op(oc, "object_storage.acl.read", func() error {

@@ -50,6 +50,22 @@ func (b *Breaker) Allow() bool {
 	return !b.tripped
 }
 
+// Trip forces the breaker open with an explicit reason, regardless of the
+// rolling-window accounting. It is used for out-of-band failures that are not a
+// single op outcome — e.g. a cycle goroutine that PANICKED: the panic is
+// recovered, recorded as a failure op, and the breaker is tripped so the engine
+// stops scheduling new work and drains to teardown. Latching: a no-op once
+// already tripped, so the first reason wins.
+func (b *Breaker) Trip(reason string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.tripped {
+		return
+	}
+	b.tripped = true
+	b.reason = reason
+}
+
 // Tripped reports whether the breaker has tripped.
 func (b *Breaker) Tripped() bool {
 	b.mu.Lock()

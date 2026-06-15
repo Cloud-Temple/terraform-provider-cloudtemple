@@ -41,6 +41,13 @@ func (vc vpcCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
 	// or repeated runs. The 02:00:5e:f0:XX:YY range is locally-administered.
 	mac := fmt.Sprintf("02:00:5e:f0:%02x:%02x", byte(r.Iteration), byte(r.Worker))
 
+	// F3: register the by-MAC teardown BEFORE Create. The client documents that a
+	// 201 empty body means the static IP MAY already exist and id-resolution can
+	// fail (vpc_static_ip.go) — a created-but-unresolved static IP would orphan.
+	// Keying the teardown on the deterministic (private network, MAC) lets the
+	// safety net find and delete it even when Create returns no usable id.
+	registerStaticIPTeardown(r.Cleanup, vpcStaticIPSeam{c}, pn.ID, mac)
+
 	var staticID string
 	if err := r.op(vc, "vpc.static_ip.create", func() error {
 		id, cerr := c.VPC().StaticIP().Create(ctx, pn.ID, &client.CreateStaticIPRequest{
@@ -53,24 +60,16 @@ func (vc vpcCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
 		staticID = id
 		return nil
 	}); err != nil || staticID == "" {
-		// Either the create failed (recorded) or returned no id; nothing to
-		// tear down (the client only returns a non-empty id when the resource
-		// is confirmed to exist).
+		// Either the create failed (recorded) or returned no id. The by-MAC
+		// teardown registered above still sweeps a created-but-unresolved static
+		// IP, so we can safely return here.
 		return err
 	}
 
-	// Register teardown IMMEDIATELY: from here on, an abort must still delete
-	// this static IP. Teardown is best-effort with a bounded transient-retry.
+	// Also register the precise by-id teardown now that the id is resolved (LIFO:
+	// it runs before the broader by-MAC sweep). Both are idempotent.
 	r.Cleanup.Register(fmt.Sprintf("vpc.static_ip %s", staticID), func(tctx context.Context) error {
-		activityID, derr := c.VPC().StaticIP().Delete(tctx, staticID)
-		if derr != nil {
-			return derr
-		}
-		if activityID == "" {
-			return nil
-		}
-		_, werr := c.Activity().WaitForCompletion(tctx, activityID, silentWaiter)
-		return werr
+		return vpcStaticIPSeam{c}.DeleteAndWait(tctx, staticID)
 	})
 
 	vc.bindSubCycle(ctx, c, r, staticID)
@@ -148,7 +147,13 @@ func (vc vpcCycle) bindSubCycle(ctx context.Context, c *client.Client, r *Run, s
 		return
 	}
 
-	bound := false
+	// F3: register the unbind teardown BEFORE the bind, keyed by the
+	// deterministic (fip, static) pair. A bind whose activity completes but whose
+	// confirmation is then lost (abort/panic between Bind and the registration)
+	// must still release our FIP. The teardown is idempotent (already-unbound →
+	// success), so registering it even if the bind ultimately fails is harmless.
+	registerFIPUnbindTeardown(r.Cleanup, vpcFIPBindSeam{c}, spare.ID, staticID)
+
 	if err := r.op(vc, "vpc.floating_ip.bind", func() error {
 		activityID, berr := c.VPC().FloatingIP().Bind(ctx, spare.ID, staticID)
 		if berr != nil {
@@ -159,30 +164,12 @@ func (vc vpcCycle) bindSubCycle(ctx context.Context, c *client.Client, r *Run, s
 				return werr
 			}
 		}
-		bound = true
 		return nil
 	}); err != nil {
-		// Bind failed; nothing to unbind. The static IP teardown is already
-		// registered.
+		// Bind failed; the idempotent unbind teardown registered above is a
+		// best-effort no-op if the bind never took effect.
 		r.skip(vc, "vpc.floating_ip.unbind")
 		return
-	}
-
-	if bound {
-		// Register the unbind teardown BEFORE doing anything else with the
-		// binding, so an abort still releases our FIP (LIFO: unbind runs before
-		// the static-IP delete).
-		r.Cleanup.Register(fmt.Sprintf("vpc.floating_ip unbind %s<-%s", spare.ID, staticID), func(tctx context.Context) error {
-			activityID, uerr := c.VPC().FloatingIP().Unbind(tctx, spare.ID, staticID)
-			if uerr != nil {
-				return uerr
-			}
-			if activityID == "" {
-				return nil
-			}
-			_, werr := c.Activity().WaitForCompletion(tctx, activityID, silentWaiter)
-			return werr
-		})
 	}
 
 	// Confirm the binding took effect (positive same-pair corroboration).

@@ -34,7 +34,14 @@ func (ic iamPATCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
 	// the provider use milliseconds — see resource_iam_personal_access_token).
 	expiration := int(time.Now().Add(time.Hour).UTC().UnixMilli())
 
-	var patID string
+	// F3: register the PAT teardown BEFORE the create/decode. A PAT is a live
+	// credential; a created-but-undecoded one (201 received, body decode fails) is
+	// a security orphan. The teardown deletes by id once resolved, else falls back
+	// to find-by-name-and-delete. The ref is shared so the cycle can fill in the
+	// resolved id AFTER registration without re-registering.
+	ref := &patTeardownRef{Name: name}
+	registerPATTeardown(r.Cleanup, iamPATSeam{c}, ref)
+
 	if err := r.op(ic, "iam.pat.create", func() error {
 		tok, cerr := c.IAM().PAT().Create(ctx, name, []string{role}, expiration)
 		if cerr != nil {
@@ -43,23 +50,22 @@ func (ic iamPATCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
 		if tok == nil || tok.ID == "" {
 			return fmt.Errorf("PAT created but no id returned")
 		}
-		patID = tok.ID
+		ref.ID = tok.ID
+		ref.Resolved = true
 		return nil
-	}); err != nil || patID == "" {
+	}); err != nil || !ref.Resolved {
+		// Create failed or returned no usable id. The pre-registered teardown
+		// still removes a created-but-undecoded PAT by find-by-name.
 		return err
 	}
 
-	r.Cleanup.Register(fmt.Sprintf("iam.pat %s", patID), func(tctx context.Context) error {
-		return c.IAM().PAT().Delete(tctx, patID)
-	})
-
 	_ = r.op(ic, "iam.pat.read", func() error {
-		_, rerr := c.IAM().PAT().Read(ctx, patID)
+		_, rerr := c.IAM().PAT().Read(ctx, ref.ID)
 		return rerr
 	})
 
 	_ = r.op(ic, "iam.pat.delete", func() error {
-		return c.IAM().PAT().Delete(ctx, patID)
+		return c.IAM().PAT().Delete(ctx, ref.ID)
 	})
 	return nil
 }

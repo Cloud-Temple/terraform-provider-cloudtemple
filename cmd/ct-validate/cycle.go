@@ -60,7 +60,20 @@ type Cycle interface {
 // recorder, and feeds the failure signal to the breaker. It returns fn's error
 // so the cycle can decide whether to continue. This is the single choke point
 // that keeps recording and breaker accounting consistent for every endpoint.
+//
+// SAFETY (mid-cycle gating): the breaker is consulted BEFORE launching fn. Once
+// the breaker has tripped, op does NOT call fn — it records the endpoint as a
+// skip (not a failure, so it does not feed the breaker window) and returns nil.
+// This bounds the hammering even inside a long, multi-op cycle (e.g. readonly,
+// which chains IAM/VPC/Compute/Backup/ObjectStorage/Marketplace/Tag/Activity):
+// every post-trip op becomes a cheap no-op instead of another call against a
+// distressed shared API. Without this gate a cycle that has already started
+// would keep calling every remaining endpoint after an early 502.
 func (r *Run) op(c Cycle, endpoint string, fn func() error) error {
+	if r.Breaker != nil && !r.Breaker.Allow() {
+		r.skip(c, endpoint)
+		return nil
+	}
 	start := time.Now()
 	err := fn()
 	latency := time.Since(start)
