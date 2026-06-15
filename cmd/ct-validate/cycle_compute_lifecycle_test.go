@@ -34,19 +34,11 @@ func (f fakeVMSeam) FindIDByName(_ context.Context, name, mmID string) (string, 
 }
 
 type fakeDiskSeam struct {
-	log         *[]string
-	connections []string
-	findID      string
-	delErr      error // when non-nil, DeleteAndWait fails (e.g. an OpenIaaS 403-on-absent)
+	log    *[]string
+	findID string
+	delErr error // when non-nil, DeleteAndWait fails (e.g. an OpenIaaS 403-on-absent)
 }
 
-func (f fakeDiskSeam) ReadConnections(_ context.Context, id string) ([]string, error) {
-	return f.connections, nil
-}
-func (f fakeDiskSeam) DisconnectAndWait(_ context.Context, id, vmID string) error {
-	*f.log = append(*f.log, "disk.disconnect:"+id+"/"+vmID)
-	return nil
-}
 func (f fakeDiskSeam) DeleteAndWait(_ context.Context, id string) error {
 	*f.log = append(*f.log, "disk.delete:"+id)
 	return f.delErr
@@ -128,21 +120,22 @@ func TestRegisterVMTeardownNotFoundIsNoop(t *testing.T) {
 	}
 }
 
-// TestRegisterVirtualDiskTeardownDisconnectsEveryConnectionThenDeletes pins the
-// disk doctrine: a user disk is disconnected from EVERY connected VM BEFORE
-// delete (a VM delete never cascades it). Mutation: drop the disconnect loop →
-// the "disconnect before delete" assertion goes RED.
-func TestRegisterVirtualDiskTeardownDisconnectsEveryConnectionThenDeletes(t *testing.T) {
+// TestRegisterVirtualDiskTeardownDeletesDirectlyNoDisconnect pins the Bug A
+// doctrine: the data-disk teardown deletes the disk DIRECTLY while attached, with
+// NO pre-delete disconnect (a disconnect needs a running VM; the lean cycle leaves
+// it halted, and a disconnect there would only block the delete that works). The
+// fakeDiskSeam no longer implements ReadConnections/DisconnectAndWait, so
+// re-introducing a disconnect step would not compile — a structural guard. The
+// runtime assertion pins that only a delete is performed.
+func TestRegisterVirtualDiskTeardownDeletesDirectlyNoDisconnect(t *testing.T) {
 	var log []string
 	cl := NewCleanup()
-	registerVirtualDiskTeardown(cl, fakeDiskSeam{log: &log, connections: []string{"vm-1", "vm-2"}},
+	registerVirtualDiskTeardown(cl, fakeDiskSeam{log: &log},
 		&diskTeardownRef{Name: "d-data", VMID: "vm-1", ID: "disk-7", Resolved: true})
 	cl.TeardownAll(context.Background())
-	d1 := indexOf(log, "disk.disconnect:disk-7/vm-1")
-	d2 := indexOf(log, "disk.disconnect:disk-7/vm-2")
-	del := indexOf(log, "disk.delete:disk-7")
-	if d1 == -1 || d2 == -1 || del == -1 || d1 > del || d2 > del {
-		t.Fatalf("disk must disconnect EVERY connection before delete; log=%v", log)
+	// Exactly one op — a direct delete by id, nothing else (no disconnect, no read).
+	if len(log) != 1 || log[0] != "disk.delete:disk-7" {
+		t.Fatalf("the disk teardown must perform exactly one op (a direct delete, no disconnect); log=%v", log)
 	}
 }
 

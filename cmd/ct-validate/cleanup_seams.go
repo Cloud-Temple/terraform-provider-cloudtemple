@@ -438,11 +438,13 @@ func (s iamPATSeam) FindIDByName(ctx context.Context, name string) (string, erro
 //
 // Teardown ordering is leaves-first (LIFO over registration order): the network
 // adapter and the user data disk are removed BEFORE the VM anchor, because a VM
-// delete does NOT cascade a user-created disk (it would orphan storage) and a
-// still-connected disk can refuse deletion. Each teardown is registered BEFORE
-// the create it undoes (F3), keyed by a deterministic identity, and finds its
-// resource via a STRICT listing when the create's activity did not resolve the
-// id.
+// delete does NOT cascade a user-created disk (it would orphan storage). The disk
+// is deleted DIRECTLY while still attached — live evidence shows the attached data
+// disk delete succeeds, and an explicit disconnect requires a RUNNING VM (this lean
+// cycle leaves the VM halted), so a pre-delete disconnect would only fail and BLOCK
+// the delete that otherwise works. Each teardown is registered BEFORE the create it
+// undoes (F3), keyed by a deterministic identity, and finds its resource via a
+// STRICT listing when the create's activity did not resolve the id.
 //
 // 403-on-absent (#303): the OpenIaaS compute DELETE answers 403 (not 404) for an
 // ALREADY-ABSENT resource — observed live when the deferred net re-deletes what
@@ -545,10 +547,11 @@ func (s computeVMSeam) FindIDByName(ctx context.Context, name, machineManagerID 
 	return found, nil
 }
 
-// diskSeam is the subset of the virtual-disk client a disk teardown needs.
+// diskSeam is the subset of the virtual-disk client a disk teardown needs. There
+// is intentionally no Disconnect: the data disk is deleted directly while attached
+// (see registerVirtualDiskTeardown). Keeping the method off the interface makes
+// re-introducing a pre-delete disconnect a compile error.
 type diskSeam interface {
-	ReadConnections(ctx context.Context, id string) ([]string, error) // connected VM ids
-	DisconnectAndWait(ctx context.Context, id, vmID string) error
 	DeleteAndWait(ctx context.Context, id string) error
 	FindIDByName(ctx context.Context, name, vmID string) (string, error)
 }
@@ -562,9 +565,13 @@ type diskTeardownRef struct {
 	ExplicitlyDeleted bool
 }
 
-// registerVirtualDiskTeardown registers the user data-disk teardown: disconnect
-// from EVERY connected VM (a VM delete never cascades a user disk) THEN delete.
-// Registered before the disk create; runs before the VM teardown (LIFO).
+// registerVirtualDiskTeardown registers the user data-disk teardown: delete the
+// disk (a VM delete never cascades a user disk, so it must be removed explicitly).
+// The disk is deleted DIRECTLY while attached — no pre-delete disconnect: the
+// attached-disk delete succeeds (live evidence), and a disconnect requires a
+// running VM, so a pre-delete disconnect on this lean halted-VM cycle would only
+// fail and block the delete that otherwise works. Registered before the disk
+// create; runs before the VM teardown (LIFO).
 func registerVirtualDiskTeardown(cl *Cleanup, seam diskSeam, ref *diskTeardownRef) {
 	cl.Register(fmt.Sprintf("compute.openiaas.virtual_disk %s", ref.Name), func(tctx context.Context) error {
 		id := ref.ID
@@ -578,15 +585,6 @@ func registerVirtualDiskTeardown(cl *Cleanup, seam diskSeam, ref *diskTeardownRe
 			}
 			id = found
 		}
-		vmIDs, err := seam.ReadConnections(tctx, id)
-		if err != nil {
-			return err
-		}
-		for _, vmID := range vmIDs {
-			if derr := seam.DisconnectAndWait(tctx, id, vmID); derr != nil {
-				return derr
-			}
-		}
 		// 403-on-absent (#303): accept only on the same-cycle explicit-delete proof
 		// for the RESOLVED id (a find-by-name fallback carries no proof → fail closed).
 		priorDeleteOK := ref.Resolved && ref.ExplicitlyDeleted && id == ref.ID
@@ -595,33 +593,6 @@ func registerVirtualDiskTeardown(cl *Cleanup, seam diskSeam, ref *diskTeardownRe
 }
 
 type computeVirtualDiskSeam struct{ c *client.Client }
-
-func (s computeVirtualDiskSeam) ReadConnections(ctx context.Context, id string) ([]string, error) {
-	disk, err := s.c.Compute().OpenIaaS().VirtualDisk().Read(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	if disk == nil { // 403/absent mapped to nil → nothing connected to disconnect
-		return nil, nil
-	}
-	var vmIDs []string
-	for _, vm := range disk.VirtualMachines {
-		if vm.Connected && vm.ID != "" {
-			vmIDs = append(vmIDs, vm.ID)
-		}
-	}
-	return vmIDs, nil
-}
-
-func (s computeVirtualDiskSeam) DisconnectAndWait(ctx context.Context, id, vmID string) error {
-	activityID, err := s.c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, id,
-		&client.OpenIaaSVirtualDiskConnectionRequest{VirtualMachineID: vmID})
-	if err != nil {
-		return idempotentDeleteErr(err) // already disconnected/gone → ok
-	}
-	_, werr := s.c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
-	return werr
-}
 
 func (s computeVirtualDiskSeam) DeleteAndWait(ctx context.Context, id string) error {
 	activityID, err := s.c.Compute().OpenIaaS().VirtualDisk().Delete(ctx, id)

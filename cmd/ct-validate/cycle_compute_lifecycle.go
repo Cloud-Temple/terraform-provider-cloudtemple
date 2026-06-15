@@ -194,7 +194,6 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 		"compute.openiaas.network_adapter.create",
 		"compute.openiaas.virtual_machine.read",
 		"compute.openiaas.network_adapter.delete",
-		"compute.openiaas.virtual_disk.disconnect",
 		"compute.openiaas.virtual_disk.delete",
 		"compute.openiaas.virtual_machine.delete",
 	}
@@ -281,7 +280,7 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 		for _, ep := range []string{
 			"compute.openiaas.virtual_disk.create", "compute.openiaas.network_adapter.create",
 			"compute.openiaas.virtual_machine.read",
-			"compute.openiaas.network_adapter.delete", "compute.openiaas.virtual_disk.disconnect",
+			"compute.openiaas.network_adapter.delete",
 			"compute.openiaas.virtual_disk.delete", "compute.openiaas.virtual_machine.delete",
 		} {
 			r.skip(cyc, ep)
@@ -399,15 +398,10 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 	}
 
 	if diskID != "" {
-		_ = r.op(cyc, "compute.openiaas.virtual_disk.disconnect", func() error {
-			activityID, err := oi.VirtualDisk().Disconnect(ctx, diskID,
-				&client.OpenIaaSVirtualDiskConnectionRequest{VirtualMachineID: vmID})
-			if err != nil {
-				return idempotentDeleteErr(err)
-			}
-			_, werr := c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
-			return werr
-		})
+		// No explicit disconnect: deleting the attached data disk works directly
+		// (live evidence), and a disconnect requires a RUNNING VM ("VM state is
+		// halted but should be running") which this lean halted-VM cycle never
+		// satisfies — mirrors the dropped Connect (#333).
 		cyc.explicitDelete(r, &diskRef.ExplicitlyDeleted, "compute.openiaas.virtual_disk.delete", func() error {
 			activityID, err := oi.VirtualDisk().Delete(ctx, diskID)
 			if err != nil {
@@ -417,7 +411,6 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 			return werr
 		})
 	} else {
-		r.skip(cyc, "compute.openiaas.virtual_disk.disconnect")
 		r.skip(cyc, "compute.openiaas.virtual_disk.delete")
 	}
 
