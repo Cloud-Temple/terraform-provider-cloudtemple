@@ -14,14 +14,21 @@ import (
 // fakes in cycle_compute_lifecycle_test.go (distinct names, same package). ---
 
 type fakeVMwareVMSeam struct {
-	log     *[]string
-	findID  string
-	findErr error
+	log       *[]string
+	findID    string
+	findErr   error
+	delErr    error // when non-nil, DeleteAndWait fails (e.g. a VMware 403-on-absent)
+	exists    bool  // Exists() result, used to confirm a 403 delete
+	existsErr error
 }
 
 func (f fakeVMwareVMSeam) DeleteAndWait(_ context.Context, id string) error {
 	*f.log = append(*f.log, "vm.delete:"+id)
-	return nil
+	return f.delErr
+}
+func (f fakeVMwareVMSeam) Exists(_ context.Context, id string) (bool, error) {
+	*f.log = append(*f.log, "vm.exists:"+id)
+	return f.exists, f.existsErr
 }
 func (f fakeVMwareVMSeam) PowerOffAndWait(_ context.Context, id string) error {
 	*f.log = append(*f.log, "vm.poweroff:"+id)
@@ -33,9 +40,11 @@ func (f fakeVMwareVMSeam) FindIDByName(_ context.Context, name, dcID string) (st
 }
 
 type fakeVMwareDiskSeam struct {
-	log    *[]string
-	ids    []string // FindIDsByVM returns these
-	delErr error    // when non-nil, DeleteAndWait fails (e.g. a 409)
+	log       *[]string
+	ids       []string // FindIDsByVM returns these
+	delErr    error    // when non-nil, DeleteAndWait fails (e.g. a 409)
+	exists    bool     // Exists() result
+	existsErr error
 }
 
 func (f fakeVMwareDiskSeam) FindIDsByVM(_ context.Context, vmID string) ([]string, error) {
@@ -46,11 +55,17 @@ func (f fakeVMwareDiskSeam) DeleteAndWait(_ context.Context, id string) error {
 	*f.log = append(*f.log, "disk.delete:"+id)
 	return f.delErr
 }
+func (f fakeVMwareDiskSeam) Exists(_ context.Context, id string) (bool, error) {
+	*f.log = append(*f.log, "disk.exists:"+id)
+	return f.exists, f.existsErr
+}
 
 type fakeVMwareAdapterSeam struct {
-	log    *[]string
-	ids    []string // FindIDsByVM returns these
-	delErr error    // when non-nil, DeleteAndWait fails
+	log       *[]string
+	ids       []string // FindIDsByVM returns these
+	delErr    error    // when non-nil, DeleteAndWait fails
+	exists    bool     // Exists() result
+	existsErr error
 }
 
 func (f fakeVMwareAdapterSeam) FindIDsByVM(_ context.Context, vmID string) ([]string, error) {
@@ -60,6 +75,109 @@ func (f fakeVMwareAdapterSeam) FindIDsByVM(_ context.Context, vmID string) ([]st
 func (f fakeVMwareAdapterSeam) DeleteAndWait(_ context.Context, id string) error {
 	*f.log = append(*f.log, "adapter.delete:"+id)
 	return f.delErr
+}
+func (f fakeVMwareAdapterSeam) Exists(_ context.Context, id string) (bool, error) {
+	*f.log = append(*f.log, "adapter.exists:"+id)
+	return f.exists, f.existsErr
+}
+
+// TestConfirmComputeDeleteErr pins the VMware compute delete decision: 404 →
+// idempotent success; a 403 is CONFIRMED via a by-id existence re-check and
+// accepted ONLY when the id is proven absent (the false-"orphan" fix), surfaced
+// when it still exists, and failed-closed when the re-check itself errors; other
+// errors surface unchanged. Mutations: treat 403 as always-success → the
+// still-present case wrongly passes → RED; treat 403 as always-failure → the
+// absent case fails → RED.
+func TestConfirmComputeDeleteErr(t *testing.T) {
+	forbidden := client.StatusError{Code: http.StatusForbidden, Body: "Forbidden."}
+	notFound := client.StatusError{Code: http.StatusNotFound}
+	serverErr := client.StatusError{Code: http.StatusInternalServerError}
+	absent := func() (bool, error) { return false, nil }
+	present := func() (bool, error) { return true, nil }
+	recheckFailed := func() (bool, error) { return false, errors.New("transport error: cannot confirm") }
+
+	if confirmComputeDeleteErr(nil, present, "id-x") != nil {
+		t.Fatal("nil error must be success")
+	}
+	if confirmComputeDeleteErr(notFound, present, "id-x") != nil {
+		t.Fatal("a 404 must be idempotent success without re-checking existence")
+	}
+	if err := confirmComputeDeleteErr(forbidden, absent, "id-x"); err != nil {
+		t.Fatalf("a 403 with the id confirmed ABSENT must be success (no false orphan), got %v", err)
+	}
+	if confirmComputeDeleteErr(forbidden, present, "id-x") == nil {
+		t.Fatal("a 403 with the id STILL existing must surface as a real failure")
+	}
+	if confirmComputeDeleteErr(forbidden, recheckFailed, "id-x") == nil {
+		t.Fatal("a 403 whose absence cannot be confirmed must fail closed")
+	}
+	if confirmComputeDeleteErr(serverErr, absent, "id-x") == nil {
+		t.Fatal("a 5xx must surface unchanged (never silently accepted)")
+	}
+}
+
+// TestVMwareVMTeardownConfirms403AsAbsent pins the wiring: when the deferred VM
+// teardown re-deletes an already-gone VM (VMware answers 403, not 404) and the
+// by-id existence re-check shows it absent, the teardown is a clean SUCCESS — not
+// a false "possible orphan". If the re-check still shows it present, it is a real
+// failure. A separate case pins fail-closed when the re-check itself errors.
+func TestVMwareVMTeardownConfirms403AsAbsent(t *testing.T) {
+	forbidden := client.StatusError{Code: http.StatusForbidden, Body: "Forbidden."}
+
+	// VM already gone: delete 403s, the by-id existence re-check says absent → ok.
+	var log []string
+	cl := NewCleanup()
+	registerVMwareVMTeardown(cl, fakeVMwareVMSeam{log: &log, delErr: forbidden, exists: false},
+		&vmwareVMTeardownRef{Name: "vm-x", DatacenterID: "dc-1", ID: "vm-id", Resolved: true})
+	if f := cl.TeardownAll(context.Background()); len(f) != 0 {
+		t.Fatalf("a 403 on an already-gone VM must be confirmed absent (no false orphan), got failures %v", f)
+	}
+
+	// VM still present: delete 403s, the re-check says it still exists → real failure.
+	var log2 []string
+	cl2 := NewCleanup()
+	registerVMwareVMTeardown(cl2, fakeVMwareVMSeam{log: &log2, delErr: forbidden, exists: true},
+		&vmwareVMTeardownRef{Name: "vm-x", DatacenterID: "dc-1", ID: "vm-id", Resolved: true})
+	if f := cl2.TeardownAll(context.Background()); len(f) != 1 {
+		t.Fatalf("a 403 with the VM STILL present must be a real teardown failure, got %v", f)
+	}
+
+	// Re-check ITSELF errors (e.g. a 5xx on Read): unknown existence → FAIL CLOSED
+	// (a teardown failure), never silently accepted.
+	var log3 []string
+	cl3 := NewCleanup()
+	registerVMwareVMTeardown(cl3, fakeVMwareVMSeam{log: &log3, delErr: forbidden, existsErr: errors.New("503 on read")},
+		&vmwareVMTeardownRef{Name: "vm-x", DatacenterID: "dc-1", ID: "vm-id", Resolved: true})
+	if f := cl3.TeardownAll(context.Background()); len(f) != 1 {
+		t.Fatalf("a 403 whose existence re-check errors must fail closed (teardown failure), got %v", f)
+	}
+}
+
+// TestVMwareLeafTeardownConfirms403WhenParentVMGone pins Codex's exact concern: a
+// deferred LEAF (disk/adapter) re-delete after the explicit deprovision already
+// removed the parent VM gets a 403; the confirm is a BY-ID existence re-check
+// (Exists), independent of the now-gone VM, so an absent leaf is a clean success
+// (not a false orphan), and a still-present leaf is a real failure.
+func TestVMwareLeafTeardownConfirms403WhenParentVMGone(t *testing.T) {
+	forbidden := client.StatusError{Code: http.StatusForbidden, Body: "Forbidden."}
+
+	// Disk: resolved, delete 403s, Exists=false (gone with its VM) → success.
+	var dl []string
+	dcl := NewCleanup()
+	registerVMwareDiskTeardown(dcl, fakeVMwareDiskSeam{log: &dl, delErr: forbidden, exists: false},
+		&vmwareDiskTeardownRef{VMID: "vm-gone", ID: "disk-1", Resolved: true})
+	if f := dcl.TeardownAll(context.Background()); len(f) != 0 {
+		t.Fatalf("a 403 disk delete confirmed absent by-id must succeed even when the VM is gone, got %v", f)
+	}
+
+	// Adapter: resolved, delete 403s, Exists=true (still there) → real failure.
+	var al []string
+	acl := NewCleanup()
+	registerVMwareNetworkAdapterTeardown(acl, fakeVMwareAdapterSeam{log: &al, delErr: forbidden, exists: true},
+		&vmwareAdapterTeardownRef{VMID: "vm-x", ID: "ad-1", Resolved: true})
+	if f := acl.TeardownAll(context.Background()); len(f) != 1 {
+		t.Fatalf("a 403 adapter delete with the adapter still present must be a real failure, got %v", f)
+	}
 }
 
 // TestRegisterVMwareVMTeardownResolvedDeletesByID: a resolved ref deletes by id
