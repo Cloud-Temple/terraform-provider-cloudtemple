@@ -17,11 +17,12 @@ type fakeVMSeam struct {
 	log     *[]string
 	findID  string
 	findErr error
+	delErr  error // when non-nil, DeleteAndWait fails (e.g. an OpenIaaS 403-on-absent)
 }
 
 func (f fakeVMSeam) DeleteAndWait(_ context.Context, id string) error {
 	*f.log = append(*f.log, "vm.delete:"+id)
-	return nil
+	return f.delErr
 }
 func (f fakeVMSeam) PowerOffAndWait(_ context.Context, id string) error {
 	*f.log = append(*f.log, "vm.poweroff:"+id)
@@ -36,6 +37,7 @@ type fakeDiskSeam struct {
 	log         *[]string
 	connections []string
 	findID      string
+	delErr      error // when non-nil, DeleteAndWait fails (e.g. an OpenIaaS 403-on-absent)
 }
 
 func (f fakeDiskSeam) ReadConnections(_ context.Context, id string) ([]string, error) {
@@ -47,7 +49,7 @@ func (f fakeDiskSeam) DisconnectAndWait(_ context.Context, id, vmID string) erro
 }
 func (f fakeDiskSeam) DeleteAndWait(_ context.Context, id string) error {
 	*f.log = append(*f.log, "disk.delete:"+id)
-	return nil
+	return f.delErr
 }
 func (f fakeDiskSeam) FindIDByName(_ context.Context, name, vmID string) (string, error) {
 	*f.log = append(*f.log, "disk.find:"+name)
@@ -55,8 +57,9 @@ func (f fakeDiskSeam) FindIDByName(_ context.Context, name, vmID string) (string
 }
 
 type fakeAdapterSeam struct {
-	log *[]string
-	ids []string // FindIDsByVM returns these
+	log    *[]string
+	ids    []string // FindIDsByVM returns these
+	delErr error    // when non-nil, DeleteAndWait fails (e.g. an OpenIaaS 403-on-absent)
 }
 
 func (f fakeAdapterSeam) FindIDsByVM(_ context.Context, vmID string) ([]string, error) {
@@ -65,7 +68,7 @@ func (f fakeAdapterSeam) FindIDsByVM(_ context.Context, vmID string) ([]string, 
 }
 func (f fakeAdapterSeam) DeleteAndWait(_ context.Context, id string) error {
 	*f.log = append(*f.log, "adapter.delete:"+id)
-	return nil
+	return f.delErr
 }
 
 func indexOf(log []string, prefix string) int {
@@ -447,5 +450,194 @@ func TestFlagsValidateRejectsRunawayLoad(t *testing.T) {
 	}
 	if _, err := parseFlags([]string{"-runs", "100000000"}, out); err == nil {
 		t.Fatal("-runs 100000000 must be rejected (runaway load)")
+	}
+}
+
+// --- Bug B: OpenIaaS deferred teardown 403-on-absent (#303) via same-cycle proof ---
+
+// TestConfirmComputeDeleteByPriorDelete pins the pure decision: nil/404 are
+// idempotent success; a 403 is accepted ONLY with same-cycle explicit-delete proof,
+// else it FAILS CLOSED; any other error surfaces. Mutations: accept a 403 without
+// proof → the "no proof" case wrongly passes → RED; reject a proven 403 → the
+// proven case wrongly fails → RED.
+func TestConfirmComputeDeleteByPriorDelete(t *testing.T) {
+	forbidden := client.StatusError{Code: http.StatusForbidden, Body: "Forbidden."}
+	notFound := client.StatusError{Code: http.StatusNotFound}
+	serverErr := client.StatusError{Code: http.StatusInternalServerError}
+
+	if confirmComputeDeleteByPriorDelete(nil, false, "id-x") != nil {
+		t.Fatal("a nil delete error must be success")
+	}
+	if confirmComputeDeleteByPriorDelete(notFound, false, "id-x") != nil {
+		t.Fatal("a definitive 404 must be idempotent success even without prior-delete proof")
+	}
+	if err := confirmComputeDeleteByPriorDelete(forbidden, true, "id-x"); err != nil {
+		t.Fatalf("a 403 WITH same-cycle explicit-delete proof must be success (no false orphan), got %v", err)
+	}
+	if confirmComputeDeleteByPriorDelete(forbidden, false, "id-x") == nil {
+		t.Fatal("a 403 WITHOUT proof must FAIL CLOSED (a possible orphan, never masked)")
+	}
+	if confirmComputeDeleteByPriorDelete(serverErr, true, "id-x") == nil {
+		t.Fatal("a non-403/404 error must surface even with prior-delete proof")
+	}
+}
+
+// TestOpenIaaSVMTeardownConfirms403ByPriorDelete pins the wiring: the deferred VM
+// teardown re-deletes an already-gone VM (OpenIaaS answers 403, not 404). With the
+// same-cycle explicit-delete proof it is a clean success (no false orphan); without
+// it, it fails closed. Mutation: revert the wrap to idempotentDeleteErr (404-only)
+// → the proven 403 surfaces as a failure → RED.
+func TestOpenIaaSVMTeardownConfirms403ByPriorDelete(t *testing.T) {
+	forbidden := client.StatusError{Code: http.StatusForbidden, Body: "Forbidden."}
+
+	// VM explicitly deleted this cycle: deferred delete 403s, proof present → success.
+	var log []string
+	cl := NewCleanup()
+	registerVMTeardown(cl, fakeVMSeam{log: &log, delErr: forbidden},
+		&vmTeardownRef{Name: "vm", ID: "vm-1", Resolved: true, ExplicitlyDeleted: true})
+	if f := cl.TeardownAll(context.Background()); len(f) != 0 {
+		t.Fatalf("a 403 on a VM proven deleted this cycle must be confirmed absent (no false orphan), got failures %v", f)
+	}
+
+	// No proof (e.g. explicit delete skipped by the breaker): 403 fails closed.
+	var log2 []string
+	cl2 := NewCleanup()
+	registerVMTeardown(cl2, fakeVMSeam{log: &log2, delErr: forbidden},
+		&vmTeardownRef{Name: "vm", ID: "vm-1", Resolved: true, ExplicitlyDeleted: false})
+	if f := cl2.TeardownAll(context.Background()); len(f) != 1 {
+		t.Fatalf("a 403 with NO same-cycle delete proof must fail closed (possible orphan), got failures %v", f)
+	}
+
+	// A definitive 404 is idempotent success regardless of proof.
+	var log3 []string
+	cl3 := NewCleanup()
+	registerVMTeardown(cl3, fakeVMSeam{log: &log3, delErr: client.StatusError{Code: http.StatusNotFound}},
+		&vmTeardownRef{Name: "vm", ID: "vm-1", Resolved: true, ExplicitlyDeleted: false})
+	if f := cl3.TeardownAll(context.Background()); len(f) != 0 {
+		t.Fatalf("a definitive 404 must be idempotent success, got failures %v", f)
+	}
+
+	// UNRESOLVED (create id never came back): the teardown finds the VM by name and
+	// re-deletes it; a 403 there carries NO same-cycle proof → must fail closed (a
+	// created-but-unresolved, still-present VM must never be masked). Mutation: force
+	// priorDeleteOK=true on this path → the 403 is masked → RED.
+	var log4 []string
+	cl4 := NewCleanup()
+	registerVMTeardown(cl4, fakeVMSeam{log: &log4, findID: "found-vm-9", delErr: forbidden},
+		&vmTeardownRef{Name: "vm", MachineManagerID: "mm-1"}) // Resolved=false
+	if f := cl4.TeardownAll(context.Background()); len(f) != 1 {
+		t.Fatalf("an unresolved find-by-name VM 403 carries no proof and must fail closed, got failures %v", f)
+	}
+}
+
+// TestOpenIaaSDiskTeardownConfirms403ByPriorDelete: same doctrine for the disk leaf.
+func TestOpenIaaSDiskTeardownConfirms403ByPriorDelete(t *testing.T) {
+	forbidden := client.StatusError{Code: http.StatusForbidden, Body: "Forbidden."}
+
+	var log []string
+	cl := NewCleanup()
+	registerVirtualDiskTeardown(cl, fakeDiskSeam{log: &log, delErr: forbidden},
+		&diskTeardownRef{Name: "d-data", VMID: "vm-1", ID: "disk-1", Resolved: true, ExplicitlyDeleted: true})
+	if f := cl.TeardownAll(context.Background()); len(f) != 0 {
+		t.Fatalf("a 403 on a disk proven deleted this cycle must be confirmed absent, got failures %v", f)
+	}
+
+	var log2 []string
+	cl2 := NewCleanup()
+	registerVirtualDiskTeardown(cl2, fakeDiskSeam{log: &log2, delErr: forbidden},
+		&diskTeardownRef{Name: "d-data", VMID: "vm-1", ID: "disk-1", Resolved: true, ExplicitlyDeleted: false})
+	if f := cl2.TeardownAll(context.Background()); len(f) != 1 {
+		t.Fatalf("a disk 403 with NO same-cycle delete proof must fail closed, got failures %v", f)
+	}
+
+	// UNRESOLVED: the disk is found by name (created-but-unresolved), then re-deleted;
+	// a 403 there carries no proof → must fail closed. Mutation: force priorDeleteOK=true
+	// on the find-by-name path → the 403 is masked → RED.
+	var log3 []string
+	cl3 := NewCleanup()
+	registerVirtualDiskTeardown(cl3, fakeDiskSeam{log: &log3, findID: "disk-9", delErr: forbidden},
+		&diskTeardownRef{Name: "d-data", VMID: "vm-1"}) // Resolved=false
+	if f := cl3.TeardownAll(context.Background()); len(f) != 1 {
+		t.Fatalf("an unresolved find-by-name disk 403 carries no proof and must fail closed, got failures %v", f)
+	}
+}
+
+// TestOpenIaaSAdapterTeardownConfirms403ByPriorDelete: the adapter leaf, both the
+// resolved (proof-bearing) path and the unresolved delete-all-on-VM path (which
+// carries NO per-id proof → a 403 there must fail closed).
+func TestOpenIaaSAdapterTeardownConfirms403ByPriorDelete(t *testing.T) {
+	forbidden := client.StatusError{Code: http.StatusForbidden, Body: "Forbidden."}
+
+	// Resolved + proof → 403 confirmed absent.
+	var log []string
+	cl := NewCleanup()
+	registerNetworkAdapterTeardown(cl, fakeAdapterSeam{log: &log, delErr: forbidden},
+		&adapterTeardownRef{VMID: "vm-1", ID: "ad-1", Resolved: true, ExplicitlyDeleted: true})
+	if f := cl.TeardownAll(context.Background()); len(f) != 0 {
+		t.Fatalf("a 403 on an adapter proven deleted this cycle must be confirmed absent, got failures %v", f)
+	}
+
+	// Resolved + no proof → fail closed.
+	var log2 []string
+	cl2 := NewCleanup()
+	registerNetworkAdapterTeardown(cl2, fakeAdapterSeam{log: &log2, delErr: forbidden},
+		&adapterTeardownRef{VMID: "vm-1", ID: "ad-1", Resolved: true, ExplicitlyDeleted: false})
+	if f := cl2.TeardownAll(context.Background()); len(f) != 1 {
+		t.Fatalf("an adapter 403 with NO same-cycle delete proof must fail closed, got failures %v", f)
+	}
+
+	// Unresolved delete-all-on-VM: no per-id proof → a 403 must fail closed even if
+	// the ref were (wrongly) marked. Mutation: pass ref.ExplicitlyDeleted instead of
+	// false in the delete-all branch → this 403 would be masked → RED.
+	var log3 []string
+	cl3 := NewCleanup()
+	registerNetworkAdapterTeardown(cl3, fakeAdapterSeam{log: &log3, ids: []string{"ad-9"}, delErr: forbidden},
+		&adapterTeardownRef{VMID: "vm-1", ExplicitlyDeleted: true}) // unresolved (Resolved=false)
+	if f := cl3.TeardownAll(context.Background()); len(f) != 1 {
+		t.Fatalf("an unresolved delete-all 403 must fail closed (no per-id proof), got failures %v", f)
+	}
+}
+
+// TestExplicitDeleteMarksProofOnlyWhenClosureRuns is the blocker-#2 guard: the
+// same-cycle proof must be set from INSIDE the breaker-gated closure, never from
+// r.op's return value (which is nil on a breaker SKIP too). A skipped explicit
+// delete must leave the proof false, so a later 403-on-absent fails closed instead
+// of masking a still-present forbidden orphan. Mutation: set the flag with
+// `r.op(...) == nil` → case (a) would mark it true on a skip → RED.
+func TestExplicitDeleteMarksProofOnlyWhenClosureRuns(t *testing.T) {
+	cyc := computeLifecycleCycle{}
+
+	// (a) breaker tripped → op skipped → closure NOT run → proof stays false.
+	b := NewBreaker(1000, 0.99, 1000)
+	b.Trip("force-skip")
+	r := &Run{Recorder: NewRecorder(), Breaker: b, Cleanup: NewCleanup()}
+	deleted, ran := false, false
+	cyc.explicitDelete(r, &deleted, "compute.openiaas.virtual_machine.delete", func() error {
+		ran = true
+		return nil
+	})
+	if ran {
+		t.Fatal("a tripped breaker must skip the op — the closure must not run")
+	}
+	if deleted {
+		t.Fatal("a skipped (never-run) explicit delete must NOT set the same-cycle proof (else a later 403 masks an orphan)")
+	}
+
+	// (b) breaker allows + delete succeeds → proof set.
+	r2 := &Run{Recorder: NewRecorder(), Breaker: NewBreaker(1000, 0.99, 1000), Cleanup: NewCleanup()}
+	deleted2 := false
+	cyc.explicitDelete(r2, &deleted2, "compute.openiaas.virtual_machine.delete", func() error { return nil })
+	if !deleted2 {
+		t.Fatal("a ran-and-succeeded explicit delete must set the same-cycle proof")
+	}
+
+	// (c) breaker allows + delete fails → proof NOT set.
+	r3 := &Run{Recorder: NewRecorder(), Breaker: NewBreaker(1000, 0.99, 1000), Cleanup: NewCleanup()}
+	deleted3 := false
+	cyc.explicitDelete(r3, &deleted3, "compute.openiaas.virtual_machine.delete", func() error {
+		return errors.New("delete boom")
+	})
+	if deleted3 {
+		t.Fatal("a failed explicit delete must NOT set the same-cycle proof")
 	}
 }
