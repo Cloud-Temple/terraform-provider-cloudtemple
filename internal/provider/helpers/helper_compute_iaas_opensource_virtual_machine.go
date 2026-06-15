@@ -118,6 +118,11 @@ const cloudConfigDriveName = "XO CloudConfigDrive"
 // platform naming is excluded; when the VBD is absent Find returns a zero
 // value, so the default stays fail-safe (the disk remains managed).
 func IsPlatformManagedDisk(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) bool {
+	if osDisk == nil {
+		// A nil disk (the API maps a deleted/forbidden disk to nil) is not a
+		// platform-managed disk; never dereference it (#320).
+		return false
+	}
 	if osDisk.Name != cloudConfigDriveName {
 		return false
 	}
@@ -131,6 +136,12 @@ func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMa
 	disks := make([]interface{}, 0, len(osDisks))
 
 	for _, osDisk := range osDisks {
+		// Skip a nil disk (the API maps a deleted/forbidden disk to nil): it must
+		// never be dereferenced nor appended as a nil entry (#320). append-based
+		// (not index-based), so skipping does not shift the kept disks.
+		if osDisk == nil {
+			continue
+		}
 		if IsPlatformManagedDisk(osDisk, virtualMachineId) {
 			continue
 		}
@@ -141,6 +152,13 @@ func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMa
 }
 
 func FlattenOpenIaaSOSDiskData(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) interface{} {
+	if osDisk == nil {
+		// The API maps a deleted/forbidden disk to a nil read (403 -> nil).
+		// Refreshing a VM whose OS disk disappeared out-of-band must not panic
+		// here (#320); callers skip a nil entry. Defense-in-depth on top of
+		// classifyOSDiskOnRead, which already drops a nil disk on the read path.
+		return nil
+	}
 	vbd := Find(osDisk.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
 		return virtualMachine.ID == virtualMachineId
 	})

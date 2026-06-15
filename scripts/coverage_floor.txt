@@ -3,4 +3,4 @@
 # CI fails if coverage drops below these values. Never lower by hand.
 internal/client 18.5
 internal/provider 12.3
-internal/provider/helpers 65.4
+internal/provider/helpers 68.1
