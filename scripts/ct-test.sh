@@ -28,7 +28,7 @@ scenarios() {
 readonly|readonly|0|1|Read every service (no create/destroy). The safest scenario, validates the tool.
 vpc|vpc|1|1|Create a VPC static IP + floating-IP binding, verify, then destroy.
 storage|object_storage|1|1|Create an object-storage bucket + account + ACL, verify, then destroy.
-vm|compute_lifecycle|1|0|Create a VM, add a disk, connect the network, then destroy. (api: cycle being built)
+vm|compute_lifecycle|1|1|Create a VM from a template, add a disk, connect the network, then destroy.
 EOF
 }
 
