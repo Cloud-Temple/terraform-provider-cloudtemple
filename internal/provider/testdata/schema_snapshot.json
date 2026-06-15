@@ -1907,6 +1907,34 @@
         }
       }
     },
+    "cloudtemple_vpc_floating_ip_binding": {
+      "schema": {
+        "floating_ip_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "floating_ip_id": {
+          "type": "TypeString",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "static_ip_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "static_ip_id": {
+          "type": "TypeString",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_vpc_static_ip": {
       "schema": {
         "floating_ip_address": {
