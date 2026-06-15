@@ -72,9 +72,24 @@ API_PATH=/api/compute/v1/open_iaas/storage_repositories scripts/ct-soak.sh
 | `PER_STEP` | `25` | calls per step (total = `PER_STEP` × #steps) |
 | `MAX_TIME` | `30` | per-call timeout (s) |
 | `ABORT_5XX_RATE` | `0.5` | stop the ladder if a step's 5xx rate exceeds this |
+| `USER_AGENT` | *(empty)* | `User-Agent` header (empty = byte-for-byte like the Go client) |
 
 Exit code is non-zero if the breaker tripped. Useful to characterize platform
 flakiness (e.g. ComputeManager 5xx bursts) and to size a client retry/backoff policy.
+
+**Fidelity to the real client:** the probe sends the **same bytes** as the
+`ct-validate` Go client — an empty `User-Agent` and no `Accept` header (curl would
+otherwise inject `curl/x.y` + `Accept: */*`, which a gateway can route differently).
+For a 100% client-identical soak that exercises `machine_managers.list` through the
+real Go client, drive the read-only cycle with load knobs instead:
+
+```bash
+CT_ENV_OPENIAAS=/path/.env.recette-openiaas scripts/ct-test.sh api readonly -runs 100 -concurrency 8
+```
+
+The per-endpoint table then reports the 5xx rate of `compute.openiaas.machine_managers.list`
+specifically. Use `ct-soak.sh` for a targeted single-endpoint probe; `ct-test.sh api readonly`
+for a multi-endpoint soak through the exact provider client.
 
 ## `coverage_ratchet.sh` — CI coverage gate
 

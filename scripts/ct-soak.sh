@@ -39,6 +39,11 @@ STEPS="${STEPS:-1 2 4 8}"
 PER_STEP="${PER_STEP:-25}"
 MAX_TIME="${MAX_TIME:-30}"
 ABORT_5XX_RATE="${ABORT_5XX_RATE:-0.5}"
+# USER_AGENT mirrors the ct-validate Go client, which sends an EMPTY User-Agent and
+# NO Accept header. curl otherwise injects "curl/x.y" + "Accept: */*", which a
+# gateway/WAF can route differently — so by default we send the same bytes as the
+# real client. Override USER_AGENT to test a specific UA.
+USER_AGENT="${USER_AGENT:-}"
 
 # --- resolve & load credentials (never printed) ------------------------------
 CT_ENV="${CT_ENV:-${CT_ENV_OPENIAAS:-./.env.recette-openiaas}}"
@@ -57,7 +62,7 @@ fi
 # The token is captured into a variable and never echoed.
 TOKEN="$(curl -ksS --max-time "$MAX_TIME" -X POST \
   "https://${HOST}/api/iam/v2/auth/personal_access_token" \
-  -H 'Content-Type: application/json' \
+  -A "$USER_AGENT" -H 'Accept:' -H 'Content-Type: application/json' \
   -d "{\"id\":\"${CLOUDTEMPLE_CLIENT_ID}\",\"secret\":\"${CLOUDTEMPLE_SECRET_ID}\"}" 2>/dev/null)"
 case "$TOKEN" in
   eyJ*) : ;;  # looks like a JWT
@@ -79,6 +84,7 @@ one_call() {
   local out="$1" line
   line="$(curl -ksS --max-time "$MAX_TIME" -o /dev/null \
             -w '%{http_code} %{time_total}' \
+            -A "$USER_AGENT" -H 'Accept:' \
             -H "Authorization: Bearer ${TOKEN}" "$URL" 2>/dev/null)" || line="000 0"
   printf '%s\n' "$line" > "$out"
 }
