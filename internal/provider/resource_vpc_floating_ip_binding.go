@@ -219,17 +219,28 @@ func createVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fip
 		return diag.Errorf("failed to read floating IP %s before binding: %s", fipID, err)
 	}
 	if fip, ok := usableFloatingIPRead(rawFip, fipID); ok {
-		switch {
-		case fip.StaticIP != nil && fip.StaticIP.ID == staticID:
+		switch client.ClassifyFloatingIPBinding(fip, staticID) {
+		case client.FloatingIPBindingBoundToTarget:
 			// Already bound to OUR static IP: ADOPT, do not re-bind.
 			d.SetId(makeFloatingIPBindingID(fipID, staticID))
 			writeFloatingIPBindingComputed(d, fip)
 			return nil
-		case fip.StaticIP != nil && fip.StaticIP.ID != staticID:
-			// Bound to a DIFFERENT static IP: anti-clobber, ZERO bind POST.
+		case client.FloatingIPBindingBoundToOther:
+			// Bound to a DIFFERENT static IP (non-empty different id): anti-clobber,
+			// ZERO bind POST.
 			return diag.Errorf(
 				"floating IP %s is already bound to static IP %s; refusing to clobber it by binding it to %s. Unbind it first (or import the existing binding).",
 				fipID, fip.StaticIP.ID, staticID,
+			)
+		case client.FloatingIPBindingInconclusive:
+			// Present, but the nested staticIp is structurally incomplete (a staticIp
+			// object with an empty/omitted id). This is NOT proof the FIP is free, nor
+			// proof it is bound elsewhere: it must NOT unlock a bind and must NOT be
+			// reported as "bound to a different static IP". Fail closed with ZERO bind
+			// POST so we never clobber an out-of-band binding on an inconclusive read.
+			return diag.Errorf(
+				"floating IP %s was read with a structurally incomplete nested staticIp (present but id-less); its binding state is inconclusive, so refusing to bind it to %s to avoid clobbering a possible out-of-band binding. Resolve the inconsistent read, then retry.",
+				fipID, staticID,
 			)
 		}
 		// fip present and unbound -> fall through to bind (FIP provably free).
@@ -333,14 +344,26 @@ func readVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fipID
 	// mismatched/empty-id body is treated like a nil/ambiguous read and must NEVER
 	// trigger SetId("") (#312 R7 guard).
 	if fip, ok := usableFloatingIPRead(rawFip, fipID); ok {
-		if fip.StaticIP != nil && fip.StaticIP.ID == staticID {
+		switch client.ClassifyFloatingIPBinding(fip, staticID) {
+		case client.FloatingIPBindingBoundToTarget:
 			// Present and still our pair: refresh.
 			writeFloatingIPBindingComputed(d, fip)
 			return nil
+		case client.FloatingIPBindingInconclusive:
+			// Present, but the nested staticIp is structurally incomplete (a staticIp
+			// object with an empty/omitted id). This is NOT proof the pair is gone, so
+			// it must NEVER become a stable negative that drops state — treat it like
+			// an ambiguous read and keep the binding (#312 R6 applied to the nested id).
+			tflog.Warn(ctx, fmt.Sprintf(
+				"floating IP %s was read with a structurally incomplete nested staticIp (present but id-less); the binding is kept in the state to avoid a wrong removal on an inconclusive read",
+				fipID,
+			))
+			return nil
 		}
-		// Present, but NOT our pair (unbound or bound elsewhere). This could be a
-		// stale-200 right after a bind. Do a bounded retry to rule that out; only
-		// a STABLE negative drops the resource (positive absence of THIS pair).
+		// DEFINITIVE not-our-pair (Unbound, or BoundToOther with a non-empty different
+		// id). This could be a stale-200 right after a bind. Do a bounded retry to
+		// rule that out; only a STABLE definitive negative drops the resource
+		// (positive absence of THIS pair).
 		for attempt := 1; attempt < maxFloatingIPBindingConfirmAttempts; attempt++ {
 			if serr := funcs.sleep(ctx, attempt); serr != nil {
 				return diag.Errorf("cancelled while confirming floating IP %s binding state: %s", fipID, serr)
@@ -351,18 +374,25 @@ func readVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fipID
 				return diag.Errorf("failed to re-read floating IP %s while confirming its binding state: %s", fipID, err)
 			}
 			fip, ok = usableFloatingIPRead(rawFip, fipID)
-			if ok && fip.StaticIP != nil && fip.StaticIP.ID == staticID {
-				writeFloatingIPBindingComputed(d, fip)
-				return nil
-			}
 			if !ok {
 				// Became ambiguous (nil/403/mismatched-id): do not drop; keep state.
 				tflog.Warn(ctx, fmt.Sprintf("floating IP %s became unreadable while confirming its binding state; keeping the binding in state", fipID))
 				return nil
 			}
+			switch client.ClassifyFloatingIPBinding(fip, staticID) {
+			case client.FloatingIPBindingBoundToTarget:
+				writeFloatingIPBindingComputed(d, fip)
+				return nil
+			case client.FloatingIPBindingInconclusive:
+				// Became inconclusive mid-confirmation (id-less nested staticIp): do
+				// not drop; keep state.
+				tflog.Warn(ctx, fmt.Sprintf("floating IP %s was re-read with an id-less nested staticIp while confirming its binding state; keeping the binding in state", fipID))
+				return nil
+			}
 		}
-		// Stable negative: the floating IP is present and provably NOT bound to
-		// our static IP. This is positive absence of THIS pair -> drop.
+		// Stable DEFINITIVE negative: the floating IP is present and provably NOT
+		// bound to our static IP (Unbound or BoundToOther). This is positive absence
+		// of THIS pair -> drop.
 		d.SetId("")
 		return nil
 	}
@@ -417,7 +447,12 @@ func confirmFloatingIPUnbound(ctx context.Context, fipID, staticID string, funcs
 	// shape. A mismatched/empty-id body must NOT be accepted as "gone": fall to the
 	// strict-listing corroboration just like a nil/ambiguous read (#312 R7 guard).
 	if fip, ok := usableFloatingIPRead(rawFip, fipID); ok {
-		if fip.StaticIP != nil && fip.StaticIP.ID == staticID {
+		switch client.ClassifyFloatingIPBinding(fip, staticID) {
+		case client.FloatingIPBindingUnbound, client.FloatingIPBindingBoundToOther:
+			// DEFINITIVELY not our pair (staticIp nil, or bound to a different static
+			// IP with a non-empty id): positively unbound (or rebound elsewhere).
+			return nil
+		case client.FloatingIPBindingBoundToTarget:
 			// Still bound to our pair: the unbind did not take effect.
 			detail := ""
 			if unbindErr != nil {
@@ -428,8 +463,10 @@ func confirmFloatingIPUnbound(ctx context.Context, fipID, staticID string, funcs
 				fipID, staticID, detail,
 			)
 		}
-		// Present and NOT our pair: positively unbound (or rebound elsewhere).
-		return nil
+		// Inconclusive: the nested staticIp is structurally incomplete (present but
+		// id-less). This is NOT proof the pair is gone, so it must NOT be accepted as
+		// a successful unbind. Fall through to the strict-listing corroboration (and
+		// if that is also Inconclusive, the delete FAILS CLOSED below).
 	}
 
 	// Read is ambiguous (nil/403/mismatched-id). Corroborate via the strict

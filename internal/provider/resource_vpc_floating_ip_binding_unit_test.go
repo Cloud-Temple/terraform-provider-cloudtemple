@@ -99,6 +99,21 @@ func emptyIDBoundFIP() *client.FloatingIP {
 	}
 }
 
+// idlessNestedStaticIPFIP is a per-id read carrying EXACTLY our floating IP (so
+// the top-level id-match guard passes) but whose NESTED staticIp object is
+// present with an EMPTY/omitted id (the API returned a staticIp but omitted its
+// id). This is STRUCTURALLY INCONCLUSIVE: it is neither proof of unbound nor of
+// bound-elsewhere, so it must NEVER be used as negative evidence to drop state or
+// accept an unbind (#312 R6 applied to the nested staticIp.id). It may carry an
+// address (the API can populate the address while still omitting the id).
+func idlessNestedStaticIPFIP() *client.FloatingIP {
+	return &client.FloatingIP{
+		ID:        testFIPID,
+		IPAddress: "198.51.100.1",
+		StaticIP:  &client.FloatingIPStaticIP{ID: "", Address: "10.0.1.5"},
+	}
+}
+
 // readSeq returns a read func that yields the supplied results in order, then
 // repeats the last one. It counts the number of calls.
 func readSeq(calls *int, results ...struct {
@@ -421,6 +436,38 @@ func TestCreateVPCFloatingIPBinding(t *testing.T) {
 			t.Fatalf("a fail-closed create must not set the id, got %q", d.Id())
 		}
 	})
+
+	// R2 — the pre-bind per-id read carries EXACTLY our FIP (top-level id matches)
+	// but its NESTED staticIp is present-with-an-empty-id (structurally
+	// inconclusive). A naive "present and NOT our pair (staticIp.id != staticID
+	// because it is "") => bound elsewhere" path would either report a wrong
+	// anti-clobber reason OR (if collapsed with unbound) issue a bind. The
+	// inconclusive guard must FAIL CLOSED with ZERO bind POST and NO id, WITHOUT
+	// falling to the listing (the read is usable, just inconclusive), so the
+	// corroborate seam must not be reached here.
+	t.Run("pre-bind read with an id-less NESTED staticIp is inconclusive -> fail closed (ZERO bind POST, NO id)", func(t *testing.T) {
+		d := emptyBindingState(t)
+		var bindCalls int
+		funcs := vpcFloatingIPBindingFuncs{
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) {
+				return idlessNestedStaticIPFIP(), nil
+			},
+			bind:        func(ctx context.Context, fipID, staticID string) (string, error) { bindCalls++; return "act", nil },
+			wait:        okWait,
+			corroborate: noCorroborate, // a usable-but-inconclusive read must fail closed without the listing
+			sleep:       noSleep,
+		}
+		diags := createVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("an id-less nested staticIp pre-bind read is INCONCLUSIVE and must FAIL CLOSED (never bind)")
+		}
+		if bindCalls != 0 {
+			t.Fatalf("an inconclusive nested staticIp read must NOT issue a bind POST, got %d bind calls", bindCalls)
+		}
+		if d.Id() != "" {
+			t.Fatalf("a fail-closed create must not set the id, got %q", d.Id())
+		}
+	})
 }
 
 // --- Read -----------------------------------------------------------------
@@ -572,6 +619,30 @@ func TestReadVPCFloatingIPBinding(t *testing.T) {
 		}
 		if d.Id() != testBindID {
 			t.Fatalf("an empty-id read must NEVER drop the binding, got id %q", d.Id())
+		}
+	})
+
+	// R2 — a per-id read that carries EXACTLY our FIP but whose NESTED staticIp is
+	// present-with-an-empty-id is STRUCTURALLY INCONCLUSIVE. A naive "not our pair"
+	// path would treat it as a stable negative and SetId("") — dropping the resource
+	// while the FIP may still be bound to OUR static IP. The inconclusive guard must
+	// KEEP the binding (never drop on an inconclusive read). The read func always
+	// returns the id-less body, so a missing guard would exhaust the bounded retry
+	// and drop -> RED.
+	t.Run("an id-less NESTED staticIp read NEVER drops the binding (inconclusive, kept)", func(t *testing.T) {
+		d := bindingState(t)
+		funcs := vpcFloatingIPBindingFuncs{
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) {
+				return idlessNestedStaticIPFIP(), nil
+			},
+			sleep: noSleep,
+		}
+		diags := readVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if diags.HasError() {
+			t.Fatalf("an id-less nested staticIp read must keep the state without error, got: %v", diags)
+		}
+		if d.Id() != testBindID {
+			t.Fatalf("an id-less nested staticIp read is INCONCLUSIVE and must NEVER drop the binding, got id %q", d.Id())
 		}
 	})
 }
@@ -748,6 +819,34 @@ func TestDeleteVPCFloatingIPBinding(t *testing.T) {
 		diags := deleteVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
 		if !diags.HasError() {
 			t.Fatal("an empty-id read must NOT be accepted as gone; with an inconclusive listing it must FAIL CLOSED")
+		}
+		if d.Id() != testBindID {
+			t.Fatalf("a fail-closed delete must keep the binding id, got %q", d.Id())
+		}
+	})
+
+	// R2 — the per-id read carries EXACTLY our FIP but its NESTED staticIp is
+	// present-with-an-empty-id (structurally inconclusive). A naive "present and NOT
+	// our pair => unbound" path would ACCEPT the unbind as a success while the FIP
+	// may still be bound to OUR static IP. The inconclusive guard must NOT accept it
+	// as gone: it falls through to the strict-listing corroboration, and with an
+	// Inconclusive listing the delete must FAIL CLOSED (keep the binding).
+	t.Run("unbind then id-less NESTED staticIp read + List INCONCLUSIVE FAILS CLOSED", func(t *testing.T) {
+		d := bindingState(t)
+		funcs := vpcFloatingIPBindingFuncs{
+			unbind: func(ctx context.Context, fipID, staticID string) (string, error) { return "act", nil },
+			wait:   okWait,
+			read: func(ctx context.Context, fipID string) (*client.FloatingIP, error) {
+				return idlessNestedStaticIPFIP(), nil
+			},
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				return client.FloatingIPBindingInconclusive, nil
+			},
+			sleep: noSleep,
+		}
+		diags := deleteVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("an id-less nested staticIp read must NOT be accepted as gone; with an inconclusive listing it must FAIL CLOSED")
 		}
 		if d.Id() != testBindID {
 			t.Fatalf("a fail-closed delete must keep the binding id, got %q", d.Id())

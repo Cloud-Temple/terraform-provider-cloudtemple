@@ -312,6 +312,41 @@ func TestVPCFloatingIPCorroborateBinding(t *testing.T) {
 		}
 	})
 
+	// A present FIP whose nested staticIp is an OBJECT but with an empty/omitted id
+	// is STRUCTURALLY INCONCLUSIVE — the API returned a staticIp but omitted its id,
+	// which is neither proof of unbound nor of bound-elsewhere. It must classify as
+	// Inconclusive, NEVER as BoundToOther (the #312 R6 lesson applied to the nested
+	// id). Treating it as BoundToOther would let the resource layer use it as
+	// negative evidence (drop state / accept an unbind) while the FIP may still be
+	// bound to OUR static IP.
+	t.Run("present but nested staticIp is an empty object {} -> Inconclusive (NOT BoundToOther)", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[{"id":"fip-1","staticIp":{}}]`))
+		})
+		state, err := c.VPC().FloatingIP().CorroborateBinding(ctx, "fip-1", "si-1")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if state != FloatingIPBindingInconclusive {
+			t.Fatalf("a present FIP with an id-less nested staticIp must be Inconclusive, never BoundToOther, got %v", state)
+		}
+	})
+
+	t.Run("present but nested staticIp has an address and no id -> Inconclusive (NOT BoundToOther)", func(t *testing.T) {
+		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[{"id":"fip-1","staticIp":{"address":"10.0.1.5"}}]`))
+		})
+		state, err := c.VPC().FloatingIP().CorroborateBinding(ctx, "fip-1", "si-1")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if state != FloatingIPBindingInconclusive {
+			t.Fatalf("a nested staticIp with an address but no id must be Inconclusive, never BoundToOther, got %v", state)
+		}
+	})
+
 	t.Run("the FIP is NOT in the listing -> Inconclusive (never negative evidence)", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)

@@ -210,22 +210,64 @@ const (
 	// to the target static IP (positive same-pair corroboration).
 	FloatingIPBindingBoundToTarget
 	// FloatingIPBindingBoundToOther means the floating IP is present and bound to
-	// a DIFFERENT static IP. Binding our pair would clobber that out-of-band
-	// binding, so this is FAIL-CLOSED for create; for delete it means "no longer
-	// bound to OUR pair", i.e. our unbind took effect.
+	// a DIFFERENT static IP, observed with a NON-EMPTY nested staticIp.id. Binding
+	// our pair would clobber that out-of-band binding, so this is FAIL-CLOSED for
+	// create; for delete it means "no longer bound to OUR pair", i.e. our unbind
+	// took effect. The non-empty id is what makes this a DEFINITIVE not-our-pair:
+	// a present-but-id-less nested staticIp is Inconclusive, never BoundToOther.
 	FloatingIPBindingBoundToOther
 )
+
+// ClassifyFloatingIPBinding classifies a SINGLE, positively observed floating IP
+// (a per-id read body or a listing entry) relative to a target static IP id. It
+// is the one place the four-way rule lives, so the client (CorroborateBinding)
+// and the provider (read stable-negative, delete confirm, create pre-bind) can
+// never drift apart on how a nested staticIp is read.
+//
+// The caller MUST have already established that fip is non-nil and is THE target
+// floating IP (its top-level id matches); this helper only inspects the nested
+// staticIp relative to staticID:
+//
+//   - staticIp == nil                          -> Unbound        (definitively free)
+//   - staticIp != nil && staticIp.id == ""     -> Inconclusive   (structurally incomplete:
+//     the API returned a staticIp OBJECT but omitted its id; this is NOT proof of
+//     unbound nor of bound-elsewhere, so it must NEVER be used as negative evidence
+//     to drop state or accept an unbind — #312 R6 lesson applied to the nested id)
+//   - staticIp != nil && staticIp.id == staticID            -> BoundToTarget (our pair)
+//   - staticIp != nil && staticIp.id != "" && != staticID   -> BoundToOther  (definitively not our pair)
+func ClassifyFloatingIPBinding(fip *FloatingIP, staticID string) FloatingIPBindingState {
+	if fip == nil || fip.StaticIP == nil {
+		// staticIp nil: present and bound to nothing -> provably free.
+		return FloatingIPBindingUnbound
+	}
+	if fip.StaticIP.ID == "" {
+		// staticIp object present but its id is empty/omitted: structurally
+		// incomplete, so we cannot tell unbound from bound-elsewhere. Inconclusive.
+		return FloatingIPBindingInconclusive
+	}
+	if fip.StaticIP.ID == staticID {
+		return FloatingIPBindingBoundToTarget
+	}
+	// Present and bound to a DIFFERENT static IP, with a non-empty id: definitive.
+	return FloatingIPBindingBoundToOther
+}
 
 // CorroborateBinding strictly classifies the FIP/static relationship from a
 // COMPLETE HTTP 200 listing. Like vpc_static_ip's ListStrict, it FAILS CLOSED to
 // "inconclusive": a listing that cannot prove the floating IP's state (null /
 // empty / non-array body, an id-less entry, or the FIP simply not present) is
-// NEVER read as negative evidence. Only a positively observed FIP yields a
-// definite present-and-(unbound|bound-to-target|bound-to-other) classification.
+// NEVER read as negative evidence. Even when the FIP IS observed, the nested
+// staticIp can itself be structurally incomplete (a staticIp object present but
+// with an empty/omitted id): that too is Inconclusive, never negative evidence.
+// Only a structurally COMPLETE observation yields a definite present-and-
+// (unbound|bound-to-target|bound-to-other) classification.
 //
-// The four states are kept DISTINCT so the create path can never collapse
+// The states are kept DISTINCT so the create path can never collapse
 // "present & unbound" (safe to bind) with "present & bound to a DIFFERENT static
 // IP" (must fail closed, never bind): that collapse was the anti-clobber defect.
+// The classification itself is delegated to ClassifyFloatingIPBinding so the rule
+// (including the id-less-nested-staticIp -> Inconclusive case) cannot drift
+// between the client and the provider paths.
 //
 // The "id" the live API returns inside FloatingIP.StaticIP is the static IP id
 // (FloatingIPStaticIP.ID), so the same-pair test compares fip.StaticIP.ID to the
@@ -239,15 +281,12 @@ func (f *VPCFloatingIPClient) CorroborateBinding(ctx context.Context, fipID, sta
 		if fip == nil || fip.ID != fipID {
 			continue
 		}
-		if fip.StaticIP == nil {
-			// Present and not bound to anything: provably free.
-			return FloatingIPBindingUnbound, nil
-		}
-		if fip.StaticIP.ID == staticID {
-			return FloatingIPBindingBoundToTarget, nil
-		}
-		// Present and bound to a DIFFERENT static IP.
-		return FloatingIPBindingBoundToOther, nil
+		// The FIP is positively observed in a structurally complete listing. Defer
+		// to the shared four-way classifier: a present-but-id-less nested staticIp
+		// is Inconclusive (structurally incomplete), NOT BoundToOther — so it can
+		// never be used as negative evidence by the resource layer (#312 R6 applied
+		// to the nested staticIp.id).
+		return ClassifyFloatingIPBinding(fip, staticID), nil
 	}
 	// The floating IP was not observed in the listing. Listing completeness is
 	// NOT proven for floating IPs, so this is inconclusive, never "absent".
