@@ -253,3 +253,48 @@ func TestRunOpSkipDoesNotFeedBreaker(t *testing.T) {
 		}
 	}
 }
+
+// TestRunOpBreakerTripsOnDistressNot4xx pins the breaker-distress fix: op()
+// feeds the breaker cat.isDistress(), NOT cat.isFailure(). A burst of
+// deterministic 4xx (client errors) must NOT trip the breaker — they are real
+// failures in the report but not API distress, and tripping would mask the rest
+// of the map. A 429 (rate-limited) and a 5xx MUST trip.
+//
+// Mutation proof: revert Run.op to feed cat.isFailure() and the 4xx burst trips
+// the breaker, so the "must NOT trip" assertion goes RED.
+func TestRunOpBreakerTripsOnDistressNot4xx(t *testing.T) {
+	c := fakeCycle{"readonly", KindRead}
+
+	t.Run("4xx burst does NOT trip", func(t *testing.T) {
+		b := NewBreaker(3, 1.0, 100)
+		r := &Run{Recorder: NewRecorder(), Breaker: b, Cleanup: NewCleanup()}
+		for i := 0; i < 10; i++ {
+			_ = r.op(c, "x.list", func() error { return client.StatusError{Code: 403} })
+		}
+		if b.Tripped() {
+			t.Fatal("a burst of deterministic 4xx must NOT trip the breaker (not API distress)")
+		}
+	})
+
+	t.Run("429 burst trips (rate limiting is distress)", func(t *testing.T) {
+		b := NewBreaker(3, 1.0, 100)
+		r := &Run{Recorder: NewRecorder(), Breaker: b, Cleanup: NewCleanup()}
+		for i := 0; i < 3; i++ {
+			_ = r.op(c, "x.list", func() error { return client.StatusError{Code: 429} })
+		}
+		if !b.Tripped() {
+			t.Fatal("429 (rate limiting) IS distress and must trip the breaker")
+		}
+	})
+
+	t.Run("5xx burst trips", func(t *testing.T) {
+		b := NewBreaker(3, 1.0, 100)
+		r := &Run{Recorder: NewRecorder(), Breaker: b, Cleanup: NewCleanup()}
+		for i := 0; i < 3; i++ {
+			_ = r.op(c, "x.list", func() error { return client.StatusError{Code: 503} })
+		}
+		if !b.Tripped() {
+			t.Fatal("a 5xx burst must trip the breaker (real distress)")
+		}
+	})
+}

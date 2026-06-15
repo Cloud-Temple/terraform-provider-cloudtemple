@@ -395,3 +395,277 @@ func (s iamPATSeam) FindIDByName(ctx context.Context, name string) (string, erro
 	}
 	return "", nil
 }
+
+// --- OpenIaaS compute lifecycle teardowns (#316 compute_lifecycle) -----------
+//
+// Teardown ordering is leaves-first (LIFO over registration order): the network
+// adapter and the user data disk are removed BEFORE the VM anchor, because a VM
+// delete does NOT cascade a user-created disk (it would orphan storage) and a
+// still-connected disk can refuse deletion. Each teardown is registered BEFORE
+// the create it undoes (F3), keyed by a deterministic identity, and finds its
+// resource via a STRICT listing when the create's activity did not resolve the
+// id. Q4/#303 note: a compute DELETE that answered 403 for an absent resource
+// would surface here as a teardown FAILURE (a false alarm, never an orphan — the
+// safe direction); only a definitive 404 is idempotent success.
+
+// vmSeam is the subset of the VM client a VM teardown needs.
+type vmSeam interface {
+	DeleteAndWait(ctx context.Context, id string) error
+	PowerOffAndWait(ctx context.Context, id string) error // best-effort, never fatal
+	FindIDByName(ctx context.Context, name, machineManagerID string) (string, error)
+}
+
+// vmTeardownRef carries the VM identity; ID is filled once the create activity
+// resolves it (shared pointer, like patTeardownRef). MachineManagerID scopes the
+// fallback find-by-name (the OpenIaaS list 5xx's without a scope).
+type vmTeardownRef struct {
+	Name             string
+	MachineManagerID string
+	ID               string
+	Resolved         bool
+}
+
+// registerVMTeardown registers the VM teardown (the anchor; runs LAST under LIFO).
+// Best-effort power-off (a running VM can refuse delete) then delete; if the id
+// never resolved, find the VM by its deterministic name within the machine
+// manager and delete that.
+func registerVMTeardown(cl *Cleanup, seam vmSeam, ref *vmTeardownRef) {
+	cl.Register(fmt.Sprintf("compute.openiaas.virtual_machine %s", ref.Name), func(tctx context.Context) error {
+		id := ref.ID
+		if !ref.Resolved || id == "" {
+			found, err := seam.FindIDByName(tctx, ref.Name, ref.MachineManagerID)
+			if err != nil {
+				return err
+			}
+			if found == "" {
+				return nil // never created / already gone → idempotent success
+			}
+			id = found
+		}
+		_ = seam.PowerOffAndWait(tctx, id) // best-effort: a powered-on VM may refuse delete
+		return seam.DeleteAndWait(tctx, id)
+	})
+}
+
+type computeVMSeam struct{ c *client.Client }
+
+func (s computeVMSeam) DeleteAndWait(ctx context.Context, id string) error {
+	activityID, err := s.c.Compute().OpenIaaS().VirtualMachine().Delete(ctx, id)
+	if err != nil {
+		return idempotentDeleteErr(err) // 404 → already gone; other surfaced
+	}
+	_, werr := s.c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
+	return werr // a failed delete activity is a real teardown failure
+}
+
+func (s computeVMSeam) PowerOffAndWait(ctx context.Context, id string) error {
+	activityID, err := s.c.Compute().OpenIaaS().VirtualMachine().Power(ctx, id,
+		&client.UpdateOpenIaasVirtualMachinePowerRequest{PowerState: "off", Force: true})
+	if err != nil {
+		return nil // best-effort; the subsequent delete surfaces a real problem
+	}
+	_, _ = s.c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
+	return nil
+}
+
+func (s computeVMSeam) FindIDByName(ctx context.Context, name, machineManagerID string) (string, error) {
+	vms, err := s.c.Compute().OpenIaaS().VirtualMachine().ListStrict(ctx,
+		&client.OpenIaaSVirtualMachineFilter{MachineManagerID: machineManagerID})
+	if err != nil {
+		return "", err
+	}
+	var found string
+	for _, vm := range vms {
+		if vm != nil && vm.Name == name && vm.ID != "" {
+			if found != "" {
+				// Ambiguous: the run-unique name should match at most one. More
+				// than one means an anomaly — fail closed (surface), never delete
+				// a possibly-wrong VM.
+				return "", fmt.Errorf("ambiguous: more than one virtual machine named %q", name)
+			}
+			found = vm.ID
+		}
+	}
+	return found, nil
+}
+
+// diskSeam is the subset of the virtual-disk client a disk teardown needs.
+type diskSeam interface {
+	ReadConnections(ctx context.Context, id string) ([]string, error) // connected VM ids
+	DisconnectAndWait(ctx context.Context, id, vmID string) error
+	DeleteAndWait(ctx context.Context, id string) error
+	FindIDByName(ctx context.Context, name, vmID string) (string, error)
+}
+
+type diskTeardownRef struct {
+	Name     string
+	VMID     string
+	ID       string
+	Resolved bool
+}
+
+// registerVirtualDiskTeardown registers the user data-disk teardown: disconnect
+// from EVERY connected VM (a VM delete never cascades a user disk) THEN delete.
+// Registered before the disk create; runs before the VM teardown (LIFO).
+func registerVirtualDiskTeardown(cl *Cleanup, seam diskSeam, ref *diskTeardownRef) {
+	cl.Register(fmt.Sprintf("compute.openiaas.virtual_disk %s", ref.Name), func(tctx context.Context) error {
+		id := ref.ID
+		if !ref.Resolved || id == "" {
+			found, err := seam.FindIDByName(tctx, ref.Name, ref.VMID)
+			if err != nil {
+				return err
+			}
+			if found == "" {
+				return nil
+			}
+			id = found
+		}
+		vmIDs, err := seam.ReadConnections(tctx, id)
+		if err != nil {
+			return err
+		}
+		for _, vmID := range vmIDs {
+			if derr := seam.DisconnectAndWait(tctx, id, vmID); derr != nil {
+				return derr
+			}
+		}
+		return seam.DeleteAndWait(tctx, id)
+	})
+}
+
+type computeVirtualDiskSeam struct{ c *client.Client }
+
+func (s computeVirtualDiskSeam) ReadConnections(ctx context.Context, id string) ([]string, error) {
+	disk, err := s.c.Compute().OpenIaaS().VirtualDisk().Read(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if disk == nil { // 403/absent mapped to nil → nothing connected to disconnect
+		return nil, nil
+	}
+	var vmIDs []string
+	for _, vm := range disk.VirtualMachines {
+		if vm.Connected && vm.ID != "" {
+			vmIDs = append(vmIDs, vm.ID)
+		}
+	}
+	return vmIDs, nil
+}
+
+func (s computeVirtualDiskSeam) DisconnectAndWait(ctx context.Context, id, vmID string) error {
+	activityID, err := s.c.Compute().OpenIaaS().VirtualDisk().Disconnect(ctx, id,
+		&client.OpenIaaSVirtualDiskConnectionRequest{VirtualMachineID: vmID})
+	if err != nil {
+		return idempotentDeleteErr(err) // already disconnected/gone → ok
+	}
+	_, werr := s.c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
+	return werr
+}
+
+func (s computeVirtualDiskSeam) DeleteAndWait(ctx context.Context, id string) error {
+	activityID, err := s.c.Compute().OpenIaaS().VirtualDisk().Delete(ctx, id)
+	if err != nil {
+		return idempotentDeleteErr(err)
+	}
+	_, werr := s.c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
+	return werr
+}
+
+func (s computeVirtualDiskSeam) FindIDByName(ctx context.Context, name, vmID string) (string, error) {
+	// VM-scoped first, then tenant-wide (mirrors the #325 provider doctrine): a
+	// created-but-UNATTACHED disk (the create materialized it but lost the result
+	// before attachment) is NOT in the VM-scoped listing, so a VM-scoped-only
+	// search would orphan it after the VM delete. The disk name is run-unique, so
+	// a tenant-wide match is unambiguous; >1 fails closed.
+	for _, filter := range []*client.OpenIaaSVirtualDiskFilter{{VirtualMachineID: vmID}, {}} {
+		id, err := s.findDiskByName(ctx, name, filter)
+		if err != nil {
+			return "", err
+		}
+		if id != "" {
+			return id, nil
+		}
+	}
+	return "", nil
+}
+
+func (s computeVirtualDiskSeam) findDiskByName(ctx context.Context, name string, filter *client.OpenIaaSVirtualDiskFilter) (string, error) {
+	disks, err := s.c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, filter)
+	if err != nil {
+		return "", err
+	}
+	var found string
+	for _, d := range disks {
+		if d != nil && d.Name == name && d.ID != "" {
+			if found != "" {
+				return "", fmt.Errorf("ambiguous: more than one virtual disk named %q", name)
+			}
+			found = d.ID
+		}
+	}
+	return found, nil
+}
+
+// adapterSeam is the subset of the network-adapter client an adapter teardown needs.
+type adapterSeam interface {
+	// FindIDsByVM returns the ids of EVERY adapter on the VM. For a
+	// created-but-unresolved adapter the teardown deletes all of them: the VM is
+	// run-unique and ours and is being destroyed, so removing its adapters
+	// (including any template-provided one) is safe, and there is no MAC to match
+	// on (the platform assigns it).
+	FindIDsByVM(ctx context.Context, vmID string) ([]string, error)
+	DeleteAndWait(ctx context.Context, id string) error
+}
+
+type adapterTeardownRef struct {
+	VMID     string
+	ID       string
+	Resolved bool
+}
+
+// registerNetworkAdapterTeardown registers the adapter teardown (a network leaf;
+// runs FIRST under LIFO). When the id resolved, delete it; otherwise delete every
+// adapter on the (run-unique, ours) VM.
+func registerNetworkAdapterTeardown(cl *Cleanup, seam adapterSeam, ref *adapterTeardownRef) {
+	cl.Register(fmt.Sprintf("compute.openiaas.network_adapter %s", ref.VMID), func(tctx context.Context) error {
+		if ref.Resolved && ref.ID != "" {
+			return seam.DeleteAndWait(tctx, ref.ID)
+		}
+		ids, err := seam.FindIDsByVM(tctx, ref.VMID)
+		if err != nil {
+			return err
+		}
+		for _, id := range ids {
+			if derr := seam.DeleteAndWait(tctx, id); derr != nil {
+				return derr
+			}
+		}
+		return nil
+	})
+}
+
+type computeNetworkAdapterSeam struct{ c *client.Client }
+
+func (s computeNetworkAdapterSeam) FindIDsByVM(ctx context.Context, vmID string) ([]string, error) {
+	adapters, err := s.c.Compute().OpenIaaS().NetworkAdapter().ListStrict(ctx,
+		&client.OpenIaaSNetworkAdapterFilter{VirtualMachineID: vmID})
+	if err != nil {
+		return nil, err
+	}
+	var ids []string
+	for _, a := range adapters {
+		if a != nil && a.ID != "" {
+			ids = append(ids, a.ID)
+		}
+	}
+	return ids, nil
+}
+
+func (s computeNetworkAdapterSeam) DeleteAndWait(ctx context.Context, id string) error {
+	activityID, err := s.c.Compute().OpenIaaS().NetworkAdapter().Delete(ctx, id)
+	if err != nil {
+		return idempotentDeleteErr(err)
+	}
+	_, werr := s.c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
+	return werr
+}

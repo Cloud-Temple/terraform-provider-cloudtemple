@@ -85,7 +85,10 @@ func (r *Run) op(c Cycle, endpoint string, fn func() error) error {
 		Latency:  latency,
 		Category: cat,
 	})
-	r.Breaker.Record(cat.isFailure())
+	// The breaker trips on DISTRESS only (5xx, 502, timeout, transient, 429),
+	// NOT on deterministic client errors (4xx): a 4xx is recorded as a failure
+	// in the report but must not latch the breaker and mask the rest of the map.
+	r.Breaker.Record(cat.isDistress())
 	return err
 }
 

@@ -164,51 +164,91 @@ func (rc readonlyCycle) runVPC(ctx context.Context, c *client.Client, r *Run) {
 }
 
 func (rc readonlyCycle) runCompute(ctx context.Context, c *client.Client, r *Run) {
-	// VMware compute.
+	// VMware compute. These lists need a machine_manager_id scope that this
+	// read-only smoke test cannot discover (the client exposes no VMware
+	// machine-manager listing). Probe the entry list once: a 4xx means VMware is
+	// not available/usable on this tenant, so SKIP the rest of the block rather
+	// than emit a false "squeak" per endpoint. A 5xx/timeout/transient still
+	// surfaces as a real failure on the probe.
 	var vms []*client.VirtualMachine
-	_ = r.op(rc, "compute.virtual_machines.list", func() error {
+	vmwareErr := r.op(rc, "compute.virtual_machines.list", func() error {
 		var err error
 		vms, err = c.Compute().VirtualMachine().List(ctx, nil)
 		return err
 	})
-	if len(vms) > 0 {
-		_ = r.op(rc, "compute.virtual_machines.read", func() error {
-			_, err := c.Compute().VirtualMachine().Read(ctx, vms[0].ID)
+	vmwareRest := []string{
+		"compute.virtual_machines.read", "compute.datastores.list",
+		"compute.hosts.list", "compute.networks.list",
+		"compute.virtual_datacenters.list", "compute.folders.list",
+		"compute.virtual_disks.list",
+	}
+	if categorize(vmwareErr) == CategoryHTTP4xx {
+		for _, ep := range vmwareRest {
+			r.skip(rc, ep)
+		}
+	} else {
+		if len(vms) > 0 {
+			_ = r.op(rc, "compute.virtual_machines.read", func() error {
+				_, err := c.Compute().VirtualMachine().Read(ctx, vms[0].ID)
+				return err
+			})
+		} else {
+			r.skip(rc, "compute.virtual_machines.read")
+		}
+		_ = r.op(rc, "compute.datastores.list", func() error {
+			_, err := c.Compute().Datastore().List(ctx, nil)
 			return err
 		})
-	} else {
-		r.skip(rc, "compute.virtual_machines.read")
+		_ = r.op(rc, "compute.hosts.list", func() error {
+			_, err := c.Compute().Host().List(ctx, nil)
+			return err
+		})
+		_ = r.op(rc, "compute.networks.list", func() error {
+			_, err := c.Compute().Network().List(ctx, nil)
+			return err
+		})
+		_ = r.op(rc, "compute.virtual_datacenters.list", func() error {
+			_, err := c.Compute().VirtualDatacenter().List(ctx, nil)
+			return err
+		})
+		_ = r.op(rc, "compute.folders.list", func() error {
+			_, err := c.Compute().Folder().List(ctx, nil)
+			return err
+		})
+		_ = r.op(rc, "compute.virtual_disks.list", func() error {
+			_, err := c.Compute().VirtualDisk().List(ctx, nil)
+			return err
+		})
 	}
-	_ = r.op(rc, "compute.datastores.list", func() error {
-		_, err := c.Compute().Datastore().List(ctx, nil)
-		return err
-	})
-	_ = r.op(rc, "compute.hosts.list", func() error {
-		_, err := c.Compute().Host().List(ctx, nil)
-		return err
-	})
-	_ = r.op(rc, "compute.networks.list", func() error {
-		_, err := c.Compute().Network().List(ctx, nil)
-		return err
-	})
-	_ = r.op(rc, "compute.virtual_datacenters.list", func() error {
-		_, err := c.Compute().VirtualDatacenter().List(ctx, nil)
-		return err
-	})
-	_ = r.op(rc, "compute.folders.list", func() error {
-		_, err := c.Compute().Folder().List(ctx, nil)
-		return err
-	})
-	_ = r.op(rc, "compute.virtual_disks.list", func() error {
-		_, err := c.Compute().VirtualDisk().List(ctx, nil)
-		return err
-	})
 
-	// OpenIaaS compute.
+	// OpenIaaS compute. Discover the machine manager FIRST: EVERY OpenIaaS list
+	// (virtual_machines, networks, storage_repositories, templates, hosts,
+	// pools) is scoped by machine_manager_id — the API answers 5xx (sometimes
+	// intermittently) without it. Scope them all to the first machine manager;
+	// if the tenant has none, skip them.
+	var mms []*client.OpenIaaSMachineManager
+	_ = r.op(rc, "compute.openiaas.machine_managers.list", func() error {
+		var err error
+		mms, err = c.Compute().OpenIaaS().MachineManager().List(ctx)
+		return err
+	})
+	if len(mms) == 0 {
+		for _, ep := range []string{
+			"compute.openiaas.virtual_machines.list", "compute.openiaas.virtual_machines.read",
+			"compute.openiaas.networks.list", "compute.openiaas.storage_repositories.list",
+			"compute.openiaas.templates.list", "compute.openiaas.hosts.list", "compute.openiaas.pools.list",
+		} {
+			r.skip(rc, ep)
+		}
+		return
+	}
+	// Smoke read-only scope: the FIRST machine manager. On a multi-machine-manager
+	// tenant this maps one MM, not all of them (a fuller sweep would iterate mms).
+	mmID := mms[0].ID
 	var oVMs []*client.OpenIaaSVirtualMachine
 	_ = r.op(rc, "compute.openiaas.virtual_machines.list", func() error {
 		var err error
-		oVMs, err = c.Compute().OpenIaaS().VirtualMachine().ListStrict(ctx, nil)
+		oVMs, err = c.Compute().OpenIaaS().VirtualMachine().ListStrict(ctx, &client.OpenIaaSVirtualMachineFilter{MachineManagerID: mmID})
 		return err
 	})
 	if len(oVMs) > 0 {
@@ -219,37 +259,42 @@ func (rc readonlyCycle) runCompute(ctx context.Context, c *client.Client, r *Run
 	} else {
 		r.skip(rc, "compute.openiaas.virtual_machines.read")
 	}
-	_ = r.op(rc, "compute.openiaas.machine_managers.list", func() error {
-		_, err := c.Compute().OpenIaaS().MachineManager().List(ctx)
-		return err
-	})
 	_ = r.op(rc, "compute.openiaas.networks.list", func() error {
-		_, err := c.Compute().OpenIaaS().Network().List(ctx, nil)
+		_, err := c.Compute().OpenIaaS().Network().List(ctx, &client.OpenIaaSNetworkFilter{MachineManagerID: mmID})
 		return err
 	})
 	_ = r.op(rc, "compute.openiaas.storage_repositories.list", func() error {
-		_, err := c.Compute().OpenIaaS().StorageRepository().List(ctx, nil)
-		return err
-	})
-	_ = r.op(rc, "compute.openiaas.hosts.list", func() error {
-		_, err := c.Compute().OpenIaaS().Host().List(ctx, nil)
+		_, err := c.Compute().OpenIaaS().StorageRepository().List(ctx, &client.StorageRepositoryFilter{MachineManagerId: mmID})
 		return err
 	})
 	_ = r.op(rc, "compute.openiaas.templates.list", func() error {
-		_, err := c.Compute().OpenIaaS().Template().List(ctx, nil)
+		_, err := c.Compute().OpenIaaS().Template().List(ctx, &client.OpenIaaSTemplateFilter{MachineManagerId: mmID})
+		return err
+	})
+	_ = r.op(rc, "compute.openiaas.hosts.list", func() error {
+		_, err := c.Compute().OpenIaaS().Host().List(ctx, &client.OpenIaasHostFilter{MachineManagerId: mmID})
 		return err
 	})
 	_ = r.op(rc, "compute.openiaas.pools.list", func() error {
-		_, err := c.Compute().OpenIaaS().Pool().List(ctx, nil)
+		_, err := c.Compute().OpenIaaS().Pool().List(ctx, &client.OpenIaasPoolFilter{MachineManagerId: mmID})
 		return err
 	})
 }
 
 func (rc readonlyCycle) runBackup(ctx context.Context, c *client.Client, r *Run) {
-	_ = r.op(rc, "backup.sla_policies.list", func() error {
+	// Backup may be absent on a tenant. Probe once; a 4xx means "not available
+	// on this tenant", so skip the rest instead of emitting a squeak per
+	// endpoint. A 5xx/timeout still surfaces as a real failure on the probe.
+	backupErr := r.op(rc, "backup.sla_policies.list", func() error {
 		_, err := c.Backup().SLAPolicy().List(ctx, nil)
 		return err
 	})
+	if categorize(backupErr) == CategoryHTTP4xx {
+		for _, ep := range []string{"backup.sites.list", "backup.storages.list", "backup.spp_servers.list"} {
+			r.skip(rc, ep)
+		}
+		return
+	}
 	_ = r.op(rc, "backup.sites.list", func() error {
 		_, err := c.Backup().Site().List(ctx)
 		return err

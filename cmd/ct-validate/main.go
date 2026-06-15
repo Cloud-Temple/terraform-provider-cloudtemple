@@ -21,7 +21,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -34,6 +36,8 @@ func buildRegistry() *Registry {
 		readonlyCycle{},
 		backupCycle{},
 		computeOpenIaaSCycle{},
+		computeLifecycleCycle{},
+		computeVMwareLifecycleCycle{},
 		vpcCycle{},
 		objectStorageCycle{},
 		iamPATCycle{},
@@ -52,6 +56,7 @@ type flags struct {
 	jsonOut       bool
 	list          bool
 	apiSuffix     bool
+	quiet         bool
 }
 
 func parseFlags(args []string, out *os.File) (*flags, error) {
@@ -69,6 +74,7 @@ func parseFlags(args []string, out *os.File) (*flags, error) {
 	fs.BoolVar(&f.jsonOut, "json", false, "emit the report as JSON")
 	fs.BoolVar(&f.list, "list", false, "list available cycles and exit (no network)")
 	fs.BoolVar(&f.apiSuffix, "api-suffix", true, "prefix request paths with /api (client ApiSuffix)")
+	fs.BoolVar(&f.quiet, "quiet", false, "suppress the live per-operation progress lines (only print the final report)")
 
 	fs.Usage = func() {
 		fmt.Fprintf(out, "ct-validate — endpoint validation & resilience harness (reads through internal/client)\n\n")
@@ -94,12 +100,27 @@ func parseFlags(args []string, out *os.File) (*flags, error) {
 	return f, nil
 }
 
+// Hard ceilings on the load knobs: a CLI warning is not enough for a tool that
+// can issue WRITE business cycles against a SHARED API. These guard against a
+// typo (e.g. -concurrency 5000); the circuit breaker is still the real-time
+// safety net. Raise deliberately in code if a genuine need arises.
+const (
+	maxRuns        = 10000
+	maxConcurrency = 64
+)
+
 func (f *flags) validate() error {
 	if f.runs < 1 {
 		return fmt.Errorf("-runs must be >= 1 (got %d)", f.runs)
 	}
+	if f.runs > maxRuns {
+		return fmt.Errorf("-runs must be <= %d (got %d): refusing a runaway load against a shared API", maxRuns, f.runs)
+	}
 	if f.concurrency < 1 {
 		return fmt.Errorf("-concurrency must be >= 1 (got %d)", f.concurrency)
+	}
+	if f.concurrency > maxConcurrency {
+		return fmt.Errorf("-concurrency must be <= %d (got %d): high concurrency on a shared API is dangerous", maxConcurrency, f.concurrency)
 	}
 	if f.timeout <= 0 {
 		return fmt.Errorf("-timeout must be > 0 (got %s)", f.timeout)
@@ -112,6 +133,53 @@ func (f *flags) validate() error {
 	}
 	if f.abortWindow < 1 {
 		return fmt.Errorf("-abort-window must be >= 1 (got %d)", f.abortWindow)
+	}
+	return nil
+}
+
+// resolveTarget computes the scheme and host the client will ACTUALLY use,
+// mirroring NewClient's handling of a "scheme://" prefix embedded in the
+// address (internal/client/api.go). Precondition: cfg has already been resolved
+// by client.DefaultConfig() (as run() does), so cfg.Scheme/cfg.Address already
+// reflect the environment; under that precondition it prints/checks the exact
+// same target the requests will hit. An empty scheme defaults to https, matching
+// DefaultConfig.
+func resolveTarget(cfg *client.Config) (scheme, host string) {
+	scheme, host = cfg.Scheme, cfg.Address
+	if parts := strings.SplitN(cfg.Address, "://", 2); len(parts) == 2 {
+		scheme, host = parts[0], parts[1]
+	}
+	if scheme == "" {
+		scheme = "https"
+	}
+	return scheme, host
+}
+
+// preflight enforces the live-run safety guards the #316 audit flagged before
+// any request is issued against the SHARED recette API:
+//   - it PRINTS the resolved target (scheme://host) so the operator can confirm
+//     it is the intended recette host — the binary otherwise never shows where
+//     it is about to fire, and the default address looks production-like;
+//   - it REFUSES a non-HTTPS scheme: the credential exchange carries the PAT
+//     id/secret and must never travel in cleartext;
+//   - it FAILS FAST when credentials are missing, instead of firing
+//     empty-credential auth calls.
+//
+// The target line goes to w (stderr in run()); stdout stays reserved for the
+// report / JSON.
+func preflight(cfg *client.Config, w io.Writer) error {
+	scheme, host := resolveTarget(cfg)
+	fmt.Fprintf(w, "ct-validate: target = %s://%s (apiSuffix=%t) — confirm this is the intended RECETTE host\n",
+		scheme, host, cfg.ApiSuffix)
+
+	if scheme != "https" {
+		return fmt.Errorf("refusing to run over %q: the credential exchange would travel in cleartext; "+
+			"use https (unset %s or set it to https, and drop any \"http://\" prefix in %s)",
+			scheme, client.HTTPSchemeEnvName, client.HTTPAddrEnvName)
+	}
+	if strings.TrimSpace(cfg.ClientID) == "" || strings.TrimSpace(cfg.SecretID) == "" {
+		return fmt.Errorf("credentials not set: export %s and %s before running cycles",
+			client.HTTPClientIDEnvName, client.HTTPClientSecretEnvName)
 	}
 	return nil
 }
@@ -159,6 +227,14 @@ func run(args []string, stdout, stderr *os.File) int {
 	// network and no credentials.
 	cfg := client.DefaultConfig()
 	cfg.ApiSuffix = f.apiSuffix
+
+	// Safety preflight: print the resolved target, refuse cleartext, and require
+	// credentials BEFORE building the client or firing any request (#316 audit).
+	if err := preflight(cfg, stderr); err != nil {
+		fmt.Fprintf(stderr, "ct-validate: %v\n", err)
+		return 2
+	}
+
 	c, err := client.NewClient(cfg)
 	if err != nil {
 		fmt.Fprintf(stderr, "ct-validate: building client: %v\n", err)
@@ -169,7 +245,18 @@ func run(args []string, stdout, stderr *os.File) int {
 	defer cancel()
 
 	breaker := NewBreaker(f.abortConsec, f.abortFailRate, f.abortWindow)
+	// Live progress goes to stderr (stdout stays reserved for the report/JSON),
+	// so the operator sees each endpoint as it runs. -quiet turns it off.
 	rec := NewRecorder()
+	if !f.quiet {
+		rec = NewRecorderWithProgress(stderr)
+		names := make([]string, 0, len(selected))
+		for _, cy := range selected {
+			names = append(names, cy.Name())
+		}
+		fmt.Fprintf(stderr, "Running %s — %d run(s), concurrency %d (live progress below; -quiet to silence)\n",
+			strings.Join(names, ", "), f.runs, f.concurrency)
+	}
 	cleanup := NewCleanup()
 	engine := NewEngine(EngineConfig{Runs: f.runs, Concurrency: f.concurrency}, breaker, rec, cleanup)
 
