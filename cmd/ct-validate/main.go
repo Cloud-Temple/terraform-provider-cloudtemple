@@ -55,6 +55,7 @@ type flags struct {
 	jsonOut       bool
 	list          bool
 	apiSuffix     bool
+	quiet         bool
 }
 
 func parseFlags(args []string, out *os.File) (*flags, error) {
@@ -72,6 +73,7 @@ func parseFlags(args []string, out *os.File) (*flags, error) {
 	fs.BoolVar(&f.jsonOut, "json", false, "emit the report as JSON")
 	fs.BoolVar(&f.list, "list", false, "list available cycles and exit (no network)")
 	fs.BoolVar(&f.apiSuffix, "api-suffix", true, "prefix request paths with /api (client ApiSuffix)")
+	fs.BoolVar(&f.quiet, "quiet", false, "suppress the live per-operation progress lines (only print the final report)")
 
 	fs.Usage = func() {
 		fmt.Fprintf(out, "ct-validate — endpoint validation & resilience harness (reads through internal/client)\n\n")
@@ -242,7 +244,18 @@ func run(args []string, stdout, stderr *os.File) int {
 	defer cancel()
 
 	breaker := NewBreaker(f.abortConsec, f.abortFailRate, f.abortWindow)
+	// Live progress goes to stderr (stdout stays reserved for the report/JSON),
+	// so the operator sees each endpoint as it runs. -quiet turns it off.
 	rec := NewRecorder()
+	if !f.quiet {
+		rec = NewRecorderWithProgress(stderr)
+		names := make([]string, 0, len(selected))
+		for _, cy := range selected {
+			names = append(names, cy.Name())
+		}
+		fmt.Fprintf(stderr, "Running %s — %d run(s), concurrency %d (live progress below; -quiet to silence)\n",
+			strings.Join(names, ", "), f.runs, f.concurrency)
+	}
 	cleanup := NewCleanup()
 	engine := NewEngine(EngineConfig{Runs: f.runs, Concurrency: f.concurrency}, breaker, rec, cleanup)
 

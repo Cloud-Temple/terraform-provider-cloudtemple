@@ -7,6 +7,10 @@ on request, full create-and-clean-up lifecycles — directly against the API
 per-endpoint health report: success rate, latency (p50/p95), and a breakdown of
 any errors.
 
+As it runs, it streams each endpoint live — a running counter, the outcome
+(`ok` / `skip` / `FAIL`) and the latency — so you always see what it is doing
+(pass `-quiet` to show only the final report).
+
 It can also replay a scenario repeatedly and in parallel to observe how the API
 holds up under increasing load.
 

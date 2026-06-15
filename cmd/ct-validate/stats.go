@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+	"io"
 	"sort"
 	"sync"
 	"time"
@@ -26,18 +28,49 @@ type Op struct {
 type Recorder struct {
 	mu  sync.Mutex
 	ops []Op
+	// progress, when set, receives one human-readable line per recorded
+	// operation as it happens (live advancement). Writing happens under the
+	// lock so concurrent workers never interleave a line.
+	progress io.Writer
 }
 
-// NewRecorder returns an empty recorder.
+// NewRecorder returns an empty recorder (no live progress).
 func NewRecorder() *Recorder {
 	return &Recorder{}
+}
+
+// NewRecorderWithProgress returns a recorder that also prints one line per
+// operation to w as it is recorded, so the operator sees what is running.
+func NewRecorderWithProgress(w io.Writer) *Recorder {
+	return &Recorder{progress: w}
 }
 
 // Record appends a single operation. Safe for concurrent callers.
 func (r *Recorder) Record(op Op) {
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.ops = append(r.ops, op)
-	r.mu.Unlock()
+	if r.progress != nil {
+		writeProgressLine(r.progress, len(r.ops), op)
+	}
+}
+
+// writeProgressLine renders one live advancement line:
+//
+//	12  ok    iam.token.read                          730 ms
+//	18  skip  compute.openiaas.virtual_machines.read
+//	21  FAIL  compute.openiaas.networks.list          http_5xx
+func writeProgressLine(w io.Writer, n int, op Op) {
+	tag, extra := "ok", ""
+	switch {
+	case op.Skipped:
+		tag = "skip"
+	case !op.OK:
+		tag, extra = "FAIL", string(op.Category)
+	case op.Latency > 0:
+		extra = fmt.Sprintf("%d ms", op.Latency.Milliseconds())
+	}
+	fmt.Fprintf(w, "  %3d  %-4s  %-44s  %s\n", n, tag, op.Endpoint, extra)
 }
 
 // Ops returns a copy of the recorded operations, in insertion order.
