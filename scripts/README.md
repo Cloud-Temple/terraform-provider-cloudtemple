@@ -39,9 +39,31 @@ scripts/ct-test.sh tf   <scenario>                   # play the same scenario vi
   scripts/ct-test.sh --tenant vmware api vm-vmware -runs 20 -concurrency 4
   ```
 
-Scenarios today: `readonly` (safe, read-only), `vpc`, `storage`, `vm` (OpenIaaS
-lifecycle), `vm-vmware` (VMware lifecycle). Write scenarios create then destroy
-their resources, with a deferred never-orphan teardown net.
+Scenarios today: `readonly` (safe, read-only), `machine-managers` (read-only: just
+`run_identity` + `machine_managers.list`, repeatable — see below), `vpc`, `storage`,
+`vm` (OpenIaaS lifecycle), `vm-vmware` (VMware lifecycle). Write scenarios create then
+destroy their resources, with a deferred never-orphan teardown net.
+
+### `machine-managers` — isolated, client-identical probe of one flaky call (#315)
+
+A read-only scenario that performs EXACTLY the first two steps of the `vm` cycle — the
+local `run_identity` token, then `compute.openiaas.machine_managers.list` (the same
+`MachineManager().List(ctx)` call) — and nothing else. It is the faithful way to
+reproduce the intermittent `machine_managers` 5xx (#315) in isolation, through the real
+provider client (unlike a `curl` probe, it is byte-identical to what the `vm` cycle
+sends). Drive it with load knobs:
+
+```bash
+# repeat the exact call 100× in series (default breaker stops on distress)
+scripts/ct-test.sh api machine-managers -runs 100 -concurrency 1
+
+# characterize the full 5xx rate over all 100 calls (relax the breaker), or chase the burst correlation
+scripts/ct-test.sh api machine-managers -runs 100 -concurrency 1 \
+  -abort-failure-rate 1.0 -abort-consecutive 1000 -abort-window 1000
+scripts/ct-test.sh api machine-managers -runs 100 -concurrency 8
+```
+
+The per-endpoint report then gives the OK% / 5xx rate of `machine_managers.list`.
 
 ## `ct-soak.sh` — characterize intermittent endpoint flakiness
 
@@ -80,16 +102,16 @@ flakiness (e.g. ComputeManager 5xx bursts) and to size a client retry/backoff po
 **Fidelity to the real client:** the probe sends the **same bytes** as the
 `ct-validate` Go client — an empty `User-Agent` and no `Accept` header (curl would
 otherwise inject `curl/x.y` + `Accept: */*`, which a gateway can route differently).
-For a 100% client-identical soak that exercises `machine_managers.list` through the
-real Go client, drive the read-only cycle with load knobs instead:
+Even so, curl can never be 100% identical (HTTP version, TLS, header order, keep-alive).
+**For a byte-identical soak, prefer the `machine-managers` scenario** (above), which
+drives `machine_managers.list` through the real Go client:
 
 ```bash
-CT_ENV_OPENIAAS=/path/.env.recette-openiaas scripts/ct-test.sh api readonly -runs 100 -concurrency 8
+CT_ENV_OPENIAAS=/path/.env.recette-openiaas scripts/ct-test.sh api machine-managers -runs 100 -concurrency 8
 ```
 
-The per-endpoint table then reports the 5xx rate of `compute.openiaas.machine_managers.list`
-specifically. Use `ct-soak.sh` for a targeted single-endpoint probe; `ct-test.sh api readonly`
-for a multi-endpoint soak through the exact provider client.
+Use `ct-soak.sh` as a quick standalone curl probe; use `ct-test.sh api machine-managers`
+(or `api readonly` for a multi-endpoint sweep) when you need the exact provider client.
 
 ## `coverage_ratchet.sh` — CI coverage gate
 
