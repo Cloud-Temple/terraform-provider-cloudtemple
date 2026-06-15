@@ -1,0 +1,344 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"net/http"
+	"os"
+	"strings"
+	"testing"
+)
+
+// --- recording fake seams (offline, no client) ---
+
+type fakeVMSeam struct {
+	log     *[]string
+	findID  string
+	findErr error
+}
+
+func (f fakeVMSeam) DeleteAndWait(_ context.Context, id string) error {
+	*f.log = append(*f.log, "vm.delete:"+id)
+	return nil
+}
+func (f fakeVMSeam) PowerOffAndWait(_ context.Context, id string) error {
+	*f.log = append(*f.log, "vm.poweroff:"+id)
+	return nil
+}
+func (f fakeVMSeam) FindIDByName(_ context.Context, name, mmID string) (string, error) {
+	*f.log = append(*f.log, "vm.find:"+name+"@"+mmID)
+	return f.findID, f.findErr
+}
+
+type fakeDiskSeam struct {
+	log         *[]string
+	connections []string
+	findID      string
+}
+
+func (f fakeDiskSeam) ReadConnections(_ context.Context, id string) ([]string, error) {
+	return f.connections, nil
+}
+func (f fakeDiskSeam) DisconnectAndWait(_ context.Context, id, vmID string) error {
+	*f.log = append(*f.log, "disk.disconnect:"+id+"/"+vmID)
+	return nil
+}
+func (f fakeDiskSeam) DeleteAndWait(_ context.Context, id string) error {
+	*f.log = append(*f.log, "disk.delete:"+id)
+	return nil
+}
+func (f fakeDiskSeam) FindIDByName(_ context.Context, name, vmID string) (string, error) {
+	*f.log = append(*f.log, "disk.find:"+name)
+	return f.findID, nil
+}
+
+type fakeAdapterSeam struct {
+	log *[]string
+	ids []string // FindIDsByVM returns these
+}
+
+func (f fakeAdapterSeam) FindIDsByVM(_ context.Context, vmID string) ([]string, error) {
+	*f.log = append(*f.log, "adapter.find:"+vmID)
+	return f.ids, nil
+}
+func (f fakeAdapterSeam) DeleteAndWait(_ context.Context, id string) error {
+	*f.log = append(*f.log, "adapter.delete:"+id)
+	return nil
+}
+
+func indexOf(log []string, prefix string) int {
+	for i, s := range log {
+		if strings.HasPrefix(s, prefix) {
+			return i
+		}
+	}
+	return -1
+}
+
+// TestRegisterVMTeardownResolvedDeletesByID: a resolved ref deletes by id
+// (power-off best-effort first), never falling back to find-by-name. Mutation:
+// drop the `ref.Resolved` check → find-by-name is used → "vm.find" appears.
+func TestRegisterVMTeardownResolvedDeletesByID(t *testing.T) {
+	var log []string
+	cl := NewCleanup()
+	registerVMTeardown(cl, fakeVMSeam{log: &log, findID: "should-not-be-used"},
+		&vmTeardownRef{Name: "vm-a", MachineManagerID: "mm-1", ID: "vm-id-1", Resolved: true})
+	cl.TeardownAll(context.Background())
+	if indexOf(log, "vm.find") != -1 {
+		t.Fatalf("a resolved ref must delete by id, not find by name; log=%v", log)
+	}
+	if indexOf(log, "vm.delete:vm-id-1") == -1 {
+		t.Fatalf("must delete by the resolved id; log=%v", log)
+	}
+}
+
+// TestRegisterVMTeardownUnresolvedFindsByName: an UNRESOLVED ref (create id
+// never came back) finds the VM by its deterministic name and deletes it — this
+// is why the teardown is registered BEFORE the create. Mutation: register after
+// the create (so the ref is never set) is exactly this path; dropping find →
+// orphan survives.
+func TestRegisterVMTeardownUnresolvedFindsByName(t *testing.T) {
+	var log []string
+	cl := NewCleanup()
+	registerVMTeardown(cl, fakeVMSeam{log: &log, findID: "found-vm-9"},
+		&vmTeardownRef{Name: "vm-b", MachineManagerID: "mm-1"}) // not resolved
+	cl.TeardownAll(context.Background())
+	if indexOf(log, "vm.find:vm-b@mm-1") == -1 || indexOf(log, "vm.delete:found-vm-9") == -1 {
+		t.Fatalf("unresolved ref must find-by-name then delete; log=%v", log)
+	}
+}
+
+// TestRegisterVMTeardownNotFoundIsNoop: unresolved + not found → nothing to do,
+// no delete (idempotent: never created / already gone).
+func TestRegisterVMTeardownNotFoundIsNoop(t *testing.T) {
+	var log []string
+	cl := NewCleanup()
+	registerVMTeardown(cl, fakeVMSeam{log: &log, findID: ""},
+		&vmTeardownRef{Name: "vm-c", MachineManagerID: "mm-1"})
+	if f := cl.TeardownAll(context.Background()); len(f) != 0 {
+		t.Fatalf("not-found teardown must be a no-op success, got failures %v", f)
+	}
+	if indexOf(log, "vm.delete") != -1 {
+		t.Fatalf("nothing must be deleted when not found; log=%v", log)
+	}
+}
+
+// TestRegisterVirtualDiskTeardownDisconnectsEveryConnectionThenDeletes pins the
+// disk doctrine: a user disk is disconnected from EVERY connected VM BEFORE
+// delete (a VM delete never cascades it). Mutation: drop the disconnect loop →
+// the "disconnect before delete" assertion goes RED.
+func TestRegisterVirtualDiskTeardownDisconnectsEveryConnectionThenDeletes(t *testing.T) {
+	var log []string
+	cl := NewCleanup()
+	registerVirtualDiskTeardown(cl, fakeDiskSeam{log: &log, connections: []string{"vm-1", "vm-2"}},
+		&diskTeardownRef{Name: "d-data", VMID: "vm-1", ID: "disk-7", Resolved: true})
+	cl.TeardownAll(context.Background())
+	d1 := indexOf(log, "disk.disconnect:disk-7/vm-1")
+	d2 := indexOf(log, "disk.disconnect:disk-7/vm-2")
+	del := indexOf(log, "disk.delete:disk-7")
+	if d1 == -1 || d2 == -1 || del == -1 || d1 > del || d2 > del {
+		t.Fatalf("disk must disconnect EVERY connection before delete; log=%v", log)
+	}
+}
+
+// TestRegisterNetworkAdapterTeardownResolvedDeletesByID: a resolved adapter is
+// deleted by id, no VM-wide listing.
+func TestRegisterNetworkAdapterTeardownResolvedDeletesByID(t *testing.T) {
+	var log []string
+	cl := NewCleanup()
+	registerNetworkAdapterTeardown(cl, fakeAdapterSeam{log: &log, ids: []string{"should-not-be-used"}},
+		&adapterTeardownRef{VMID: "vm-1", ID: "ad-3", Resolved: true})
+	cl.TeardownAll(context.Background())
+	if indexOf(log, "adapter.find") != -1 {
+		t.Fatalf("a resolved adapter must delete by id, not list the VM; log=%v", log)
+	}
+	if indexOf(log, "adapter.delete:ad-3") == -1 {
+		t.Fatalf("must delete the resolved adapter id; log=%v", log)
+	}
+}
+
+// TestRegisterNetworkAdapterTeardownUnresolvedDeletesAllOnVM: an UNRESOLVED
+// adapter (create id never came back, and no MAC since the platform assigns it)
+// is recovered by deleting EVERY adapter on the (run-unique, ours) VM. Mutation:
+// drop the find/delete-all loop → the created-but-unresolved adapter orphans.
+func TestRegisterNetworkAdapterTeardownUnresolvedDeletesAllOnVM(t *testing.T) {
+	var log []string
+	cl := NewCleanup()
+	registerNetworkAdapterTeardown(cl, fakeAdapterSeam{log: &log, ids: []string{"ad-1", "ad-2"}},
+		&adapterTeardownRef{VMID: "vm-1"}) // unresolved
+	cl.TeardownAll(context.Background())
+	if indexOf(log, "adapter.find:vm-1") == -1 || indexOf(log, "adapter.delete:ad-1") == -1 || indexOf(log, "adapter.delete:ad-2") == -1 {
+		t.Fatalf("unresolved adapter must list the VM and delete every adapter; log=%v", log)
+	}
+}
+
+// TestComputeLifecycleTeardownLIFOOrder pins leaves-first: registering VM, then
+// disk, then adapter (the cycle's creation order) makes TeardownAll remove them
+// in REVERSE — adapter, then disk, then VM (anchor last). Mutation: register the
+// VM teardown AFTER the disk/adapter → LIFO would delete the VM before its
+// devices → this order assertion goes RED.
+func TestComputeLifecycleTeardownLIFOOrder(t *testing.T) {
+	var log []string
+	cl := NewCleanup()
+	registerVMTeardown(cl, fakeVMSeam{log: &log}, &vmTeardownRef{Name: "vm", ID: "vm-1", Resolved: true})
+	registerVirtualDiskTeardown(cl, fakeDiskSeam{log: &log}, &diskTeardownRef{Name: "d", VMID: "vm-1", ID: "disk-1", Resolved: true})
+	registerNetworkAdapterTeardown(cl, fakeAdapterSeam{log: &log}, &adapterTeardownRef{VMID: "vm-1", ID: "ad-1", Resolved: true})
+
+	cl.TeardownAll(context.Background())
+
+	a, d, v := indexOf(log, "adapter.delete"), indexOf(log, "disk.delete"), indexOf(log, "vm.delete")
+	if a == -1 || d == -1 || v == -1 || !(a < d && d < v) {
+		t.Fatalf("LIFO must tear down leaves-first (adapter < disk < vm), got order %v", log)
+	}
+}
+
+// TestRegistryHasComputeLifecycleGated: the cycle is registered, write-typed, and
+// gated out unless -write is set.
+func TestRegistryHasComputeLifecycleGated(t *testing.T) {
+	reg := buildRegistry()
+	sel, gated, err := reg.Select("compute_lifecycle", false)
+	if err != nil {
+		t.Fatalf("select: %v", err)
+	}
+	if len(sel) != 0 {
+		t.Fatalf("compute_lifecycle must be GATED without -write, got selected %v", sel)
+	}
+	if len(gated) != 1 || gated[0] != "compute_lifecycle" {
+		t.Fatalf("compute_lifecycle must be the gated write cycle, got %v", gated)
+	}
+	sel, _, _ = reg.Select("compute_lifecycle", true)
+	if len(sel) != 1 || sel[0].Name() != "compute_lifecycle" || sel[0].Kind() != KindWrite {
+		t.Fatalf("compute_lifecycle must be selectable (write) with -write, got %v", sel)
+	}
+}
+
+// TestComputeLifecycleSkipsWithoutSubstrate pins that with NO machine manager,
+// the cycle records every write step as SKIPPED and attempts ZERO create — it
+// never guesses or fires a create blindly. Mutation: turn a skip into a create
+// attempt → the stub flags the unexpected POST.
+func TestComputeLifecycleSkipsWithoutSubstrate(t *testing.T) {
+	c := newReadonlyTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Errorf("no write/create call expected without a machine manager, got %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if isOpenIaaSMachineManagers(r.URL.Path) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`[]`)) // no machine manager
+			return
+		}
+		t.Errorf("only the machine-managers list should be called, got GET %s", r.URL.Path)
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[]`))
+	})
+
+	r := &Run{Recorder: NewRecorder(), Breaker: NewBreaker(1000, 0.99, 1000), Cleanup: NewCleanup()}
+	if err := (computeLifecycleCycle{}).Run(context.Background(), c, r); err != nil {
+		t.Fatalf("Run returned error: %v", err)
+	}
+	if cl := r.Cleanup.Pending(); cl != 0 {
+		t.Fatalf("no teardown must be registered when there is no substrate, got %d pending", cl)
+	}
+	for _, o := range r.Recorder.Ops() {
+		if strings.Contains(o.Endpoint, ".create") || strings.Contains(o.Endpoint, ".delete") || strings.Contains(o.Endpoint, ".connect") {
+			if !o.Skipped {
+				t.Fatalf("%s must be SKIPPED without substrate, got %+v", o.Endpoint, o)
+			}
+		}
+	}
+}
+
+// TestComputeVMSeamFindIDByNameFailsHardOnDuplicate pins that the unresolved
+// find-by-name REFUSES to pick a VM when more than one shares the (run-unique)
+// name — it fails closed rather than risk deleting the wrong VM. Mutation: have
+// FindIDByName return the first match → no error → RED.
+func TestComputeVMSeamFindIDByNameFailsHardOnDuplicate(t *testing.T) {
+	c := newReadonlyTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`[{"id":"a","name":"dup"},{"id":"b","name":"dup"}]`))
+	})
+	if _, err := (computeVMSeam{c}).FindIDByName(context.Background(), "dup", "mm-1"); err == nil {
+		t.Fatal("two VMs sharing the name must fail closed (refuse to delete the wrong one), got nil error")
+	}
+}
+
+// TestComputeVirtualDiskSeamFindTenantWideWhenUnattached pins the anti-orphan
+// fallback: a created-but-UNATTACHED disk (absent from the VM-scoped listing) is
+// still found tenant-wide by its run-unique name. Mutation: drop the tenant-wide
+// pass → the unattached disk is not found → would orphan → RED.
+func TestComputeVirtualDiskSeamFindTenantWideWhenUnattached(t *testing.T) {
+	c := newReadonlyTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if r.URL.Query().Get("virtualMachineId") != "" {
+			_, _ = w.Write([]byte(`[]`)) // VM-scoped: not attached → empty
+			return
+		}
+		_, _ = w.Write([]byte(`[{"id":"disk-9","name":"d-data"}]`)) // tenant-wide: found
+	})
+	id, err := (computeVirtualDiskSeam{c}).FindIDByName(context.Background(), "d-data", "vm-1")
+	if err != nil || id != "disk-9" {
+		t.Fatalf("a created-but-unattached disk must be found tenant-wide, got id=%q err=%v", id, err)
+	}
+}
+
+// TestComputeVirtualDiskSeamFindFailsHardOnDuplicate pins fail-closed on a
+// duplicate disk name (refuse to delete the wrong disk).
+func TestComputeVirtualDiskSeamFindFailsHardOnDuplicate(t *testing.T) {
+	c := newReadonlyTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if r.URL.Query().Get("virtualMachineId") != "" {
+			_, _ = w.Write([]byte(`[]`))
+			return
+		}
+		_, _ = w.Write([]byte(`[{"id":"a","name":"d-data"},{"id":"b","name":"d-data"}]`))
+	})
+	if _, err := (computeVirtualDiskSeam{c}).FindIDByName(context.Background(), "d-data", "vm-1"); err == nil {
+		t.Fatal("two disks sharing the name must fail closed, got nil error")
+	}
+}
+
+// TestComputeLifecycleIdentityFailureIsObservable pins that a run-identity
+// generation failure (no entropy) creates NOTHING and is recorded as a FAILURE
+// op (so the run exits non-zero) — not a silent exit-0. Mutation: revert the
+// token step to a bare `return err` (engine-swallowed) → no failure op recorded
+// → RED.
+func TestComputeLifecycleIdentityFailureIsObservable(t *testing.T) {
+	c := newReadonlyTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		t.Errorf("no call expected when identity generation fails, got %s %s", r.Method, r.URL.Path)
+		w.WriteHeader(http.StatusInternalServerError)
+	})
+	cyc := computeLifecycleCycle{tokenFunc: func() (string, error) { return "", errors.New("no entropy") }}
+	r := &Run{Recorder: NewRecorder(), Breaker: NewBreaker(1000, 0.99, 1000), Cleanup: NewCleanup()}
+	_ = cyc.Run(context.Background(), c, r)
+
+	if r.Cleanup.Pending() != 0 {
+		t.Fatalf("nothing must be created/registered on an identity failure, got %d pending", r.Cleanup.Pending())
+	}
+	var failed bool
+	for _, o := range r.Recorder.Ops() {
+		if o.Endpoint == "compute.openiaas.run_identity" && !o.OK && !o.Skipped {
+			failed = true
+		}
+	}
+	if !failed {
+		t.Fatal("identity failure must be recorded as a failed op (observable, exit non-zero)")
+	}
+}
+
+// TestFlagsValidateRejectsRunawayLoad pins the hard ceilings on the load knobs: a
+// typo'd -concurrency / -runs is refused before anything runs. Mutation: drop the
+// upper-bound checks in validate() → these are accepted → RED.
+func TestFlagsValidateRejectsRunawayLoad(t *testing.T) {
+	out, err := os.CreateTemp(t.TempDir(), "usage")
+	if err != nil {
+		t.Fatalf("temp: %v", err)
+	}
+	defer out.Close()
+	if _, err := parseFlags([]string{"-concurrency", "5000"}, out); err == nil {
+		t.Fatal("-concurrency 5000 must be rejected (runaway load)")
+	}
+	if _, err := parseFlags([]string{"-runs", "100000000"}, out); err == nil {
+		t.Fatal("-runs 100000000 must be rejected (runaway load)")
+	}
+}

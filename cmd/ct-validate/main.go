@@ -36,6 +36,7 @@ func buildRegistry() *Registry {
 		readonlyCycle{},
 		backupCycle{},
 		computeOpenIaaSCycle{},
+		computeLifecycleCycle{},
 		vpcCycle{},
 		objectStorageCycle{},
 		iamPATCycle{},
@@ -96,12 +97,27 @@ func parseFlags(args []string, out *os.File) (*flags, error) {
 	return f, nil
 }
 
+// Hard ceilings on the load knobs: a CLI warning is not enough for a tool that
+// can issue WRITE business cycles against a SHARED API. These guard against a
+// typo (e.g. -concurrency 5000); the circuit breaker is still the real-time
+// safety net. Raise deliberately in code if a genuine need arises.
+const (
+	maxRuns        = 10000
+	maxConcurrency = 64
+)
+
 func (f *flags) validate() error {
 	if f.runs < 1 {
 		return fmt.Errorf("-runs must be >= 1 (got %d)", f.runs)
 	}
+	if f.runs > maxRuns {
+		return fmt.Errorf("-runs must be <= %d (got %d): refusing a runaway load against a shared API", maxRuns, f.runs)
+	}
 	if f.concurrency < 1 {
 		return fmt.Errorf("-concurrency must be >= 1 (got %d)", f.concurrency)
+	}
+	if f.concurrency > maxConcurrency {
+		return fmt.Errorf("-concurrency must be <= %d (got %d): high concurrency on a shared API is dangerous", maxConcurrency, f.concurrency)
 	}
 	if f.timeout <= 0 {
 		return fmt.Errorf("-timeout must be > 0 (got %s)", f.timeout)
