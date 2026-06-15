@@ -49,6 +49,32 @@ type computeLifecycleCycle struct {
 func (computeLifecycleCycle) Name() string { return "compute_lifecycle" }
 func (computeLifecycleCycle) Kind() Kind   { return KindWrite }
 
+// vmSize returns the VM create size for one dimension (CPU or memory): the larger
+// of the floor and the template's own requirement. Deploying a template below its
+// defined CPU/RAM is rejected by the order layer (MEMORY_CONSTRAINT_VIOLATION_ORDER),
+// so the template's value must win when it exceeds the floor; the floor guards the
+// case where the listing reports 0.
+func vmSize(floor, fromTemplate int) int {
+	if fromTemplate > floor {
+		return fromTemplate
+	}
+	return floor
+}
+
+// openIaaSVMCreateReq builds the create request for the OpenIaaS lifecycle VM,
+// sizing CPU/RAM at max(floor, template) so the deploy satisfies the order layer's
+// "not below the template" constraint. Kept as a pure builder so a test can pin
+// that the SELECTED template's sizing actually reaches the create request (not the
+// bare floor constants).
+func openIaaSVMCreateReq(name, templateID string, tmplCPU, tmplMem int) *client.CreateOpenIaasVirtualMachineRequest {
+	return &client.CreateOpenIaasVirtualMachineRequest{
+		Name:       name,
+		TemplateID: templateID,
+		CPU:        vmSize(clVMCPU, tmplCPU),
+		Memory:     vmSize(clVMMemory, tmplMem),
+	}
+}
+
 func (cyc computeLifecycleCycle) mkToken() (string, error) {
 	if cyc.tokenFunc != nil {
 		return cyc.tokenFunc()
@@ -57,6 +83,9 @@ func (cyc computeLifecycleCycle) mkToken() (string, error) {
 }
 
 const (
+	// clVMCPU/clVMMemory are FLOORS: the VM is sized at max(floor, template's own
+	// CPU/RAM), because the order layer rejects deploying a template with less than
+	// its defined CPU/RAM (MEMORY_CONSTRAINT_VIOLATION_ORDER).
 	clVMCPU    = 1
 	clVMMemory = 1073741824 // 1 GiB, in bytes
 	clDiskSize = 1073741824 // 1 GiB, in bytes
@@ -142,6 +171,7 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 	}
 
 	var tmplID string
+	var tmplCPU, tmplMem int
 	_ = r.op(cyc, "compute.openiaas.templates.list", func() error {
 		tmpls, err := oi.Template().List(ctx, &client.OpenIaaSTemplateFilter{MachineManagerId: mmID})
 		if err != nil {
@@ -149,7 +179,7 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 		}
 		for _, t := range tmpls {
 			if t != nil && t.ID != "" {
-				tmplID = t.ID
+				tmplID, tmplCPU, tmplMem = t.ID, t.CPU, t.Memory
 				break
 			}
 		}
@@ -197,12 +227,7 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 	registerVMTeardown(r.Cleanup, computeVMSeam{c}, vmRef)
 	var vmID string
 	_ = r.op(cyc, "compute.openiaas.virtual_machine.create", func() error {
-		activityID, err := oi.VirtualMachine().Create(ctx, &client.CreateOpenIaasVirtualMachineRequest{
-			Name:       name,
-			TemplateID: tmplID,
-			CPU:        clVMCPU,
-			Memory:     clVMMemory,
-		})
+		activityID, err := oi.VirtualMachine().Create(ctx, openIaaSVMCreateReq(name, tmplID, tmplCPU, tmplMem))
 		if err != nil {
 			return err
 		}

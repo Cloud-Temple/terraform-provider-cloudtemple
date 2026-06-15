@@ -192,6 +192,48 @@ func TestComputeLifecycleTeardownLIFOOrder(t *testing.T) {
 	}
 }
 
+// TestVMSizeUsesTemplateWhenLarger pins the order-constraint fix: the create size
+// is max(floor, template). The template's own CPU/RAM must win when it exceeds the
+// floor (deploying a template under-sized is rejected: MEMORY_CONSTRAINT_VIOLATION_ORDER);
+// the floor guards a 0/absent template value. Mutation: always return the floor →
+// the "template larger" case goes RED (and the live create would 400/violate).
+func TestVMSizeUsesTemplateWhenLarger(t *testing.T) {
+	const floor = 1073741824 // 1 GiB
+	if got := vmSize(floor, 4*floor); got != 4*floor {
+		t.Fatalf("template larger than floor must win (avoids the order constraint), got %d", got)
+	}
+	if got := vmSize(floor, 0); got != floor {
+		t.Fatalf("a 0/absent template value must fall back to the floor, got %d", got)
+	}
+	if got := vmSize(floor, floor/2); got != floor {
+		t.Fatalf("a template smaller than the floor must keep the floor, got %d", got)
+	}
+	if got := vmSize(2, 8); got != 8 { // CPU dimension
+		t.Fatalf("cpu sizing must also take the larger, got %d", got)
+	}
+}
+
+// TestOpenIaaSVMCreateReqUsesSelectedTemplateSizing pins the integration the unit
+// test alone misses: the SELECTED template's id AND its CPU/Memory (sized to the
+// floor) actually reach the create request — a regression that hardcoded the floor
+// constants or read a different template would be caught here. Mutation: build the
+// request with clVMCPU/clVMMemory instead of the template values → RED.
+func TestOpenIaaSVMCreateReqUsesSelectedTemplateSizing(t *testing.T) {
+	const bigMem = 4 * clVMMemory // template wants 4 GiB, above the 1 GiB floor
+	req := openIaaSVMCreateReq("ct-validate-vm", "tmpl-selected", 4, bigMem)
+	if req.TemplateID != "tmpl-selected" {
+		t.Fatalf("must deploy from the selected template, got %q", req.TemplateID)
+	}
+	if req.CPU != 4 || req.Memory != bigMem {
+		t.Fatalf("must size from the template (cpu=4, mem=%d), got cpu=%d mem=%d", bigMem, req.CPU, req.Memory)
+	}
+	// A template reporting 0 (listing did not populate it) falls back to the floor.
+	floorReq := openIaaSVMCreateReq("ct-validate-vm", "tmpl-zero", 0, 0)
+	if floorReq.CPU != clVMCPU || floorReq.Memory != clVMMemory {
+		t.Fatalf("a 0 template must fall back to the floor, got cpu=%d mem=%d", floorReq.CPU, floorReq.Memory)
+	}
+}
+
 // TestRegistryHasComputeLifecycleGated: the cycle is registered, write-typed, and
 // gated out unless -write is set.
 func TestRegistryHasComputeLifecycleGated(t *testing.T) {
