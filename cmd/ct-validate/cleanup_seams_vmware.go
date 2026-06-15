@@ -3,9 +3,46 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 )
+
+// confirmComputeDeleteErr resolves a VMware compute delete outcome. A 404 is a
+// definitive not-found → success (idempotent). A 403 is AMBIGUOUS: the VMware
+// compute API returns 403 for an ABSENT resource as well as a forbidden one (the
+// #303 conflation) — typically when the explicit deprovision already deleted the
+// resource and the deferred backstop re-deletes it. The 403 is CONFIRMED by
+// re-checking the resource's OWN existence (a Read by id, which maps 403/404 →
+// not-found): accepted ONLY when it is proven absent; surfaced when it still
+// exists; failed CLOSED when existence cannot be determined (a 5xx/transport
+// error on the re-check). Any other delete error surfaces unchanged.
+//
+// The existence re-check is BY ID and independent of the parent VM — so it stays
+// valid even when the deferred leaf teardown runs AFTER the explicit deprovision
+// already deleted the parent VM (a VM-scoped listing would fail there). stillExists
+// is injected so this decision is unit-testable offline. Mirrors the VPC #312
+// confirm-before-accept doctrine: a 403-on-absent must not be a false "possible
+// orphan", and a 403-on-present must never be silently accepted.
+func confirmComputeDeleteErr(err error, stillExists func() (bool, error), id string) error {
+	if err == nil {
+		return nil
+	}
+	if isStatusCode(err, http.StatusNotFound) {
+		return nil
+	}
+	if isStatusCode(err, http.StatusForbidden) {
+		exists, cerr := stillExists()
+		if cerr != nil {
+			return fmt.Errorf("compute delete of %s returned 403 and the existence re-check to confirm absence failed: %w", id, cerr)
+		}
+		if exists {
+			return fmt.Errorf("compute resource %s could not be deleted (403) and still exists: %w", id, err)
+		}
+		return nil // re-check proves it is gone → idempotent success
+	}
+	return err
+}
 
 // VMware (vCenter) compute lifecycle teardowns — the sibling of the OpenIaaS
 // teardowns in cleanup_seams.go, with the SAME doctrine:
@@ -31,6 +68,9 @@ type vmwareVMSeam interface {
 	DeleteAndWait(ctx context.Context, id string) error
 	PowerOffAndWait(ctx context.Context, id string) error // best-effort, never fatal
 	FindIDByName(ctx context.Context, name, datacenterID string) (string, error)
+	// Exists reports whether the VM id is still present (a Read by id; a definitive
+	// not-found is false). Used to confirm a 403 delete is absent, not forbidden.
+	Exists(ctx context.Context, id string) (bool, error)
 }
 
 // vmwareVMTeardownRef carries the VM identity; ID is filled once the create
@@ -61,7 +101,13 @@ func registerVMwareVMTeardown(cl *Cleanup, seam vmwareVMSeam, ref *vmwareVMTeard
 			id = found
 		}
 		_ = seam.PowerOffAndWait(tctx, id) // best-effort: a powered-on VM may refuse delete
-		return seam.DeleteAndWait(tctx, id)
+		// A 403 here is the VMware "absent-or-forbidden" conflation (#303): the
+		// explicit deprovision may have already deleted this VM, and a re-delete of
+		// an absent VM answers 403, not 404. Confirm via a by-id existence re-check
+		// before treating it as a failure.
+		delID := id
+		return confirmComputeDeleteErr(seam.DeleteAndWait(tctx, delID),
+			func() (bool, error) { return seam.Exists(tctx, delID) }, delID)
 	})
 }
 
@@ -117,6 +163,16 @@ func (s computeVMwareVMSeam) FindIDByName(ctx context.Context, name, datacenterI
 	return found, nil
 }
 
+// Exists reads the VM by id; a definitive not-found (the client maps 403/404 → nil)
+// is reported as absent. A transport/5xx error surfaces so the caller fails closed.
+func (s computeVMwareVMSeam) Exists(ctx context.Context, id string) (bool, error) {
+	vm, err := s.c.Compute().VirtualMachine().Read(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	return vm != nil, nil
+}
+
 // --- VMware virtual disk ------------------------------------------------------
 
 // vmwareDiskSeam is the subset of the VMware virtual-disk client a disk teardown
@@ -133,6 +189,9 @@ func (s computeVMwareVMSeam) FindIDByName(ctx context.Context, name, datacenterI
 type vmwareDiskSeam interface {
 	FindIDsByVM(ctx context.Context, vmID string) ([]string, error)
 	DeleteAndWait(ctx context.Context, id string) error
+	// Exists reports whether the disk id is still present (a Read by id). Used to
+	// confirm a 403 delete is absent, not forbidden — independent of the parent VM.
+	Exists(ctx context.Context, id string) (bool, error)
 }
 
 type vmwareDiskTeardownRef struct {
@@ -148,15 +207,23 @@ type vmwareDiskTeardownRef struct {
 // create (F3).
 func registerVMwareDiskTeardown(cl *Cleanup, seam vmwareDiskSeam, ref *vmwareDiskTeardownRef) {
 	cl.Register(fmt.Sprintf("compute.vmware.virtual_disk on %s", ref.VMID), func(tctx context.Context) error {
+		// A 403 on delete is the VMware absent-or-forbidden conflation (#303) — the
+		// explicit deprovision may have already removed this disk; confirm via a
+		// by-id existence re-check (independent of the parent VM, which may itself be
+		// gone by now) before treating it as a failure.
+		del := func(id string) error {
+			return confirmComputeDeleteErr(seam.DeleteAndWait(tctx, id),
+				func() (bool, error) { return seam.Exists(tctx, id) }, id)
+		}
 		if ref.Resolved && ref.ID != "" {
-			return seam.DeleteAndWait(tctx, ref.ID)
+			return del(ref.ID)
 		}
 		ids, err := seam.FindIDsByVM(tctx, ref.VMID)
 		if err != nil {
 			return err
 		}
 		for _, id := range ids {
-			if derr := seam.DeleteAndWait(tctx, id); derr != nil {
+			if derr := del(id); derr != nil {
 				return derr
 			}
 		}
@@ -165,6 +232,15 @@ func registerVMwareDiskTeardown(cl *Cleanup, seam vmwareDiskSeam, ref *vmwareDis
 }
 
 type computeVMwareDiskSeam struct{ c *client.Client }
+
+// Exists reads the disk by id; a definitive not-found (403/404 → nil) is absent.
+func (s computeVMwareDiskSeam) Exists(ctx context.Context, id string) (bool, error) {
+	disk, err := s.c.Compute().VirtualDisk().Read(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	return disk != nil, nil
+}
 
 func (s computeVMwareDiskSeam) FindIDsByVM(ctx context.Context, vmID string) ([]string, error) {
 	disks, err := s.c.Compute().VirtualDisk().ListStrict(ctx, &client.VirtualDiskFilter{VirtualMachineID: vmID})
@@ -200,6 +276,9 @@ type vmwareAdapterSeam interface {
 	// and there is no MAC to match on (the platform assigns it).
 	FindIDsByVM(ctx context.Context, vmID string) ([]string, error)
 	DeleteAndWait(ctx context.Context, id string) error
+	// Exists reports whether the adapter id is still present (a Read by id). Used to
+	// confirm a 403 delete is absent, not forbidden — independent of the parent VM.
+	Exists(ctx context.Context, id string) (bool, error)
 }
 
 type vmwareAdapterTeardownRef struct {
@@ -213,15 +292,23 @@ type vmwareAdapterTeardownRef struct {
 // every adapter on the (run-unique, ours) VM.
 func registerVMwareNetworkAdapterTeardown(cl *Cleanup, seam vmwareAdapterSeam, ref *vmwareAdapterTeardownRef) {
 	cl.Register(fmt.Sprintf("compute.vmware.network_adapter %s", ref.VMID), func(tctx context.Context) error {
+		// A 403 on delete is the VMware absent-or-forbidden conflation (#303) — the
+		// explicit deprovision may have already removed this adapter; confirm via a
+		// by-id existence re-check (independent of the parent VM, which may be gone)
+		// before treating it as a failure.
+		del := func(id string) error {
+			return confirmComputeDeleteErr(seam.DeleteAndWait(tctx, id),
+				func() (bool, error) { return seam.Exists(tctx, id) }, id)
+		}
 		if ref.Resolved && ref.ID != "" {
-			return seam.DeleteAndWait(tctx, ref.ID)
+			return del(ref.ID)
 		}
 		ids, err := seam.FindIDsByVM(tctx, ref.VMID)
 		if err != nil {
 			return err
 		}
 		for _, id := range ids {
-			if derr := seam.DeleteAndWait(tctx, id); derr != nil {
+			if derr := del(id); derr != nil {
 				return derr
 			}
 		}
@@ -230,6 +317,15 @@ func registerVMwareNetworkAdapterTeardown(cl *Cleanup, seam vmwareAdapterSeam, r
 }
 
 type computeVMwareAdapterSeam struct{ c *client.Client }
+
+// Exists reads the adapter by id; a definitive not-found (403/404 → nil) is absent.
+func (s computeVMwareAdapterSeam) Exists(ctx context.Context, id string) (bool, error) {
+	adapter, err := s.c.Compute().NetworkAdapter().Read(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	return adapter != nil, nil
+}
 
 func (s computeVMwareAdapterSeam) FindIDsByVM(ctx context.Context, vmID string) ([]string, error) {
 	adapters, err := s.c.Compute().NetworkAdapter().ListStrict(ctx,
