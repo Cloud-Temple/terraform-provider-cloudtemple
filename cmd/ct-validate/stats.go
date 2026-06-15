@@ -17,6 +17,10 @@ type Op struct {
 	Skipped  bool
 	Latency  time.Duration
 	Category Category
+	// Detail carries the (truncated) error message for a FAILED op — e.g. the
+	// 4xx/5xx response body — so the report can show WHY an endpoint squeaked,
+	// not just its category. Empty for OK/skipped ops.
+	Detail string
 }
 
 // Recorder collects Op records concurrently and aggregates them per
@@ -92,6 +96,9 @@ type EndpointStats struct {
 	P50      time.Duration    `json:"p50_ns"`
 	P95      time.Duration    `json:"p95_ns"`
 	Reasons  map[Category]int `json:"reasons"`
+	// SampleError is the first failed op's (truncated) error message for this
+	// endpoint — a representative reason it squeaked. Empty when none failed.
+	SampleError string `json:"sample_error,omitempty"`
 }
 
 // SuccessRate is the fraction of non-skipped attempts that succeeded, in
@@ -171,6 +178,9 @@ func Aggregate(ops []Op) []EndpointStats {
 		if op.OK {
 			b.stats.OK++
 			b.latencies = append(b.latencies, op.Latency)
+		} else if !op.Skipped && b.stats.SampleError == "" && op.Detail != "" {
+			// First real failure's detail is the representative reason it squeaked.
+			b.stats.SampleError = op.Detail
 		}
 		// Record the category for every op (including OK→CategoryOK and
 		// Skipped→CategorySkipped) so the histogram is complete.

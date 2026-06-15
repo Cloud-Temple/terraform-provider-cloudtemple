@@ -31,6 +31,7 @@ type squeak struct {
 	Endpoint    string  `json:"endpoint"`
 	SuccessRate float64 `json:"success_rate"`
 	Total       int     `json:"total"`
+	SampleError string  `json:"sample_error,omitempty"`
 }
 
 type jsonEndpoint struct {
@@ -43,6 +44,7 @@ type jsonEndpoint struct {
 	P50ms       float64          `json:"p50_ms"`
 	P95ms       float64          `json:"p95_ms"`
 	Reasons     map[Category]int `json:"reasons"`
+	SampleError string           `json:"sample_error,omitempty"`
 }
 
 type jsonTeardownFailure struct {
@@ -76,6 +78,7 @@ func squeaks(stats []EndpointStats) []squeak {
 				Endpoint:    s.Endpoint,
 				SuccessRate: rate,
 				Total:       s.Total,
+				SampleError: s.SampleError,
 			})
 		}
 	}
@@ -151,6 +154,9 @@ func PrintText(w io.Writer, res EngineResult) {
 	} else {
 		for _, s := range sq {
 			fmt.Fprintf(w, "  %-6.1f%%  %s / %s  (n=%d)\n", s.SuccessRate*100, s.Cycle, s.Endpoint, s.Total)
+			if s.SampleError != "" {
+				fmt.Fprintf(w, "           ↳ %s\n", s.SampleError)
+			}
 		}
 	}
 	fmt.Fprintln(w)
@@ -202,6 +208,7 @@ func PrintJSON(w io.Writer, res EngineResult) error {
 			P50ms:       msFloat(s.P50),
 			P95ms:       msFloat(s.P95),
 			Reasons:     s.Reasons,
+			SampleError: s.SampleError,
 		})
 	}
 	for _, f := range res.TeardownFailed {
