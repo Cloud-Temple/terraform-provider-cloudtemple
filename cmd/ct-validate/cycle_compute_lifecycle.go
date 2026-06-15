@@ -129,6 +129,25 @@ func resolveActivityResultID(act *client.Activity) string {
 	return ""
 }
 
+// explicitDelete runs the breaker-gated explicit delete op `do` and records STRICT
+// same-cycle proof of absence into *deleted. *deleted is set true ONLY when the op
+// actually RAN and the delete succeeded (a 200, or a definitive 404 the OpenIaaS
+// delete treats as already-gone). On a breaker skip r.op never invokes the closure,
+// so *deleted stays false and the deferred teardown fails closed on a later
+// 403-on-absent (#303) instead of masking a possible orphan. NEVER infer success
+// from r.op's return value: it is nil on a breaker skip too (the op did not run) —
+// the proof MUST be set from inside the closure, which only runs when the breaker
+// allows it.
+func (cyc computeLifecycleCycle) explicitDelete(r *Run, deleted *bool, endpoint string, do func() error) {
+	_ = r.op(cyc, endpoint, func() error {
+		err := do()
+		if err == nil {
+			*deleted = true
+		}
+		return err
+	})
+}
+
 func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
 	// Collision-free identity: a 128-bit run token + full (Iteration, Worker)
 	// integers (no byte() truncation). The find-by-name teardown fallback relies
@@ -289,8 +308,9 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 	// --- PHASE 2: storage variation — attach a user data disk (optional) ---
 	srID := selectOpenIaaSDiskSR(srs, vmPoolID, vmHostID, clDiskSize)
 	var diskID string
+	var diskRef *diskTeardownRef // function-scoped so PHASE 4 can record the explicit-delete proof
 	if srID != "" {
-		diskRef := &diskTeardownRef{Name: name + "-data", VMID: vmID}
+		diskRef = &diskTeardownRef{Name: name + "-data", VMID: vmID}
 		registerVirtualDiskTeardown(r.Cleanup, computeVirtualDiskSeam{c}, diskRef)
 		_ = r.op(cyc, "compute.openiaas.virtual_disk.create", func() error {
 			activityID, err := oi.VirtualDisk().Create(ctx, &client.OpenIaaSVirtualDiskCreateRequest{
@@ -334,8 +354,9 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 	// and this lean cycle keeps the VM halted — the network attachment at provision
 	// time is what we exercise (mirrors the VMware cycle).
 	var adapterID string
+	var adapterRef *adapterTeardownRef // function-scoped so PHASE 4 can record the explicit-delete proof
 	if networkID != "" {
-		adapterRef := &adapterTeardownRef{VMID: vmID}
+		adapterRef = &adapterTeardownRef{VMID: vmID}
 		registerNetworkAdapterTeardown(r.Cleanup, computeNetworkAdapterSeam{c}, adapterRef)
 		_ = r.op(cyc, "compute.openiaas.network_adapter.create", func() error {
 			activityID, err := oi.NetworkAdapter().Create(ctx, &client.CreateOpenIaasNetworkAdapterRequest{
@@ -365,7 +386,7 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 	// not a false failure. Every op is breaker-gated, so once tripped these become
 	// recorded skips and the deferred TeardownAll still sweeps everything. ---
 	if adapterID != "" {
-		_ = r.op(cyc, "compute.openiaas.network_adapter.delete", func() error {
+		cyc.explicitDelete(r, &adapterRef.ExplicitlyDeleted, "compute.openiaas.network_adapter.delete", func() error {
 			activityID, err := oi.NetworkAdapter().Delete(ctx, adapterID)
 			if err != nil {
 				return idempotentDeleteErr(err)
@@ -387,7 +408,7 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 			_, werr := c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
 			return werr
 		})
-		_ = r.op(cyc, "compute.openiaas.virtual_disk.delete", func() error {
+		cyc.explicitDelete(r, &diskRef.ExplicitlyDeleted, "compute.openiaas.virtual_disk.delete", func() error {
 			activityID, err := oi.VirtualDisk().Delete(ctx, diskID)
 			if err != nil {
 				return idempotentDeleteErr(err)
@@ -400,7 +421,7 @@ func (cyc computeLifecycleCycle) Run(ctx context.Context, c *client.Client, r *R
 		r.skip(cyc, "compute.openiaas.virtual_disk.delete")
 	}
 
-	_ = r.op(cyc, "compute.openiaas.virtual_machine.delete", func() error {
+	cyc.explicitDelete(r, &vmRef.ExplicitlyDeleted, "compute.openiaas.virtual_machine.delete", func() error {
 		activityID, err := oi.VirtualMachine().Delete(ctx, vmID)
 		if err != nil {
 			return idempotentDeleteErr(err)

@@ -62,6 +62,44 @@ func idempotentDeleteErr(err error) error {
 	return err
 }
 
+// confirmComputeDeleteByPriorDelete resolves a DEFERRED OpenIaaS compute delete
+// outcome (VM / disk / adapter) WITHOUT a Read re-check. It handles the direct
+// delete-CALL error: a definitive 404 (the OpenIaaS delete is idempotent) means
+// the resource is already gone → success; a 403 is the absent/forbidden
+// conflation (#303) the OpenIaaS compute API returns when the deferred net
+// re-deletes a resource the explicit deprovision already removed. Any other error
+// (and an activity-completion failure, which surfaces as an ActivityCompletionError,
+// not a StatusError) is surfaced unchanged.
+//
+// A 403 is accepted as "already gone" ONLY on STRICT POSITIVE same-cycle evidence:
+// priorDeleteOK means THIS cycle's explicit delete of THIS exact id already
+// succeeded (a 200, or a definitive 404), so the resource is provably absent and
+// the deferred 403 is the conflation, not a real orphan. Without that proof the
+// 403 FAILS CLOSED (surfaced as a teardown failure) — never silently accepted.
+//
+// Why NOT a by-id Read re-check (unlike the VMware #330 confirmComputeDeleteErr):
+// the OpenIaaS Read maps BOTH 403 and 404 to "absent" (requireNotFoundOrOK(resp,
+// 403)), so a Read cannot distinguish a truly-absent resource from a
+// present-but-forbidden one — using it would let a real orphan (delete 403 +
+// read 403 on a still-present resource) be masked as success, exactly the
+// access-denied→absent inference the never-orphan doctrine forbids. The
+// same-cycle explicit-delete proof is the unambiguous positive signal instead.
+func confirmComputeDeleteByPriorDelete(err error, priorDeleteOK bool, id string) error {
+	if err == nil {
+		return nil
+	}
+	if isStatusCode(err, http.StatusNotFound) {
+		return nil
+	}
+	if isStatusCode(err, http.StatusForbidden) {
+		if priorDeleteOK {
+			return nil // this cycle's explicit delete of this id already succeeded → 403 is the conflation, not an orphan
+		}
+		return fmt.Errorf("compute delete of %s returned 403 and its absence could not be confirmed (no successful same-cycle explicit delete): %w", id, err)
+	}
+	return err
+}
+
 // staticIPDeleteErrResult is the SHARED static-IP delete idempotency decision
 // (#312): a 404 is idempotent success; a 403 is AMBIGUOUS (#303 conflates
 // absent/forbidden) and is confirmed via a strict 200-only listing of the
@@ -404,9 +442,17 @@ func (s iamPATSeam) FindIDByName(ctx context.Context, name string) (string, erro
 // still-connected disk can refuse deletion. Each teardown is registered BEFORE
 // the create it undoes (F3), keyed by a deterministic identity, and finds its
 // resource via a STRICT listing when the create's activity did not resolve the
-// id. Q4/#303 note: a compute DELETE that answered 403 for an absent resource
-// would surface here as a teardown FAILURE (a false alarm, never an orphan — the
-// safe direction); only a definitive 404 is idempotent success.
+// id.
+//
+// 403-on-absent (#303): the OpenIaaS compute DELETE answers 403 (not 404) for an
+// ALREADY-ABSENT resource — observed live when the deferred net re-deletes what
+// the explicit deprovision already removed. The deferred delete is therefore
+// resolved by confirmComputeDeleteByPriorDelete: a definitive 404 is success; a
+// 403 is accepted as "already gone" ONLY when this cycle's explicit delete of
+// this exact id already succeeded (ExplicitlyDeleted — strict positive same-cycle
+// proof of absence), otherwise it FAILS CLOSED (a 403 with no such proof surfaces
+// as a teardown failure, never a masked orphan). A by-id Read re-check is NOT used
+// because the OpenIaaS Read conflates 403/404 → absent and so cannot prove absence.
 
 // vmSeam is the subset of the VM client a VM teardown needs.
 type vmSeam interface {
@@ -423,6 +469,10 @@ type vmTeardownRef struct {
 	MachineManagerID string
 	ID               string
 	Resolved         bool
+	// ExplicitlyDeleted is set by the cycle once its explicit delete of the
+	// RESOLVED id succeeded this cycle: strict positive proof the resource is gone,
+	// so the deferred re-delete's 403-on-absent (#303) is accepted, not surfaced.
+	ExplicitlyDeleted bool
 }
 
 // registerVMTeardown registers the VM teardown (the anchor; runs LAST under LIFO).
@@ -443,7 +493,13 @@ func registerVMTeardown(cl *Cleanup, seam vmSeam, ref *vmTeardownRef) {
 			id = found
 		}
 		_ = seam.PowerOffAndWait(tctx, id) // best-effort: a powered-on VM may refuse delete
-		return seam.DeleteAndWait(tctx, id)
+		// A 403 here is the OpenIaaS absent/forbidden conflation (#303) on a resource
+		// the explicit deprovision already removed; accept it as gone ONLY on the
+		// same-cycle explicit-delete proof, else fail closed. A 404 is idempotent
+		// success. The proof is valid only for the RESOLVED id; a find-by-name
+		// fallback (ref not resolved) carries no proof → priorDeleteOK is false there.
+		priorDeleteOK := ref.Resolved && ref.ExplicitlyDeleted && id == ref.ID
+		return confirmComputeDeleteByPriorDelete(seam.DeleteAndWait(tctx, id), priorDeleteOK, id)
 	})
 }
 
@@ -502,6 +558,8 @@ type diskTeardownRef struct {
 	VMID     string
 	ID       string
 	Resolved bool
+	// ExplicitlyDeleted: see vmTeardownRef — same-cycle proof the disk was deleted.
+	ExplicitlyDeleted bool
 }
 
 // registerVirtualDiskTeardown registers the user data-disk teardown: disconnect
@@ -529,7 +587,10 @@ func registerVirtualDiskTeardown(cl *Cleanup, seam diskSeam, ref *diskTeardownRe
 				return derr
 			}
 		}
-		return seam.DeleteAndWait(tctx, id)
+		// 403-on-absent (#303): accept only on the same-cycle explicit-delete proof
+		// for the RESOLVED id (a find-by-name fallback carries no proof → fail closed).
+		priorDeleteOK := ref.Resolved && ref.ExplicitlyDeleted && id == ref.ID
+		return confirmComputeDeleteByPriorDelete(seam.DeleteAndWait(tctx, id), priorDeleteOK, id)
 	})
 }
 
@@ -621,6 +682,8 @@ type adapterTeardownRef struct {
 	VMID     string
 	ID       string
 	Resolved bool
+	// ExplicitlyDeleted: see vmTeardownRef — same-cycle proof the adapter was deleted.
+	ExplicitlyDeleted bool
 }
 
 // registerNetworkAdapterTeardown registers the adapter teardown (a network leaf;
@@ -629,14 +692,17 @@ type adapterTeardownRef struct {
 func registerNetworkAdapterTeardown(cl *Cleanup, seam adapterSeam, ref *adapterTeardownRef) {
 	cl.Register(fmt.Sprintf("compute.openiaas.network_adapter %s", ref.VMID), func(tctx context.Context) error {
 		if ref.Resolved && ref.ID != "" {
-			return seam.DeleteAndWait(tctx, ref.ID)
+			// 403-on-absent (#303): accept only on the same-cycle explicit-delete proof.
+			return confirmComputeDeleteByPriorDelete(seam.DeleteAndWait(tctx, ref.ID), ref.ExplicitlyDeleted, ref.ID)
 		}
 		ids, err := seam.FindIDsByVM(tctx, ref.VMID)
 		if err != nil {
 			return err
 		}
 		for _, id := range ids {
-			if derr := seam.DeleteAndWait(tctx, id); derr != nil {
+			// Unresolved delete-all-on-VM: no per-id explicit-delete proof, so a 403
+			// here FAILS CLOSED (priorDeleteOK=false) rather than mask a possible orphan.
+			if derr := confirmComputeDeleteByPriorDelete(seam.DeleteAndWait(tctx, id), false, id); derr != nil {
 				return derr
 			}
 		}
