@@ -178,6 +178,41 @@ func openIaasVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta
 	return openIaasVirtualDiskRead(ctx, d, meta)
 }
 
+// confirmOpenIaaSVirtualDiskDeleted resolves the ambiguity of a nil per-id disk
+// read: the OpenIaaS API answers 403 for unknown AND forbidden ids alike and the
+// client maps both to nil, so an absence is only treated as a deletion under
+// strict listing EVIDENCE. It runs two independent strict listings (scoped to
+// the VM, then tenant-wide) and returns the verdict; a listing failure yields a
+// non-nil diags so callers fail closed. Shared by Read and Delete so the
+// never-drop / never-orphan doctrine stays SYMMETRIC across both paths (#325).
+// On the error path it returns deviceStillInScope (fail-closed), never the
+// zero-value deviceDeletionConfirmed, in case a caller ever ignored the diags.
+func confirmOpenIaaSVirtualDiskDeleted(ctx context.Context, c *client.Client, id, vmID string) (missingDeviceVerdict, diag.Diagnostics) {
+	scoped, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{
+		VirtualMachineID: vmID,
+	})
+	if err != nil {
+		return deviceStillInScope, diag.Errorf("virtual disk %s could not be read and its deletion could not be confirmed: %s", id, err)
+	}
+	tenant, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{})
+	if err != nil {
+		return deviceStillInScope, diag.Errorf("virtual disk %s could not be read and its deletion could not be confirmed: %s", id, err)
+	}
+	scopedIDs := map[string]bool{}
+	for _, disk := range scoped {
+		if disk != nil {
+			scopedIDs[disk.ID] = true
+		}
+	}
+	tenantIDs := map[string]bool{}
+	for _, disk := range tenant {
+		if disk != nil {
+			tenantIDs[disk.ID] = true
+		}
+	}
+	return classifyMissingDevice(id, scopedIDs, tenantIDs), nil
+}
+
 func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
 	var diags diag.Diagnostics
@@ -197,29 +232,11 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 		// listing may have been DETACHED or MOVED, which is drift, never a
 		// deletion (#275 doctrine, FF-5).
 		vmID := d.Get("virtual_machine_id").(string)
-		scoped, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{
-			VirtualMachineID: vmID,
-		})
-		if err != nil {
-			return diag.Errorf("virtual disk %s could not be read and its deletion could not be confirmed: %s", d.Id(), err)
+		verdict, confirmDiags := confirmOpenIaaSVirtualDiskDeleted(ctx, c, d.Id(), vmID)
+		if confirmDiags != nil {
+			return confirmDiags
 		}
-		tenant, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{})
-		if err != nil {
-			return diag.Errorf("virtual disk %s could not be read and its deletion could not be confirmed: %s", d.Id(), err)
-		}
-		scopedIDs := map[string]bool{}
-		for _, disk := range scoped {
-			if disk != nil {
-				scopedIDs[disk.ID] = true
-			}
-		}
-		tenantIDs := map[string]bool{}
-		for _, disk := range tenant {
-			if disk != nil {
-				tenantIDs[disk.ID] = true
-			}
-		}
-		switch classifyMissingDevice(d.Id(), scopedIDs, tenantIDs) {
+		switch verdict {
 		case deviceStillInScope:
 			return diag.Errorf("virtual disk %s could not be read but is still listed on virtual machine %s: refusing to drop it from the state (possible access restriction)", d.Id(), vmID)
 		case deviceExistsOutOfScope:
@@ -250,6 +267,15 @@ func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta
 	disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
 	if err != nil {
 		return diag.Errorf("failed to read virtual disk state before update: %s", err)
+	}
+	if disk == nil {
+		// A nil read (403 for an unknown OR forbidden id, mapped to nil by the
+		// client) means we cannot enumerate the disk's attachments to compute
+		// the update cycle safely: refuse to mutate blindly rather than
+		// dereferencing disk.VirtualMachines and panicking (#325). The next
+		// refresh's Read resolves the drop-or-drift decision under strict
+		// evidence.
+		return diag.Errorf("virtual disk %s could not be read before update (it may have been deleted out-of-band or access is restricted): refusing to apply changes — refresh or re-import, then retry", d.Id())
 	}
 
 	// Handle connection state changes
@@ -396,6 +422,28 @@ func openIaasVirtualDiskDelete(ctx context.Context, d *schema.ResourceData, meta
 	disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
 	if err != nil {
 		return diag.Errorf("failed to read virtual disk state before delete: %s", err)
+	}
+	if disk == nil {
+		// The client maps a 403 (unknown OR forbidden id) to a nil read.
+		// Treating the destroy as already satisfied is correct ONLY when the
+		// deletion is positively confirmed; a forbidden disk that still exists
+		// must never be silently dropped from the state (never-orphan doctrine,
+		// SYMMETRIC with Read — #325). Without this guard the loop below would
+		// dereference disk.VirtualMachines and panic.
+		vmID := d.Get("virtual_machine_id").(string)
+		verdict, confirmDiags := confirmOpenIaaSVirtualDiskDeleted(ctx, c, d.Id(), vmID)
+		if confirmDiags != nil {
+			return confirmDiags
+		}
+		switch verdict {
+		case deviceStillInScope:
+			return diag.Errorf("virtual disk %s could not be read but is still listed on virtual machine %s: refusing to assume it was deleted (possible access restriction)", d.Id(), vmID)
+		case deviceExistsOutOfScope:
+			return diag.Errorf("virtual disk %s could not be read and is no longer attached to virtual machine %s but still exists platform-side (detached or moved): refusing to treat this drift as a deletion — fix the attachment then destroy, or remove it from state", d.Id(), vmID)
+		}
+		// Deletion confirmed by independent strict reads: nothing to disconnect
+		// or delete, the destroy is already satisfied.
+		return nil
 	}
 	for _, vm := range disk.VirtualMachines {
 		if vm.Connected {
