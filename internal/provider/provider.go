@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -221,6 +222,19 @@ type loggingHttpTransport struct {
 	transport http.RoundTripper
 }
 
+// sensitiveBodyValueRegex redacts the VALUE of secret-bearing JSON keys wherever
+// they appear in a logged HTTP body (tf_http_req_body / tf_http_res_body), so a
+// `TF_LOG=DEBUG` run never prints a credential. Whole-body masking is only
+// applied to the auth endpoint; other endpoints (e.g. object storage, which
+// returns `secretAccessKey`, or VM customization, which sends `password`) log
+// their body, so the secret values must be redacted by key. The closing quote in
+// the alternation anchors each key exactly, so "secret" never partially matches
+// "secretAccessKey". The value matcher `"(?:[^"\\]|\\.)*"` is JSON-string aware:
+// it consumes escaped characters (including an escaped quote `\"`), so a value
+// containing a quote is masked in full — a plain `[^"]*` would stop at the
+// escaped quote and leak the suffix.
+var sensitiveBodyValueRegex = regexp.MustCompile(`(?i)"(secretAccessKey|accessSecretKey|secretKey|secret|password|domainAdminPassword)"\s*:\s*"(?:[^"\\]|\\.)*"`)
+
 func (t *loggingHttpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 	if strings.Contains(req.URL.Path, "personal_access_token") {
@@ -228,6 +242,10 @@ func (t *loggingHttpTransport) RoundTrip(req *http.Request) (*http.Response, err
 		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "tf_http_res_body")
 	}
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "Authorization")
+	// Redact secret JSON values in any logged body, regardless of endpoint, so a
+	// credential (object-storage secretAccessKey, VM password, …) cannot leak into
+	// TF_LOG=DEBUG output even when the whole body is not masked.
+	ctx = tflog.MaskAllFieldValuesRegexes(ctx, sensitiveBodyValueRegex)
 	req = req.WithContext(ctx)
 	return t.transport.RoundTrip(req)
 }
