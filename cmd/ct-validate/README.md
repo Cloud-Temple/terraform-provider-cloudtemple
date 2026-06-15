@@ -36,12 +36,38 @@ holds up under increasing load.
 ### Quick start (the wrapper)
 
 ```sh
-scripts/ct-test.sh list            # show the available scenarios
-scripts/ct-test.sh api readonly    # read every service and report its health
-scripts/ct-test.sh api vpc         # VPC: create → verify → remove
-scripts/ct-test.sh api storage     # object storage: create → verify → remove
-scripts/ct-test.sh api vm          # full VM lifecycle: create → verify → remove
-scripts/ct-test.sh tf  <scenario>  # run the same scenario through Terraform
+scripts/ct-test.sh list                       # show the available scenarios
+scripts/ct-test.sh api readonly                # read every service and report its health
+scripts/ct-test.sh api vpc                     # VPC: create → verify → remove
+scripts/ct-test.sh api storage                 # object storage: create → verify → remove
+scripts/ct-test.sh api vm                      # OpenIaaS VM lifecycle: create → verify → remove
+scripts/ct-test.sh --tenant vmware api vm-vmware   # VMware VM lifecycle: create → verify → remove
+scripts/ct-test.sh tf  <scenario>             # run the same scenario through Terraform
+```
+
+### Choosing the tenant (VMware or OpenIaaS)
+
+The API host is the same for every tenant — the tenant is determined by the
+credentials, not the URL. Pick which credentials to use with `--tenant`:
+
+```sh
+scripts/ct-test.sh --tenant openiaas api vm        # default
+scripts/ct-test.sh --tenant vmware   api vm-vmware
+```
+
+Point each tenant at its credentials file with `CT_ENV_OPENIAAS` /
+`CT_ENV_VMWARE` (or `CT_TEST_ENV` to override directly). A read-only scenario
+(`readonly`) exercises whichever services the tenant actually has — VMware
+endpoints on a VMware tenant, OpenIaaS endpoints on an OpenIaaS one — and quietly
+skips the ones it does not.
+
+### Repetition and parallelism (bounded load)
+
+In `api` mode, any flags after the scenario are forwarded to the runner, so you
+can replay a scenario and raise the load gradually:
+
+```sh
+scripts/ct-test.sh --tenant vmware api vm-vmware -runs 20 -concurrency 4
 ```
 
 `api` exercises the API directly. `tf` runs the scenario through Terraform
@@ -64,7 +90,8 @@ go run ./cmd/ct-validate -cycles readonly -json   # a read-only health report
 | `vpc` | write | Allocate a VPC static IP and a floating-IP binding, verify, then remove. |
 | `object_storage` | write | Create a bucket, a storage account and an ACL, verify, then remove. |
 | `iam_pat` | write | Create a personal access token, verify, then remove. |
-| `compute_lifecycle` | write | Create a VM from a template, attach a disk and a network adapter, then remove everything. |
+| `compute_lifecycle` | write | OpenIaaS: create a VM from a template, attach a disk and a network adapter, then remove everything. |
+| `compute_vmware_lifecycle` | write | VMware: create a VM (discovered datacenter/host/datastore/guest-OS), attach a disk and a network adapter, then remove everything. |
 
 Write scenarios run only when you pass `-write`; otherwise they are listed and
 skipped.

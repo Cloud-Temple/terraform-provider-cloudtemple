@@ -37,6 +37,7 @@ func buildRegistry() *Registry {
 		backupCycle{},
 		computeOpenIaaSCycle{},
 		computeLifecycleCycle{},
+		computeVMwareLifecycleCycle{},
 		vpcCycle{},
 		objectStorageCycle{},
 		iamPATCycle{},
