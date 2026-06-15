@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"net/http"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 )
@@ -19,9 +21,98 @@ import (
 // teardown needs), not *client.Client, so it is unit-testable offline with a
 // fake that returns an error AFTER simulating the server-side effect.
 //
-// Idempotency contract for every teardown here: an absent resource is SUCCESS
-// (nil error), never a failure — so the safety net does not generate noise when
-// the happy-path delete already removed the resource.
+// Idempotency contract for every teardown here (F3): "absent = success" means a
+// DEFINITIVE HTTP 404 only, never a blanket 4xx. A 403/409/400 is NOT proof of
+// absence — treating it as "already gone" would let a delete/revoke/unbind
+// report success while a bucket, ACL grant, FIP binding or static IP still
+// exists (an orphan). So:
+//   - bucket delete, ACL revoke, PAT delete, static IP delete: a 404 is success
+//     (idempotent: a second delete of an already-removed resource returns 404),
+//     any other error is surfaced as a real failure;
+//   - the static IP delete additionally mirrors #312: a 403 is AMBIGUOUS (the
+//     VPC API conflates absent/forbidden, #303), so it is confirmed via a strict
+//     200-only listing of the private network before being accepted as gone;
+//   - the FIP unbind mirrors the merged #309 confirmFloatingIPUnbound doctrine:
+//     a 404 is success, a 403/other is NEVER assumed gone — it is positively
+//     confirmed via the strict listing (CorroborateBinding), accepted only on
+//     proof the pair is no longer bound (Unbound or BoundToOther).
+
+// isStatusCode reports whether err is (or wraps) a client.StatusError with the
+// given HTTP code. This is the single source of truth for the "404-only is
+// absent" contract — mirrors isVPCStatusCode in the provider so the harness and
+// the resource layer cannot drift on what counts as a definitive not-found.
+func isStatusCode(err error, code int) bool {
+	var statusErr client.StatusError
+	return errors.As(err, &statusErr) && statusErr.Code == code
+}
+
+// idempotentDeleteErr is the SHARED delete/revoke idempotency decision for the
+// seams whose absence is unambiguous (bucket, ACL grant, PAT): a DEFINITIVE 404
+// means the resource is already gone → success (nil); ANY other error (403, 409,
+// 400, 5xx, transport) is NOT proof of absence and is surfaced unchanged. Both
+// the production seams and the offline unit tests call THIS function, so a
+// mutation here breaks production and the tests together (no parallel copy).
+func idempotentDeleteErr(err error) error {
+	if err == nil {
+		return nil
+	}
+	if isStatusCode(err, http.StatusNotFound) {
+		return nil
+	}
+	return err
+}
+
+// staticIPDeleteErrResult is the SHARED static-IP delete idempotency decision
+// (#312): a 404 is idempotent success; a 403 is AMBIGUOUS (#303 conflates
+// absent/forbidden) and is confirmed via a strict 200-only listing of the
+// private network before being accepted; any other error surfaces. listStrict
+// is injected so the decision is unit-testable offline.
+func staticIPDeleteErrResult(err error, listStrict func() ([]*client.StaticIP, error), privateNetworkID, id string) error {
+	if err == nil {
+		return nil
+	}
+	if isStatusCode(err, http.StatusNotFound) {
+		return nil
+	}
+	if isStatusCode(err, http.StatusForbidden) {
+		if privateNetworkID == "" {
+			return fmt.Errorf("static IP %s delete returned 403 and its absence could not be confirmed (no private network scope): %w", id, err)
+		}
+		list, lerr := listStrict()
+		if lerr != nil {
+			return fmt.Errorf("static IP %s delete returned 403 and the strict listing of private network %s failed: %w (original: %v)", id, privateNetworkID, lerr, err)
+		}
+		for _, si := range list {
+			if si != nil && si.ID == id {
+				return fmt.Errorf("static IP %s could not be deleted (403) and is still present on private network %s: %w", id, privateNetworkID, err)
+			}
+		}
+		// Confirmed absent from a complete 200 listing of its own network.
+		return nil
+	}
+	return err
+}
+
+// fipUnbindOutcome is the SHARED floating-IP unbind confirmation decision (#309
+// confirmFloatingIPUnbound doctrine): the unbind is accepted ONLY on strict
+// positive evidence the FIP is no longer bound to OUR static IP (Unbound or
+// BoundToOther). A failed corroboration, a still-our-pair (BoundToTarget), or an
+// inconclusive listing all FAIL CLOSED — there is NO "absent from listing =>
+// success" path. unbindErr (when non-nil) is woven into the failure detail.
+func fipUnbindOutcome(state client.FloatingIPBindingState, corrErr error, fipID, staticID string, unbindErr error) error {
+	if corrErr != nil {
+		return fmt.Errorf("floating IP %s unbind from %s could not be confirmed (strict listing failed): %w (original: %v)", fipID, staticID, corrErr, unbindErr)
+	}
+	switch state {
+	case client.FloatingIPBindingUnbound, client.FloatingIPBindingBoundToOther:
+		// No longer bound to OUR pair: the unbind took effect → success.
+		return nil
+	case client.FloatingIPBindingBoundToTarget:
+		return fmt.Errorf("floating IP %s is still bound to static IP %s after the unbind (confirmed by the strict listing): %v", fipID, staticID, unbindErr)
+	default:
+		return fmt.Errorf("floating IP %s unbind from %s could not be positively confirmed (inconclusive listing): %v", fipID, staticID, unbindErr)
+	}
+}
 
 // --- VPC static IP -----------------------------------------------------------
 
@@ -32,7 +123,10 @@ type staticIPSeam interface {
 	// static IPs (fails closed otherwise — see the client doc).
 	ListStrict(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error)
 	// DeleteAndWait deletes a static IP by id and waits for the delete activity.
-	DeleteAndWait(ctx context.Context, id string) error
+	// It is idempotent under the F3 contract: a 404 is success; a 403 is
+	// confirmed absent via a strict listing of privateNetworkID before being
+	// accepted (mirrors #312); any other error is surfaced.
+	DeleteAndWait(ctx context.Context, privateNetworkID, id string) error
 }
 
 // registerStaticIPTeardown registers a teardown that finds the custom static IP
@@ -58,7 +152,7 @@ func registerStaticIPTeardown(cl *Cleanup, seam staticIPSeam, privateNetworkID, 
 				continue
 			}
 			// Found our created-but-maybe-unresolved static IP: delete by id.
-			return seam.DeleteAndWait(tctx, si.ID)
+			return seam.DeleteAndWait(tctx, privateNetworkID, si.ID)
 		}
 		// Absent → already clean → success (idempotent).
 		return nil
@@ -90,10 +184,15 @@ func (s vpcStaticIPSeam) ListStrict(ctx context.Context, privateNetworkID string
 	return s.c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
 }
 
-func (s vpcStaticIPSeam) DeleteAndWait(ctx context.Context, id string) error {
+func (s vpcStaticIPSeam) DeleteAndWait(ctx context.Context, privateNetworkID, id string) error {
 	activityID, err := s.c.VPC().StaticIP().Delete(ctx, id)
 	if err != nil {
-		return err
+		// 404 → idempotent success; 403 → confirm absence via the strict listing
+		// (#312); anything else surfaces. The decision lives in a shared, offline-
+		// testable helper so production and tests cannot drift.
+		return staticIPDeleteErrResult(err, func() ([]*client.StaticIP, error) {
+			return s.ListStrict(ctx, privateNetworkID)
+		}, privateNetworkID, id)
 	}
 	if activityID == "" {
 		return nil
@@ -107,13 +206,14 @@ func (s vpcStaticIPSeam) DeleteAndWait(ctx context.Context, id string) error {
 // bucketSeam is the subset of the bucket client a bucket teardown needs.
 type bucketSeam interface {
 	// DeleteAndWait deletes a bucket by name and waits for the delete activity.
-	// It MUST treat an already-absent bucket as success.
+	// It MUST treat an already-absent bucket (404) as success; any other error
+	// (403/409/400/5xx/transport) is a real failure.
 	DeleteAndWait(ctx context.Context, name string) error
 }
 
 // registerBucketTeardown registers "delete bucket by name if present" BEFORE the
 // create, keyed by the deterministic bucket name, so a created-but-unconfirmed
-// bucket is still swept. Idempotent via the seam's absent-is-success contract.
+// bucket is still swept. Idempotent via the seam's 404-is-success contract.
 func registerBucketTeardown(cl *Cleanup, seam bucketSeam, name string) {
 	cl.Register(fmt.Sprintf("object_storage.bucket by-name %s", name), func(tctx context.Context) error {
 		return seam.DeleteAndWait(tctx, name)
@@ -126,12 +226,9 @@ type objectStorageBucketSeam struct{ c *client.Client }
 func (s objectStorageBucketSeam) DeleteAndWait(ctx context.Context, name string) error {
 	activityID, err := s.c.ObjectStorage().Bucket().Delete(ctx, name)
 	if err != nil {
-		// A 404/absent bucket is not an orphan: swallow not-found so the safety
-		// net stays idempotent. Any other error is surfaced for the retry/report.
-		if categorize(err) == CategoryHTTP4xx {
-			return nil
-		}
-		return err
+		// Only a DEFINITIVE 404 proves the bucket is gone → idempotent success.
+		// A 403/409/400 is NOT proof of absence (shared decision; see helper).
+		return idempotentDeleteErr(err)
 	}
 	if activityID == "" {
 		return nil
@@ -145,13 +242,14 @@ func (s objectStorageBucketSeam) DeleteAndWait(ctx context.Context, name string)
 // aclSeam is the subset of the ACL-entry client an ACL teardown needs.
 type aclSeam interface {
 	// RevokeAndWait revokes (role, account) on the bucket and waits. It MUST
-	// treat an already-absent grant as success.
+	// treat an already-absent grant (404) as success; any other error is a real
+	// failure.
 	RevokeAndWait(ctx context.Context, bucket, role, account string) error
 }
 
 // registerACLTeardown registers revoke(role, account) BEFORE the grant, keyed by
 // the deterministic (bucket, role, account) triple, so an ambiguous grant is
-// still swept. Idempotent via the seam's absent-is-success contract.
+// still swept. Idempotent via the seam's 404-is-success contract.
 func registerACLTeardown(cl *Cleanup, seam aclSeam, bucket, role, account string) {
 	cl.Register(fmt.Sprintf("object_storage.acl revoke %s/%s/%s", bucket, role, account), func(tctx context.Context) error {
 		return seam.RevokeAndWait(tctx, bucket, role, account)
@@ -164,10 +262,9 @@ type objectStorageACLSeam struct{ c *client.Client }
 func (s objectStorageACLSeam) RevokeAndWait(ctx context.Context, bucket, role, account string) error {
 	activityID, err := s.c.ObjectStorage().ACLEntry().Revoke(ctx, bucket, role, account)
 	if err != nil {
-		if categorize(err) == CategoryHTTP4xx {
-			return nil // absent grant → already clean
-		}
-		return err
+		// Only a 404 proves the grant is already gone → idempotent success. A
+		// 403/409/400 must NOT be read as "already revoked" (shared decision).
+		return idempotentDeleteErr(err)
 	}
 	if activityID == "" {
 		return nil
@@ -180,14 +277,18 @@ func (s objectStorageACLSeam) RevokeAndWait(ctx context.Context, bucket, role, a
 
 // fipBindSeam is the subset of the floating-IP client a binding teardown needs.
 type fipBindSeam interface {
-	// UnbindAndWait unbinds the floating IP from the static IP and waits. It MUST
-	// treat an already-unbound pair as success.
+	// UnbindAndWait unbinds the floating IP from the static IP and waits. A 404
+	// is idempotent success; a 403/other is NEVER assumed "gone" — it is
+	// positively confirmed via CorroborateBinding before being accepted.
 	UnbindAndWait(ctx context.Context, fipID, staticID string) error
+	// CorroborateBinding strictly classifies the FIP/static relationship from a
+	// COMPLETE 200 listing (fails closed to Inconclusive otherwise).
+	CorroborateBinding(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error)
 }
 
 // registerFIPUnbindTeardown registers unbind(fip, static) BEFORE the bind, keyed
 // by the deterministic (fipID, staticID) pair, so a bind whose confirmation is
-// lost is still released. Idempotent via the seam's absent-is-success contract.
+// lost is still released. Idempotent via the seam's 404/confirmed contract.
 func registerFIPUnbindTeardown(cl *Cleanup, seam fipBindSeam, fipID, staticID string) {
 	cl.Register(fmt.Sprintf("vpc.floating_ip unbind %s<-%s", fipID, staticID), func(tctx context.Context) error {
 		return seam.UnbindAndWait(tctx, fipID, staticID)
@@ -200,23 +301,37 @@ type vpcFIPBindSeam struct{ c *client.Client }
 func (s vpcFIPBindSeam) UnbindAndWait(ctx context.Context, fipID, staticID string) error {
 	activityID, err := s.c.VPC().FloatingIP().Unbind(ctx, fipID, staticID)
 	if err != nil {
-		if categorize(err) == CategoryHTTP4xx {
-			return nil // already unbound → idempotent success
+		// 404 on the unbind call itself: unambiguous absence → idempotent success.
+		if isStatusCode(err, http.StatusNotFound) {
+			return nil
 		}
-		return err
+		// 403 or any other error: NEVER assume the pair is gone (mirrors the merged
+		// #309 confirmFloatingIPUnbound doctrine). Positively confirm via the strict
+		// listing before accepting; an unproven state fails closed.
+		state, cerr := s.CorroborateBinding(ctx, fipID, staticID)
+		return fipUnbindOutcome(state, cerr, fipID, staticID, err)
 	}
-	if activityID == "" {
-		return nil
+	if activityID != "" {
+		if _, werr := s.c.Activity().WaitForCompletion(ctx, activityID, silentWaiter); werr != nil {
+			return werr
+		}
 	}
-	_, werr := s.c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
-	return werr
+	// Happy path too is positively confirmed: an unbind activity completing does
+	// not by itself prove the pair is no longer bound.
+	state, cerr := s.CorroborateBinding(ctx, fipID, staticID)
+	return fipUnbindOutcome(state, cerr, fipID, staticID, nil)
+}
+
+func (s vpcFIPBindSeam) CorroborateBinding(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+	return s.c.VPC().FloatingIP().CorroborateBinding(ctx, fipID, staticID)
 }
 
 // --- IAM personal access token ------------------------------------------------
 
 // patSeam is the subset of the PAT client a PAT teardown needs.
 type patSeam interface {
-	// Delete removes a PAT by id (idempotent: absent → success).
+	// Delete removes a PAT by id. A 404 is idempotent success; any other error is
+	// a real failure.
 	Delete(ctx context.Context, patID string) error
 	// FindIDByName returns the id of a PAT whose name matches, or "" if none.
 	// Used to remove a created-but-undecoded PAT best-effort.
@@ -239,7 +354,8 @@ type patTeardownRef struct {
 // created-but-undecoded PAT (a live credential) is still removed. A PAT left
 // orphaned is a security issue, hence the pre-registration.
 //
-// Idempotent: a nil-id, name-not-found PAT means nothing to delete → success.
+// Idempotent: a nil-id, name-not-found PAT means nothing to delete → success;
+// a delete that 404s (already removed by the happy path) is also success.
 func registerPATTeardown(cl *Cleanup, seam patSeam, ref *patTeardownRef) {
 	cl.Register(fmt.Sprintf("iam.pat %s", ref.Name), func(tctx context.Context) error {
 		if ref.Resolved && ref.ID != "" {
@@ -260,7 +376,11 @@ func registerPATTeardown(cl *Cleanup, seam patSeam, ref *patTeardownRef) {
 type iamPATSeam struct{ c *client.Client }
 
 func (s iamPATSeam) Delete(ctx context.Context, patID string) error {
-	return s.c.IAM().PAT().Delete(ctx, patID)
+	// A 404 proves the PAT is already gone → idempotent success (so the happy-
+	// path-then-deferred double delete does not report a false failure). Any other
+	// error (403/409/400/5xx/transport) is surfaced: a PAT is a live credential,
+	// so a non-404 delete error must be reported, never swallowed (shared helper).
+	return idempotentDeleteErr(s.c.IAM().PAT().Delete(ctx, patID))
 }
 
 func (s iamPATSeam) FindIDByName(ctx context.Context, name string) (string, error) {

@@ -69,7 +69,7 @@ func (vc vpcCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
 	// Also register the precise by-id teardown now that the id is resolved (LIFO:
 	// it runs before the broader by-MAC sweep). Both are idempotent.
 	r.Cleanup.Register(fmt.Sprintf("vpc.static_ip %s", staticID), func(tctx context.Context) error {
-		return vpcStaticIPSeam{c}.DeleteAndWait(tctx, staticID)
+		return vpcStaticIPSeam{c}.DeleteAndWait(tctx, pn.ID, staticID)
 	})
 
 	vc.bindSubCycle(ctx, c, r, staticID)
