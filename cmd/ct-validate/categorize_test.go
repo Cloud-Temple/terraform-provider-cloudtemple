@@ -54,6 +54,11 @@ func TestCategorize(t *testing.T) {
 			CategoryHTTP4xx,
 		},
 		{
+			"429 is RateLimited (split out of the 4xx bucket)",
+			client.StatusError{Code: 429, Body: "too many requests"},
+			CategoryRateLimited,
+		},
+		{
 			"500 is HTTP5xx",
 			client.StatusError{Code: 500, Body: "boom"},
 			CategoryHTTP5xx,
@@ -100,19 +105,25 @@ func TestCategorize502BeatsGeneric5xx(t *testing.T) {
 	}
 }
 
-func TestCategoryIsFailure(t *testing.T) {
-	failures := []Category{
-		CategoryTransientWorkers, CategoryBadGateway502, CategoryHTTP4xx,
-		CategoryHTTP5xx, CategoryTimeout, CategoryOther,
+// TestCategoryIsDistress pins which categories trip the breaker. The crucial
+// assertion is that a deterministic 4xx is NOT distress (it is a real failure to
+// report, but must not latch the breaker and mask the rest of the map), while
+// 429 IS distress. Mutation proof: widen isDistress to include CategoryHTTP4xx
+// (the old isFailure behaviour) and the "HTTP4xx must NOT be distress" assertion
+// goes RED.
+func TestCategoryIsDistress(t *testing.T) {
+	distress := []Category{
+		CategoryTransientWorkers, CategoryBadGateway502, CategoryHTTP5xx,
+		CategoryTimeout, CategoryRateLimited, CategoryOther,
 	}
-	for _, c := range failures {
-		if !c.isFailure() {
-			t.Errorf("%q should count as failure", c)
+	for _, c := range distress {
+		if !c.isDistress() {
+			t.Errorf("%q should count as distress (trip the breaker)", c)
 		}
 	}
-	for _, c := range []Category{CategoryOK, CategorySkipped} {
-		if c.isFailure() {
-			t.Errorf("%q must NOT count as failure", c)
+	for _, c := range []Category{CategoryOK, CategorySkipped, CategoryHTTP4xx} {
+		if c.isDistress() {
+			t.Errorf("%q must NOT count as distress", c)
 		}
 	}
 }
