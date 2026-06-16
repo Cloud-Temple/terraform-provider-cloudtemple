@@ -59,8 +59,19 @@ data "cloudtemple_vpc_private_networks" "all" {}
 data "cloudtemple_vpc_floating_ips" "all" {}
 
 locals {
-  storage_repository_id = data.cloudtemple_compute_iaas_opensource_storage_repositories.all.storage_repositories[0].id
-  backup_policy_id      = data.cloudtemple_backup_iaas_opensource_policies.all.policies[0].id
+  # Storage repository: pick a USABLE SR (not in maintenance, accessible) with the
+  # MOST free space — never the first listed, which may be full/limited (the
+  # marketplace deploy then fails "Limited storage capacity"). Mirrors the API
+  # cycle's hard filters (maintenance / accessible / capacity); the precondition on
+  # the VM fails closed if none has room.
+  all_srs    = data.cloudtemple_compute_iaas_opensource_storage_repositories.all.storage_repositories
+  usable_srs = [for s in local.all_srs : s if s.id != "" && !s.maintenance_mode && s.accessible != 0]
+  # Floor = OS-disk/headroom (var.min_free_gib) + the data disk this config also creates.
+  min_free_bytes        = (var.min_free_gib + var.data_disk_gib) * 1024 * 1024 * 1024
+  max_free_bytes        = length(local.usable_srs) > 0 ? max([for s in local.usable_srs : s.free_capacity]...) : 0
+  storage_repository_id = try([for s in local.usable_srs : s.id if s.free_capacity == local.max_free_bytes][0], null)
+
+  backup_policy_id = data.cloudtemple_backup_iaas_opensource_policies.all.policies[0].id
 
   # The LAN, by name, on each layer. We keep the full match lists so resource
   # `precondition`s below can assert EXACTLY one match — a 0-match would otherwise be
@@ -114,6 +125,12 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "ubuntu" {
     precondition {
       condition     = length(local.lan_openiaas_matches) == 1
       error_message = "Expected exactly one OpenIaaS network named \"${var.lan_network_name}\", found ${length(local.lan_openiaas_matches)}. Set var.lan_network_name to your LAN."
+    }
+    # Fail closed if no usable storage repository has room — never deploy onto a
+    # full/limited SR (the API rejects it with "Limited storage capacity").
+    precondition {
+      condition     = local.max_free_bytes >= local.min_free_bytes
+      error_message = "No usable storage repository has at least ${var.min_free_gib + var.data_disk_gib} GiB free (largest usable free = ${floor(local.max_free_bytes / 1024 / 1024 / 1024)} GiB). Free space, or lower var.min_free_gib."
     }
   }
 }
