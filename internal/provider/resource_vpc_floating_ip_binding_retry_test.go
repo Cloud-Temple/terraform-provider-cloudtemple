@@ -163,6 +163,119 @@ func TestCreateVPCFloatingIPBindingRetriesTransient502(t *testing.T) {
 			t.Fatalf("a non-transient failure must NOT be retried, got %d bind POSTs", bindCalls)
 		}
 	})
+
+	t.Run("transient wait then AMBIGUOUS re-read corroborated UNBOUND -> re-bind, converges", func(t *testing.T) {
+		// The retry's per-id re-read is ambiguous (nil/403) and must fall back to
+		// the strict listing (corroborate). A corroborated UNBOUND unlocks a re-bind.
+		d := emptyBindingState(t)
+		var bindCalls, waitCalls, readCalls, corrCalls int
+		funcs := vpcFloatingIPBindingFuncs{
+			read: readSeq(&readCalls,
+				readResult{unboundFIP(), nil}, // pre-bind: free
+				readResult{nil, nil},          // retry re-classify: ambiguous -> corroborate
+				readResult{boundFIP(), nil},   // confirmation
+			),
+			bind: func(ctx context.Context, fipID, staticID string) (string, error) { bindCalls++; return "act", nil },
+			wait: func(ctx context.Context, activityID string) error {
+				waitCalls++
+				if waitCalls == 1 {
+					return errVPCTransient
+				}
+				return nil
+			},
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				corrCalls++
+				return client.FloatingIPBindingUnbound, nil
+			},
+			sleep:       noSleep,
+			retrySleep:  noSleep,
+			isTransient: vpcIsTransient,
+		}
+		diags := createVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if diags.HasError() {
+			t.Fatalf("an ambiguous re-read corroborated UNBOUND must allow a re-bind, got: %v", diags)
+		}
+		if corrCalls != 1 {
+			t.Fatalf("the retry must fall back to the strict listing on an ambiguous re-read, got %d corroborate calls", corrCalls)
+		}
+		if bindCalls != 2 {
+			t.Fatalf("a corroborated-unbound retry must re-bind, got %d bind POSTs", bindCalls)
+		}
+		if d.Id() != testBindID {
+			t.Fatalf("the id must be set after convergence, got %q", d.Id())
+		}
+	})
+
+	t.Run("transient wait then AMBIGUOUS re-read corroborated BOUND-TO-OTHER -> abort, NO second bind POST", func(t *testing.T) {
+		// The retry's per-id re-read is ambiguous; the strict listing shows the FIP
+		// bound elsewhere -> anti-clobber abort, never re-bind on ambiguous evidence.
+		d := emptyBindingState(t)
+		var bindCalls, readCalls, corrCalls int
+		funcs := vpcFloatingIPBindingFuncs{
+			read: readSeq(&readCalls,
+				readResult{unboundFIP(), nil}, // pre-bind: free
+				readResult{nil, nil},          // retry re-classify: ambiguous -> corroborate
+			),
+			bind: func(ctx context.Context, fipID, staticID string) (string, error) { bindCalls++; return "act", nil },
+			wait: func(ctx context.Context, activityID string) error { return errVPCTransient },
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				corrCalls++
+				return client.FloatingIPBindingBoundToOther, nil
+			},
+			sleep:       noSleep,
+			retrySleep:  noSleep,
+			isTransient: vpcIsTransient,
+		}
+		diags := createVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("an ambiguous re-read corroborated BOUND-TO-OTHER must ABORT (anti-clobber)")
+		}
+		if corrCalls != 1 {
+			t.Fatalf("the retry must corroborate on an ambiguous re-read, got %d corroborate calls", corrCalls)
+		}
+		if bindCalls != 1 {
+			t.Fatalf("a corroborated-bound-elsewhere retry must NOT re-bind, got %d bind POSTs", bindCalls)
+		}
+		if d.Id() != "" {
+			t.Fatalf("an aborted create must not set the id, got %q", d.Id())
+		}
+	})
+
+	t.Run("transient wait then AMBIGUOUS re-read corroborated INCONCLUSIVE -> abort, NO second bind POST", func(t *testing.T) {
+		// The retry's per-id re-read is ambiguous; the strict listing is itself
+		// Inconclusive -> fail-closed abort, never re-bind on ambiguous evidence
+		// (the dedicated Inconclusive branch, distinct from BoundToOther).
+		d := emptyBindingState(t)
+		var bindCalls, readCalls, corrCalls int
+		funcs := vpcFloatingIPBindingFuncs{
+			read: readSeq(&readCalls,
+				readResult{unboundFIP(), nil}, // pre-bind: free
+				readResult{nil, nil},          // retry re-classify: ambiguous -> corroborate
+			),
+			bind: func(ctx context.Context, fipID, staticID string) (string, error) { bindCalls++; return "act", nil },
+			wait: func(ctx context.Context, activityID string) error { return errVPCTransient },
+			corroborate: func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error) {
+				corrCalls++
+				return client.FloatingIPBindingInconclusive, nil
+			},
+			sleep:       noSleep,
+			retrySleep:  noSleep,
+			isTransient: vpcIsTransient,
+		}
+		diags := createVPCFloatingIPBinding(ctx, d, testFIPID, testStaticID, funcs)
+		if !diags.HasError() {
+			t.Fatal("an ambiguous re-read corroborated INCONCLUSIVE must FAIL CLOSED (no re-bind on ambiguous evidence)")
+		}
+		if corrCalls != 1 {
+			t.Fatalf("the retry must corroborate on an ambiguous re-read, got %d corroborate calls", corrCalls)
+		}
+		if bindCalls != 1 {
+			t.Fatalf("a corroborated-inconclusive retry must NOT re-bind, got %d bind POSTs; kills the Inconclusive-falls-through-to-rebind mutant", bindCalls)
+		}
+		if d.Id() != "" {
+			t.Fatalf("a fail-closed create must not set the id, got %q", d.Id())
+		}
+	})
 }
 
 func TestDeleteVPCFloatingIPBindingRetriesTransient502(t *testing.T) {

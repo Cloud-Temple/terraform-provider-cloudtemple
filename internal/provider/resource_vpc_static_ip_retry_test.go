@@ -119,6 +119,9 @@ func TestUpdateVPCStaticIPRetriesTransient502(t *testing.T) {
 	live := func(desc string) *client.StaticIP {
 		return &client.StaticIP{ID: "si-1", MacAddress: desiredMAC, ResourceDescription: siDescPtr(desc)}
 	}
+	liveMAC := func(mac, desc string) *client.StaticIP {
+		return &client.StaticIP{ID: "si-1", MacAddress: mac, ResourceDescription: siDescPtr(desc)}
+	}
 
 	t.Run("transient wait then live already converged -> success, NO second PATCH", func(t *testing.T) {
 		// Attempt 1 sees a diverged description -> PATCH; wait fails transient.
@@ -244,6 +247,56 @@ func TestUpdateVPCStaticIPRetriesTransient502(t *testing.T) {
 		}
 		if updateCalls != 0 {
 			t.Fatalf("a fail-closed update must NOT PATCH, got %d PATCHes", updateCalls)
+		}
+	})
+
+	t.Run("MAC format-only difference (dash + uppercase) -> zero PATCH", func(t *testing.T) {
+		// desired = 00:50:56:ab:cd:ef ; live = the SAME MAC, dash-separated and
+		// uppercased. normMAC canonicalises both -> no diff -> no PATCH.
+		d := newStaticIPState(t)
+		var updateCalls int
+		funcs := vpcStaticIPUpdateFuncs{
+			read: func(ctx context.Context, id string) (*client.StaticIP, error) {
+				return liveMAC("00-50-56-AB-CD-EF", "seeded"), nil
+			},
+			update: func(ctx context.Context, id string, req *client.UpdateStaticIPRequest) (string, error) {
+				updateCalls++
+				return "act", nil
+			},
+			wait:        func(ctx context.Context, activityID string) error { return nil },
+			retrySleep:  noSleep,
+			isTransient: vpcIsTransient,
+		}
+		diags := updateVPCStaticIPWith(ctx, d, funcs)
+		if diags.HasError() {
+			t.Fatalf("a format-only MAC difference must converge cleanly, got: %v", diags)
+		}
+		if updateCalls != 0 {
+			t.Fatalf("a format-only MAC difference must NOT PATCH (normalised equal), got %d PATCHes", updateCalls)
+		}
+	})
+
+	t.Run("genuinely different MAC -> PATCH", func(t *testing.T) {
+		d := newStaticIPState(t)
+		var updateCalls int
+		funcs := vpcStaticIPUpdateFuncs{
+			read: func(ctx context.Context, id string) (*client.StaticIP, error) {
+				return liveMAC("00:50:56:00:00:01", "seeded"), nil
+			},
+			update: func(ctx context.Context, id string, req *client.UpdateStaticIPRequest) (string, error) {
+				updateCalls++
+				return "act", nil
+			},
+			wait:        func(ctx context.Context, activityID string) error { return nil },
+			retrySleep:  noSleep,
+			isTransient: vpcIsTransient,
+		}
+		diags := updateVPCStaticIPWith(ctx, d, funcs)
+		if diags.HasError() {
+			t.Fatalf("a genuinely different MAC must PATCH cleanly, got: %v", diags)
+		}
+		if updateCalls != 1 {
+			t.Fatalf("a genuinely different MAC must PATCH exactly once, got %d PATCHes", updateCalls)
 		}
 	})
 }
