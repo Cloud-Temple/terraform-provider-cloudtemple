@@ -6,8 +6,11 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/stretchr/testify/require"
 )
 
@@ -72,4 +75,66 @@ func TestJWTReturnsErrorOnUnparseableTokenAndDoesNotCache(t *testing.T) {
 	// With the bad token cached (old behaviour), this second call panics in the
 	// cache-hit branch while reading the malformed claims.
 	require.NotPanics(t, func() { _, _ = c.JWT(context.Background()) })
+}
+
+// signedJWT builds a parseable JWT carrying the given claims.
+func signedJWT(t *testing.T, claims jwt.MapClaims) string {
+	t.Helper()
+	s, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte("test-secret"))
+	require.NoError(t, err)
+	return s
+}
+
+// authStub returns a transport that answers every request with a 200 carrying a
+// fresh valid token, counting the calls (so a test can assert re-auth happened).
+func authStub(token string, calls *int32) stubRoundTripper {
+	return stubRoundTripper{fn: func(*http.Request) (*http.Response, error) {
+		atomic.AddInt32(calls, 1)
+		return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(token))}, nil
+	}}
+}
+
+// TestJWTCacheHitGuardsExpClaim pins #342: the cache-hit branch must read "exp"
+// defensively. A valid far-future token is served from cache; a cached token
+// with nil/empty/non-numeric claims must NOT panic — it falls through to a
+// single re-authentication.
+func TestJWTCacheHitGuardsExpClaim(t *testing.T) {
+	fresh := signedJWT(t, jwt.MapClaims{"exp": float64(time.Now().Add(time.Hour).Unix())})
+
+	t.Run("far-future exp is served from cache without re-auth", func(t *testing.T) {
+		var calls int32
+		c, err := NewClient(&Config{Address: "https://shiva.example", Transport: authStub(fresh, &calls)})
+		require.NoError(t, err)
+		c.SavedToken = &jwt.Token{Claims: jwt.MapClaims{"exp": float64(time.Now().Add(time.Hour).Unix())}}
+
+		tok, err := c.JWT(context.Background())
+		require.NoError(t, err)
+		require.NotNil(t, tok)
+		require.Equal(t, int32(0), atomic.LoadInt32(&calls), "a valid far-future cached token must be served without re-auth")
+	})
+
+	for _, bc := range []struct {
+		name string
+		tok  *jwt.Token
+	}{
+		{"nil claims", &jwt.Token{}},
+		{"non-MapClaims type", &jwt.Token{Claims: jwt.RegisteredClaims{}}},
+		{"empty claims (no exp)", &jwt.Token{Claims: jwt.MapClaims{}}},
+		{"non-numeric exp", &jwt.Token{Claims: jwt.MapClaims{"exp": "soon"}}},
+	} {
+		bc := bc
+		t.Run("falls through to re-auth without panic on "+bc.name, func(t *testing.T) {
+			var calls int32
+			c, err := NewClient(&Config{Address: "https://shiva.example", Transport: authStub(fresh, &calls)})
+			require.NoError(t, err)
+			c.SavedToken = bc.tok
+
+			require.NotPanics(t, func() {
+				tok, err := c.JWT(context.Background())
+				require.NoError(t, err)
+				require.NotNil(t, tok)
+			})
+			require.Equal(t, int32(1), atomic.LoadInt32(&calls), "an unusable cached token must trigger exactly one re-auth")
+		})
+	}
 }
