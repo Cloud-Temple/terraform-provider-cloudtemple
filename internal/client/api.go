@@ -35,7 +35,7 @@ const (
 	// client-side bound. Generous on purpose so it never regresses a legitimately
 	// slow request, while still cutting an unbounded hang. Override with
 	// CLOUDTEMPLE_HTTP_TIMEOUT (seconds).
-	defaultHTTPTimeout = 240 * time.Second
+	defaultHTTPTimeout = 600 * time.Second
 
 	// defaultReadRetryMax is the total number of attempts for an idempotent GET
 	// read (and the auth POST): 1 = no retry. It lets the provider absorb the rare
