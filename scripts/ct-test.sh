@@ -116,6 +116,26 @@ cmd_api() {
   "$CTV_BIN" "${args[@]}"
 }
 
+# Teardown state for the TF lifecycle (globals, because a RETURN/EXIT/signal trap
+# fires after cmd_tf's locals are gone). _tf_teardown is the never-orphan safety net:
+# if the normal flow did not reach its own destroy (interrupt / crash), it destroys
+# the run-unique stack best-effort; then it always removes the isolated workdir.
+_TF_WORK=""
+_TF_RCFILE=""
+_TF_RUN_NAME=""
+_tf_teardown() {
+  set +e            # never let the safety net abort half-way under `set -e`
+  trap '' INT TERM  # a second Ctrl-C must not interrupt the net destroy
+  [ -n "$_TF_WORK" ] && [ -d "$_TF_WORK" ] || return 0
+  # The normal flow marks `.destroyed` only after a SUCCESSFUL destroy, so the net
+  # re-attempts when the normal destroy failed or never ran (interrupt / crash).
+  if [ ! -f "$_TF_WORK/.destroyed" ]; then
+    echo ">> teardown net: destroying (normal destroy did not complete)..." >&2
+    ( cd "$_TF_WORK" && TF_CLI_CONFIG_FILE="$_TF_RCFILE" terraform destroy -auto-approve -input=false -var "vm_name=$_TF_RUN_NAME" >&2 )
+  fi
+  rm -rf "$_TF_WORK"
+}
+
 cmd_tf() {
   local scenario="${1:-}"; [ -n "$scenario" ] || die "usage: ct-test tf <scenario> (see 'ct-test list')"
   local row; row="$(lookup "$scenario")" || true
@@ -125,20 +145,145 @@ cmd_tf() {
   command -v terraform >/dev/null || die "terraform not found in PATH"
   load_creds
 
-  echo ">> TF scenario '$scenario'  (apply then destroy)  dir=$dir"
-  ( cd "$dir"
-    terraform init -input=false >/dev/null
+  # Use the LOCALLY built provider (this checkout), not a registry release, via a
+  # dev_overrides CLI config. With dev_overrides, `terraform init` is unnecessary
+  # (and warns), so we skip it.
+  echo ">> Building the provider (local dev_override)..."
+  ( cd "$REPO_ROOT" && go build -o terraform-provider-cloudtemple . ) || die "provider build failed"
+
+  # Run in an ISOLATED workdir so no terraform.tfstate ever persists in the repo: a
+  # prior failed run can never contaminate this one (the run-unique name guards the
+  # remote object; the isolated state guards the local state).
+  local work; work="$(mktemp -d "${TMPDIR:-/tmp}/ct-test-tf.XXXXXX")"
+  # Run-unique name so a prior run's orphan can never collide with this apply.
+  local run_name="ct-validate-tf-$(date +%Y%m%d-%H%M%S)-$$"
+  local rcfile="$work/dev.tfrc"
+  # Arm the never-orphan net IMMEDIATELY (before any setup can fail), so the workdir
+  # is always cleaned and any created stack is always swept.
+  _TF_WORK="$work"; _TF_RCFILE="$rcfile"; _TF_RUN_NAME="$run_name"
+  trap '_tf_teardown' EXIT
+  trap 'echo ">> interrupted — tearing down..." >&2; exit 130' INT TERM
+
+  cp "$dir"/*.tf "$work"/
+  cat > "$rcfile" <<EOF
+provider_installation {
+  dev_overrides {
+    "registry.terraform.io/Cloud-Temple/cloudtemple" = "$REPO_ROOT"
+  }
+  direct {}
+}
+EOF
+  export TF_CLI_CONFIG_FILE="$rcfile"
+
+  # Scenarios that declare a vm_power_state variable get a stop/start power cycle.
+  local has_power=0
+  grep -rqs 'variable "vm_power_state"' "$dir"/*.tf && has_power=1
+
+  echo ">> TF scenario '$scenario'  name=$run_name  workdir=$work  (provider: local dev_override)"
+  ( cd "$work"
     set +e
-    terraform apply -auto-approve -input=false; apply_rc=$?
-    echo ">> Destroying (always, even on apply failure)..."
-    terraform destroy -auto-approve -input=false; destroy_rc=$?
-    # A failed destroy is a hard failure (possible orphan) — never report PASS
-    # just because apply succeeded. Surface both codes.
-    if [ "$apply_rc" -ne 0 ] || [ "$destroy_rc" -ne 0 ]; then
-      echo ">> FAIL (apply=$apply_rc destroy=$destroy_rc)$([ "$destroy_rc" -ne 0 ] && echo ' — DESTROY FAILED, CHECK FOR ORPHANS')" >&2
+
+    terraform validate >/dev/null || { echo ">> FAIL: terraform validate" >&2; exit 1; }
+
+    # apply_and_converge <label> [power]: apply, then assert `plan` is EMPTY
+    # (-detailed-exitcode: 0=convergent, 2=drift, other=error). The empty-plan check
+    # is the value of the TF path over the raw API: it proves no permanent drift
+    # after apply. plan uses the SAME -var set as the apply (so flipping power_state
+    # is not mistaken for drift).
+    apply_and_converge() {
+      local label="$1" power="${2:-}"
+      echo ">> [$label] apply..."
+      if [ -n "$power" ]; then
+        terraform apply -auto-approve -input=false -var "vm_name=$run_name" -var "vm_power_state=$power" || { echo ">> [$label] FAIL: apply" >&2; return 1; }
+      else
+        terraform apply -auto-approve -input=false -var "vm_name=$run_name" || { echo ">> [$label] FAIL: apply" >&2; return 1; }
+      fi
+      echo ">> [$label] convergence (plan must be empty)..."
+      # Capture the plan so a non-empty/errored plan can be SHOWN — a bare "drift
+      # detected" with no diff is not actionable.
+      local planout; planout="$(mktemp)"
+      if [ -n "$power" ]; then
+        terraform plan -detailed-exitcode -no-color -input=false -var "vm_name=$run_name" -var "vm_power_state=$power" >"$planout" 2>&1
+      else
+        terraform plan -detailed-exitcode -no-color -input=false -var "vm_name=$run_name" >"$planout" 2>&1
+      fi
+      local plan_rc=$?
+      case $plan_rc in
+        0) echo ">> [$label] OK — convergent (no drift)"; rm -f "$planout"; return 0 ;;
+        2) echo ">> [$label] FAIL — drift detected (plan not empty); the drifting plan:" >&2
+           sed 's/^/   | /' "$planout" >&2; rm -f "$planout"; return 1 ;;
+        *) echo ">> [$label] FAIL — plan errored:" >&2
+           sed 's/^/   | /' "$planout" >&2; rm -f "$planout"; return 1 ;;
+      esac
+    }
+
+    lifecycle_fail=0
+    if [ "$has_power" -eq 1 ]; then
+      # create+start → convergence → stop → convergence → restart → convergence
+      apply_and_converge "create+start" on || lifecycle_fail=1
+      [ "$lifecycle_fail" -eq 0 ] && { apply_and_converge "stop" off || lifecycle_fail=1; }
+      [ "$lifecycle_fail" -eq 0 ] && { apply_and_converge "restart" on || lifecycle_fail=1; }
+    else
+      apply_and_converge "create" || lifecycle_fail=1
+    fi
+
+    # Destroy ALWAYS — even on a lifecycle failure above — to never leave orphans.
+    echo ">> Destroying (always, even on failure)..."
+    terraform destroy -auto-approve -input=false -var "vm_name=$run_name"; destroy_rc=$?
+    # Mark `.destroyed` ONLY on success, so the EXIT net re-attempts a failed destroy.
+    [ "$destroy_rc" -eq 0 ] && : > .destroyed
+
+    # Post-destroy orphan SMOKE CHECK — a best-effort net ON TOP of the destroy (which
+    # is the PRIMARY proof of removal, via the provider's delete+wait). It scans the
+    # live OpenIaaS listings for our run-unique name on the NAMED resources the
+    # scenario creates as their own objects (the VM and the data disk). Semantics are
+    # deliberately one-directional: it can only FAIL the run (a run-named object still
+    # present == orphan); it NEVER upgrades a run to "proven clean". A listing is
+    # consulted only when it is a trusted complete response (curl ok + HTTP 200 + body
+    # is a JSON array); anything else is skipped (inconclusive), never read as absent.
+    # A rigorous independent proof — complete ListStrict by id, incl. the VM's
+    # sub-objects (OS disk, network adapter, which the VM delete is expected to
+    # cascade) — is a follow-up; grep-by-name only covers the run-named resources.
+    orphan_found=0; smoke_skipped=0
+    echo ">> Post-destroy orphan smoke check (run-named VM/disk must be gone)..."
+    local tok
+    tok="$(curl -ksS --max-time 30 -X POST "https://${CT_TEST_HOST}/api/iam/v2/auth/personal_access_token" \
+            -A "" -H 'Accept:' -H 'Content-Type: application/json' \
+            -d "{\"id\":\"${CLOUDTEMPLE_CLIENT_ID}\",\"secret\":\"${CLOUDTEMPLE_SECRET_ID}\"}" 2>/dev/null)"
+    # list_probe <path> <exact-json-name> → "present" | "absent" | "unavailable".
+    # The pattern is the EXACT quoted JSON name, so the VM name does not falsely match
+    # the "<name>-data" disk and vice versa.
+    list_probe() {
+      local path="$1" pat="$2" bf="$work/.list.json" code crc
+      code="$(curl -ksS --max-time 30 -o "$bf" -w '%{http_code}' -A "" -H 'Accept:' \
+               -H "Authorization: Bearer $tok" "https://${CT_TEST_HOST}${path}" 2>/dev/null)"; crc=$?
+      if [ "$crc" -ne 0 ] || [ "$code" != "200" ] || [ "$(head -c1 "$bf" 2>/dev/null)" != "[" ]; then
+        echo unavailable; return
+      fi
+      grep -qF "$pat" "$bf" && { echo present; return; } # -F: exact string, not a regex
+      echo absent
+    }
+    # probe_one <path> <label> <exact-json-name>: FAIL on present, note skipped on inconclusive.
+    probe_one() {
+      local res; res="$(list_probe "$1" "$3")"
+      case "$res" in
+        present) echo ">>   FAIL — $2 orphan ($3) STILL PRESENT in $1" >&2; orphan_found=1 ;;
+        absent)  echo ">>   smoke: no $2 orphan in $1" ;;
+        *)       echo ">>   smoke: $1 inconclusive (skipped — not proof of absence)" >&2; smoke_skipped=1 ;;
+      esac
+    }
+    case "$tok" in
+      eyJ*)
+        probe_one /api/compute/v1/open_iaas/virtual_machines "VM" "\"$run_name\""
+        probe_one /api/compute/v1/open_iaas/virtual_disks "data-disk" "\"${run_name}-data\"" ;;
+      *) echo ">>   smoke check skipped (could not authenticate)" >&2; smoke_skipped=1 ;;
+    esac
+
+    if [ "$lifecycle_fail" -ne 0 ] || [ "$destroy_rc" -ne 0 ] || [ "$orphan_found" -ne 0 ]; then
+      echo ">> FAIL (lifecycle=$lifecycle_fail destroy=$destroy_rc orphan=$orphan_found)$([ "$destroy_rc" -ne 0 ] && echo ' — DESTROY FAILED, CHECK FOR ORPHANS')" >&2
       exit 1
     fi
-    echo ">> OK (apply + destroy both clean)"
+    echo ">> OK (apply + convergence$([ "$has_power" -eq 1 ] && echo ' + stop/start cycle') + destroy clean; no orphan found in trusted listings$([ "$smoke_skipped" -ne 0 ] && echo ' — some smoke probes inconclusive'))"
     exit 0
   )
 }

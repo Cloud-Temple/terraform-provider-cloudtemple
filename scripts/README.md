@@ -65,6 +65,31 @@ scripts/ct-test.sh api machine-managers -runs 100 -concurrency 8
 
 The per-endpoint report then gives the OK% / 5xx rate of `machine_managers.list`.
 
+### TF mode — validate a scenario through real Terraform
+
+`ct-test.sh tf <scenario>` runs the scenario as Terraform would, against the
+configs in `examples/ct-test/<scenario>/`. It:
+
+- builds the provider from this checkout and wires it via a `dev_overrides` CLI
+  config, so Terraform uses **our** local provider, not a registry release (no
+  `init` needed);
+- injects a run-unique `vm_name` (a prior orphan can't collide with the apply);
+- runs `apply`, then a **convergence check** — `terraform plan -detailed-exitcode`
+  must be EMPTY (no permanent drift; this is the value of the TF path over the raw
+  API);
+- for scenarios that declare a `vm_power_state` variable (e.g. `vm`), drives a
+  **stop/start power cycle** with a convergence check at each state;
+- always runs `destroy` at the end — even on a mid-lifecycle failure — and treats a
+  failed destroy as a hard failure (possible orphan).
+
+```bash
+CT_ENV_OPENIAAS=/path/to/.env.recette-openiaas scripts/ct-test.sh tf vm
+```
+
+Today only `vm` (OpenIaaS: marketplace Ubuntu + data disk + start/stop) ships a TF
+config — see [`examples/ct-test/vm/`](../examples/ct-test/vm/). Other scenarios fall
+back to a "not ready yet" message until their `examples/ct-test/<scenario>/` is added.
+
 ## `ct-soak.sh` — characterize intermittent endpoint flakiness
 
 Authenticates with a PAT, then fires a fixed quota of GET calls per **concurrency
