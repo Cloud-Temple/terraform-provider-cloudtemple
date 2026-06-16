@@ -199,7 +199,7 @@ type MarketplaceOpenIaasDeployementRequest struct {
 	Name                string               `json:"name"`
 	StorageRepositoryID string               `json:"storageRepositoryId"`
 	NetworkData         []NetworkDataMapping `json:"networkData,omitempty"`
-	CloudInit           CloudInit            `json:"cloudInit,omitempty"`
+	CloudInit           *CloudInit           `json:"cloudInit,omitempty"`
 }
 
 func (c *MarketplaceItemClient) DeployOpenIaasItem(ctx context.Context, req *MarketplaceOpenIaasDeployementRequest) (string, error) {

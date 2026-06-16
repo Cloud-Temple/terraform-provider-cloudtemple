@@ -78,7 +78,7 @@ type CreateOpenIaasVirtualMachineRequest struct {
 	TemplateID      string             `json:"templateId"`
 	CPU             int                `json:"cpu"`
 	Memory          int                `json:"memory"`
-	CloudInit       CloudInit          `json:"cloudInit,omitempty"`
+	CloudInit       *CloudInit         `json:"cloudInit,omitempty"`
 	NetworkAdapters []OSNetworkAdapter `json:"networkAdapters,omitempty"`
 }
 

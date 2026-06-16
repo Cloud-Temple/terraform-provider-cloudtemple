@@ -442,21 +442,40 @@ Order of the elements in the list is the boot order.`,
 	}
 }
 
+// buildOpenIaasCloudInit maps the optional cloud_init schema attribute to the
+// client payload. It returns:
+//   - nil when cloud_init is absent, empty, or only carries empty values, so the
+//     "cloudInit" field is OMITTED from the request (the API rejects an empty
+//     cloudInit object with "cloudConfig is required");
+//   - an error when cloud_init is set with a network_config but no cloud_config —
+//     the API requires cloud_config whenever cloudInit is present, so we fail
+//     closed with a clear message instead of forwarding a doomed request;
+//   - a populated *client.CloudInit when cloud_config is set (network_config
+//     optional).
+func buildOpenIaasCloudInit(raw map[string]interface{}) (*client.CloudInit, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	cloudConfig, _ := raw["cloud_config"].(string)
+	networkConfig, _ := raw["network_config"].(string)
+	if cloudConfig == "" {
+		if networkConfig != "" {
+			return nil, fmt.Errorf("cloud_init requires cloud_config: set cloud_config (the API rejects a cloud-init without it)")
+		}
+		return nil, nil
+	}
+	return &client.CloudInit{CloudConfig: cloudConfig, NetworkConfig: networkConfig}, nil
+}
+
 func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
-	// Cloud-Init to configure the virtual machine
-	var cloudInit client.CloudInit
-	cloudInitRaw, ok := d.Get("cloud_init").(map[string]interface{})
-	if ok && cloudInitRaw != nil && len(cloudInitRaw) > 0 {
-		cloudConfig, ok := cloudInitRaw["cloud_config"].(string)
-		if cloudConfig != "" && ok {
-			cloudInit.CloudConfig = cloudConfig
-		}
-		networkConfig, ok := cloudInitRaw["network_config"].(string)
-		if networkConfig != "" && ok {
-			cloudInit.NetworkConfig = networkConfig
-		}
+	// Cloud-Init to configure the virtual machine. A nil result omits the
+	// "cloudInit" field entirely — the API rejects an empty cloudInit object.
+	cloudInitRaw, _ := d.Get("cloud_init").(map[string]interface{})
+	cloudInit, err := buildOpenIaasCloudInit(cloudInitRaw)
+	if err != nil {
+		return diag.FromErr(err)
 	}
 
 	osNetworkAdapters := d.Get("os_network_adapter").([]interface{})
