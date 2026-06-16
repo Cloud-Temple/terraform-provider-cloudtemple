@@ -261,6 +261,34 @@ func TestIsTransientActivityFailure(t *testing.T) {
 	if IsTransientActivityFailure(errors.New("plain error")) {
 		t.Fatal("a non-activity error must not be retryable")
 	}
+
+	// VPC transient gateway hiccup (#315/#319): the write activity fails with
+	// "Failed to load configuration via API: …502 Bad Gateway…nginx…". The lead
+	// phrase requires a 502 / Bad Gateway corroboration (AND-match): the matcher
+	// is GLOBAL (it also gates VIF/compute retries), so the lead phrase alone is
+	// too broad — a genuine PERMANENT config-load failure could carry it. A bare
+	// 502 without the lead phrase is also rejected: a non-idempotent upstream 502
+	// must stay fatal. Fail-closed (a false negative beats a false positive).
+	vpcFailure := func(reason string) *ActivityCompletionError {
+		return &ActivityCompletionError{activity: &Activity{State: map[string]ActivityState{
+			"failed": {Reason: reason},
+		}}}
+	}
+	if !IsTransientActivityFailure(vpcFailure("Failed to load configuration via API: <html><body><h1>502 Bad Gateway</h1></body></html> nginx/1.22.1")) {
+		t.Fatal("the VPC transient 502 (lead phrase + 502 + Bad Gateway) must be retryable")
+	}
+	if !IsTransientActivityFailure(vpcFailure("Failed to load configuration via API: 502 upstream error")) {
+		t.Fatal("the lead phrase corroborated by 502 alone must be retryable")
+	}
+	if !IsTransientActivityFailure(vpcFailure("Failed to load configuration via API: Bad Gateway from upstream")) {
+		t.Fatal("the lead phrase corroborated by Bad Gateway alone must be retryable")
+	}
+	if IsTransientActivityFailure(vpcFailure("Failed to load configuration via API: invalid schema definition")) {
+		t.Fatal("the lead phrase WITHOUT a 502/Bad Gateway corroboration must NOT be retryable (a permanent config-load failure stays fatal); kills the marker-alone / OR mutant")
+	}
+	if IsTransientActivityFailure(vpcFailure("upstream returned 502 Bad Gateway")) {
+		t.Fatal("a bare 502/Bad Gateway WITHOUT the lead phrase must NOT be retryable (too broad); kills the broaden-to-502 mutant")
+	}
 }
 
 func TestActivityWaitNotFoundToleranceSurvivesTransientBlips(t *testing.T) {

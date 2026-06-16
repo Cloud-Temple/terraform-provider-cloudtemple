@@ -18,6 +18,27 @@ var transientActivityReasons = []string{
 	"None of the workers were able to respond",
 }
 
+// transientActivityReasonPairs lists COMPOSITE (AND) markers: a failure reason
+// is transient only when it contains the lead phrase AND at least one of the
+// corroborating signals. The VPC platform's transient gateway hiccup
+// (#315/#319) surfaces as "Failed to load configuration via API: <html>…502
+// Bad Gateway…nginx…". The lead phrase ALONE is too broad: IsTransientActivity
+// Failure is GLOBAL — it also gates VIF/compute retries — and a genuine
+// PERMANENT config-load failure could carry the same phrase. Requiring a
+// 502 / Bad Gateway corroboration keeps it fail-closed: a false negative
+// (missing a transient 502) is preferred to a false positive (retrying a
+// non-idempotent permanent failure). A bare "502" without the lead phrase is
+// likewise NOT matched, so an unrelated upstream 502 stays fatal.
+var transientActivityReasonPairs = []struct {
+	lead  string
+	anyOf []string
+}{
+	{
+		lead:  "Failed to load configuration via API",
+		anyOf: []string{"502", "Bad Gateway"},
+	},
+}
+
 // IsTransientActivityFailure reports whether err is an activity that reached
 // the "failed" state for a reason known to be transient platform-side.
 func IsTransientActivityFailure(err error) bool {
@@ -30,6 +51,21 @@ func IsTransientActivityFailure(err error) bool {
 			if strings.Contains(state.Reason, marker) {
 				return true
 			}
+		}
+		for _, pair := range transientActivityReasonPairs {
+			if strings.Contains(state.Reason, pair.lead) && containsAny(state.Reason, pair.anyOf) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// containsAny reports whether s contains at least one of the given substrings.
+func containsAny(s string, subs []string) bool {
+	for _, sub := range subs {
+		if strings.Contains(s, sub) {
+			return true
 		}
 	}
 	return false
