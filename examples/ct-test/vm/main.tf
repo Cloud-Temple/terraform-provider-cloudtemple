@@ -82,10 +82,16 @@ locals {
   lan_openiaas_network_id = try(local.lan_openiaas_matches[0], null)
   lan_private_network_id  = try(local.lan_private_matches[0], null)
 
-  # FREE public floating IPs (not bound to any static IP). null if none — a
-  # precondition on the binding fails visibly rather than picking an in-use address.
-  free_floating_ips   = [for f in data.cloudtemple_vpc_floating_ips.all.floating_ips : f.id if f.static_ip_id == ""]
-  free_floating_ip_id = try(local.free_floating_ips[0], null)
+  # Public floating IP to bind: prefer the one ALREADY bound to THIS run's static IP,
+  # so the choice is STABLE across plan / refresh / destroy. A blind "first free" pick
+  # is unstable: once we bind it the IP is no longer free, so on the next plan it
+  # flips to null — which fails the convergence check AND blocks destroy (leaving an
+  # orphan). On the initial create nothing is bound to our brand-new static IP yet,
+  # so we fall back to the first currently-free IP. null only if neither exists.
+  fips                  = data.cloudtemple_vpc_floating_ips.all.floating_ips
+  fip_bound_to_ours     = [for f in local.fips : f.id if f.static_ip_id == cloudtemple_vpc_static_ip.lan.id]
+  fip_free              = [for f in local.fips : f.id if f.static_ip_id == ""]
+  public_floating_ip_id = try(local.fip_bound_to_ours[0], try(local.fip_free[0], null))
 }
 
 # --- the VM, deployed from the marketplace ----------------------------------------
@@ -166,18 +172,19 @@ resource "cloudtemple_vpc_static_ip" "lan" {
 }
 
 # --- attach a public (floating) IP to the static IP -------------------------------
-# Binds a PRE-PROVISIONED free floating IP (create = bind, destroy = unbind; it never
-# creates/destroys the public IP). free_floating_ip_id is null if none is free, which
-# fails the apply visibly rather than touching an in-use address.
+# Binds a PRE-PROVISIONED floating IP (create = bind, destroy = unbind; it never
+# creates/destroys the public IP). The id is chosen STABLY (see local.public_floating_ip_id):
+# the IP already bound to our static IP if present, else the first free one — so the
+# binding converges and destroys cleanly instead of flipping to null once bound.
 resource "cloudtemple_vpc_floating_ip_binding" "public" {
-  floating_ip_id = local.free_floating_ip_id
+  floating_ip_id = local.public_floating_ip_id
   static_ip_id   = cloudtemple_vpc_static_ip.lan.id
 
-  # Fail closed (clear message) if no public IP is free, rather than passing null.
+  # Fail closed (clear message) if no usable public IP exists at all.
   lifecycle {
     precondition {
-      condition     = local.free_floating_ip_id != null
-      error_message = "No free public (floating) IP available — all are bound. Free one or provision a new public IP in the VPC."
+      condition     = local.public_floating_ip_id != null
+      error_message = "No public (floating) IP available — none free and none already bound to this VM's static IP. Free or provision one in the VPC."
     }
   }
 }

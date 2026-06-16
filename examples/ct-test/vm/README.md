@@ -29,7 +29,7 @@ destroy always runs, even on a mid-lifecycle failure, to never leave orphans.
 - **LAN + static IP**: the adapter joins the LAN (an OpenIaaS network) and a managed
   **static IP** (`cloudtemple_vpc_static_ip`) is allocated on the LAN's VPC private
   network, bound to the adapter's MAC (address auto-allocated by the API).
-- **Public IP**: a pre-provisioned free floating IP is bound to the static IP
+- **Public IP**: a pre-provisioned floating IP is bound to the static IP
   (`cloudtemple_vpc_floating_ip_binding`) — the VM is reachable from outside for tests.
 - **Power management** via `power_state` (`on`/`off`) — the stop/start cycle.
 - **Convergence**: no permanent drift after apply (the value of the TF path vs the API).
@@ -39,19 +39,24 @@ destroy always runs, even on a mid-lifecycle failure, to never leave orphans.
 
 ## Substrate discovery (no hard-coded ids)
 
-The availability zone, storage repository and backup policy are discovered
-dynamically (first usable of each), so the config runs on any OpenIaaS tenant —
-mirroring the API cycle's read-then-pick approach. A backup SLA policy is required
-to power a VM on; any policy in the tenant satisfies it.
+The availability zone and backup policy are the first the API returns; the
+**storage repository** is the usable one (not in maintenance, accessible) with the
+**most free capacity** — never the first listed, which may be full (a VM
+precondition fails closed if none has room for the OS disk + data disk). The config
+thus runs on any OpenIaaS tenant — mirroring the API cycle's read-then-pick
+approach. A backup SLA policy is required to power a VM on; any policy in the tenant
+satisfies it.
 
 **The LAN** is selected **by name** (`var.lan_network_name`) on two correlated
 layers — the OpenIaaS network (where the adapter connects) and the VPC private
 network (where the static IP is allocated), which share the LAN's name by
 convention. Resource `precondition`s assert the name matches **exactly one** network
 on each layer (`length(...) == 1`), so a typo, a missing LAN, or an ambiguous name is
-a clear plan-time error — never a wrong silent pick. **The public IP** is the first
-**free** floating IP (`static_ip_id == ""`); a precondition on the binding fails the
-apply if none is free, rather than touching an in-use address.
+a clear plan-time error — never a wrong silent pick. **The public IP** is chosen
+**stably**: the floating IP already bound to this run's static IP if present (so the
+binding converges and destroys cleanly), else the first free one (`static_ip_id ==
+""`); a precondition fails closed if neither exists. A blind "first free" pick would
+break convergence and destroy once the IP is bound (it is no longer free).
 
 > Networking is the most tenant-specific part: it assumes the OpenIaaS network and
 > the VPC private network share the LAN name, and that a free floating IP exists.
