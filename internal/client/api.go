@@ -318,15 +318,22 @@ func (c *Client) JWT(ctx context.Context) (*jwt.Token, error) {
 		return nil, err
 	}
 
-	bytes, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, nil
+		// Surface the read failure (fail closed) instead of returning a nil token
+		// with no error — the caller would dereference token.Raw and panic.
+		return nil, fmt.Errorf("failed to read authentication response: %w", err)
 	}
 
-	token, _, err := new(jwt.Parser).ParseUnverified(string(bytes), jwt.MapClaims{})
+	token, _, err := new(jwt.Parser).ParseUnverified(string(body), jwt.MapClaims{})
+	if err != nil {
+		// Do NOT cache a partially-parsed token on error: a later cache hit reads
+		// its claims (the "exp" expiry) and would panic on a malformed token.
+		return nil, fmt.Errorf("failed to parse authentication token: %w", err)
+	}
 	c.SavedToken = token
 
-	return token, err
+	return token, nil
 }
 
 type LoginToken struct {
