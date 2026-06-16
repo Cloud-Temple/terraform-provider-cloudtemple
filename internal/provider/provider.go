@@ -564,7 +564,9 @@ func setIdFromActivityConcernedItems(d *schema.ResourceData, activity *client.Ac
 	}
 
 	i := slices.IndexFunc(activity.ConcernedItems, func(concernedItem client.ActivityConcernedItem) bool { return concernedItem.Type == expectedType })
-	if i > -1 {
+	if i > -1 && activity.ConcernedItems[i].ID != "" {
+		// Symmetric with setIdFromActivityState: never adopt an empty id, which
+		// would clobber a previously-set id and make the resource untrackable.
 		d.SetId(activity.ConcernedItems[i].ID)
 	}
 }
