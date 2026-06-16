@@ -85,6 +85,31 @@ type vpcFloatingIPBindingFuncs struct {
 	corroborate func(ctx context.Context, fipID, staticID string) (client.FloatingIPBindingState, error)
 	// sleep waits between confirmation attempts; returns ctx.Err() on cancel.
 	sleep func(ctx context.Context, attempt int) error
+	// retrySleep backs off between transient-failure retries of the async
+	// write (bind/unbind). Defaults to defaultVPCSleep (attempt*10s) when nil.
+	// Distinct from sleep, which paces the post-mutation confirmation reads.
+	retrySleep func(ctx context.Context, attempt int) error
+	// isTransient classifies an activity failure as a retryable transient
+	// platform error. Defaults to client.IsTransientActivityFailure when nil.
+	isTransient func(err error) bool
+}
+
+// classifyFloatingIPBindingLive resolves the live binding state of fipID
+// relative to staticID, using the per-id read first and falling back to the
+// strict listing when that read is ambiguous (nil/403/mismatched-id). It
+// mirrors the create pre-bind evidence rules so a transient-failure retry
+// re-classifies on the same basis before re-issuing a write. A read error is
+// returned as-is (it is NOT an activity failure, so the retry helper stops on
+// it) rather than acting on stale evidence.
+func classifyFloatingIPBindingLive(ctx context.Context, fipID, staticID string, funcs vpcFloatingIPBindingFuncs) (client.FloatingIPBindingState, error) {
+	rawFip, err := funcs.read(ctx, fipID)
+	if err != nil {
+		return client.FloatingIPBindingInconclusive, err
+	}
+	if fip, ok := usableFloatingIPRead(rawFip, fipID); ok {
+		return client.ClassifyFloatingIPBinding(fip, staticID), nil
+	}
+	return funcs.corroborate(ctx, fipID, staticID)
 }
 
 // usableFloatingIPRead applies the #312 R7 id-match guard to a per-id read
@@ -280,13 +305,47 @@ func createVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fip
 		}
 	}
 
-	// 2. Bind, then wait for the activity (skipped on a 409-idempotent bind).
-	activityID, err := funcs.bind(ctx, fipID, staticID)
-	if err != nil {
-		return diag.Errorf("failed to bind floating IP %s to static IP %s: %s", fipID, staticID, err)
-	}
-	if err := funcs.wait(ctx, activityID); err != nil {
-		return diag.Errorf("failed to bind floating IP %s to static IP %s: %s", fipID, staticID, err)
+	// 2. Bind, then wait for the activity (skipped on a 409-idempotent bind) —
+	//    with a bounded retry on the transient platform gateway 502 (#315/#319).
+	//    The retry wraps ONLY the bind+wait; the pre-bind anti-clobber decision
+	//    (above) and the post-bind confirmation (below) stay OUTSIDE it. The
+	//    FIRST attempt binds directly (the pre-bind read already proved the FIP
+	//    free); a RETRY first re-reads and re-classifies so it never clobbers a
+	//    binding that appeared in between, and short-circuits to success once
+	//    the bind has converged platform-side.
+	firstBindAttempt := true
+	bindErr := runVPCWriteWithRetry(ctx, vpcWriteRetry{
+		label:       fmt.Sprintf("bind floating IP %s to static IP %s", fipID, staticID),
+		sleep:       funcs.retrySleep,
+		isTransient: funcs.isTransient,
+		attempt: func(ctx context.Context) error {
+			if !firstBindAttempt {
+				state, serr := classifyFloatingIPBindingLive(ctx, fipID, staticID, funcs)
+				if serr != nil {
+					return serr
+				}
+				switch state {
+				case client.FloatingIPBindingBoundToTarget:
+					// The bind converged platform-side despite the transient
+					// failure: success (the external confirmation sets the id).
+					return nil
+				case client.FloatingIPBindingBoundToOther:
+					return fmt.Errorf("floating IP %s became bound to a different static IP between retries; refusing to clobber it by binding it to %s", fipID, staticID)
+				case client.FloatingIPBindingInconclusive:
+					return fmt.Errorf("floating IP %s has an inconclusive binding state between retries; refusing to re-bind it to %s on ambiguous evidence", fipID, staticID)
+				}
+				// Unbound: still free, re-bind below.
+			}
+			firstBindAttempt = false
+			activityID, berr := funcs.bind(ctx, fipID, staticID)
+			if berr != nil {
+				return berr
+			}
+			return funcs.wait(ctx, activityID)
+		},
+	})
+	if bindErr != nil {
+		return diag.Errorf("failed to bind floating IP %s to static IP %s: %s", fipID, staticID, bindErr)
 	}
 
 	// 3. Bounded confirmation retry: SetId ONLY after the binding is confirmed
@@ -412,17 +471,49 @@ func readVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fipID
 // the floating IP is no longer bound to our static IP. A 403 alone is NEVER
 // "gone".
 func deleteVPCFloatingIPBinding(ctx context.Context, d *schema.ResourceData, fipID, staticID string, funcs vpcFloatingIPBindingFuncs) diag.Diagnostics {
-	activityID, err := funcs.unbind(ctx, fipID, staticID)
-	if err != nil {
-		// A 404/403 on the unbind CALL itself is idempotent ONLY after a strict
-		// positive confirmation that the pair is gone.
-		if isVPCStatusCode(err, http.StatusNotFound) || isVPCStatusCode(err, http.StatusForbidden) {
-			return confirmFloatingIPUnbound(ctx, fipID, staticID, funcs, err)
-		}
-		return diag.Errorf("failed to unbind floating IP %s from static IP %s: %s", fipID, staticID, err)
-	}
-	if err := funcs.wait(ctx, activityID); err != nil {
-		return diag.Errorf("failed to unbind floating IP %s from static IP %s: %s", fipID, staticID, err)
+	// Unbind, then wait for the activity — with a bounded retry on the
+	// transient platform gateway 502 (#315/#319). The retry wraps ONLY the
+	// unbind+wait; the post-unbind confirmation (confirmFloatingIPUnbound)
+	// stays OUTSIDE it and rules on the final state. The FIRST attempt unbinds
+	// directly; a RETRY first re-reads and re-classifies, and re-issues the
+	// unbind ONLY while the pair is still bound to OUR target — otherwise the
+	// unbind already took effect (or the pair was never ours) and re-issuing it
+	// could disturb a binding that is no longer ours.
+	firstUnbindAttempt := true
+	unbindErr := runVPCWriteWithRetry(ctx, vpcWriteRetry{
+		label:       fmt.Sprintf("unbind floating IP %s from static IP %s", fipID, staticID),
+		sleep:       funcs.retrySleep,
+		isTransient: funcs.isTransient,
+		attempt: func(ctx context.Context) error {
+			if !firstUnbindAttempt {
+				state, serr := classifyFloatingIPBindingLive(ctx, fipID, staticID, funcs)
+				if serr != nil {
+					return serr
+				}
+				if state != client.FloatingIPBindingBoundToTarget {
+					// No longer bound to OUR pair (Unbound / BoundToOther /
+					// Inconclusive): the unbind took effect (or the pair was
+					// never ours). Stop; the external confirmation rules.
+					return nil
+				}
+				// Still our pair: re-issue the unbind below.
+			}
+			firstUnbindAttempt = false
+			activityID, uerr := funcs.unbind(ctx, fipID, staticID)
+			if uerr != nil {
+				// A 404/403 on the unbind CALL itself is idempotent: the pair
+				// is (probably) gone. Stop here and let the strict external
+				// confirmation prove it; never retry a permission/absence code.
+				if isVPCStatusCode(uerr, http.StatusNotFound) || isVPCStatusCode(uerr, http.StatusForbidden) {
+					return nil
+				}
+				return uerr
+			}
+			return funcs.wait(ctx, activityID)
+		},
+	})
+	if unbindErr != nil {
+		return diag.Errorf("failed to unbind floating IP %s from static IP %s: %s", fipID, staticID, unbindErr)
 	}
 
 	return confirmFloatingIPUnbound(ctx, fipID, staticID, funcs, nil)
