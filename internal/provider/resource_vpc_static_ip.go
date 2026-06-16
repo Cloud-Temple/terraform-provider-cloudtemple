@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -232,39 +233,97 @@ func readVPCStaticIPInto(ctx context.Context, d *schema.ResourceData, read vpcSt
 	return sw.diags
 }
 
+// vpcStaticIPUpdateFuncs abstracts the static IP update API surface so the
+// PATCH logic is unit tested without HTTP calls or real sleeps. retrySleep /
+// isTransient default to defaultVPCSleep / client.IsTransientActivityFailure.
+type vpcStaticIPUpdateFuncs struct {
+	read        vpcStaticIPReadFunc
+	update      func(ctx context.Context, id string, req *client.UpdateStaticIPRequest) (string, error)
+	wait        vpcActivityWaitFunc
+	retrySleep  func(ctx context.Context, attempt int) error
+	isTransient func(err error) bool
+}
+
 func resourceVPCStaticIPUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
-
-	// Diff-driven PATCH body: send ONLY the changed updatable fields. The
-	// UpdateStaticIpPayload schema contains exactly resourceDescription and
-	// macAddress (no ipAddress), so only those can change here; ip_address and
-	// private_network_id are ForceNew and never reach this path.
-	req := &client.UpdateStaticIPRequest{}
-	changed := false
-	if d.HasChange("mac_address") {
-		v := d.Get("mac_address").(string)
-		req.MacAddress = &v
-		changed = true
+	if diags := updateVPCStaticIPWith(ctx, d, vpcStaticIPUpdateFuncs{
+		read:   c.VPC().StaticIP().Read,
+		update: c.VPC().StaticIP().Update,
+		wait: func(ctx context.Context, activityID string) error {
+			_, err := c.Activity().WaitForCompletion(ctx, activityID, getWaiterOptions(ctx))
+			return err
+		},
+	}); diags.HasError() {
+		return diags
 	}
-	if d.HasChange("resource_description") {
-		v := d.Get("resource_description").(string)
-		req.ResourceDescription = &v
-		changed = true
-	}
-
-	if changed {
-		// Update is ASYNCHRONOUS: the PATCH returns an activity (Location); wait
-		// for its completion before reading back.
-		activityID, err := c.VPC().StaticIP().Update(ctx, d.Id(), req)
-		if err != nil {
-			return diag.Errorf("failed to update VPC static IP %s: %s", d.Id(), err)
-		}
-		if _, err := c.Activity().WaitForCompletion(ctx, activityID, getWaiterOptions(ctx)); err != nil {
-			return diag.Errorf("failed to update VPC static IP %s: %s", d.Id(), err)
-		}
-	}
-
 	return resourceVPCStaticIPRead(ctx, d, meta)
+}
+
+// updateVPCStaticIPWith holds the testable update logic. The PATCH body
+// (UpdateStaticIpPayload = exactly resourceDescription + macAddress; ip_address
+// and private_network_id are ForceNew and never reach this path) is wrapped in
+// the bounded transient-502 retry (#315/#319).
+//
+// Codex PLAN strict guard: the diff is rebuilt against a FRESH LIVE read before
+// EVERY attempt, never from the state alone — so a retry after a transient
+// failure that actually applied the change re-reads an already-converged static
+// IP and returns success WITHOUT a second PATCH. A nil/ambiguous read (403/absent
+// or an id-inconsistent body) FAILS CLOSED: never PATCH on ambiguous evidence.
+func updateVPCStaticIPWith(ctx context.Context, d *schema.ResourceData, funcs vpcStaticIPUpdateFuncs) diag.Diagnostics {
+	desiredMAC := d.Get("mac_address").(string)
+	desiredDesc := d.Get("resource_description").(string)
+	// Canonicalise the MAC for comparison (lowercase, ":"-separated), mirroring
+	// the client's create-time matching, so a pure formatting difference between
+	// the config and the live read never triggers a needless PATCH.
+	normMAC := func(m string) string { return strings.ToLower(strings.ReplaceAll(m, "-", ":")) }
+
+	updateErr := runVPCWriteWithRetry(ctx, vpcWriteRetry{
+		label:       fmt.Sprintf("update VPC static IP %s", d.Id()),
+		sleep:       funcs.retrySleep,
+		isTransient: funcs.isTransient,
+		attempt: func(ctx context.Context) error {
+			live, rerr := funcs.read(ctx, d.Id())
+			if rerr != nil {
+				return rerr
+			}
+			if live == nil || live.ID != d.Id() {
+				return fmt.Errorf("VPC static IP %s could not be read consistently before updating it; refusing to PATCH on ambiguous evidence", d.Id())
+			}
+
+			req := &client.UpdateStaticIPRequest{}
+			changed := false
+			if normMAC(desiredMAC) != normMAC(live.MacAddress) {
+				v := desiredMAC
+				req.MacAddress = &v
+				changed = true
+			}
+			liveDesc := ""
+			if live.ResourceDescription != nil {
+				liveDesc = *live.ResourceDescription
+			}
+			if desiredDesc != liveDesc {
+				v := desiredDesc
+				req.ResourceDescription = &v
+				changed = true
+			}
+			if !changed {
+				// Live already matches the desired state: converged, no PATCH.
+				return nil
+			}
+
+			// Update is ASYNCHRONOUS: the PATCH returns an activity (Location);
+			// wait for its completion.
+			activityID, uerr := funcs.update(ctx, d.Id(), req)
+			if uerr != nil {
+				return uerr
+			}
+			return funcs.wait(ctx, activityID)
+		},
+	})
+	if updateErr != nil {
+		return diag.Errorf("failed to update VPC static IP %s: %s", d.Id(), updateErr)
+	}
+	return nil
 }
 
 func resourceVPCStaticIPDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
@@ -309,6 +368,18 @@ type vpcActivityWaitFunc func(ctx context.Context, activityID string) error
 //     So a 403 is confirmed via a strict, complete (200-only) listing before the
 //     delete is accepted; anything inconclusive FAILS CLOSED.
 func deleteVPCStaticIPWith(ctx context.Context, d *schema.ResourceData, del vpcStaticIPDeleteFunc, listStrict vpcStaticIPListStrictFunc, wait vpcActivityWaitFunc) diag.Diagnostics {
+	return deleteVPCStaticIPWithRetry(ctx, d, del, listStrict, wait, nil, nil)
+}
+
+// deleteVPCStaticIPWithRetry is deleteVPCStaticIPWith with the transient-502
+// retry seams exposed for unit tests; retrySleep / isTransient default to
+// defaultVPCSleep / client.IsTransientActivityFailure when nil.
+//
+// The DELETE+wait is wrapped in the bounded transient-502 retry (#315/#319); the
+// 403-absence confirmation (confirmStaticIPDeleted) stays OUTSIDE it. No live
+// re-read is needed between attempts: a re-DELETE is idempotent and the re-DELETE
+// itself is the probe — a 404 proves the static IP is already gone (success).
+func deleteVPCStaticIPWithRetry(ctx context.Context, d *schema.ResourceData, del vpcStaticIPDeleteFunc, listStrict vpcStaticIPListStrictFunc, wait vpcActivityWaitFunc, retrySleep func(context.Context, int) error, isTransient func(error) bool) diag.Diagnostics {
 	// Preflight (#311): only CUSTOM static IPs are deletable via the API. If the
 	// state already knows this is a platform-managed one (e.g. source "xoa"),
 	// surface an actionable diagnostic instead of issuing a doomed delete. Import
@@ -321,22 +392,31 @@ func deleteVPCStaticIPWith(ctx context.Context, d *schema.ResourceData, del vpcS
 		)
 	}
 
-	activityID, err := del(ctx, d.Id())
-	if err != nil {
-		// 404: unambiguous absence -> idempotent success.
-		if isVPCStatusCode(err, http.StatusNotFound) {
-			return nil
-		}
+	delErr := runVPCWriteWithRetry(ctx, vpcWriteRetry{
+		label:       fmt.Sprintf("delete VPC static IP %s", d.Id()),
+		sleep:       retrySleep,
+		isTransient: isTransient,
+		attempt: func(ctx context.Context) error {
+			activityID, err := del(ctx, d.Id())
+			if err != nil {
+				// 404: unambiguous absence -> idempotent success.
+				if isVPCStatusCode(err, http.StatusNotFound) {
+					return nil
+				}
+				// 403 (ambiguous, #303) and any other error are non-transient:
+				// surface them so the caller can apply the right rule below.
+				return err
+			}
+			return wait(ctx, activityID)
+		},
+	})
+	if delErr != nil {
 		// 403: ambiguous (#303). Confirm absence before accepting the delete, so a
 		// genuine permission error never silently drops the resource from the state.
-		if isVPCStatusCode(err, http.StatusForbidden) {
-			return confirmStaticIPDeleted(ctx, d, listStrict, err)
+		if isVPCStatusCode(delErr, http.StatusForbidden) {
+			return confirmStaticIPDeleted(ctx, d, listStrict, delErr)
 		}
-		return diag.Errorf("failed to delete VPC static IP %s: %s", d.Id(), staticIPDeleteErrorDetail(err))
-	}
-
-	if err := wait(ctx, activityID); err != nil {
-		return diag.Errorf("failed to delete VPC static IP %s: %s", d.Id(), staticIPDeleteErrorDetail(err))
+		return diag.Errorf("failed to delete VPC static IP %s: %s", d.Id(), staticIPDeleteErrorDetail(delErr))
 	}
 	return nil
 }
