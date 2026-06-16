@@ -217,6 +217,21 @@ func TestIsTransientAPIError(t *testing.T) {
 	if !isTransientAPIError(fmt.Errorf("wrapped: %w", StatusError{Code: http.StatusBadGateway})) {
 		t.Fatal("wrapped transient StatusError must stay transient")
 	}
+	if !isTransientAPIError(&url.Error{Op: "Get", URL: "https://shiva.example", Err: errors.New("connection reset")}) {
+		t.Fatal("a non-timeout transport error (connection reset) must stay transient")
+	}
+	// A CONFIGURED request timeout (or ctx deadline/cancel) must NOT be transient:
+	// retrying it in a waiter would multiply the per-request bound into a
+	// multi-minute stall (issue #339).
+	if isTransientAPIError(&url.Error{Op: "Get", URL: "https://shiva.example", Err: timeoutErr{}}) {
+		t.Fatal("a configured request timeout must NOT be transient")
+	}
+	if isTransientAPIError(context.DeadlineExceeded) {
+		t.Fatal("a context deadline must not be transient")
+	}
+	if isTransientAPIError(context.Canceled) {
+		t.Fatal("a context cancellation must not be transient")
+	}
 }
 
 func TestIsTransientActivityFailure(t *testing.T) {

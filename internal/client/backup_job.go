@@ -123,7 +123,16 @@ func (c *BackupJobClient) WaitForCompletion(ctx context.Context, id string, opti
 		count++
 		job, err := c.Read(ctx, id)
 		if err != nil {
-			return options.retryableError(&BackupJobCompletionError{
+			// Only a transient read error is worth retrying. A configured request
+			// timeout, a context error or a permanent error (4xx, decode) must fail
+			// the wait at once — retrying a timeout here would stall for minutes.
+			if isTransientAPIError(err) {
+				return options.retryableError(&BackupJobCompletionError{
+					message: fmt.Sprintf("transient error while getting job %q status: %s", id, err),
+					job:     job,
+				})
+			}
+			return options.error(&BackupJobCompletionError{
 				message: fmt.Sprintf("an error occured while getting job %q status: %s", id, err),
 				job:     job,
 			})
