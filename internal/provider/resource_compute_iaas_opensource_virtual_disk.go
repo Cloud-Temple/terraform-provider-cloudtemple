@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -213,6 +214,67 @@ func confirmOpenIaaSVirtualDiskDeleted(ctx context.Context, c *client.Client, id
 	return classifyMissingDevice(id, scopedIDs, tenantIDs), nil
 }
 
+// normalizeOpenIaaSPowerState maps the platform power state to "on"/"off", or
+// "" when it is none of the known states (so the caller can fail closed). It
+// mirrors the normalisation used by the VM resource's Read.
+func normalizeOpenIaaSPowerState(s string) string {
+	switch s {
+	case "Running":
+		return "on"
+	case "Halted", "Paused":
+		return "off"
+	default:
+		return ""
+	}
+}
+
+// resolveOpenIaaSDiskConnected decides the `connected` value to write to state
+// for the disk's attachment to vmID, guarding against the power-off drift (#350).
+//
+// `connected` maps to the VBD PLUG state (connect/disconnect = currently_attached,
+// a RUNTIME fact), NOT to the attach/detach LINK. On a halted/paused VM the
+// platform reports every VBD unplugged (Connected=false), which does not reflect
+// the user's intent (it re-plugs on boot). So:
+//   - VM running  -> mirror the runtime (vm.Connected): a real disconnect is visible;
+//   - VM off       -> preserve the known intent (priorConnected) to avoid a drift;
+//   - power unknown -> fail closed (cannot decide).
+//
+// A disk that is readable but NO LONGER attached to vmID is an ATTACHMENT drift
+// (attach/detach), never a mere connected=false (connect/disconnect cannot fix
+// it): fail closed so it is surfaced, not silently flattened away.
+func resolveOpenIaaSDiskConnected(disk *client.OpenIaaSVirtualDisk, vmID string, priorConnected bool, powerState string) (bool, error) {
+	found := false
+	vbdConnected := false
+	for _, vm := range disk.VirtualMachines {
+		if vm.ID == vmID {
+			found = true
+			vbdConnected = vm.Connected
+			break
+		}
+	}
+	if !found {
+		return false, fmt.Errorf(
+			"virtual disk %s is readable but is no longer attached to virtual machine %s (attachment drift); refusing to report it as merely disconnected — re-attach the disk or fix the configuration",
+			disk.ID, vmID,
+		)
+	}
+	switch normalizeOpenIaaSPowerState(powerState) {
+	case "on":
+		// VM running: the runtime plug state is the source of truth (a genuine
+		// disconnect is observable and must surface as drift).
+		return vbdConnected, nil
+	case "off":
+		// VM halted/paused: every VBD is reported unplugged, which is NOT the
+		// intent — preserve the known intent to avoid a perpetual power-off drift.
+		return priorConnected, nil
+	default:
+		return false, fmt.Errorf(
+			"virtual machine %s (attached to disk %s) has an unknown power state %q; refusing to decide the disk connection state on ambiguous evidence",
+			vmID, disk.ID, powerState,
+		)
+	}
+}
+
 func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
 	var diags diag.Diagnostics
@@ -250,6 +312,32 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 	// Mapper les données en utilisant la fonction helper
 	vmID := d.Get("virtual_machine_id").(string)
 	diskData := helpers.FlattenOpenIaaSVirtualDisk(virtualDisk, vmID)
+
+	// #350: the flatten copies `connected` from the runtime VBD plug state, which
+	// the platform reports false for EVERY VBD of a halted VM — not the user's
+	// intent. Override it with a power-state-aware decision so stopping a VM never
+	// produces a perpetual `connected: false -> true` drift. Done HERE (not in the
+	// pure flatten helper) because it needs the VM power state and the prior intent.
+	// Only meaningful when the disk is attached to a configured VM; an id-only
+	// import (virtual_machine_id not yet known) keeps the flattened value until the
+	// configuration provides the VM.
+	if vmID != "" {
+		vm, vmErr := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, vmID)
+		if vmErr != nil {
+			return diag.Errorf("failed to read virtual machine %s to resolve disk %s connection state: %s", vmID, d.Id(), vmErr)
+		}
+		if vm == nil {
+			// The OpenIaaS API maps 403 for an unknown OR forbidden id to nil:
+			// we cannot tell a halted VM from a running one, so we must not decide
+			// the connection state. Fail closed rather than risk a wrong plug state.
+			return diag.Errorf("virtual machine %s (attached to disk %s) could not be read; refusing to resolve the disk connection state on ambiguous evidence", vmID, d.Id())
+		}
+		connected, resErr := resolveOpenIaaSDiskConnected(virtualDisk, vmID, d.Get("connected").(bool), vm.PowerState)
+		if resErr != nil {
+			return diag.FromErr(resErr)
+		}
+		diskData["connected"] = connected
+	}
 
 	// Définir les données dans le state
 	for k, v := range diskData {
