@@ -287,11 +287,16 @@ func (c *Client) JWT(ctx context.Context) (*jwt.Token, error) {
 	defer c.lock.Unlock()
 
 	if c.SavedToken != nil {
-		expireAt := c.SavedToken.Claims.(jwt.MapClaims)["exp"].(float64)
-		tm := time.Unix(int64(expireAt), 0)
-
-		if time.Until(tm) > 5*time.Minute {
-			return c.SavedToken, nil
+		// Serve the cached token only while it stays valid for at least 5 more
+		// minutes. Read its expiry defensively: a token whose claims are nil, or
+		// whose "exp" is absent or non-numeric, is treated as unusable and falls
+		// through to re-authentication — never panicking on the type assertions.
+		if claims, ok := c.SavedToken.Claims.(jwt.MapClaims); ok {
+			if exp, ok := claims["exp"].(float64); ok {
+				if time.Until(time.Unix(int64(exp), 0)) > 5*time.Minute {
+					return c.SavedToken, nil
+				}
+			}
 		}
 	}
 
