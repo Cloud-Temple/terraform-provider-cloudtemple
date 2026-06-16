@@ -199,15 +199,21 @@ EOF
         terraform apply -auto-approve -input=false -var "vm_name=$run_name" || { echo ">> [$label] FAIL: apply" >&2; return 1; }
       fi
       echo ">> [$label] convergence (plan must be empty)..."
+      # Capture the plan so a non-empty/errored plan can be SHOWN — a bare "drift
+      # detected" with no diff is not actionable.
+      local planout; planout="$(mktemp)"
       if [ -n "$power" ]; then
-        terraform plan -detailed-exitcode -input=false -var "vm_name=$run_name" -var "vm_power_state=$power" >/dev/null
+        terraform plan -detailed-exitcode -no-color -input=false -var "vm_name=$run_name" -var "vm_power_state=$power" >"$planout" 2>&1
       else
-        terraform plan -detailed-exitcode -input=false -var "vm_name=$run_name" >/dev/null
+        terraform plan -detailed-exitcode -no-color -input=false -var "vm_name=$run_name" >"$planout" 2>&1
       fi
-      case $? in
-        0) echo ">> [$label] OK — convergent (no drift)"; return 0 ;;
-        2) echo ">> [$label] FAIL — drift detected (plan not empty)" >&2; return 1 ;;
-        *) echo ">> [$label] FAIL — plan errored" >&2; return 1 ;;
+      local plan_rc=$?
+      case $plan_rc in
+        0) echo ">> [$label] OK — convergent (no drift)"; rm -f "$planout"; return 0 ;;
+        2) echo ">> [$label] FAIL — drift detected (plan not empty); the drifting plan:" >&2
+           sed 's/^/   | /' "$planout" >&2; rm -f "$planout"; return 1 ;;
+        *) echo ">> [$label] FAIL — plan errored:" >&2
+           sed 's/^/   | /' "$planout" >&2; rm -f "$planout"; return 1 ;;
       esac
     }
 
