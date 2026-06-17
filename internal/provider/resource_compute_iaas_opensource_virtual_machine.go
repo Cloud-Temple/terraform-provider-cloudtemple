@@ -470,6 +470,13 @@ func buildOpenIaasCloudInit(raw map[string]interface{}) (*client.CloudInit, erro
 func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
+	// Fail fast, before creating anything, if an explicit host_id is requested
+	// while the VM ends powered off (#355): host placement cannot be stably
+	// represented for a powered-off VM.
+	if diags := preflightOpenIaaSHostPlacement(d); diags != nil {
+		return diags
+	}
+
 	// Cloud-Init to configure the virtual machine. A nil result omits the
 	// "cloudInit" field entirely — the API rejects an empty cloudInit object.
 	cloudInitRaw, _ := d.Get("cloud_init").(map[string]interface{})
@@ -837,6 +844,15 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
+	// Capture the host-placement intent once, before any mutation or read
+	// (#355): GetChange/GetRawConfig reflect the plan, not the live mutations
+	// performed below. Fail fast if an explicit host_id change would leave the
+	// VM powered off.
+	placementInputs := openIaaSHostPlacementInputs(d)
+	if diags := hostPlacementPreflightError(placementInputs); diags != nil {
+		return diags
+	}
+
 	// Associate a replication policy if provided
 	if d.HasChange("replication_policy_id") {
 		oldPolicyId, newPolicyId := d.GetChange("replication_policy_id")
@@ -1023,37 +1039,48 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		return diags
 	}
 
-	if d.HasChange("power_state") {
+	// Host placement (#355): relocate a running VM whose host_id genuinely
+	// changed BEFORE the power block, run the power block, then assert the VM
+	// actually converged onto the requested host. powerBlock wraps the
+	// pre-existing power_state handling so the whole flow is unit-testable.
+	powerBlock := func() error {
+		if !d.HasChange("power_state") {
+			return nil
+		}
 		powerState := d.Get("power_state").(string)
-		// Avoid trying to power off a halted VM
-		if powerState == "on" || !d.IsNewResource() {
-			activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
-				HostId:                  d.Get("host_id").(string),
-				PowerState:              powerState,
-				Force:                   false,
-				BypassMacAddressesCheck: false,
-				BypassBlockedOperation:  false,
-				ForceShutdownDelay:      0,
-			})
-			if err != nil {
-				return diag.Errorf("failed to power %s virtual machine: %s", powerState, err)
-			}
-			_, err = c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
-			if err != nil {
-				return diag.Errorf("failed to power %s virtual machine, %s", powerState, err)
-			}
-			// Avoid trying to wait for the drivers on a halter virtual machine
-			if powerState != "off" {
-				// We have to wait for the PV drivers to be detected, otherwise, operations like creating new network adapters will fail.
-				timeout := time.Duration(d.Get("wait_for_drivers_timeout").(int)) * time.Second
-				if timeout > 0 {
-					_, err = c.Compute().OpenIaaS().VirtualMachine().WaitForDrivers(ctx, d.Id(), timeout, getWaiterOptions(ctx))
-					if err != nil {
-						return diag.Errorf("failed to get PV drivers on virtual machine, %s", err)
-					}
+		// Avoid trying to power off a halted (never-started) VM
+		if powerState != "on" && d.IsNewResource() {
+			return nil
+		}
+		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
+			HostId:                  d.Get("host_id").(string),
+			PowerState:              powerState,
+			Force:                   false,
+			BypassMacAddressesCheck: false,
+			BypassBlockedOperation:  false,
+			ForceShutdownDelay:      0,
+		})
+		if err != nil {
+			return fmt.Errorf("failed to power %s virtual machine: %s", powerState, err)
+		}
+		if _, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx)); err != nil {
+			return fmt.Errorf("failed to power %s virtual machine, %s", powerState, err)
+		}
+		// Avoid trying to wait for the drivers on a halted virtual machine
+		if powerState != "off" {
+			// Wait for the PV drivers to be detected, otherwise operations like creating new network adapters will fail.
+			timeout := time.Duration(d.Get("wait_for_drivers_timeout").(int)) * time.Second
+			if timeout > 0 {
+				if _, err := c.Compute().OpenIaaS().VirtualMachine().WaitForDrivers(ctx, d.Id(), timeout, getWaiterOptions(ctx)); err != nil {
+					return fmt.Errorf("failed to get PV drivers on virtual machine, %s", err)
 				}
 			}
 		}
+		return nil
+	}
+
+	if err := applyOpenIaaSHostPlacement(ctx, d.Id(), placementInputs, newOpenIaaSHostPlacementFuncs(c, powerBlock)); err != nil {
+		return diag.FromErr(err)
 	}
 
 	if diags := updateTags(ctx, c, d, d.Id(), "iaas_opensource_virtual_machine", "iaas_opensource"); diags != nil {

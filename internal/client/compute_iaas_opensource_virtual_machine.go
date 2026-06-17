@@ -196,6 +196,21 @@ func (v *OpenIaaSVirtualMachineClient) Power(ctx context.Context, id string, req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
+// RelocateOpenIaasVirtualMachineRequest relocates (migrates) a virtual machine
+// to another host. For an intra-pool (same-cluster) live migration of a running
+// VM, only HostId is required (the API documents this case explicitly). The
+// optional storageRepositoryId / networkData fields of the endpoint are out of
+// scope here (host-only migration, #355) and tracked separately if needed.
+type RelocateOpenIaasVirtualMachineRequest struct {
+	HostId string `json:"hostId,omitempty"`
+}
+
+func (v *OpenIaaSVirtualMachineClient) Relocate(ctx context.Context, id string, req *RelocateOpenIaasVirtualMachineRequest) (string, error) {
+	r := v.c.newRequest("POST", "/compute/v1/open_iaas/virtual_machines/%s/relocate", id)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
 func (v *OpenIaaSVirtualMachineClient) MountISO(ctx context.Context, id string, virtualDiskId string) (string, error) {
 	r := v.c.newRequest("POST", "/compute/v1/open_iaas/virtual_machines/%s/mount", id)
 	r.obj = map[string]string{"virtualDiskId": virtualDiskId}
