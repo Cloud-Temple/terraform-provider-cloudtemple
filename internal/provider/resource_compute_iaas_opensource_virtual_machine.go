@@ -1035,7 +1035,7 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	if diags := handleUpdateOSDevices(ctx, c, d, disks, networkAdapters); diags != nil {
+	if diags := handleUpdateOSDevices(ctx, c, d, disks, networkAdapters, placementInputs.hostConfigured); diags != nil {
 		return diags
 	}
 
@@ -1052,8 +1052,20 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		if powerState != "on" && d.IsNewResource() {
 			return nil
 		}
+		// Resolve the power-on host (#356): only on power-on (HostId is ignored
+		// on power-off), honoring a configured host_id and otherwise the LIVE
+		// current host — never the possibly-stale Terraform state value.
+		hostID := ""
+		if powerState == "on" {
+			resolved, err := resolveOpenIaaSPowerOnHostID(placementInputs.hostConfigured, d.Get("host_id").(string),
+				func() (string, error) { return openIaaSLiveHostID(ctx, c, d.Id()) })
+			if err != nil {
+				return fmt.Errorf("failed to resolve the power-on host for virtual machine %s: %w", d.Id(), err)
+			}
+			hostID = resolved
+		}
 		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
-			HostId:                  d.Get("host_id").(string),
+			HostId:                  hostID,
 			PowerState:              powerState,
 			Force:                   false,
 			BypassMacAddressesCheck: false,
@@ -1359,7 +1371,7 @@ func osAdapterTxConfigured(raw cty.Value, adapters []interface{}) map[string]*bo
 	return configured
 }
 
-func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.ResourceData, disks []map[string]interface{}, networkAdapters []map[string]interface{}) diag.Diagnostics {
+func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.ResourceData, disks []map[string]interface{}, networkAdapters []map[string]interface{}, hostConfigured bool) diag.Diagnostics {
 	// Nothing to reconcile: do not make an unrelated update (tags, power
 	// state, boot order…) depend on the disk/adapter listing endpoints.
 	if len(disks) == 0 && len(networkAdapters) == 0 {
@@ -1541,9 +1553,17 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 
 	// Power on the VM if it was powered off for the update
 	if needsReboot {
+		// Preserve the host the VM was running on before this provider-initiated
+		// reboot (#356): honor a configured host_id, otherwise use the live host
+		// captured above (vm) — never the possibly-stale Terraform state value.
+		hostID, err := resolveOpenIaaSPowerOnHostID(hostConfigured, d.Get("host_id").(string),
+			func() (string, error) { return vm.Host.ID, nil })
+		if err != nil {
+			return diag.Errorf("failed to resolve the power-on host for virtual machine %s: %s", d.Id(), err)
+		}
 		activityId, err := c.Compute().OpenIaaS().VirtualMachine().Power(ctx, d.Id(), &client.UpdateOpenIaasVirtualMachinePowerRequest{
 			PowerState: "on",
-			HostId:     d.Get("host_id").(string),
+			HostId:     hostID,
 		})
 		if err != nil {
 			return diag.Errorf("failed to power on virtual machine: %s", err)
