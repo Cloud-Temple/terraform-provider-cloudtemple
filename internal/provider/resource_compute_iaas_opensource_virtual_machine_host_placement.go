@@ -227,3 +227,33 @@ func newOpenIaaSHostPlacementFuncs(c *client.Client, runPowerBlock func() error)
 		runPowerBlock: runPowerBlock,
 	}
 }
+
+// openIaaSLiveHostID reads the live current host (vm.Host.ID) of a VM. Used to
+// resolve the power-on host when host_id is unconfigured (#356), so the power-on
+// targets the actual current host rather than a possibly-stale Terraform state
+// value.
+func openIaaSLiveHostID(ctx context.Context, c *client.Client, id string) (string, error) {
+	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	if vm == nil {
+		return "", fmt.Errorf("virtual machine %s not found", id)
+	}
+	return vm.Host.ID, nil
+}
+
+// resolveOpenIaaSPowerOnHostID picks the host to pin on a provider-initiated
+// power-on (#356). A configured host_id is the user's intent. An unconfigured
+// host_id must NOT pin the possibly-stale Terraform state value (d.Get), which
+// under `-refresh=false` can force an unintended migration: it resolves the host
+// via readLiveHost (a fresh live read, or a host captured before a provider
+// power-off). An empty live host is returned as "" so the caller omits HostId
+// and the platform places the VM. A read error is surfaced, never falling back
+// to the stale state value.
+func resolveOpenIaaSPowerOnHostID(hostConfigured bool, configuredHost string, readLiveHost func() (string, error)) (string, error) {
+	if hostConfigured {
+		return configuredHost, nil
+	}
+	return readLiveHost()
+}
