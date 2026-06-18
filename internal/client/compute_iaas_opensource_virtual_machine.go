@@ -234,20 +234,58 @@ func (c *OpenIaaSVirtualMachineClient) WaitForDrivers(
 	timeout time.Duration,
 	options *WaiterOptions,
 ) (*OpenIaaSVirtualMachine, error) {
+	return waitForDrivers(ctx, id, timeout,
+		func(d time.Duration) (<-chan time.Time, func()) {
+			t := time.NewTicker(d)
+			return t.C, t.Stop
+		},
+		func(ctx context.Context) (*OpenIaaSVirtualMachine, error) {
+			return c.Read(ctx, id)
+		},
+		options,
+	)
+}
+
+// driverReadFunc abstracts the VM read; newTickerFunc abstracts the poll ticker
+// (it returns the tick channel and a stop func). Both are injected so
+// waitForDrivers is unit tested without HTTP calls or a real 5s tick (a
+// test-controlled channel drives the ticks). A channel seam is used rather than a
+// fake *time.Ticker to avoid depending on time.Ticker internals.
+type driverReadFunc func(ctx context.Context) (*OpenIaaSVirtualMachine, error)
+type newTickerFunc func(d time.Duration) (<-chan time.Time, func())
+
+// waitForDrivers is the polling loop behind WaitForDrivers, with the ticker and
+// read injected. Behavior is preserved EXACTLY:
+//   - timeout == 0: ONE read with the PARENT ctx, no ticker, return it (best-effort skip);
+//   - timeout > 0: a timeout ctx is created BEFORE the ticker (factory called with 5s);
+//     reads use the TIMEOUT ctx, not the parent;
+//   - the timeout firing (before any tick, or via the guard on a late tick) returns
+//     (lastVM, nil) — best-effort, NEVER an error;
+//   - a read error returns (nil, fmt.Errorf("[WAITER] failed to read ...: %s", id, err)) —
+//     note %s, NOT %w (the original error is not wrapped);
+//   - a nil VM returns (nil, fmt.Errorf("[WAITER] the virtual machine %q could not be found", id)).
+func waitForDrivers(
+	ctx context.Context,
+	id string,
+	timeout time.Duration,
+	newTicker newTickerFunc,
+	read driverReadFunc,
+	options *WaiterOptions,
+) (*OpenIaaSVirtualMachine, error) {
 
 	if timeout == 0 {
 		options.log(fmt.Sprintf(
 			"[WAITER] skipping wait for drivers for virtual machine %q (timeout = 0)",
 			id,
 		))
-		return c.Read(ctx, id)
+		return read(ctx)
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	tickC, stop := newTicker(5 * time.Second)
+	defer stop()
 
 	var lastVM *OpenIaaSVirtualMachine
 
@@ -261,14 +299,14 @@ func (c *OpenIaaSVirtualMachineClient) WaitForDrivers(
 			))
 			return lastVM, nil
 
-		case <-ticker.C:
+		case <-tickC:
 
 			if timeoutCtx.Err() != nil {
 				options.log("[WAITER] timeout reached while waiting, continuing without PV drivers")
 				return lastVM, nil
 			}
 
-			vm, err := c.Read(timeoutCtx, id)
+			vm, err := read(timeoutCtx)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"[WAITER] failed to read virtual machine %q while waiting for drivers: %s",

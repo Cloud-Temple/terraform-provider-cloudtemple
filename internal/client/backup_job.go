@@ -116,12 +116,29 @@ func (c *BackupJobClient) WaitForCompletion(ctx context.Context, id string, opti
 	b := retry.NewFibonacci(1 * time.Second)
 	b = retry.WithCappedDuration(30*time.Second, b)
 
+	return waitForBackupJobCompletion(ctx, id, func(ctx context.Context) (*BackupJob, error) {
+		return c.Read(ctx, id)
+	}, b, options)
+}
+
+// backupJobReadFunc abstracts the job read so the polling loop can be unit
+// tested without HTTP calls or real sleeps.
+type backupJobReadFunc func(ctx context.Context) (*BackupJob, error)
+
+// waitForBackupJobCompletion is the polling loop behind WaitForCompletion, with
+// the read and the backoff injected (mirrors waitForActivityCompletion). Behavior
+// is preserved exactly: transient read errors are retried, permanent/timeout/ctx
+// errors fail at once, an IDLE job is completion, RUNNING keeps polling, anything
+// else is a failure, and the not-found tolerance is `count == 1` ONLY — i.e. a nil
+// job on the FIRST polling attempt; any prior attempt (a transient blip or a
+// RUNNING status) consumes it (see #293 Finding F2; NOT changed here).
+func waitForBackupJobCompletion(ctx context.Context, id string, read backupJobReadFunc, b retry.Backoff, options *WaiterOptions) (*BackupJob, error) {
 	var res *BackupJob
 	var count int
 
 	err := retry.Do(ctx, b, func(ctx context.Context) error {
 		count++
-		job, err := c.Read(ctx, id)
+		job, err := read(ctx)
 		if err != nil {
 			// Only a transient read error is worth retrying. A configured request
 			// timeout, a context error or a permanent error (4xx, decode) must fail
