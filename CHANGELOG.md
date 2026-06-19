@@ -2,11 +2,6 @@
 
 # 1.8.0 (Unreleased)
 
-NEW FEATURES :
-
-  * Added resource `cloudtemple_vpc_static_ip` to allocate a VPC static IP on a private network, bound to a network-adapter MAC address (the VPC↔VM association). The IP can be auto-assigned or explicitly requested (`ip_address` forces replacement); `mac_address` and `resource_description` are updatable in place. Only `custom` static IPs — those this resource allocates — are managed: a platform-managed static IP (e.g. `source = "xoa"`, auto-created when an adapter is attached to a VPC network) is rejected, because it cannot be deleted via the API. Wire `mac_address` from your network-adapter resource so Terraform removes the static IP association before destroying the VM/adapter (avoiding an orphaned IP).
-  * Added resource `cloudtemple_vpc_floating_ip_binding` to bind a pre-existing VPC floating IP to a VPC static IP (`floating_ip_id` and `static_ip_id`, both forcing replacement). The floating IP must already be provisioned out-of-band: the resource only manages the association (create = bind, destroy = unbind) and never creates, destroys or re-describes the floating IP. It is fail-closed against an ambiguous API: a bind is issued only on positive evidence that the floating IP is free (it adopts an already-existing identical binding and refuses to clobber a binding to a different static IP), the resource id is recorded only after the binding is confirmed in the read model, and an unbind is accepted only after a strict listing confirms the floating IP is no longer bound to that static IP — an access-denied (403) read can never silently drop the binding from the state. Import the binding with the composite id `{floating_ip_id}:{static_ip_id}`.
-
 SECURITY :
 
   * Replaced the archived `github.com/dgrijalva/jwt-go` dependency with the maintained fork `github.com/golang-jwt/jwt/v4` (CVE-2020-26160).

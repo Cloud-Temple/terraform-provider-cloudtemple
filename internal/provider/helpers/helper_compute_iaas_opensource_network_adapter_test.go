@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -97,4 +98,30 @@ func TestFlattenOpenIaaSNetworkAdapterNoVPC(t *testing.T) {
 	assertEq(t, "private_network_id", got["private_network_id"], "")
 	assertEq(t, "private_network_name", got["private_network_name"], "")
 	assertEq(t, "static_ip_address", got["static_ip_address"], "")
+}
+
+// keysOf returns the sorted key set of a flatten output, for exact-set asserts.
+func keysOf(m map[string]interface{}) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// assertKeySet fails unless got's keys are exactly want: an undeclared key makes
+// d.Set fail and breaks the whole datasource read (the #243 class).
+func assertKeySet(t *testing.T, name string, got map[string]interface{}, want []string) {
+	t.Helper()
+	sort.Strings(want)
+	gotKeys := keysOf(got)
+	if len(gotKeys) != len(want) {
+		t.Fatalf("%s emits %d keys %v, want %d keys %v", name, len(gotKeys), gotKeys, len(want), want)
+	}
+	for i := range want {
+		if gotKeys[i] != want[i] {
+			t.Fatalf("%s key set = %v, want %v (an undeclared key breaks the datasource read, #243)", name, gotKeys, want)
+		}
+	}
 }

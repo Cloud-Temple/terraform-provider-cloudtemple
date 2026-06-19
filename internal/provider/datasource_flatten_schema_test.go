@@ -339,20 +339,6 @@ var datasourceCoverage = map[string]dsCoverage{
 	// --- Marketplace ------------------------------------------------------
 	"cloudtemple_marketplace_item":  {"", flat(helpers.FlattenMarketplaceItem)},
 	"cloudtemple_marketplace_items": {"marketplace_items", flat(helpers.FlattenMarketplaceItem)},
-
-	// --- VPC --------------------------------------------------------------
-	// Every VPC flatten helper emits "id" itself (it is a real attribute, not an
-	// injected one), so the plural Reads also use flat(...) — they call the same
-	// helper per element without injecting an id afterwards. Hence flat, not
-	// flatID, mirrors the real Read for both the singular and the plural forms.
-	"cloudtemple_vpc_vpc":              {"", flat(helpers.FlattenVPC)},
-	"cloudtemple_vpc_vpcs":             {"vpcs", flat(helpers.FlattenVPC)},
-	"cloudtemple_vpc_private_network":  {"", flat(helpers.FlattenPrivateNetwork)},
-	"cloudtemple_vpc_private_networks": {"private_networks", flat(helpers.FlattenPrivateNetwork)},
-	"cloudtemple_vpc_static_ip":        {"", flat(helpers.FlattenStaticIP)},
-	"cloudtemple_vpc_static_ips":       {"static_ips", flat(helpers.FlattenStaticIP)},
-	"cloudtemple_vpc_floating_ip":      {"", flat(helpers.FlattenFloatingIP)},
-	"cloudtemple_vpc_floating_ips":     {"floating_ips", flat(helpers.FlattenFloatingIP)},
 }
 
 // datasourceKnownGaps lists datasources deliberately NOT covered by the walker

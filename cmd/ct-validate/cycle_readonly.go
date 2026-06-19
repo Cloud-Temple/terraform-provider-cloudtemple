@@ -33,7 +33,10 @@ func (rc readonlyCycle) Run(ctx context.Context, c *client.Client, r *Run) error
 	})
 
 	rc.runIAM(ctx, c, r, tenantID, companyID)
-	rc.runVPC(ctx, c, r)
+	// VPC is intentionally NOT swept here: the /vpc/v1 contract is deprecated and
+	// frozen pending the rebuild (see internal/client/vpc.go), so probing it in
+	// the always-on default path would only emit false squeaks on a contract we
+	// have abandoned. The opt-in -write "vpc" cycle still exercises it on demand.
 	rc.runCompute(ctx, c, r)
 	rc.runBackup(ctx, c, r)
 	rc.runObjectStorage(ctx, c, r)
@@ -119,48 +122,6 @@ func (rc readonlyCycle) runIAM(ctx context.Context, c *client.Client, r *Run, te
 		_, err := c.IAM().PAT().List(ctx)
 		return err
 	})
-}
-
-func (rc readonlyCycle) runVPC(ctx context.Context, c *client.Client, r *Run) {
-	var pns []*client.PrivateNetwork
-	_ = r.op(rc, "vpc.vpc.list", func() error {
-		_, err := c.VPC().VPC().List(ctx)
-		return err
-	})
-	_ = r.op(rc, "vpc.private_networks.list", func() error {
-		var err error
-		pns, err = c.VPC().PrivateNetwork().List(ctx, nil)
-		return err
-	})
-	if len(pns) > 0 {
-		_ = r.op(rc, "vpc.private_networks.read", func() error {
-			_, err := c.VPC().PrivateNetwork().Read(ctx, pns[0].ID)
-			return err
-		})
-		// Static IPs need a parent private-network id: list the parent first,
-		// then list its static IPs.
-		_ = r.op(rc, "vpc.static_ips.list", func() error {
-			_, err := c.VPC().StaticIP().List(ctx, pns[0].ID, nil)
-			return err
-		})
-	} else {
-		r.skip(rc, "vpc.private_networks.read")
-		r.skip(rc, "vpc.static_ips.list")
-	}
-	var fips []*client.FloatingIP
-	_ = r.op(rc, "vpc.floating_ips.list", func() error {
-		var err error
-		fips, err = c.VPC().FloatingIP().List(ctx, nil)
-		return err
-	})
-	if len(fips) > 0 {
-		_ = r.op(rc, "vpc.floating_ips.read", func() error {
-			_, err := c.VPC().FloatingIP().Read(ctx, fips[0].ID)
-			return err
-		})
-	} else {
-		r.skip(rc, "vpc.floating_ips.read")
-	}
 }
 
 func (rc readonlyCycle) runCompute(ctx context.Context, c *client.Client, r *Run) {
@@ -353,21 +314,13 @@ func (rc readonlyCycle) runMarketplace(ctx context.Context, c *client.Client, r 
 
 func (rc readonlyCycle) runTag(ctx context.Context, c *client.Client, r *Run) {
 	// The Tag service exposes only per-resource Read/Create/Delete (no global
-	// list endpoint). A safe read needs a resource id; we reuse the first
-	// floating IP id if one exists, otherwise skip. This keeps the read sweep
-	// honest rather than inventing a fake id.
-	var fips []*client.FloatingIP
-	_ = r.op(rc, "tag.floating_ips.list_for_resource", func() error {
-		var err error
-		fips, err = c.VPC().FloatingIP().List(ctx, nil)
-		return err
-	})
-	if len(fips) > 0 {
-		_ = r.op(rc, "tag.resource.read", func() error {
-			_, err := c.Tag().Resource().Read(ctx, fips[0].ID)
-			return err
-		})
-	} else {
-		r.skip(rc, "tag.resource.read")
-	}
+	// list endpoint), so a safe read needs an EXISTING resource id. The only id
+	// source this read-only sweep had was a VPC floating IP, but the /vpc/v1
+	// contract is deprecated and quarantined out of the default path (see
+	// internal/client/vpc.go); firing it here would reintroduce the very
+	// deprecated read we just removed, and fabricating an id would be dishonest.
+	// So the tag read is skipped until a non-deprecated taggable resource is
+	// wired in (expected with the VPC rebuild). ctx/c are kept for signature
+	// symmetry with the sibling run* methods and the future re-wiring.
+	r.skip(rc, "tag.resource.read")
 }

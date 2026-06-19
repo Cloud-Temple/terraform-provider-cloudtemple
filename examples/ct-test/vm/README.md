@@ -26,16 +26,12 @@ destroy always runs, even on a mid-lifecycle failure, to never leave orphans.
 
 - **Marketplace deploy** (`marketplace_item_id` + `storage_repository_id`).
 - **Data disk** attached to the VM (`cloudtemple_compute_iaas_opensource_virtual_disk`).
-- **LAN + static IP**: the adapter joins the LAN (an OpenIaaS network) and a managed
-  **static IP** (`cloudtemple_vpc_static_ip`) is allocated on the LAN's VPC private
-  network, bound to the adapter's MAC (address auto-allocated by the API).
-- **Public IP**: a pre-provisioned floating IP is bound to the static IP
-  (`cloudtemple_vpc_floating_ip_binding`) — the VM is reachable from outside for tests.
+- **LAN**: the adapter joins the LAN, an OpenIaaS network selected by name.
 - **Power management** via `power_state` (`on`/`off`) — the stop/start cycle.
 - **Convergence**: no permanent drift after apply (the value of the TF path vs the API).
 - **Clean teardown**: destroy leaves nothing behind.
 
-`terraform output` exposes `lan_static_ip` and `public_ip`.
+`terraform output` exposes `vm_id`, `vm_power_state`, and `data_disk_id`.
 
 ## Substrate discovery (no hard-coded ids)
 
@@ -47,27 +43,18 @@ thus runs on any OpenIaaS tenant — mirroring the API cycle's read-then-pick
 approach. A backup SLA policy is required to power a VM on; any policy in the tenant
 satisfies it.
 
-**The LAN** is selected **by name** (`var.lan_network_name`) on two correlated
-layers — the OpenIaaS network (where the adapter connects) and the VPC private
-network (where the static IP is allocated), which share the LAN's name by
-convention. Resource `precondition`s assert the name matches **exactly one** network
-on each layer (`length(...) == 1`), so a typo, a missing LAN, or an ambiguous name is
-a clear plan-time error — never a wrong silent pick. **The public IP** is chosen
-**stably**: the floating IP already bound to this run's static IP if present (so the
-binding converges and destroys cleanly), else the first free one (`static_ip_id ==
-""`); a precondition fails closed if neither exists. A blind "first free" pick would
-break convergence and destroy once the IP is bound (it is no longer free).
+**The LAN** is selected **by name** (`var.lan_network_name`): the VM's adapter joins
+the OpenIaaS network of that name. A resource `precondition` asserts the name matches
+**exactly one** network (`length(...) == 1`), so a typo, a missing LAN, or an
+ambiguous name is a clear plan-time error — never a wrong silent pick.
 
-> Networking is the most tenant-specific part: it assumes the OpenIaaS network and
-> the VPC private network share the LAN name, and that a free floating IP exists.
-> Validate on first live run and adjust `var.lan_network_name` if needed.
+> Networking is the most tenant-specific part: it assumes an OpenIaaS network named
+> `var.lan_network_name` exists. Validate on first live run and adjust if needed.
 >
-> **Teardown coverage:** `terraform destroy` is the primary removal proof (the static
-> IP depends on the VM and is destroyed before it; the floating-IP binding is unbound,
-> not deleted). The post-destroy smoke check in `ct-test.sh` currently scans only the
-> VM and data disk by name — it does **not** yet probe `cloudtemple_vpc_static_ip` /
-> the floating binding. A rigorous independent VPC absence proof (ListStrict by id) is
-> a documented follow-up.
+> The managed static IP and public floating IP this scenario used to allocate were
+> removed with the VPC surface: the `/vpc/v1` contract is deprecated and will be
+> rebuilt (see the provider CHANGELOG for v1.8.0). They will return once the VPC
+> resources are reintroduced against the new contract.
 
 ## Tunables (see `variables.tf`)
 
@@ -75,7 +62,7 @@ If an apply fails on a tenant-specific detail, adjust via `-var` or a `*.tfvars`
 
 | Variable | Default | When to change |
 | -------- | ------- | -------------- |
-| `lan_network_name` | `LAN` | Your LAN is named differently (matched on the OpenIaaS network AND the VPC private network). |
+| `lan_network_name` | `LAN` | Your LAN is named differently (matched on the OpenIaaS network the adapter joins). |
 | `marketplace_name` | `Ubuntu 24.04 LTS` | The image name differs in your catalog (apply reports "not found"). |
 | `cpu` / `memory_gib` | `2` / `4` | The image requires more (deploy rejected with `MEMORY_CONSTRAINT_VIOLATION_ORDER`). |
 | `data_disk_gib` | `1` | Larger data disk. |

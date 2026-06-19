@@ -12,6 +12,12 @@ import (
 // stdout.
 var silentWaiter = &client.WaiterOptions{Logger: func(string) {}}
 
+// DEPRECATED CONTRACT — opt-in only. This cycle exercises the /vpc/v1 API,
+// which is deprecated and frozen pending the rebuild (see
+// internal/client/vpc.go). It is intentionally NOT part of the default
+// read-only sweep; it runs only on explicit `-cycles vpc` (or `all`) with
+// `-write`. Kept as the validation harness the rebuild will reuse.
+//
 // vpcCycle drives a realistic VPC write business cycle:
 //
 //	create custom static IP -> (if a spare unbound FIP exists) bind FIP ->

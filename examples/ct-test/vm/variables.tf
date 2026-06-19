@@ -16,7 +16,7 @@ variable "vm_power_state" {
 }
 
 variable "lan_network_name" {
-  description = "Name of the LAN — matched on BOTH the OpenIaaS network (the adapter connects here) and the VPC private network (the static IP is allocated here), which share this name by convention. Adjust to your tenant's LAN."
+  description = "Name of the LAN — matched on the OpenIaaS network the VM's adapter connects to. Adjust to your tenant's LAN."
   type        = string
   default     = "LAN"
 }

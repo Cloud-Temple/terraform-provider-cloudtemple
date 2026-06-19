@@ -49,14 +49,11 @@ data "cloudtemple_marketplace_item" "image" {
   name = var.marketplace_name
 }
 
-# --- networking: put the VM on the LAN, give it a static IP, attach a public IP ---
-# The "LAN" exists on two correlated layers: an OpenIaaS network (where the adapter
-# connects) and a VPC private network (where a managed static IP is allocated). Both
-# are selected BY NAME (var.lan_network_name) — the convention is that they share the
-# LAN's name. The public IP is a pre-provisioned floating IP discovered free below.
-data "cloudtemple_vpc_private_networks" "all" {}
-
-data "cloudtemple_vpc_floating_ips" "all" {}
+# --- networking: put the VM on the LAN --------------------------------------------
+# The VM's adapter connects to an OpenIaaS network selected BY NAME
+# (var.lan_network_name), discovered above. The managed static IP and public floating
+# IP layer was removed together with the VPC surface: the /vpc/v1 contract is
+# deprecated and will be rebuilt (see the provider CHANGELOG for v1.8.0).
 
 locals {
   # Storage repository: pick a USABLE SR (not in maintenance, accessible) with the
@@ -73,25 +70,12 @@ locals {
 
   backup_policy_id = data.cloudtemple_backup_iaas_opensource_policies.all.policies[0].id
 
-  # The LAN, by name, on each layer. We keep the full match lists so resource
-  # `precondition`s below can assert EXACTLY one match — a 0-match would otherwise be
-  # silently null (Terraform's one([]) == null), and a >1-match ambiguous; both must
-  # be a clear error, not a wrong silent pick.
+  # The LAN, by name, for the OpenIaaS network. We keep the full match list so the VM
+  # resource's `precondition` below can assert EXACTLY one match — a 0-match would
+  # otherwise be silently null (Terraform's one([]) == null), and a >1-match
+  # ambiguous; both must be a clear error, not a wrong silent pick.
   lan_openiaas_matches    = [for n in data.cloudtemple_compute_iaas_opensource_networks.all.networks : n.id if n.name == var.lan_network_name]
-  lan_private_matches     = [for p in data.cloudtemple_vpc_private_networks.all.private_networks : p.id if p.name == var.lan_network_name]
   lan_openiaas_network_id = try(local.lan_openiaas_matches[0], null)
-  lan_private_network_id  = try(local.lan_private_matches[0], null)
-
-  # Public floating IP to bind: prefer the one ALREADY bound to THIS run's static IP,
-  # so the choice is STABLE across plan / refresh / destroy. A blind "first free" pick
-  # is unstable: once we bind it the IP is no longer free, so on the next plan it
-  # flips to null — which fails the convergence check AND blocks destroy (leaving an
-  # orphan). On the initial create nothing is bound to our brand-new static IP yet,
-  # so we fall back to the first currently-free IP. null only if neither exists.
-  fips                  = data.cloudtemple_vpc_floating_ips.all.floating_ips
-  fip_bound_to_ours     = [for f in local.fips : f.id if f.static_ip_id == cloudtemple_vpc_static_ip.lan.id]
-  fip_free              = [for f in local.fips : f.id if f.static_ip_id == ""]
-  public_floating_ip_id = try(local.fip_bound_to_ours[0], try(local.fip_free[0], null))
 }
 
 # --- the VM, deployed from the marketplace ----------------------------------------
@@ -111,8 +95,7 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "ubuntu" {
   auto_power_on        = false
   high_availability    = "disabled"
 
-  # One adapter on the LAN (OpenIaaS network selected by name). Its MAC (computed)
-  # is what the static IP below binds to.
+  # One adapter on the LAN (OpenIaaS network selected by name).
   os_network_adapter {
     network_id = local.lan_openiaas_network_id
   }
@@ -152,43 +135,6 @@ resource "cloudtemple_compute_iaas_opensource_virtual_disk" "data" {
   virtual_machine_id    = cloudtemple_compute_iaas_opensource_virtual_machine.ubuntu.id
 }
 
-# --- a managed static IP on the LAN (VPC private network) -------------------------
-# Bound to the VM's adapter by its MAC; ip_address is omitted so the API allocates a
-# free, valid address ("une ip qui va bien"). Referencing the VM's MAC makes the
-# static IP depend on the VM, so destroy removes the IP association BEFORE the VM —
-# no orphaned static IP (the recommended wiring from the resource's own example).
-resource "cloudtemple_vpc_static_ip" "lan" {
-  private_network_id   = local.lan_private_network_id
-  mac_address          = cloudtemple_compute_iaas_opensource_virtual_machine.ubuntu.os_network_adapter[0].mac_address
-  resource_description = var.vm_name
-
-  # Fail closed if the LAN name matches zero or several VPC private networks.
-  lifecycle {
-    precondition {
-      condition     = length(local.lan_private_matches) == 1
-      error_message = "Expected exactly one VPC private network named \"${var.lan_network_name}\", found ${length(local.lan_private_matches)}. Set var.lan_network_name to your LAN."
-    }
-  }
-}
-
-# --- attach a public (floating) IP to the static IP -------------------------------
-# Binds a PRE-PROVISIONED floating IP (create = bind, destroy = unbind; it never
-# creates/destroys the public IP). The id is chosen STABLY (see local.public_floating_ip_id):
-# the IP already bound to our static IP if present, else the first free one — so the
-# binding converges and destroys cleanly instead of flipping to null once bound.
-resource "cloudtemple_vpc_floating_ip_binding" "public" {
-  floating_ip_id = local.public_floating_ip_id
-  static_ip_id   = cloudtemple_vpc_static_ip.lan.id
-
-  # Fail closed (clear message) if no usable public IP exists at all.
-  lifecycle {
-    precondition {
-      condition     = local.public_floating_ip_id != null
-      error_message = "No public (floating) IP available — none free and none already bound to this VM's static IP. Free or provision one in the VPC."
-    }
-  }
-}
-
 output "vm_id" {
   value = cloudtemple_compute_iaas_opensource_virtual_machine.ubuntu.id
 }
@@ -199,14 +145,4 @@ output "vm_power_state" {
 
 output "data_disk_id" {
   value = cloudtemple_compute_iaas_opensource_virtual_disk.data.id
-}
-
-output "lan_static_ip" {
-  description = "The static IP allocated to the VM on the LAN."
-  value       = cloudtemple_vpc_static_ip.lan.ip_address
-}
-
-output "public_ip" {
-  description = "The public (floating) IP bound to the VM, for external reachability tests."
-  value       = cloudtemple_vpc_floating_ip_binding.public.floating_ip_address
 }

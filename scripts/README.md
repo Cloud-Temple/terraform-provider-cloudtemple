@@ -40,9 +40,12 @@ scripts/ct-test.sh tf   <scenario>                   # play the same scenario vi
   ```
 
 Scenarios today: `readonly` (safe, read-only), `machine-managers` (read-only: just
-`run_identity` + `machine_managers.list`, repeatable — see below), `vpc`, `storage`,
+`run_identity` + `machine_managers.list`, repeatable — see below), `storage`,
 `vm` (OpenIaaS lifecycle), `vm-vmware` (VMware lifecycle). Write scenarios create then
-destroy their resources, with a deferred never-orphan teardown net.
+destroy their resources, with a deferred never-orphan teardown net. The `vpc` scenario
+is **quarantined** (the `/vpc/v1` contract is deprecated and frozen pending the rebuild;
+no `cloudtemple_vpc_*` provider surface ships in v1.8.0): the wrapper blocks it, and it
+runs only via `ct-validate -cycles vpc -write` directly.
 
 ### `machine-managers` — isolated, client-identical probe of one flaky call (#315)
 
