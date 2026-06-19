@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"strings"
 )
 
 // VPCStaticIPClient handles read operations on VPC static IPs.
@@ -158,78 +157,16 @@ type CreateStaticIPRequest struct {
 	ResourceDescription string `json:"resourceDescription,omitempty"`
 }
 
-// createStaticIPResponse decodes the 201 body of the create endpoint. The static
-// IP id is returned in the BODY (static_ip_id), NOT in a Location header: the
-// create is synchronous and is NOT an activity, so doRequestAndReturnActivity
-// (which reads Location) must not be used here.
-type createStaticIPResponse struct {
-	Success    bool   `json:"success"`
-	Message    string `json:"message"`
-	StaticIPID string `json:"static_ip_id"`
-}
-
-// Create creates a static IP mapping on a private network (synchronous). It
-// returns the new static IP id parsed from the 201 body. A non-201 status, or a
-// 201 with a missing/empty static_ip_id, is an error.
+// Create allocates a static IP mapping on a private network. The create is
+// ASYNCHRONOUS: the API returns 201 with the activity id in the Location header
+// (NOT the static IP id in the body), like Update and Delete. This returns the
+// activity id; the caller waits for the activity to complete and reads the new
+// static IP id from its result (setIdFromActivityState / resolveActivityResultID).
+// A non-2xx status, or a 2xx with no Location, is an error.
 func (s *VPCStaticIPClient) Create(ctx context.Context, privateNetworkID string, req *CreateStaticIPRequest) (string, error) {
 	r := s.c.newRequest("POST", "/vpc/v1/private_networks/%s/static_ips", privateNetworkID)
 	r.obj = req
-	resp, err := s.c.doRequest(ctx, r)
-	if err != nil {
-		return "", err
-	}
-	defer closeResponseBody(resp)
-	if err := requireHttpCodes(resp, 201); err != nil {
-		return "", err
-	}
-
-	// The swagger documents a 201 body {success, message, static_ip_id}, but the
-	// live API returns 201 with an EMPTY body. The create is synchronous (the
-	// static IP exists immediately), so when the id is absent from the body we
-	// resolve it ourselves. Returning an error on an empty body would be wrong:
-	// the static IP IS created, so the caller would orphan it — created
-	// platform-side but absent from the Terraform state.
-	var out createStaticIPResponse
-	if err := decodeBody(resp, &out); err == nil && out.StaticIPID != "" {
-		return out.StaticIPID, nil
-	}
-
-	// Resolve the id from a COMPLETE listing of the private network, matching the
-	// requested MAC AND source=="custom". A by-MAC GET is NOT enough: when a
-	// network adapter is attached to a VPC network the platform auto-creates an
-	// "xoa" static IP for the SAME MAC (#311), so a MAC-only lookup can resolve to
-	// that co-resident platform-managed IP instead of the custom one we just
-	// created — which would bind the state to the wrong id and orphan ours. The
-	// per-network listing lets us pick the custom IP unambiguously, and the create
-	// always produces a "custom" static IP.
-	list, lerr := s.ListStrict(ctx, privateNetworkID)
-	if lerr != nil {
-		return "", fmt.Errorf("static IP created on private network %s but resolving its id by listing failed: %w", privateNetworkID, lerr)
-	}
-	want := normalizeMAC(req.MacAddress)
-	var match *StaticIP
-	for _, si := range list {
-		if si == nil || si.Source != "custom" || normalizeMAC(si.MacAddress) != want {
-			continue
-		}
-		if match != nil {
-			return "", fmt.Errorf("static IP created on private network %s but its id is ambiguous: several custom static IPs carry MAC %s", privateNetworkID, req.MacAddress)
-		}
-		match = si
-	}
-	// match.ID == "" must fail just like match == nil: returning an empty id with a
-	// nil error would make the resource SetId("") and orphan the created static IP.
-	if match == nil || match.ID == "" {
-		return "", fmt.Errorf("static IP created on private network %s but could not be resolved among the network's custom static IPs by MAC %s", privateNetworkID, req.MacAddress)
-	}
-	return match.ID, nil
-}
-
-// normalizeMAC canonicalises a MAC address for comparison: lowercase and
-// ":"-separated (the swagger pattern also tolerates "-"). It lets the created
-// static IP be matched against the requested MAC regardless of input formatting.
-func normalizeMAC(mac string) string {
-	return strings.ToLower(strings.ReplaceAll(mac, "-", ":"))
+	return s.c.doRequestAndReturnActivity(ctx, r)
 }
 
 // UpdateStaticIPRequest is the body of PATCH /vpc/v1/static_ips/{id} (schema

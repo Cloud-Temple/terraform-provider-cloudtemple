@@ -26,7 +26,7 @@ func TestVPCStaticIPSourceGuard(t *testing.T) {
 		d := newStaticIPState(t)
 		diags := readVPCStaticIPInto(ctx, d,
 			siRead(&client.StaticIP{ID: "si-1", Source: "xoa", PrivateNetwork: client.BaseObject{ID: "pn-1"}}, nil),
-			siListStrict())
+			siListStrict(), true)
 		if !diags.HasError() {
 			t.Fatal("a non-custom (xoa) static IP must be rejected; it cannot be managed/deleted via Terraform")
 		}
@@ -36,7 +36,7 @@ func TestVPCStaticIPSourceGuard(t *testing.T) {
 		d := newStaticIPState(t)
 		diags := readVPCStaticIPInto(ctx, d,
 			siRead(&client.StaticIP{ID: "si-1", Source: "custom", PrivateNetwork: client.BaseObject{ID: "pn-1"}}, nil),
-			siListStrict())
+			siListStrict(), true)
 		if diags.HasError() {
 			t.Fatalf("a custom static IP must be accepted, got: %v", diags)
 		}
@@ -46,7 +46,7 @@ func TestVPCStaticIPSourceGuard(t *testing.T) {
 		d := newStaticIPState(t)
 		diags := readVPCStaticIPInto(ctx, d,
 			siRead(&client.StaticIP{ID: "si-1", Source: "", PrivateNetwork: client.BaseObject{ID: "pn-1"}}, nil),
-			siListStrict())
+			siListStrict(), true)
 		if diags.HasError() {
 			t.Fatalf("an empty source must not be rejected, got: %v", diags)
 		}

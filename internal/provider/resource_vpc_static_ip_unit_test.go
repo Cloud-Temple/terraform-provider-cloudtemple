@@ -76,7 +76,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 	t.Run("a read error keeps the id and the state", func(t *testing.T) {
 		d := newStaticIPState(t)
 		diags := readVPCStaticIPInto(ctx, d, siRead(nil, errors.New("boom")),
-			siListStrictErr(errors.New("listing must not be reached on a hard read error")))
+			siListStrictErr(errors.New("listing must not be reached on a hard read error")), true)
 		if !diags.HasError() {
 			t.Fatal("a read error must surface as a diagnostic")
 		}
@@ -88,7 +88,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 		// A by-id read that comes back with a DIFFERENT id must not be trusted.
 		diags := readVPCStaticIPInto(ctx, d,
 			siRead(&client.StaticIP{ID: "someone-else", Source: "custom", PrivateNetwork: client.BaseObject{ID: "pn-1"}}, nil),
-			siListStrictErr(errors.New("listing must not be reached on a mismatched-id read")))
+			siListStrictErr(errors.New("listing must not be reached on a mismatched-id read")), true)
 		if !diags.HasError() {
 			t.Fatal("a read returning a different id must fail closed, never rebind the state")
 		}
@@ -99,7 +99,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 		d := newStaticIPState(t)
 		diags := readVPCStaticIPInto(ctx, d,
 			siRead(&client.StaticIP{ID: "", Source: "custom", PrivateNetwork: client.BaseObject{ID: "pn-1"}}, nil),
-			siListStrictErr(errors.New("listing must not be reached on an empty-id read")))
+			siListStrictErr(errors.New("listing must not be reached on an empty-id read")), true)
 		if !diags.HasError() {
 			t.Fatal("a read returning an empty id must fail closed, never write id=\"\" into the state")
 		}
@@ -110,7 +110,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 		d := newStaticIPState(t)
 		// A 206/403/5xx is surfaced by ListStrict as an error -> cannot prove
 		// absence -> must keep the resource.
-		diags := readVPCStaticIPInto(ctx, d, siRead(nil, nil), siListStrictErr(errors.New("206 partial")))
+		diags := readVPCStaticIPInto(ctx, d, siRead(nil, nil), siListStrictErr(errors.New("206 partial")), true)
 		if !diags.HasError() {
 			t.Fatal("a failing strict listing must fail closed with a diagnostic, never a drop")
 		}
@@ -120,7 +120,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 	t.Run("an inconclusive read but still listed fails closed (never drops)", func(t *testing.T) {
 		d := newStaticIPState(t)
 		diags := readVPCStaticIPInto(ctx, d, siRead(nil, nil),
-			siListStrict(&client.StaticIP{ID: "other"}, &client.StaticIP{ID: "si-1"}))
+			siListStrict(&client.StaticIP{ID: "other"}, &client.StaticIP{ID: "si-1"}), true)
 		if !diags.HasError() {
 			t.Fatal("a still-listed static IP must fail closed, never auto-remove")
 		}
@@ -133,7 +133,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 			t.Fatalf("clearing private_network_id: %v", err)
 		}
 		diags := readVPCStaticIPInto(ctx, d, siRead(nil, nil),
-			siListStrictErr(errors.New("listing must not be reached without a scope")))
+			siListStrictErr(errors.New("listing must not be reached without a scope")), true)
 		if !diags.HasError() {
 			t.Fatal("a missing private_network_id must fail closed, never auto-remove")
 		}
@@ -147,7 +147,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 		// Complete 200 listing of the private network that does NOT contain si-1:
 		// genuine deletion evidence -> drop.
 		diags := readVPCStaticIPInto(ctx, d, siRead(nil, nil),
-			siListStrict(&client.StaticIP{ID: "other"}, &client.StaticIP{ID: "yet-another"}))
+			siListStrict(&client.StaticIP{ID: "other"}, &client.StaticIP{ID: "yet-another"}), true)
 		if diags.HasError() {
 			t.Fatalf("a confirmed absence must drop cleanly, got: %v", diags)
 		}
@@ -158,7 +158,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 
 	t.Run("an empty 200 listing DROPS the resource", func(t *testing.T) {
 		d := newStaticIPState(t)
-		diags := readVPCStaticIPInto(ctx, d, siRead(nil, nil), siListStrict())
+		diags := readVPCStaticIPInto(ctx, d, siRead(nil, nil), siListStrict(), true)
 		if diags.HasError() {
 			t.Fatalf("an empty complete listing is a confirmed absence, got: %v", diags)
 		}
@@ -171,12 +171,30 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 		d := newStaticIPState(t)
 		// None of these equal "si-1" exactly -> still a confirmed absence -> drop.
 		diags := readVPCStaticIPInto(ctx, d, siRead(nil, nil),
-			siListStrict(&client.StaticIP{ID: "si-12"}, &client.StaticIP{ID: "si-"}, &client.StaticIP{ID: "si"}))
+			siListStrict(&client.StaticIP{ID: "si-12"}, &client.StaticIP{ID: "si-"}, &client.StaticIP{ID: "si"}), true)
 		if diags.HasError() {
 			t.Fatalf("only an exact id match is liveness; near-misses are an absence, got: %v", diags)
 		}
 		if d.Id() != "" {
 			t.Fatalf("near-miss ids must not keep the resource alive, got id %q", d.Id())
+		}
+	})
+
+	t.Run("create mode: a confirmed-absent listing FAILS CLOSED instead of dropping (#348/B3)", func(t *testing.T) {
+		d := newStaticIPState(t)
+		// Exactly the inputs of the refresh-mode DROP cases above (a nil read plus a
+		// complete 200 listing that lacks si-1), but with dropOnConfirmedAbsence=false:
+		// right after a completed create activity this is eventual consistency, not a
+		// deletion. The id MUST be preserved and the read MUST fail closed — dropping
+		// it would orphan the just-created static IP. Mutation proof: making this branch
+		// drop regardless of the flag reds this (id would clear, no diagnostic).
+		diags := readVPCStaticIPInto(ctx, d, siRead(nil, nil),
+			siListStrict(&client.StaticIP{ID: "other"}, &client.StaticIP{ID: "yet-another"}), false)
+		if !diags.HasError() {
+			t.Fatal("create mode must fail closed on a not-yet-visible static IP, never drop it")
+		}
+		if d.Id() != "si-1" {
+			t.Fatalf("create mode must preserve the fresh id, got %q", d.Id())
 		}
 	})
 
@@ -196,7 +214,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 			PrivateNetwork:      client.BaseObject{ID: "pn-1"},
 		}
 		diags := readVPCStaticIPInto(ctx, d, siRead(si, nil),
-			siListStrictErr(errors.New("listing must not be reached on a successful read")))
+			siListStrictErr(errors.New("listing must not be reached on a successful read")), true)
 		if diags.HasError() {
 			t.Fatalf("unexpected diagnostics: %v", diags)
 		}
@@ -229,7 +247,7 @@ func TestReadVPCStaticIPInto(t *testing.T) {
 			PrivateNetwork: client.BaseObject{ID: "pn-1"},
 			// VirtualMachine, NetworkAdapter, ResourceDescription, FloatingIP all nil.
 		}
-		diags := readVPCStaticIPInto(ctx, d, siRead(si, nil), siListStrict())
+		diags := readVPCStaticIPInto(ctx, d, siRead(si, nil), siListStrict(), true)
 		if diags.HasError() {
 			t.Fatalf("unexpected diagnostics: %v", diags)
 		}

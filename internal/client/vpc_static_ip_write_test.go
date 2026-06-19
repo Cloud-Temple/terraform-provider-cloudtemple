@@ -9,13 +9,16 @@ import (
 	"testing"
 )
 
-// TestVPCStaticIPCreate pins the SYNCHRONOUS create contract: the id comes from
-// the 201 BODY (static_ip_id), never from a Location header; a missing/empty id
-// or a non-201 status is an error; the request body carries the create fields.
+// TestVPCStaticIPCreate pins the ASYNCHRONOUS create contract: a POST that
+// returns the activity id in the Location header (NOT the static IP id in the
+// body), exactly like Update and Delete. The id of the created static IP is
+// carried by the completion activity, not this response — so the response body
+// is ignored, a missing Location is an error, and a non-2xx status is an error.
+// The request body still carries the create fields.
 func TestVPCStaticIPCreate(t *testing.T) {
 	ctx := context.Background()
 
-	t.Run("201 parses static_ip_id from the BODY and posts the right path/body", func(t *testing.T) {
+	t.Run("201 returns the activity id from Location and posts the right path/body", func(t *testing.T) {
 		var gotBody map[string]any
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			if r.Method != http.MethodPost || r.URL.Path != "/vpc/v1/private_networks/pn-1/static_ips" {
@@ -23,14 +26,16 @@ func TestVPCStaticIPCreate(t *testing.T) {
 			}
 			b, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(b, &gotBody)
-			// A Location header MUST be ignored: this is a sync create, the id is
-			// in the body. Setting one here proves Create does not read it.
-			w.Header().Set("Location", "should-be-ignored")
+			// A response BODY carrying a static_ip_id MUST be ignored: this is an
+			// async create, the new id lives in the completion activity, not here.
+			// Returning this id would re-introduce the wrong synchronous contract
+			// (#348). The Location is the only thing Create reads.
+			w.Header().Set("Location", "act-create")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"success":true,"message":"ok","static_ip_id":"si-new"}`))
+			_, _ = w.Write([]byte(`{"success":true,"static_ip_id":"si-body-must-be-ignored"}`))
 		})
 
-		id, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{
+		activityID, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{
 			MacAddress:          "00:50:56:ab:cd:ef",
 			IPAddress:           "10.0.1.50",
 			ResourceDescription: "web",
@@ -38,8 +43,8 @@ func TestVPCStaticIPCreate(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if id != "si-new" {
-			t.Fatalf("id must come from the body static_ip_id, got %q (a %q here means it read Location)", id, "should-be-ignored")
+		if activityID != "act-create" {
+			t.Fatalf("create must return the activity id from Location, got %q (a %q here means it wrongly read the body static_ip_id)", activityID, "si-body-must-be-ignored")
 		}
 		if gotBody["macAddress"] != "00:50:56:ab:cd:ef" || gotBody["ipAddress"] != "10.0.1.50" || gotBody["resourceDescription"] != "web" {
 			t.Fatalf("unexpected create body: %v", gotBody)
@@ -51,8 +56,8 @@ func TestVPCStaticIPCreate(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			b, _ := io.ReadAll(r.Body)
 			_ = json.Unmarshal(b, &gotBody)
+			w.Header().Set("Location", "act-x")
 			w.WriteHeader(http.StatusCreated)
-			_, _ = w.Write([]byte(`{"static_ip_id":"si-x"}`))
 		})
 		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -65,144 +70,28 @@ func TestVPCStaticIPCreate(t *testing.T) {
 		}
 	})
 
-	// The LIVE API returns 201 with an EMPTY body (the swagger's static_ip_id is
-	// not actually sent). The create is synchronous, so the id MUST be resolved
-	// from a complete listing of the private network rather than treated as a
-	// failure — a failure would orphan the created static IP (created
-	// platform-side but absent from the Terraform state). The resolution matches
-	// the requested MAC AND source=="custom".
-	//
-	// Non-complacent on TWO axes: (1) the pre-fix code returned an error on an
-	// empty body, so an empty-body success goes RED without the fallback; (2) an
-	// "xoa" static IP shares the SAME MAC (the #311 platform auto-creation), and
-	// it is listed FIRST — without the source=="custom" filter the resolution
-	// would match both and either pick xoa or fail ambiguous, never returning the
-	// custom id this assertion demands.
-	t.Run("a 201 empty body resolves the id from the listing, picking the custom IP over a co-resident xoa one", func(t *testing.T) {
+	// The id of an async create can ONLY come from the completion activity. A 201
+	// with no Location therefore cannot yield an id and MUST fail — never a silent
+	// success that would let the resource SetId("") and orphan the created IP.
+	t.Run("a 201 with no Location is an error", func(t *testing.T) {
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			switch {
-			case r.Method == http.MethodPost:
-				w.WriteHeader(http.StatusCreated) // empty body, like the live API
-			case r.Method == http.MethodGet && r.URL.Path == "/vpc/v1/private_networks/pn-1/static_ips":
-				w.WriteHeader(http.StatusOK)
-				// xoa first (same MAC, #311 co-residence), then our custom one.
-				_, _ = w.Write([]byte(`[
-					{"id":"si-xoa","macAddress":"00:50:56:AB:CD:EF","source":"xoa"},
-					{"id":"si-custom","macAddress":"00:50:56:ab:cd:ef","source":"custom"},
-					{"id":"si-other","macAddress":"00:50:56:11:22:33","source":"custom"}
-				]`))
-			default:
-				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
-				w.WriteHeader(http.StatusInternalServerError)
-			}
-		})
-		id, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"})
-		if err != nil {
-			t.Fatalf("an empty 201 body must resolve the id from the listing, not fail: %v", err)
-		}
-		if id != "si-custom" {
-			t.Fatalf("the id must resolve to the CUSTOM static IP for the MAC, got %q (a %q here means the xoa co-resident IP was wrongly picked)", id, "si-xoa")
-		}
-	})
-
-	// The API may format the returned MAC differently from the request (the
-	// swagger pattern tolerates "-" and any case). Resolution must normalise both
-	// sides, or a well-created static IP returned as "00-50-56-AB-CD-EF" would not
-	// match the requested "00:50:56:ab:cd:ef" and would be orphaned.
-	// Non-complacent: a raw == comparison reds this case.
-	t.Run("a 201 empty body matches the custom IP across MAC case/separator differences", func(t *testing.T) {
-		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost {
-				w.WriteHeader(http.StatusCreated) // empty body
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"si-fmt","macAddress":"00-50-56-AB-CD-EF","source":"custom"}]`))
-		})
-		id, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"})
-		if err != nil {
-			t.Fatalf("MAC formatting differences must be normalised, not fail: %v", err)
-		}
-		if id != "si-fmt" {
-			t.Fatalf("the id must resolve across MAC formatting, got %q", id)
-		}
-	})
-
-	t.Run("a 201 empty body with no matching custom IP in the listing is an error (never a silent success)", func(t *testing.T) {
-		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost {
-				w.WriteHeader(http.StatusCreated) // empty body
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-			// Only a co-resident xoa IP for the MAC, plus an unrelated custom one.
-			_, _ = w.Write([]byte(`[
-				{"id":"si-xoa","macAddress":"00:50:56:ab:cd:ef","source":"xoa"},
-				{"id":"si-other","macAddress":"00:50:56:11:22:33","source":"custom"}
-			]`))
+			w.WriteHeader(http.StatusCreated) // no Location header
 		})
 		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
-			t.Fatal("no matching custom IP must error, not silently succeed (or bind to the xoa one)")
+			t.Fatal("an async create with no Location header must be an error")
 		}
 	})
 
-	t.Run("a 201 empty body with a failing strict listing is an error", func(t *testing.T) {
-		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost {
-				w.WriteHeader(http.StatusCreated) // empty body
-				return
-			}
-			// A 206/403/5xx is rejected by ListStrict -> cannot resolve -> error.
-			w.WriteHeader(http.StatusForbidden)
-		})
-		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
-			t.Fatal("an empty body whose listing fails must error, not silently succeed")
-		}
-	})
-
-	// A listing entry WITHOUT an id must error rather than resolve to an empty id
-	// (which would orphan the created static IP via SetId("")). This is now caught
-	// upstream by ListStrict's structural guard (an id-less entry makes the whole
-	// listing untrusted); Create keeps a defensive match.ID=="" check too.
-	t.Run("a 201 empty body whose listing has an id-less entry is an error", func(t *testing.T) {
-		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost {
-				w.WriteHeader(http.StatusCreated) // empty body
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"macAddress":"00:50:56:ab:cd:ef","source":"custom"}]`)) // no id
-		})
-		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
-			t.Fatal("a matched custom entry without an id must error, not return an empty id with nil error")
-		}
-	})
-
-	t.Run("a 201 empty body with two custom IPs sharing the MAC is an ambiguity error", func(t *testing.T) {
-		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost {
-				w.WriteHeader(http.StatusCreated) // empty body
-				return
-			}
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[
-				{"id":"si-a","macAddress":"00:50:56:ab:cd:ef","source":"custom"},
-				{"id":"si-b","macAddress":"00:50:56:ab:cd:ef","source":"custom"}
-			]`))
-		})
-		if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
-			t.Fatal("two custom IPs sharing the MAC must be an ambiguity error, not a silent pick")
-		}
-	})
-
-	t.Run("a non-201 status is an error", func(t *testing.T) {
-		for _, code := range []int{http.StatusOK, http.StatusBadRequest, http.StatusForbidden, http.StatusInternalServerError} {
+	// A non-2xx is not a create, even if it carries a Location: requireOK gates the
+	// status before the Location is read.
+	t.Run("a non-2xx status is an error", func(t *testing.T) {
+		for _, code := range []int{http.StatusBadRequest, http.StatusForbidden, http.StatusInternalServerError} {
 			c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Location", "act-x") // a Location must not rescue a non-2xx
 				w.WriteHeader(code)
-				_, _ = w.Write([]byte(`{"static_ip_id":"si-x"}`))
 			})
 			if _, err := c.VPC().StaticIP().Create(ctx, "pn-1", &CreateStaticIPRequest{MacAddress: "00:50:56:ab:cd:ef"}); err == nil {
-				t.Fatalf("status %d must be rejected (only 201 is a successful create)", code)
+				t.Fatalf("status %d must be rejected (only a 2xx with a Location is a successful create)", code)
 			}
 		}
 	})

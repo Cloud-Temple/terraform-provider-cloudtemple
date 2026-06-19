@@ -102,23 +102,75 @@ func resourceVPCStaticIP() *schema.Resource {
 
 func resourceVPCStaticIPCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
+	return createVPCStaticIPWith(ctx, d, vpcStaticIPCreateFuncs{
+		create: c.VPC().StaticIP().Create,
+		wait: func(ctx context.Context, activityID string) (*client.Activity, error) {
+			return c.Activity().WaitForCompletion(ctx, activityID, getWaiterOptions(ctx))
+		},
+		read: c.VPC().StaticIP().Read,
+		listStrict: func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+			return c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
+		},
+	})
+}
 
-	// Create is SYNCHRONOUS: the API returns 201 with the new id in the body
-	// (static_ip_id), NOT an activity. The client decodes that id.
-	id, err := c.VPC().StaticIP().Create(ctx, d.Get("private_network_id").(string), &client.CreateStaticIPRequest{
-		MacAddress:          d.Get("mac_address").(string),
+// vpcStaticIPCreateFuncs abstracts the static IP create API surface so the create
+// orchestration is unit tested without HTTP calls. wait returns the COMPLETED
+// activity so the new id can be read from its state result.
+type vpcStaticIPCreateFuncs struct {
+	create     func(ctx context.Context, privateNetworkID string, req *client.CreateStaticIPRequest) (string, error)
+	wait       func(ctx context.Context, activityID string) (*client.Activity, error)
+	read       vpcStaticIPReadFunc
+	listStrict vpcStaticIPListStrictFunc
+}
+
+// createVPCStaticIPWith holds the testable create logic. Create is ASYNCHRONOUS:
+// the POST returns an activity (Location), and the COMPLETED activity carries the
+// new static IP id in its state result (read via setIdFromActivityState). State
+// safety drives every failure mode — the worst outcome is an ORPHAN (created
+// platform-side, absent from the state):
+//
+//   - create error -> fail; nothing was confirmed created (no id is set).
+//   - wait error -> FAIL CLOSED with an actionable diagnostic: the static IP MAY
+//     have been created, so the message tells the operator to import or release it
+//     before re-applying, to avoid a duplicate.
+//   - activity completed but reported no id -> FAIL CLOSED: the id could not be
+//     learned so the resource cannot be tracked; surface a contract-mismatch
+//     diagnostic rather than SetId("") (which would silently orphan it).
+//   - id set -> read back in CREATE mode (dropOnConfirmedAbsence=false): a
+//     just-created static IP not yet visible in the listing is eventual
+//     consistency, never a deletion, so the read NEVER drops the fresh id (#348).
+func createVPCStaticIPWith(ctx context.Context, d *schema.ResourceData, funcs vpcStaticIPCreateFuncs) diag.Diagnostics {
+	privateNetworkID := d.Get("private_network_id").(string)
+	mac := d.Get("mac_address").(string)
+
+	activityID, err := funcs.create(ctx, privateNetworkID, &client.CreateStaticIPRequest{
+		MacAddress:          mac,
 		IPAddress:           d.Get("ip_address").(string),
 		ResourceDescription: d.Get("resource_description").(string),
 	})
 	if err != nil {
-		return diag.Errorf("failed to create VPC static IP: %s", err)
+		return diag.Errorf("failed to create VPC static IP on private network %s (MAC %s): %s", privateNetworkID, mac, err)
 	}
 
-	// Set the id immediately, before the read, so a later failure cannot orphan
-	// the just-created static IP outside the Terraform state.
-	d.SetId(id)
+	activity, err := funcs.wait(ctx, activityID)
+	if err != nil {
+		return diag.Errorf(
+			"VPC static IP creation could not be confirmed (activity %s, private network %s, MAC %s): %s. If the static IP was created, import it (terraform import) or release it platform-side before re-applying, to avoid a duplicate.",
+			activityID, privateNetworkID, mac, err,
+		)
+	}
 
-	return resourceVPCStaticIPRead(ctx, d, meta)
+	setIdFromActivityState(d, activity)
+	if d.Id() == "" {
+		return diag.Errorf(
+			"VPC static IP creation activity %s completed but reported no static IP id (private network %s, MAC %s); the static IP may exist platform-side. This is a provider/API contract mismatch — import it manually if it was created.",
+			activityID, privateNetworkID, mac,
+		)
+	}
+
+	// Create mode: NEVER drop the just-created id on an eventually-consistent read.
+	return readVPCStaticIPInto(ctx, d, funcs.read, funcs.listStrict, false)
 }
 
 func resourceVPCStaticIPRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
@@ -129,6 +181,7 @@ func resourceVPCStaticIPRead(ctx context.Context, d *schema.ResourceData, meta a
 		func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
 			return c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
 		},
+		true, // refresh: a confirmed absence is genuine deletion evidence -> drop.
 	)
 }
 
@@ -152,13 +205,17 @@ type vpcStaticIPListStrictFunc func(ctx context.Context, privateNetworkID string
 //   - id still present -> the per-id read was a transient/permission blip but the
 //     static IP exists -> FAIL CLOSED: keep the resource, error (its mutable
 //     attributes could not be refreshed, so we must not report a clean refresh);
-//   - id confirmed ABSENT from a complete 200 listing -> this is genuine deletion
-//     evidence (the listing is scoped to the static IP's own private network and
-//     is provably complete), so the resource is dropped with SetId("").
+//   - id confirmed ABSENT from a complete 200 listing -> genuine deletion evidence
+//     (the listing is scoped to the static IP's own private network and is
+//     provably complete). What happens then depends on dropOnConfirmedAbsence:
+//     on the REFRESH path (true) the resource is dropped with SetId(""); on the
+//     CREATE path (false) it FAILS CLOSED instead, because right after a completed
+//     create activity an absent listing is eventual consistency, not a deletion —
+//     dropping a just-created id would SetId("") and orphan the static IP (#348).
 //
 // The private_network_id needed to scope the listing comes from the state; if it
 // is empty the listing cannot be scoped, so we FAIL CLOSED rather than drop.
-func readVPCStaticIPInto(ctx context.Context, d *schema.ResourceData, read vpcStaticIPReadFunc, listStrict vpcStaticIPListStrictFunc) diag.Diagnostics {
+func readVPCStaticIPInto(ctx context.Context, d *schema.ResourceData, read vpcStaticIPReadFunc, listStrict vpcStaticIPListStrictFunc, dropOnConfirmedAbsence bool) diag.Diagnostics {
 	id := d.Id()
 
 	staticIP, err := read(ctx, id)
@@ -195,8 +252,22 @@ func readVPCStaticIPInto(ctx context.Context, d *schema.ResourceData, read vpcSt
 				)
 			}
 		}
-		// Confirmed absent from a complete 200 listing of its own private network:
-		// genuine deletion evidence. Drop the resource.
+		// Confirmed absent from a complete 200 listing of its own private network.
+		if !dropOnConfirmedAbsence {
+			// Create path: the static IP was JUST created (the create activity
+			// completed — positive creation evidence) and its id was set from that
+			// activity. A complete listing that does not YET contain it is eventual
+			// consistency, NOT a deletion: dropping the id here would SetId("") and
+			// orphan the fresh static IP (created platform-side, absent from the
+			// state). Fail closed instead, keeping the id so Terraform still tracks
+			// it; a re-apply/refresh repopulates its attributes (#348).
+			return diag.Errorf(
+				"VPC static IP %s was just created but is not yet visible in the strict listing of private network %s (eventual consistency); the resource is kept in the state with its id. Re-run `terraform apply` or `terraform refresh` to populate its attributes.",
+				id, privateNetworkID,
+			)
+		}
+		// Refresh path: a complete 200 listing of the static IP's own private
+		// network that does not contain it is genuine deletion evidence. Drop it.
 		d.SetId("")
 		return nil
 	}

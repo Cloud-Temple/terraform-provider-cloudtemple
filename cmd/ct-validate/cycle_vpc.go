@@ -41,23 +41,34 @@ func (vc vpcCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
 	// or repeated runs. The 02:00:5e:f0:XX:YY range is locally-administered.
 	mac := fmt.Sprintf("02:00:5e:f0:%02x:%02x", byte(r.Iteration), byte(r.Worker))
 
-	// F3: register the by-MAC teardown BEFORE Create. The client documents that a
-	// 201 empty body means the static IP MAY already exist and id-resolution can
-	// fail (vpc_static_ip.go) — a created-but-unresolved static IP would orphan.
-	// Keying the teardown on the deterministic (private network, MAC) lets the
-	// safety net find and delete it even when Create returns no usable id.
+	// F3: register the by-MAC teardown BEFORE Create. Create is ASYNCHRONOUS: the
+	// id is only known once the create activity completes (resolveActivityResultID),
+	// so a create whose activity completes but yields no resolvable id — or whose
+	// wait is lost to an abort — would orphan a static IP. Keying the teardown on
+	// the deterministic (private network, MAC) lets the safety net find and delete
+	// it even when no usable id is ever resolved.
 	registerStaticIPTeardown(r.Cleanup, vpcStaticIPSeam{c}, pn.ID, mac)
 
 	var staticID string
 	if err := r.op(vc, "vpc.static_ip.create", func() error {
-		id, cerr := c.VPC().StaticIP().Create(ctx, pn.ID, &client.CreateStaticIPRequest{
+		activityID, cerr := c.VPC().StaticIP().Create(ctx, pn.ID, &client.CreateStaticIPRequest{
 			MacAddress:          mac,
 			ResourceDescription: "ct-validate",
 		})
 		if cerr != nil {
 			return cerr
 		}
-		staticID = id
+		act, werr := c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
+		if werr != nil {
+			return werr
+		}
+		// Mirror the provider's contract guard (createVPCStaticIPWith): a completed
+		// activity that reports no id is a contract mismatch, surfaced as a recorded
+		// failure rather than a silent success that exercised nothing.
+		staticID = resolveActivityResultID(act)
+		if staticID == "" {
+			return fmt.Errorf("create static IP activity %s completed but reported no static IP id", activityID)
+		}
 		return nil
 	}); err != nil || staticID == "" {
 		// Either the create failed (recorded) or returned no id. The by-MAC
