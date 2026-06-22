@@ -153,6 +153,9 @@ func fipUnbindOutcome(state client.FloatingIPBindingState, corrErr error, fipID,
 }
 
 // --- VPC static IP -----------------------------------------------------------
+//
+// DEPRECATED CONTRACT (/vpc/v1, frozen — see internal/client/vpc.go): used only
+// by the opt-in vpcCycle teardown, kept for the rebuild, not on the default path.
 
 // staticIPSeam is the subset of the VPC static-IP client a static-IP teardown
 // needs. *client.Client satisfies it via vpcStaticIPSeam.
@@ -312,6 +315,9 @@ func (s objectStorageACLSeam) RevokeAndWait(ctx context.Context, bucket, role, a
 }
 
 // --- VPC floating IP binding --------------------------------------------------
+//
+// DEPRECATED CONTRACT (/vpc/v1, frozen — see internal/client/vpc.go): used only
+// by the opt-in vpcCycle teardown, kept for the rebuild, not on the default path.
 
 // fipBindSeam is the subset of the floating-IP client a binding teardown needs.
 type fipBindSeam interface {

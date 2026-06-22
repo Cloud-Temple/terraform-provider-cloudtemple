@@ -43,7 +43,7 @@ scenarios() {
   cat <<'EOF'
 readonly|readonly|0|1|Read every service (no create/destroy). The safest scenario, validates the tool.
 machine-managers|machine_managers|0|1|OpenIaaS: just run_identity + machine_managers.list, repeatable, to characterize the #315 5xx flakiness. Read-only.
-vpc|vpc|1|1|Create a VPC static IP + floating-IP binding, verify, then destroy.
+vpc|vpc|1|0|QUARANTINED: /vpc/v1 is deprecated and frozen pending the rebuild (no cloudtemple_vpc_* provider surface ships in v1.8.0). The opt-in `ct-validate -cycles vpc -write` still runs it manually.
 storage|object_storage|1|1|Create an object-storage bucket + account + ACL, verify, then destroy.
 vm|compute_lifecycle|1|1|OpenIaaS: create a VM from a template, add a disk, connect the network, then destroy.
 vm-vmware|compute_vmware_lifecycle|1|1|VMware: create a VM (datacenter/host/datastore/guest-OS), add a disk, connect a NIC, then destroy.

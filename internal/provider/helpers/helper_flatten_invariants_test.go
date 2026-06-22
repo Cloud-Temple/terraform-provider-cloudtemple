@@ -146,12 +146,6 @@ func genericFlattenCases() []zeroFlattenCase {
 
 		// --- Marketplace --------------------------------------------------
 		{"FlattenMarketplaceItem", zeroOf(FlattenMarketplaceItem)},
-
-		// --- VPC ----------------------------------------------------------
-		{"FlattenVPC", zeroOf(FlattenVPC)},
-		{"FlattenPrivateNetwork", zeroOf(FlattenPrivateNetwork)},
-		{"FlattenStaticIP", zeroOf(FlattenStaticIP)},
-		{"FlattenFloatingIP", zeroOf(FlattenFloatingIP)},
 	}
 }
 

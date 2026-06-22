@@ -38,7 +38,6 @@ holds up under increasing load.
 ```sh
 scripts/ct-test.sh list                       # show the available scenarios
 scripts/ct-test.sh api readonly                # read every service and report its health
-scripts/ct-test.sh api vpc                     # VPC: create → verify → remove
 scripts/ct-test.sh api storage                 # object storage: create → verify → remove
 scripts/ct-test.sh api vm                      # OpenIaaS VM lifecycle: create → verify → remove
 scripts/ct-test.sh --tenant vmware api vm-vmware   # VMware VM lifecycle: create → verify → remove
@@ -87,7 +86,7 @@ go run ./cmd/ct-validate -cycles readonly -json   # a read-only health report
 | `readonly` | read | Lists every service and reads a sample item — the broad health map. |
 | `backup` | read | Backup service reads. |
 | `compute_openiaas` | read | OpenIaaS compute reads. |
-| `vpc` | write | Allocate a VPC static IP and a floating-IP binding, verify, then remove. |
+| `vpc` | write | **Quarantined** — runs on the deprecated, frozen `/vpc/v1` contract (no `cloudtemple_vpc_*` provider surface ships in v1.8.0). The `ct-test.sh` wrapper blocks it; runnable only directly via `-cycles vpc -write`, kept for the future rebuild. |
 | `object_storage` | write | Create a bucket, a storage account and an ACL, verify, then remove. |
 | `iam_pat` | write | Create a personal access token, verify, then remove. |
 | `compute_lifecycle` | write | OpenIaaS: create a VM from a template, attach a disk and a network adapter, then remove everything. |

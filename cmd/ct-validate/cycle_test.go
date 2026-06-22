@@ -18,6 +18,13 @@ func (f fakeCycle) Name() string                                    { return f.n
 func (f fakeCycle) Kind() Kind                                      { return f.kind }
 func (f fakeCycle) Run(context.Context, *client.Client, *Run) error { return nil }
 
+// quarantinedFake is a write cycle that opts out of the "all" selector, the way
+// the real vpcCycle does. It embeds fakeCycle (inheriting Name/Kind/Run) and
+// only adds the Quarantined capability.
+type quarantinedFake struct{ fakeCycle }
+
+func (quarantinedFake) Quarantined() bool { return true }
+
 func names(cs []Cycle) []string {
 	out := make([]string, len(cs))
 	for i, c := range cs {
@@ -30,7 +37,9 @@ func testRegistry() *Registry {
 	return NewRegistry(
 		fakeCycle{"readonly", KindRead},
 		fakeCycle{"backup", KindRead},
-		fakeCycle{"vpc", KindWrite},
+		// "vpc" mirrors the real vpcCycle: a quarantined write cycle, excluded
+		// from "all" and reachable only by naming it explicitly.
+		quarantinedFake{fakeCycle{"vpc", KindWrite}},
 		fakeCycle{"object_storage", KindWrite},
 	)
 }
@@ -77,13 +86,14 @@ func TestSelectDeduplicates(t *testing.T) {
 
 func TestSelectAll(t *testing.T) {
 	reg := testRegistry()
-	// With -write, "all" must include the write cycles, ordered by name.
+	// With -write, "all" includes the write cycles, ordered by name — EXCEPT a
+	// quarantined cycle ("vpc"), which "all" must never expand to.
 	sel, gated, err := reg.Select("all", true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got := names(sel); !reflect.DeepEqual(got, []string{"backup", "object_storage", "readonly", "vpc"}) {
-		t.Fatalf("all (write) = %v", got)
+	if got := names(sel); !reflect.DeepEqual(got, []string{"backup", "object_storage", "readonly"}) {
+		t.Fatalf("all (write) = %v, want [backup object_storage readonly] (vpc is quarantined)", got)
 	}
 	if len(gated) != 0 {
 		t.Fatalf("write enabled, nothing should be gated: %v", gated)
@@ -91,15 +101,17 @@ func TestSelectAll(t *testing.T) {
 }
 
 // TestSelectAllSupersedes proves "all" combined with explicit names is still
-// just "all" (no duplicates, full set).
+// just "all": the full UNQUARANTINED set, deduplicated. A quarantined cycle
+// ("vpc") named alongside "all" is still excluded — fail closed, so a blanket
+// sweep cannot be tricked into firing it by also naming it.
 func TestSelectAllSupersedes(t *testing.T) {
 	reg := testRegistry()
 	sel, _, err := reg.Select("vpc,all,readonly", true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got := names(sel); !reflect.DeepEqual(got, []string{"backup", "object_storage", "readonly", "vpc"}) {
-		t.Fatalf("all-supersedes = %v", got)
+	if got := names(sel); !reflect.DeepEqual(got, []string{"backup", "object_storage", "readonly"}) {
+		t.Fatalf("all-supersedes = %v, want [backup object_storage readonly] (vpc quarantined out of all)", got)
 	}
 }
 
@@ -121,7 +133,9 @@ func TestSelectWriteGating(t *testing.T) {
 }
 
 // TestSelectAllWriteGating proves "all" without -write yields only the read
-// cycles, with the write cycles reported as gated.
+// cycles, with the (unquarantined) write cycles reported as gated. The
+// quarantined "vpc" cycle is excluded from "all" entirely, so it is neither
+// selected nor reported as gated.
 func TestSelectAllWriteGating(t *testing.T) {
 	reg := testRegistry()
 	sel, gated, err := reg.Select("all", false)
@@ -131,8 +145,66 @@ func TestSelectAllWriteGating(t *testing.T) {
 	if got := names(sel); !reflect.DeepEqual(got, []string{"backup", "readonly"}) {
 		t.Fatalf("all (read-only) = %v, want [backup readonly]", got)
 	}
-	if !reflect.DeepEqual(gated, []string{"object_storage", "vpc"}) {
-		t.Fatalf("gated = %v, want [object_storage vpc]", gated)
+	if !reflect.DeepEqual(gated, []string{"object_storage"}) {
+		t.Fatalf("gated = %v, want [object_storage] (vpc is quarantined out of all, not gated)", gated)
+	}
+}
+
+// TestSelectAllExcludesQuarantinedButExplicitRuns locks the quarantine
+// invariant at the selector level: a blanket "all -write" must NOT expand to a
+// quarantined cycle, but naming it explicitly still runs it. Quarantine removes
+// a cycle from the sweep; it does not disable the cycle.
+func TestSelectAllExcludesQuarantinedButExplicitRuns(t *testing.T) {
+	reg := NewRegistry(
+		fakeCycle{"readonly", KindRead},
+		quarantinedFake{fakeCycle{"vpc", KindWrite}},
+	)
+
+	// "all -write" must exclude the quarantined cycle.
+	sel, _, err := reg.Select("all", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := names(sel); !reflect.DeepEqual(got, []string{"readonly"}) {
+		t.Fatalf("all (write) = %v, want [readonly] (vpc quarantined out of all)", got)
+	}
+
+	// Naming it explicitly (with -write) still runs it.
+	sel, gated, err := reg.Select("vpc", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := names(sel); !reflect.DeepEqual(got, []string{"vpc"}) {
+		t.Fatalf("explicit vpc = %v, want [vpc]", got)
+	}
+	if len(gated) != 0 {
+		t.Fatalf("write enabled, nothing should be gated: %v", gated)
+	}
+}
+
+// TestBuildRegistryQuarantinesVPC proves the REAL registry wiring: the shipped
+// vpcCycle declares itself quarantined, so the production `-cycles all -write`
+// path can never fire the deprecated /vpc/v1 write cycle, while `-cycles vpc
+// -write` still does. Without vpcCycle.Quarantined()==true this fails.
+func TestBuildRegistryQuarantinesVPC(t *testing.T) {
+	reg := buildRegistry()
+
+	sel, _, err := reg.Select("all", true)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	for _, n := range names(sel) {
+		if n == "vpc" {
+			t.Fatalf(`"all" -write expanded to include "vpc"; the quarantined /vpc/v1 cycle must be excluded from "all" (got %v)`, names(sel))
+		}
+	}
+
+	sel, _, err = reg.Select("vpc", true)
+	if err != nil {
+		t.Fatalf("unexpected error selecting explicit vpc: %v", err)
+	}
+	if got := names(sel); !reflect.DeepEqual(got, []string{"vpc"}) {
+		t.Fatalf("explicit vpc = %v, want [vpc] (quarantine must not disable explicit selection)", got)
 	}
 }
 

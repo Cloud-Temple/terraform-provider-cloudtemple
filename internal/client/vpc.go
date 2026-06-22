@@ -1,7 +1,22 @@
 package client
 
-// VPCClient is the entry point for the Shiva VPC API (base path /vpc/v1).
-// It groups the read-only sub-clients used by the VPC datasources.
+// DEPRECATED CONTRACT / FROZEN — DO NOT EXTEND.
+//
+// This VPC client targets the Shiva VPC API at base path /vpc/v1, which is
+// deprecated. A new contract is landing UNDER THE SAME /vpc/v1 URL with
+// breaking changes (no /v2 coexistence), so this code cannot speak the new
+// shape. The client-facing provider surface that consumed it (the
+// cloudtemple_vpc_* datasources and resources) was removed from v1.8.0 to
+// avoid shipping endpoints that will break server-side with no client
+// recourse; the VPC features will be rebuilt against the new contract.
+//
+// This package is intentionally KEPT (it compiles and its tests run) as the
+// foundation for that rebuild, but it is QUARANTINED: no provider surface
+// references it, and ct-validate no longer exercises it in the default
+// read-only path (only the opt-in, -write "vpc" cycle does). Treat any change
+// here as part of the rebuild, not as maintenance of a live contract.
+//
+// VPCClient is the entry point for that (frozen) /vpc/v1 API.
 type VPCClient struct {
 	c *Client
 }
