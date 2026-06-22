@@ -14,9 +14,10 @@ var silentWaiter = &client.WaiterOptions{Logger: func(string) {}}
 
 // DEPRECATED CONTRACT — opt-in only. This cycle exercises the /vpc/v1 API,
 // which is deprecated and frozen pending the rebuild (see
-// internal/client/vpc.go). It is intentionally NOT part of the default
-// read-only sweep; it runs only on explicit `-cycles vpc` (or `all`) with
-// `-write`. Kept as the validation harness the rebuild will reuse.
+// internal/client/vpc.go). It is QUARANTINED: excluded from the "all" selector
+// and from the default read-only sweep, so a blanket `-cycles all -write` can
+// never fire it. It runs ONLY when named explicitly: `-cycles vpc -write`.
+// Kept as the validation harness the rebuild will reuse.
 //
 // vpcCycle drives a realistic VPC write business cycle:
 //
@@ -35,6 +36,11 @@ type vpcCycle struct{}
 
 func (vpcCycle) Name() string { return "vpc" }
 func (vpcCycle) Kind() Kind   { return KindWrite }
+
+// Quarantined excludes vpcCycle from the "all" selector (see cycle.go): /vpc/v1
+// is deprecated and frozen, so a blanket `-cycles all -write` must never fire
+// it. It runs only when named explicitly: `-cycles vpc -write`.
+func (vpcCycle) Quarantined() bool { return true }
 
 func (vc vpcCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
 	pn, err := vc.pickPrivateNetwork(ctx, c, r)

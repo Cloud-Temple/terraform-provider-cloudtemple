@@ -50,11 +50,6 @@ ambiguous name is a clear plan-time error — never a wrong silent pick.
 
 > Networking is the most tenant-specific part: it assumes an OpenIaaS network named
 > `var.lan_network_name` exists. Validate on first live run and adjust if needed.
->
-> The managed static IP and public floating IP this scenario used to allocate were
-> removed with the VPC surface: the `/vpc/v1` contract is deprecated and will be
-> rebuilt (see the provider CHANGELOG for v1.8.0). They will return once the VPC
-> resources are reintroduced against the new contract.
 
 ## Tunables (see `variables.tf`)
 
