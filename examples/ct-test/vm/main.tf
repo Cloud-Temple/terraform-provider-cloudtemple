@@ -51,9 +51,7 @@ data "cloudtemple_marketplace_item" "image" {
 
 # --- networking: put the VM on the LAN --------------------------------------------
 # The VM's adapter connects to an OpenIaaS network selected BY NAME
-# (var.lan_network_name), discovered above. The managed static IP and public floating
-# IP layer was removed together with the VPC surface: the /vpc/v1 contract is
-# deprecated and will be rebuilt (see the provider CHANGELOG for v1.8.0).
+# (var.lan_network_name), discovered above.
 
 locals {
   # Storage repository: pick a USABLE SR (not in maintenance, accessible) with the
