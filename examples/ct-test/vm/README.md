@@ -5,6 +5,9 @@ API): deploy an Ubuntu VM **from the marketplace**, attach a data disk, then dri
 power (start → stop → start), with a **convergence check** (empty `terraform plan`)
 after every step and a clean `destroy` at the end.
 
+> Relaunching it? See [RUNBOOK.md](RUNBOOK.md) for the quick checklist, prerequisites,
+> troubleshooting, and a known side effect (each run leaks one `xoa` static IP on LAN — #359).
+
 ## Run
 
 ```bash
