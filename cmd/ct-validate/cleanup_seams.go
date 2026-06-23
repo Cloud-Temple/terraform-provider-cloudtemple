@@ -102,10 +102,22 @@ func confirmComputeDeleteByPriorDelete(err error, priorDeleteOK bool, id string)
 
 // staticIPDeleteErrResult is the SHARED static-IP delete idempotency decision
 // (#312): a 404 is idempotent success; a 403 is AMBIGUOUS (#303 conflates
-// absent/forbidden) and is confirmed via a strict 200-only listing of the
-// private network before being accepted; any other error surfaces. listStrict
-// is injected so the decision is unit-testable offline.
-func staticIPDeleteErrResult(err error, listStrict func() ([]*client.StaticIP, error), privateNetworkID, id string) error {
+// absent/forbidden) and is accepted as "gone" ONLY on strict positive evidence;
+// any other error surfaces. There are TWO independent positive channels:
+//
+//   - priorDeleteOK: this cycle's explicit delete of THIS exact id already
+//     succeeded (a 200, or a definitive 404) — strict same-cycle proof of absence,
+//     identical to confirmComputeDeleteByPriorDelete. A deferred 403-on-absent is
+//     then the conflation, not an orphan, and is accepted WITHOUT re-listing.
+//   - the strict 200-only listing of the private network: unlike the OpenIaaS
+//     compute delete (whose Read/list conflate 403/404 and so CANNOT prove
+//     absence, hence priorDeleteOK is its only channel), the VPC per-network
+//     listing CAN prove absence, so it is the independent fallback when there is
+//     no same-cycle proof. Found → still present → fail; provably-absent → success.
+//
+// Neither channel proving absence (no proof AND an inconclusive/failed listing)
+// FAILS CLOSED. listStrict is injected so the decision is unit-testable offline.
+func staticIPDeleteErrResult(err error, priorDeleteOK bool, listStrict func() ([]*client.StaticIP, error), privateNetworkID, id string) error {
 	if err == nil {
 		return nil
 	}
@@ -113,8 +125,13 @@ func staticIPDeleteErrResult(err error, listStrict func() ([]*client.StaticIP, e
 		return nil
 	}
 	if isStatusCode(err, http.StatusForbidden) {
+		// Channel 1: strict same-cycle explicit-delete proof — accept without a list.
+		if priorDeleteOK {
+			return nil
+		}
+		// Channel 2: confirm via the strict, provably-complete per-network listing.
 		if privateNetworkID == "" {
-			return fmt.Errorf("static IP %s delete returned 403 and its absence could not be confirmed (no private network scope): %w", id, err)
+			return fmt.Errorf("static IP %s delete returned 403 and its absence could not be confirmed (no same-cycle delete proof and no private network scope): %w", id, err)
 		}
 		list, lerr := listStrict()
 		if lerr != nil {
@@ -154,8 +171,8 @@ func fipUnbindOutcome(state client.FloatingIPBindingState, corrErr error, fipID,
 
 // --- VPC static IP -----------------------------------------------------------
 //
-// DEPRECATED CONTRACT (/vpc/v1, frozen — see internal/client/vpc.go): used only
-// by the opt-in vpcCycle teardown, kept for the rebuild, not on the default path.
+// REBUILDING CONTRACT (/vpc/v1, v1.9.0 rebuild — see internal/client/vpc.go): used
+// only by the opt-in vpcCycle teardown, not on the default read-only path.
 
 // staticIPSeam is the subset of the VPC static-IP client a static-IP teardown
 // needs. *client.Client satisfies it via vpcStaticIPSeam.
@@ -164,27 +181,55 @@ type staticIPSeam interface {
 	// static IPs (fails closed otherwise — see the client doc).
 	ListStrict(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error)
 	// DeleteAndWait deletes a static IP by id and waits for the delete activity.
-	// It is idempotent under the F3 contract: a 404 is success; a 403 is
-	// confirmed absent via a strict listing of privateNetworkID before being
-	// accepted (mirrors #312); any other error is surfaced.
-	DeleteAndWait(ctx context.Context, privateNetworkID, id string) error
+	// It is idempotent under the F3 contract: a 404 is success; a 403 is accepted
+	// as gone only on strict positive evidence (mirrors #312). priorDeleteOK is the
+	// same-cycle explicit-delete proof for THIS id: when true, a deferred 403 is
+	// accepted without re-listing; when false, the 403 is confirmed via a strict
+	// listing of privateNetworkID, else fails closed. Any other error is surfaced.
+	DeleteAndWait(ctx context.Context, privateNetworkID, id string, priorDeleteOK bool) error
 }
 
-// registerStaticIPTeardown registers a teardown that finds the custom static IP
-// carrying our MAC on the private network and deletes it if present. It is
-// registered BEFORE Create, so even an ambiguous/failed create (201 empty body,
-// id unresolved) is still swept by the next teardown pass. The deterministic key
-// is (privateNetworkID, mac); no created id is needed.
+// staticIPTeardownRef carries the static-IP identity for teardown, filled as the
+// cycle progresses (shared pointer, like adapterTeardownRef/diskTeardownRef). The
+// teardown deletes by the resolved ID when Resolved; otherwise it finds the custom
+// static IP carrying MAC via a strict per-network listing. ExplicitlyDeleted is the
+// strict same-cycle proof that the RESOLVED id was deleted this cycle (lets a
+// deferred 403-on-absent be accepted). ActivityID is kept for postmortem
+// diagnostics only — the teardown never re-waits or re-resolves it.
+type staticIPTeardownRef struct {
+	PrivateNetworkID  string
+	MAC               string
+	ID                string
+	ActivityID        string
+	Resolved          bool
+	ExplicitlyDeleted bool
+}
+
+// registerStaticIPTeardown registers the static-IP teardown BEFORE CreateStart, so
+// it covers process-death AND the "POST accepted server-side but the create call
+// errored before yielding an id" ambiguous window (the pre-POST fallback). It
+// mirrors registerNetworkAdapterTeardown: when the id resolved, delete by that
+// exact id (the same-cycle explicit-delete proof accepts a deferred 403-on-absent);
+// otherwise — UNRESOLVED or FAILED create, NOT special-cased — find the custom
+// static IP carrying our MAC via a STRICT (provably-complete) listing and delete it.
 //
-// Idempotent: if no custom static IP carries our MAC, the network is already
-// clean and the teardown succeeds.
-func registerStaticIPTeardown(cl *Cleanup, seam staticIPSeam, privateNetworkID, mac string) {
-	cl.Register(fmt.Sprintf("vpc.static_ip by-mac %s on %s", mac, privateNetworkID), func(tctx context.Context) error {
-		list, err := seam.ListStrict(tctx, privateNetworkID)
+// A FAILED create is never short-circuited to "success": it flows through the
+// strict-listing fallback exactly like an unresolved one, because failure alone is
+// not positive evidence of absence (§5). Idempotent: an absent IP (provably-complete
+// listing without our MAC) is already clean → success.
+func registerStaticIPTeardown(cl *Cleanup, seam staticIPSeam, ref *staticIPTeardownRef) {
+	cl.Register(fmt.Sprintf("vpc.static_ip by-mac %s on %s", ref.MAC, ref.PrivateNetworkID), func(tctx context.Context) error {
+		if ref.Resolved && ref.ID != "" {
+			// Resolved id: the same-cycle explicit-delete proof (ExplicitlyDeleted)
+			// accepts a deferred 403-on-absent without re-listing; absent the proof,
+			// the seam confirms the 403 via a strict listing or fails closed.
+			return seam.DeleteAndWait(tctx, ref.PrivateNetworkID, ref.ID, ref.ExplicitlyDeleted)
+		}
+		list, err := seam.ListStrict(tctx, ref.PrivateNetworkID)
 		if err != nil {
 			return err
 		}
-		want := normalizeMACForCleanup(mac)
+		want := normalizeMACForCleanup(ref.MAC)
 		for _, si := range list {
 			if si == nil || si.Source != "custom" {
 				continue
@@ -192,8 +237,10 @@ func registerStaticIPTeardown(cl *Cleanup, seam staticIPSeam, privateNetworkID, 
 			if normalizeMACForCleanup(si.MacAddress) != want {
 				continue
 			}
-			// Found our created-but-maybe-unresolved static IP: delete by id.
-			return seam.DeleteAndWait(tctx, privateNetworkID, si.ID)
+			// Found by listing: no same-cycle proof for this id (priorDeleteOK=false),
+			// so a 403 here must be re-confirmed by the seam's strict listing or fail
+			// closed — never accepted on the find alone.
+			return seam.DeleteAndWait(tctx, ref.PrivateNetworkID, si.ID, false)
 		}
 		// Absent → already clean → success (idempotent).
 		return nil
@@ -225,13 +272,14 @@ func (s vpcStaticIPSeam) ListStrict(ctx context.Context, privateNetworkID string
 	return s.c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
 }
 
-func (s vpcStaticIPSeam) DeleteAndWait(ctx context.Context, privateNetworkID, id string) error {
+func (s vpcStaticIPSeam) DeleteAndWait(ctx context.Context, privateNetworkID, id string, priorDeleteOK bool) error {
 	activityID, err := s.c.VPC().StaticIP().Delete(ctx, id)
 	if err != nil {
-		// 404 → idempotent success; 403 → confirm absence via the strict listing
-		// (#312); anything else surfaces. The decision lives in a shared, offline-
-		// testable helper so production and tests cannot drift.
-		return staticIPDeleteErrResult(err, func() ([]*client.StaticIP, error) {
+		// 404 → idempotent success; 403 → accepted on the same-cycle proof
+		// (priorDeleteOK) else confirmed via the strict listing (#312); anything else
+		// surfaces. The decision lives in a shared, offline-testable helper so
+		// production and tests cannot drift.
+		return staticIPDeleteErrResult(err, priorDeleteOK, func() ([]*client.StaticIP, error) {
 			return s.ListStrict(ctx, privateNetworkID)
 		}, privateNetworkID, id)
 	}
@@ -316,8 +364,8 @@ func (s objectStorageACLSeam) RevokeAndWait(ctx context.Context, bucket, role, a
 
 // --- VPC floating IP binding --------------------------------------------------
 //
-// DEPRECATED CONTRACT (/vpc/v1, frozen — see internal/client/vpc.go): used only
-// by the opt-in vpcCycle teardown, kept for the rebuild, not on the default path.
+// REBUILDING CONTRACT (/vpc/v1, v1.9.0 rebuild — see internal/client/vpc.go): used
+// only by the opt-in vpcCycle teardown, not on the default read-only path.
 
 // fipBindSeam is the subset of the floating-IP client a binding teardown needs.
 type fipBindSeam interface {

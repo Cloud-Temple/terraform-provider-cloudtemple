@@ -33,10 +33,10 @@ func (rc readonlyCycle) Run(ctx context.Context, c *client.Client, r *Run) error
 	})
 
 	rc.runIAM(ctx, c, r, tenantID, companyID)
-	// VPC is intentionally NOT swept here: the /vpc/v1 contract is deprecated and
-	// frozen pending the rebuild (see internal/client/vpc.go), so probing it in
-	// the always-on default path would only emit false squeaks on a contract we
-	// have abandoned. The opt-in -write "vpc" cycle still exercises it on demand.
+	// VPC is intentionally NOT swept here: the /vpc/v1 contract is being rebuilt for
+	// v1.9.0 and is not yet end-to-end validated (see internal/client/vpc.go), so it
+	// is kept off the always-on default path to avoid false squeaks on a still-
+	// evolving contract. The opt-in -write "vpc" cycle still exercises it on demand.
 	rc.runCompute(ctx, c, r)
 	rc.runBackup(ctx, c, r)
 	rc.runObjectStorage(ctx, c, r)
@@ -316,11 +316,11 @@ func (rc readonlyCycle) runTag(ctx context.Context, c *client.Client, r *Run) {
 	// The Tag service exposes only per-resource Read/Create/Delete (no global
 	// list endpoint), so a safe read needs an EXISTING resource id. The only id
 	// source this read-only sweep had was a VPC floating IP, but the /vpc/v1
-	// contract is deprecated and quarantined out of the default path (see
-	// internal/client/vpc.go); firing it here would reintroduce the very
-	// deprecated read we just removed, and fabricating an id would be dishonest.
-	// So the tag read is skipped until a non-deprecated taggable resource is
-	// wired in (expected with the VPC rebuild). ctx/c are kept for signature
-	// symmetry with the sibling run* methods and the future re-wiring.
+	// contract is under active rebuild (v1.9.0) and quarantined out of the
+	// default path (see internal/client/vpc.go); firing it here would reintroduce
+	// the very read we removed when VPC was pulled in v1.8.0, and fabricating an
+	// id would be dishonest. So the tag read is skipped until a stable taggable
+	// resource is wired in (expected with the VPC rebuild). ctx/c are kept for
+	// signature symmetry with the sibling run* methods and the future re-wiring.
 	r.skip(rc, "tag.resource.read")
 }

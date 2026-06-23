@@ -1,22 +1,25 @@
 package client
 
-// DEPRECATED CONTRACT / FROZEN — DO NOT EXTEND.
+// VPC client for the Shiva /vpc/v1 API — UNDER ACTIVE REBUILD (v1.9.0).
 //
-// This VPC client targets the Shiva VPC API at base path /vpc/v1, which is
-// deprecated. A new contract is landing UNDER THE SAME /vpc/v1 URL with
-// breaking changes (no /v2 coexistence), so this code cannot speak the new
-// shape. The client-facing provider surface that consumed it (the
-// cloudtemple_vpc_* datasources and resources) was removed from v1.8.0 to
-// avoid shipping endpoints that will break server-side with no client
-// recourse; the VPC features will be rebuilt against the new contract.
+// History: the platform replaced /vpc/v1 with breaking changes UNDER THE SAME URL
+// (no /v2 coexistence). v1.8.0 removed the client-facing provider surface (the
+// cloudtemple_vpc_* datasources and resources) and FROZE this client, to avoid
+// shipping endpoints that would break server-side with no client recourse.
 //
-// This package is intentionally KEPT (it compiles and its tests run) as the
-// foundation for that rebuild, but it is QUARANTINED: no provider surface
-// references it, and ct-validate no longer exercises it in the default
-// read-only path (only the opt-in, -write "vpc" cycle does). Treat any change
-// here as part of the rebuild, not as maintenance of a live contract.
+// v1.9.0 rebuilds VPC against the new contract, chunk by chunk: this client is the
+// foundation, updated first (e.g. static IP create is now ASYNC — see
+// vpc_static_ip.go CreateStart/WaitCreate), then the provider surface (Layer A) is
+// restored on top in later chunks. So this package is NO LONGER FROZEN — changes
+// here ARE the rebuild — but it is also not yet complete.
 //
-// VPCClient is the entry point for that (frozen) /vpc/v1 API.
+// SAFETY (kept until the rebuild is end-to-end validated): no provider surface
+// references this client on the default path, and ct-validate exercises the /vpc/v1
+// WRITE cycle ONLY via the explicit, opt-in "-cycles vpc -write" — never the blanket
+// "-cycles all" (see vpcCycle.Quarantined in cmd/ct-validate/cycle_vpc.go). A routine
+// sweep can therefore never fire VPC writes against this still-evolving contract.
+//
+// VPCClient is the entry point for the (rebuilding) /vpc/v1 API.
 type VPCClient struct {
 	c *Client
 }
