@@ -354,6 +354,7 @@ func TestVPCStaticIPMACStateFunc(t *testing.T) {
 	cases := map[string]string{
 		"00-50-56-AB-CD-EF": "00:50:56:ab:cd:ef", // dashes + uppercase
 		"AA:BB:CC:DD:EE:FF": "aa:bb:cc:dd:ee:ff", // uppercase only
+		"00-50:56-AB:cd-EF": "00:50:56:ab:cd:ef", // mixed separators + mixed case (the regexp admits each [:-] independently)
 		"00:50:56:ab:cd:ef": "00:50:56:ab:cd:ef", // already canonical -> unchanged (idempotent)
 	}
 	for in, want := range cases {
