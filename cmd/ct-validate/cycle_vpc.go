@@ -12,12 +12,13 @@ import (
 // stdout.
 var silentWaiter = &client.WaiterOptions{Logger: func(string) {}}
 
-// DEPRECATED CONTRACT — opt-in only. This cycle exercises the /vpc/v1 API,
-// which is deprecated and frozen pending the rebuild (see
-// internal/client/vpc.go). It is QUARANTINED: excluded from the "all" selector
-// and from the default read-only sweep, so a blanket `-cycles all -write` can
-// never fire it. It runs ONLY when named explicitly: `-cycles vpc -write`.
-// Kept as the validation harness the rebuild will reuse.
+// REBUILDING CONTRACT — opt-in only. This cycle exercises the /vpc/v1 API, which
+// is being rebuilt for v1.9.0 (see internal/client/vpc.go): the client now speaks
+// the new async contract, but the rebuild is not yet end-to-end validated. It
+// stays QUARANTINED: excluded from the "all" selector and from the default
+// read-only sweep, so a blanket `-cycles all -write` can never fire VPC writes
+// against the still-evolving contract. It runs ONLY when named explicitly:
+// `-cycles vpc -write` — which is how the C6 live end-to-end validation invokes it.
 //
 // vpcCycle drives a realistic VPC write business cycle:
 //
@@ -37,9 +38,11 @@ type vpcCycle struct{}
 func (vpcCycle) Name() string { return "vpc" }
 func (vpcCycle) Kind() Kind   { return KindWrite }
 
-// Quarantined excludes vpcCycle from the "all" selector (see cycle.go): /vpc/v1
-// is deprecated and frozen, so a blanket `-cycles all -write` must never fire
-// it. It runs only when named explicitly: `-cycles vpc -write`.
+// Quarantined excludes vpcCycle from the "all" selector (see cycle.go): the
+// v1.9.0 /vpc/v1 rebuild is not yet end-to-end validated, so a blanket `-cycles
+// all -write` must never fire VPC writes against it. It runs only when named
+// explicitly: `-cycles vpc -write`. (TestBuildRegistryQuarantinesVPC pins this;
+// lifting it is a deliberate end-of-rebuild step, not a C1 change.)
 func (vpcCycle) Quarantined() bool { return true }
 
 func (vc vpcCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
@@ -53,54 +56,79 @@ func (vc vpcCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
 	// or repeated runs. The 02:00:5e:f0:XX:YY range is locally-administered.
 	mac := fmt.Sprintf("02:00:5e:f0:%02x:%02x", byte(r.Iteration), byte(r.Worker))
 
-	// F3: register the by-MAC teardown BEFORE Create. The client documents that a
-	// 201 empty body means the static IP MAY already exist and id-resolution can
-	// fail (vpc_static_ip.go) — a created-but-unresolved static IP would orphan.
-	// Keying the teardown on the deterministic (private network, MAC) lets the
-	// safety net find and delete it even when Create returns no usable id.
-	registerStaticIPTeardown(r.Cleanup, vpcStaticIPSeam{c}, pn.ID, mac)
+	// F3 + the async-teardown doctrine (mirrors registerVirtualDiskTeardown /
+	// registerNetworkAdapterTeardown): register ONE ref-based teardown BEFORE the
+	// create. Registered pre-POST, it covers process-death AND the "POST accepted
+	// server-side but CreateStart errored before yielding an id" ambiguous window
+	// (the static IP would otherwise orphan). The ref is filled as the cycle
+	// advances: ActivityID/ID/Resolved on create, ExplicitlyDeleted after delete.
+	ref := &staticIPTeardownRef{PrivateNetworkID: pn.ID, MAC: mac}
+	registerStaticIPTeardown(r.Cleanup, vpcStaticIPSeam{c}, ref)
 
 	var staticID string
 	if err := r.op(vc, "vpc.static_ip.create", func() error {
-		id, cerr := c.VPC().StaticIP().Create(ctx, pn.ID, &client.CreateStaticIPRequest{
+		// CreateStart + WaitCreate (not the composed Create) so the cycle records
+		// the create ACTIVITY id in the ref BEFORE waiting: if the wait then fails,
+		// the orphan-window diagnostic can name the activity. This also exercises
+		// live the exact split the provider (C3) will use.
+		activityID, syncID, cerr := c.VPC().StaticIP().CreateStart(ctx, pn.ID, &client.CreateStaticIPRequest{
 			MacAddress:          mac,
 			ResourceDescription: "ct-validate",
 		})
 		if cerr != nil {
 			return cerr
 		}
+		ref.ActivityID = activityID
+		id := syncID
+		if activityID != "" {
+			waited, werr := c.VPC().StaticIP().WaitCreate(ctx, activityID, silentWaiter)
+			if werr != nil {
+				return fmt.Errorf("static IP create activity %s did not complete: %w", activityID, werr)
+			}
+			id = waited
+		}
 		staticID = id
+		ref.ID = id
+		ref.Resolved = true
 		return nil
 	}); err != nil || staticID == "" {
-		// Either the create failed (recorded) or returned no id. The by-MAC
-		// teardown registered above still sweeps a created-but-unresolved static
-		// IP, so we can safely return here.
+		// Create failed or yielded no id. ref.Resolved stays false, so the
+		// pre-registered teardown sweeps a created-but-unresolved (or failed) static
+		// IP via the strict by-MAC listing. Safe to return.
 		return err
 	}
 
-	// Also register the precise by-id teardown now that the id is resolved (LIFO:
-	// it runs before the broader by-MAC sweep). Both are idempotent.
-	r.Cleanup.Register(fmt.Sprintf("vpc.static_ip %s", staticID), func(tctx context.Context) error {
-		return vpcStaticIPSeam{c}.DeleteAndWait(tctx, pn.ID, staticID)
-	})
-
 	vc.bindSubCycle(ctx, c, r, staticID)
 
-	// Explicit delete step (recorded). It overlaps with the registered
-	// teardown intentionally: the cycle deletes on the happy path; the
-	// teardown is the safety net if we never reach here.
+	// Explicit delete (recorded), overlapping the teardown by design: the cycle
+	// deletes on the happy path; the teardown is the safety net if we never reach
+	// here. The same-cycle absence proof is set ONLY on real success.
+	vc.explicitDeleteStaticIP(ctx, c, r, ref)
+	return nil
+}
+
+// explicitDeleteStaticIP runs the breaker-gated explicit delete and records STRICT
+// same-cycle proof of absence into ref.ExplicitlyDeleted ONLY when the delete op
+// actually RAN and succeeded. It mirrors computeLifecycleCycle.explicitDelete
+// (cycle_compute_lifecycle.go): on a breaker skip r.op never invokes the closure,
+// so the proof stays false and the deferred teardown fails closed on a later
+// 403-on-absent (#303) instead of masking a possible orphan. The proof MUST be set
+// from inside the closure — NEVER inferred from r.op's return value, which is nil
+// on a breaker skip too.
+func (vc vpcCycle) explicitDeleteStaticIP(ctx context.Context, c *client.Client, r *Run, ref *staticIPTeardownRef) {
 	_ = r.op(vc, "vpc.static_ip.delete", func() error {
-		activityID, derr := c.VPC().StaticIP().Delete(ctx, staticID)
+		activityID, derr := c.VPC().StaticIP().Delete(ctx, ref.ID)
 		if derr != nil {
 			return derr
 		}
-		if activityID == "" {
-			return nil
+		if activityID != "" {
+			if _, werr := c.Activity().WaitForCompletion(ctx, activityID, silentWaiter); werr != nil {
+				return werr
+			}
 		}
-		_, werr := c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
-		return werr
+		ref.ExplicitlyDeleted = true
+		return nil
 	})
-	return nil
 }
 
 // pickPrivateNetwork lists private networks and returns the one named "LAN", or

@@ -125,8 +125,10 @@ func (s *VPCStaticIPClient) ListStrict(ctx context.Context, privateNetworkID str
 	return out, nil
 }
 
-// Read retrieves a single static IP by ID. It returns (nil, nil) when the
-// static IP does not exist (403; the API returns 403 for an absent resource).
+// Read retrieves a single static IP by ID. It returns (nil, nil) when the static
+// IP is not found: requireNotFoundOrOK maps BOTH 404 and 403 to not-found (the VPC
+// API conflates absent/forbidden, #303), so an absent static IP — whether the API
+// answers 404 or 403 — surfaces as (nil, nil) for idempotent read handling.
 func (s *VPCStaticIPClient) Read(ctx context.Context, id string) (*StaticIP, error) {
 	r := s.c.newRequest("GET", "/vpc/v1/static_ips/%s", id)
 	resp, err := s.c.doRequest(ctx, r)
@@ -149,87 +151,127 @@ func (s *VPCStaticIPClient) Read(ctx context.Context, id string) (*StaticIP, err
 
 // CreateStaticIPRequest is the body of POST
 // /vpc/v1/private_networks/{privateNetworkId}/static_ips (schema CreateStaticIp).
-// MacAddress is required; IPAddress is optional (auto-assigned when omitted);
-// ResourceDescription is optional. Optional fields are omitempty so an empty
-// value is not sent as an explicit "".
+// MacAddress is required; IPAddress is optional (auto-assigned when omitted, so it
+// keeps omitempty).
+//
+// ResourceDescription is REQUIRED by the live create contract: an empty or omitted
+// value is rejected by the deployed API (live evidence, 2026-06 — the swagger's
+// "optional" is wrong for this field). It therefore carries NO omitempty: an empty
+// string must surface as a CreateStart precondition error (an actionable diagnostic
+// BEFORE the POST), never be silently elided from the body and bounced server-side.
 type CreateStaticIPRequest struct {
 	MacAddress          string `json:"macAddress"`
 	IPAddress           string `json:"ipAddress,omitempty"`
-	ResourceDescription string `json:"resourceDescription,omitempty"`
+	ResourceDescription string `json:"resourceDescription"`
 }
 
-// createStaticIPResponse decodes the 201 body of the create endpoint. The static
-// IP id is returned in the BODY (static_ip_id), NOT in a Location header: the
-// create is synchronous and is NOT an activity, so doRequestAndReturnActivity
-// (which reads Location) must not be used here.
-type createStaticIPResponse struct {
-	Success    bool   `json:"success"`
-	Message    string `json:"message"`
-	StaticIPID string `json:"static_ip_id"`
-}
+// CreateStart issues POST /vpc/v1/private_networks/{id}/static_ips and reports how
+// the platform acknowledged the create WITHOUT waiting. It returns EXACTLY ONE of:
+//   - activityID: the ASYNC path — a 201 carrying a Location header; the new static
+//     IP id is resolved once that activity completes (see WaitCreate). This is the
+//     deployed live contract (2026-06: 201 + Location, EMPTY body).
+//   - syncID: the SYNC path — a 201 carrying a body static_ip_id. Retained as a
+//     DEFENSIVE contract guard so a hypothetical sync 201 surfaces a usable id
+//     instead of an orphan; never observed live.
+//
+// A 201 with NEITHER a Location nor a static_ip_id is a hard error (fail closed):
+// the create may have taken effect server-side, so the never-orphan backstop is the
+// pre-create teardown net (cmd/ct-validate), NOT a silent id guess. This removes the
+// old "resolve the id by listing the network and matching MAC+custom" path, which
+// was orphan-prone (it could bind to a co-resident xoa IP, #311) and is moot now
+// that the contract is proven async.
+//
+// ResourceDescription is REQUIRED (see CreateStaticIPRequest): an empty/whitespace
+// value is rejected HERE, before the POST, with an actionable error — a doomed
+// request never reaches the API.
+func (s *VPCStaticIPClient) CreateStart(ctx context.Context, privateNetworkID string, req *CreateStaticIPRequest) (activityID, syncID string, err error) {
+	if strings.TrimSpace(req.ResourceDescription) == "" {
+		return "", "", fmt.Errorf("static IP create on private network %s: resourceDescription is required by the API and must not be empty or whitespace", privateNetworkID)
+	}
 
-// Create creates a static IP mapping on a private network (synchronous). It
-// returns the new static IP id parsed from the 201 body. A non-201 status, or a
-// 201 with a missing/empty static_ip_id, is an error.
-func (s *VPCStaticIPClient) Create(ctx context.Context, privateNetworkID string, req *CreateStaticIPRequest) (string, error) {
 	r := s.c.newRequest("POST", "/vpc/v1/private_networks/%s/static_ips", privateNetworkID)
 	r.obj = req
-	resp, err := s.c.doRequest(ctx, r)
+	// CreateStart EXPECTS an activity (the live async create returns a Location), so it
+	// must bypass the ErrorOnUnexpectedActivity guard the same way the sibling async
+	// methods Update/Delete do — they go through doRequestAndReturnActivity, which
+	// calls doRequestWithToken directly. Routing through doRequest/doRequestOnce would
+	// instead let that guard (set suite-wide by internal/client/tests) reject the
+	// EXPECTED Location before line 204 can read it. CreateStart cannot reuse
+	// doRequestAndReturnActivity wholesale because it must ALSO accept the defensive
+	// sync path (201 + body static_ip_id, no Location), which that helper rejects.
+	token, err := s.c.JWT(ctx)
 	if err != nil {
-		return "", err
+		return "", "", err
+	}
+	resp, err := s.c.doRequestWithToken(ctx, r, token.Raw)
+	if err != nil {
+		return "", "", err
 	}
 	defer closeResponseBody(resp)
 	if err := requireHttpCodes(resp, 201); err != nil {
-		return "", err
+		return "", "", err
 	}
 
-	// The swagger documents a 201 body {success, message, static_ip_id}, but the
-	// live API returns 201 with an EMPTY body. The create is synchronous (the
-	// static IP exists immediately), so when the id is absent from the body we
-	// resolve it ourselves. Returning an error on an empty body would be wrong:
-	// the static IP IS created, so the caller would orphan it — created
-	// platform-side but absent from the Terraform state.
-	var out createStaticIPResponse
-	if err := decodeBody(resp, &out); err == nil && out.StaticIPID != "" {
-		return out.StaticIPID, nil
+	// ASYNC: a Location header is the create activity to wait on (live contract).
+	if loc := resp.Header.Get("Location"); loc != "" {
+		return loc, "", nil
 	}
 
-	// Resolve the id from a COMPLETE listing of the private network, matching the
-	// requested MAC AND source=="custom". A by-MAC GET is NOT enough: when a
-	// network adapter is attached to a VPC network the platform auto-creates an
-	// "xoa" static IP for the SAME MAC (#311), so a MAC-only lookup can resolve to
-	// that co-resident platform-managed IP instead of the custom one we just
-	// created — which would bind the state to the wrong id and orphan ours. The
-	// per-network listing lets us pick the custom IP unambiguously, and the create
-	// always produces a "custom" static IP.
-	list, lerr := s.ListStrict(ctx, privateNetworkID)
-	if lerr != nil {
-		return "", fmt.Errorf("static IP created on private network %s but resolving its id by listing failed: %w", privateNetworkID, lerr)
+	// SYNC fallback (defensive): a body static_ip_id. Decoded inline — the old named
+	// createStaticIPResponse type retired with the sync-create design.
+	var body struct {
+		StaticIPID string `json:"static_ip_id"`
 	}
-	want := normalizeMAC(req.MacAddress)
-	var match *StaticIP
-	for _, si := range list {
-		if si == nil || si.Source != "custom" || normalizeMAC(si.MacAddress) != want {
-			continue
-		}
-		if match != nil {
-			return "", fmt.Errorf("static IP created on private network %s but its id is ambiguous: several custom static IPs carry MAC %s", privateNetworkID, req.MacAddress)
-		}
-		match = si
+	if derr := decodeBody(resp, &body); derr == nil && body.StaticIPID != "" {
+		return "", body.StaticIPID, nil
 	}
-	// match.ID == "" must fail just like match == nil: returning an empty id with a
-	// nil error would make the resource SetId("") and orphan the created static IP.
-	if match == nil || match.ID == "" {
-		return "", fmt.Errorf("static IP created on private network %s but could not be resolved among the network's custom static IPs by MAC %s", privateNetworkID, req.MacAddress)
-	}
-	return match.ID, nil
+
+	return "", "", fmt.Errorf("static IP create on private network %s returned 201 with neither a Location activity nor a static_ip_id body; cannot resolve the created id", privateNetworkID)
 }
 
-// normalizeMAC canonicalises a MAC address for comparison: lowercase and
-// ":"-separated (the swagger pattern also tolerates "-"). It lets the created
-// static IP be matched against the requested MAC regardless of input formatting.
-func normalizeMAC(mac string) string {
-	return strings.ToLower(strings.ReplaceAll(mac, "-", ":"))
+// WaitCreate waits for a create activity and returns the new static IP id from the
+// completed activity's single state Result — the same channel the provider reads
+// via setIdFromActivityState. It fails closed when the activity does not complete
+// with EXACTLY ONE state, or completes with an EMPTY Result (R-M1): a created id we
+// cannot read must be an error, never an empty id that would orphan the resource
+// via SetId(""). options controls activity-poll logging (caller-supplied, like
+// every other waiter in this client).
+func (s *VPCStaticIPClient) WaitCreate(ctx context.Context, activityID string, options *WaiterOptions) (string, error) {
+	act, err := s.c.Activity().WaitForCompletion(ctx, activityID, options)
+	if err != nil {
+		return "", err
+	}
+	if act == nil || len(act.State) != 1 {
+		return "", fmt.Errorf("static IP create activity %q did not complete with exactly one state; cannot resolve the created id", activityID)
+	}
+	var id string
+	for _, st := range act.State {
+		id = st.Result
+	}
+	if id == "" {
+		return "", fmt.Errorf("static IP create activity %q completed with an empty Result; cannot resolve the created id", activityID)
+	}
+	return id, nil
+}
+
+// Create creates a static IP mapping on a private network and returns the new id by
+// composing CreateStart + WaitCreate: a SYNC body id (if any) is returned directly;
+// otherwise it waits on the create activity. A wait failure is wrapped WITH the
+// activityID (so a caller/postmortem can correlate the orphan window) and NEVER
+// yields (id, nil) — the provider must fail closed and not SetId (R-Q2).
+func (s *VPCStaticIPClient) Create(ctx context.Context, privateNetworkID string, req *CreateStaticIPRequest, options *WaiterOptions) (string, error) {
+	activityID, syncID, err := s.CreateStart(ctx, privateNetworkID, req)
+	if err != nil {
+		return "", err
+	}
+	if syncID != "" {
+		return syncID, nil
+	}
+	id, werr := s.WaitCreate(ctx, activityID, options)
+	if werr != nil {
+		return "", fmt.Errorf("static IP create on private network %s: activity %q did not complete: %w", privateNetworkID, activityID, werr)
+	}
+	return id, nil
 }
 
 // UpdateStaticIPRequest is the body of PATCH /vpc/v1/static_ips/{id} (schema
@@ -260,7 +302,8 @@ func (s *VPCStaticIPClient) Delete(ctx context.Context, id string) (string, erro
 }
 
 // ReadByMAC retrieves a single static IP by MAC address. It returns (nil, nil)
-// when no static IP matches the MAC (403; the API returns 403 for an absent resource).
+// when no static IP matches: requireNotFoundOrOK maps BOTH 404 and 403 to not-found
+// (the VPC API conflates absent/forbidden, #303).
 func (s *VPCStaticIPClient) ReadByMAC(ctx context.Context, mac string) (*StaticIP, error) {
 	r := s.c.newRequest("GET", "/vpc/v1/static_ips/mac/%s", mac)
 	resp, err := s.c.doRequest(ctx, r)
