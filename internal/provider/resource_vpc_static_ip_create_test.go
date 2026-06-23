@@ -208,4 +208,27 @@ func TestCreateVPCStaticIPWith(t *testing.T) {
 			t.Fatalf("the id must be kept on a source-guard rejection (it exists platform-side), got %q", d.Id())
 		}
 	})
+
+	// Companion to the xoa case: an EMPTY source on the create read-back is NOT
+	// positive proof of a custom static IP (#311), so it must FAIL CLOSED — and
+	// because the create path reads in readAfterWrite mode, the just-created id is
+	// KEPT (never orphaned), never dropped. Reds if the read guard tolerates an
+	// empty source again (the fail-OPEN regression).
+	t.Run("create OK + empty-source read-back fails closed and keeps the id", func(t *testing.T) {
+		d := newStaticIPCreateData(t)
+		funcs := vpcStaticIPCreateFuncs{
+			create: func(ctx context.Context, privateNetworkID string, req *client.CreateStaticIPRequest) (string, error) {
+				return "si-99", nil
+			},
+			read:       siRead(&client.StaticIP{ID: "si-99", Source: "", PrivateNetwork: client.BaseObject{ID: "pn-1"}}, nil),
+			listStrict: listFatal(t),
+		}
+		diags := createVPCStaticIPWith(ctx, d, funcs)
+		if !diags.HasError() {
+			t.Fatal("an empty-source read-back is not proof of a custom static IP; create must FAIL CLOSED, not report a clean apply")
+		}
+		if d.Id() != "si-99" {
+			t.Fatalf("the just-created id must be KEPT on a source-guard rejection (it exists platform-side), got %q", d.Id())
+		}
+	})
 }

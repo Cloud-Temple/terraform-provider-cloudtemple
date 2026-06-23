@@ -18,6 +18,17 @@ import (
 // dashes), mirroring the swagger pattern on CreateStaticIp/UpdateStaticIpPayload.
 var macAddressRegexp = regexp.MustCompile(`^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$`)
 
+// normalizeMAC canonicalises a MAC address to the lowercase, ":"-separated form.
+// macAddressRegexp also accepts uppercase hex and "-" separators, but the API
+// always reads back the canonical lowercase ":" form. Canonicalising on write (the
+// mac_address StateFunc) keeps a config written in an equivalent form from showing
+// a PERPETUAL no-op plan against that read-back, and the SAME function drives the
+// update diff so a pure formatting difference never triggers a needless PATCH. It
+// is idempotent: normalizeMAC(normalizeMAC(m)) == normalizeMAC(m).
+func normalizeMAC(m string) string {
+	return strings.ToLower(strings.ReplaceAll(m, "-", ":"))
+}
+
 // NOTE (v1.9.0 rebuild): Create is ASYNCHRONOUS (the deployed /vpc/v1 contract
 // returns 201 + Location, empty body; proven live). Update and Delete are async
 // too. There is deliberately NO transient-502 retry on the write paths: the
@@ -53,7 +64,14 @@ func resourceVPCStaticIP() *schema.Resource {
 				Type:         schema.TypeString,
 				Required:     true,
 				ValidateFunc: validation.StringMatch(macAddressRegexp, "must be a MAC address in the format xx:xx:xx:xx:xx:xx"),
-				Description:  "The MAC address of the network adapter bound to this static IP. Mutable: updating it issues a PATCH on the static IP.",
+				// Canonicalise on write (lowercase, ":"-separated). The regexp also
+				// accepts uppercase and "-" separators, but the API reads back the
+				// canonical form, so without this a config like "AA-BB-CC-DD-EE-FF"
+				// would show a perpetual no-op plan. The update path already suppresses
+				// the PATCH on a format-only difference (normalizeMAC); this additionally
+				// suppresses the plan diff.
+				StateFunc:   func(v any) string { return normalizeMAC(v.(string)) },
+				Description: "The MAC address of the network adapter bound to this static IP. Mutable: updating it issues a PATCH on the static IP.",
 			},
 			"ip_address": {
 				Type:        schema.TypeString,
@@ -391,10 +409,6 @@ func resourceVPCStaticIPUpdate(ctx context.Context, d *schema.ResourceData, meta
 func updateVPCStaticIPWith(ctx context.Context, d *schema.ResourceData, funcs vpcStaticIPUpdateFuncs) diag.Diagnostics {
 	desiredMAC := d.Get("mac_address").(string)
 	desiredDesc := d.Get("resource_description").(string)
-	// Canonicalise the MAC for comparison (lowercase, ":"-separated), mirroring the
-	// API's accepted formats, so a pure formatting difference between the config and
-	// the live read never triggers a needless PATCH.
-	normMAC := func(m string) string { return strings.ToLower(strings.ReplaceAll(m, "-", ":")) }
 
 	live, rerr := funcs.read(ctx, d.Id())
 	if rerr != nil {
@@ -422,7 +436,7 @@ func updateVPCStaticIPWith(ctx context.Context, d *schema.ResourceData, funcs vp
 
 	req := &client.UpdateStaticIPRequest{}
 	changed := false
-	if normMAC(desiredMAC) != normMAC(live.MacAddress) {
+	if normalizeMAC(desiredMAC) != normalizeMAC(live.MacAddress) {
 		v := desiredMAC
 		req.MacAddress = &v
 		changed = true

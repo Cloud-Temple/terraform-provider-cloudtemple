@@ -337,3 +337,28 @@ func TestVPCStaticIPResourceDescriptionSchema(t *testing.T) {
 		}
 	}
 }
+
+// TestVPCStaticIPMACStateFunc pins the MAC canonicalisation StateFunc: the schema
+// stores the lowercase ":"-separated form regardless of the (regexp-accepted)
+// input casing/separator, so a config written in an equivalent form does not show
+// a perpetual no-op plan against the API's canonical read-back. Non-complacent:
+// removing the StateFunc (nil) or one that fails to canonicalise goes RED here.
+func TestVPCStaticIPMACStateFunc(t *testing.T) {
+	s, ok := resourceVPCStaticIP().Schema["mac_address"]
+	if !ok {
+		t.Fatal("mac_address attribute is missing from the schema")
+	}
+	if s.StateFunc == nil {
+		t.Fatal("mac_address must carry a StateFunc canonicalising the MAC (else an uppercase/dash config shows a perpetual no-op plan)")
+	}
+	cases := map[string]string{
+		"00-50-56-AB-CD-EF": "00:50:56:ab:cd:ef", // dashes + uppercase
+		"AA:BB:CC:DD:EE:FF": "aa:bb:cc:dd:ee:ff", // uppercase only
+		"00:50:56:ab:cd:ef": "00:50:56:ab:cd:ef", // already canonical -> unchanged (idempotent)
+	}
+	for in, want := range cases {
+		if got := s.StateFunc(in); got != want {
+			t.Fatalf("StateFunc(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

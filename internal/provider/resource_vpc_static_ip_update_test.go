@@ -235,6 +235,35 @@ func TestUpdateVPCStaticIPWith(t *testing.T) {
 		}
 	})
 
+	// Companion that pins the guard PRECEDES the diff: a non-custom live read whose
+	// fields ALREADY MATCH the desired config (converged) must STILL fail closed.
+	// Without the guard this hits the no-PATCH converged path and returns success;
+	// with the guard misplaced AFTER the diff it would also return success — so this
+	// reds on BOTH the guard's removal AND its mispositioning.
+	t.Run("a converged-but-non-custom live read still fails closed (guard precedes the diff)", func(t *testing.T) {
+		d := newStaticIPState(t)
+		var updateCalls int
+		funcs := vpcStaticIPUpdateFuncs{
+			read: func(ctx context.Context, id string) (*client.StaticIP, error) {
+				// MAC + description both EQUAL the desired config -> converged (no diff),
+				// but the source is non-custom.
+				return &client.StaticIP{ID: "si-1", MacAddress: desiredMAC, ResourceDescription: siDescPtr(desiredDesc), Source: "xoa"}, nil
+			},
+			update: func(ctx context.Context, id string, req *client.UpdateStaticIPRequest) (string, error) {
+				updateCalls++
+				return "act", nil
+			},
+			wait: okWait,
+		}
+		diags := updateVPCStaticIPWith(ctx, d, funcs)
+		if !diags.HasError() {
+			t.Fatal("a non-custom live read must FAIL CLOSED even when converged; the source guard must precede the diff/no-PATCH path")
+		}
+		if updateCalls != 0 {
+			t.Fatalf("a fail-closed update must NOT PATCH, got %d PATCHes", updateCalls)
+		}
+	})
+
 	t.Run("a hard read error fails closed (no PATCH)", func(t *testing.T) {
 		d := newStaticIPState(t)
 		var updateCalls int

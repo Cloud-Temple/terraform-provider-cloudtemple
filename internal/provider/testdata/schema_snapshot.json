@@ -1934,6 +1934,7 @@
         "mac_address": {
           "type": "TypeString",
           "required": true,
+          "has_state_func": true,
           "has_validate_func": true,
           "elem_kind": "nil"
         },
