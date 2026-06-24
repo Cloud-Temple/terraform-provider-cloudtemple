@@ -12,6 +12,18 @@
 # while internal/provider/helpers rises 66.7 -> 70.0 from the new flatten tests.
 # These are honest measurements, not hand-lowered floors. internal/client is left
 # at 24.8 (its C1 slack is out of C2 scope; a future --update can lock it in).
+#
+# v1.9.0 C3 (issue #367): the restored resource cloudtemple_vpc_static_ip adds its
+# create/read/update/delete orchestration to internal/provider behind func-seams
+# that are exhaustively unit-tested (create R-Q2/#348 never-orphan, read never-drop
+# in both readForRefresh/readAfterWrite modes, diff-driven PATCH with no retry,
+# delete 403-confirm). The #311 source guard requires POSITIVE proof (source ==
+# "custom") on both the read and the write paths: an empty/unknown source fails
+# closed (keeping the id) instead of adopting/patching a possibly platform-managed
+# IP. That RAISES internal/provider 12.2 -> 14.3. internal/client (untouched by C3)
+# stays 24.8 and internal/provider/helpers stays 70.0 (FlattenStaticIP was already
+# unit-covered at C2). Only the floor that C3's own tests improved is raised here;
+# the client slack remains deferred per the C2 note.
 internal/client 24.8
-internal/provider 12.2
+internal/provider 14.3
 internal/provider/helpers 70.0
