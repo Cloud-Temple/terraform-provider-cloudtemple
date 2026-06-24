@@ -22,6 +22,7 @@ var silentWaiter = &client.WaiterOptions{Logger: func(string) {}}
 //
 // vpcCycle drives a realistic VPC write business cycle:
 //
+//	provision floating IP -> set description -> confirm by read -> deprovision FIP
 //	create custom static IP -> (if a spare unbound FIP exists) bind FIP ->
 //	confirm by read -> unbind FIP -> delete static IP
 //
@@ -29,6 +30,15 @@ var silentWaiter = &client.WaiterOptions{Logger: func(string) {}}
 // lose it, so the never-orphan backstop holds even if a later step or the
 // breaker aborts. When no spare FIP exists, the bind/unbind steps are recorded
 // as skipped and only the create/delete sub-cycle runs.
+//
+// The floating-IP provision sub-cycle runs FIRST and is self-contained: it is
+// independent of any private network (the static-IP sub-cycle below needs one),
+// and it both provisions AND deprovisions a FRESH, billable public floating IP
+// within the cycle. Because the provision body is count-only ({"count":1}) there
+// is no deterministic pre-create key, so a provision whose id is lost before we
+// resolve it is the irreducible orphan sub-window recovered only by a manual
+// audit (see registerFloatingIPTeardown / floatingIPTeardownRef in
+// cleanup_seams.go).
 //
 // This is the cycle the harness exists for: the 2026-06-15 incident was a VPC
 // write loop amplifying an outage and orphaning static IPs. Here every write is
@@ -46,6 +56,12 @@ func (vpcCycle) Kind() Kind   { return KindWrite }
 func (vpcCycle) Quarantined() bool { return true }
 
 func (vc vpcCycle) Run(ctx context.Context, c *client.Client, r *Run) error {
+	// FIP provision/describe/confirm/deprovision sub-cycle (C4). Self-contained and
+	// independent of any private network, so it runs FIRST — regardless of whether a
+	// private network exists for the static-IP sub-cycle below. It provisions a
+	// FRESH billable floating IP and deprovisions it within the cycle.
+	vc.provisionFloatingIPSubCycle(ctx, c, r)
+
 	pn, err := vc.pickPrivateNetwork(ctx, c, r)
 	if err != nil || pn == nil {
 		// pickPrivateNetwork already recorded the failure/skip.
@@ -236,5 +252,114 @@ func (vc vpcCycle) bindSubCycle(ctx context.Context, c *client.Client, r *Run, s
 		}
 		_, werr := c.Activity().WaitForCompletion(ctx, activityID, silentWaiter)
 		return werr
+	})
+}
+
+// provisionFloatingIPSubCycle provisions a FRESH, billable public floating IP,
+// PATCHes its description to the "ct-validate" marker, confirms the marker by a
+// by-id read, then deprovisions it. It is self-contained (needs no private
+// network) and is the C4 lifecycle exercised live.
+//
+// F3 + the async-teardown doctrine: register ONE ref-based teardown BEFORE the
+// provision. Unlike the static-IP ref there is NO deterministic pre-create key —
+// the provision body is count-only ({"count":1}) — so the teardown can act only
+// on the RESOLVED id; a provision that is accepted server-side but whose id we
+// then lose is the irreducible orphan sub-window left to a documented manual
+// audit (registerFloatingIPTeardown is a no-op when the ref is unresolved).
+//
+// The split is ProvisionStart + WaitProvision (not the composed Provision) so the
+// cycle records the provision ACTIVITY id in the ref BEFORE waiting: if the wait
+// then fails, the orphan-window diagnostic can name the activity. This also
+// exercises live the exact split the provider (phase 3) will use.
+func (vc vpcCycle) provisionFloatingIPSubCycle(ctx context.Context, c *client.Client, r *Run) {
+	ref := &floatingIPTeardownRef{}
+	registerFloatingIPTeardown(r.Cleanup, vpcFIPDeprovisionSeam{c}, ref)
+
+	if err := r.op(vc, "vpc.floating_ip.provision", func() error {
+		activityID, syncID, perr := c.VPC().FloatingIP().ProvisionStart(ctx)
+		if perr != nil {
+			return perr
+		}
+		ref.ActivityID = activityID
+		id := syncID
+		if activityID != "" {
+			waited, werr := c.VPC().FloatingIP().WaitProvision(ctx, activityID, silentWaiter)
+			if werr != nil {
+				return fmt.Errorf("floating IP provision activity %s did not complete: %w", activityID, werr)
+			}
+			id = waited
+		}
+		ref.ID = id
+		ref.Resolved = true
+		return nil
+	}); err != nil || !ref.Resolved || ref.ID == "" {
+		// Provision failed, was breaker-skipped, or yielded no id. ref.Resolved stays
+		// false, so the pre-registered teardown is a no-op (no key to sweep). Record
+		// the remaining steps as skipped and stop — there is no FIP to describe or
+		// deprovision.
+		r.skip(vc, "vpc.floating_ip.describe")
+		r.skip(vc, "vpc.floating_ip.confirm_described")
+		r.skip(vc, "vpc.floating_ip.deprovision")
+		return
+	}
+
+	// PATCH the description to a known marker. The count-only provision cannot carry
+	// a description, so create-time convergence is a separate PATCH — exactly what
+	// the provider Create will do in phase 3. Wait only when the PATCH yields an
+	// activity handle (UpdateDescription fails closed on 202/no-Location).
+	if err := r.op(vc, "vpc.floating_ip.describe", func() error {
+		activityID, uerr := c.VPC().FloatingIP().UpdateDescription(ctx, ref.ID, "ct-validate")
+		if uerr != nil {
+			return uerr
+		}
+		if activityID != "" {
+			if _, werr := c.Activity().WaitForCompletion(ctx, activityID, silentWaiter); werr != nil {
+				return werr
+			}
+		}
+		return nil
+	}); err != nil {
+		// Description PATCH failed; the FIP still exists. Confirm is moot, but the
+		// billable resource MUST still be released — fall through to deprovision.
+		r.skip(vc, "vpc.floating_ip.confirm_described")
+		vc.explicitDeprovisionFloatingIP(ctx, c, r, ref)
+		return
+	}
+
+	// Confirm the description took effect (positive by-id read-back corroboration).
+	_ = r.op(vc, "vpc.floating_ip.confirm_described", func() error {
+		fip, found, cerr := c.VPC().FloatingIP().ResolveByID(ctx, ref.ID)
+		if cerr != nil {
+			return cerr
+		}
+		if !found {
+			return fmt.Errorf("floating IP %s not found on read-back after provision", ref.ID)
+		}
+		if fip.Description != "ct-validate" {
+			return fmt.Errorf("floating IP %s description not confirmed (got %q, want %q)", ref.ID, fip.Description, "ct-validate")
+		}
+		return nil
+	})
+
+	// Explicit deprovision on the happy path (recorded), overlapping the registered
+	// teardown by design: the cycle deprovisions here; the teardown is the safety net
+	// if we never reach this point. Same-cycle absence proof is set ONLY on success.
+	vc.explicitDeprovisionFloatingIP(ctx, c, r, ref)
+}
+
+// explicitDeprovisionFloatingIP runs the breaker-gated explicit deprovision and
+// records STRICT same-cycle proof into ref.ExplicitlyDeleted ONLY when the op
+// actually RAN and succeeded. It mirrors explicitDeleteStaticIP: on a breaker skip
+// r.op never invokes the closure, so the proof stays false and the deferred
+// teardown re-runs (a safe no-op via DeprovisionUnbound's by-id 404 → success)
+// instead of masking a possible orphan. The proof MUST be set from inside the
+// closure — NEVER inferred from r.op's return value, which is nil on a skip too.
+func (vc vpcCycle) explicitDeprovisionFloatingIP(ctx context.Context, c *client.Client, r *Run, ref *floatingIPTeardownRef) {
+	_ = r.op(vc, "vpc.floating_ip.deprovision", func() error {
+		if derr := c.VPC().FloatingIP().DeprovisionUnbound(ctx, ref.ID, silentWaiter); derr != nil {
+			return derr
+		}
+		ref.ExplicitlyDeleted = true
+		return nil
 	})
 }
