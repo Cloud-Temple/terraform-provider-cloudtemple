@@ -207,7 +207,8 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_object_storage_global_access_key": documentResource(resourceGlobalAccessKey(), "object-storage_iam_management"),
 
 				// VPC
-				"cloudtemple_vpc_static_ip": documentResource(resourceVPCStaticIP(), "vpc_write", "vpc_read", "activity_read"),
+				"cloudtemple_vpc_static_ip":   documentResource(resourceVPCStaticIP(), "vpc_write", "vpc_read", "activity_read"),
+				"cloudtemple_vpc_floating_ip": documentResource(resourceVPCFloatingIP(), "vpc_write", "vpc_read", "activity_read"),
 			},
 		}
 

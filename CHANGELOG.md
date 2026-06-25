@@ -1,5 +1,20 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.9.0 (Unreleased)
+
+NEW FEATURES :
+
+  * Added datasource `cloudtemple_vpc_vpc`.
+  * Added datasource `cloudtemple_vpc_vpcs`.
+  * Added datasource `cloudtemple_vpc_private_network`.
+  * Added datasource `cloudtemple_vpc_private_networks`.
+  * Added datasource `cloudtemple_vpc_static_ip`.
+  * Added datasource `cloudtemple_vpc_static_ips`.
+  * Added datasource `cloudtemple_vpc_floating_ip`.
+  * Added datasource `cloudtemple_vpc_floating_ips`.
+  * Added resource `cloudtemple_vpc_static_ip` to allocate and manage a static IP on a VPC private network, bound to a network-adapter MAC address. Create, update and delete are asynchronous and fail closed: the resource never silently orphans a created IP nor drops a still-present one from the state (every destructive decision is confirmed against a strict, complete listing of the private network), only `custom` static IPs (the ones it allocates) are manageable, and the MAC address is canonicalised so a config written in an equivalent form never shows a perpetual plan.
+  * Added resource `cloudtemple_vpc_floating_ip` to provision and manage a floating (public) IP. Provisioning is asynchronous and the billable IP is never silently orphaned; destroying the resource deprovisions the IP only once a strict read proves it unbound and a positive absence check confirms its removal — destroying a floating IP that is still bound to a static IP is refused with an actionable error. Binding to a static IP is read-only on this resource.
+
 # 1.8.0 (Unreleased)
 
 SECURITY :
