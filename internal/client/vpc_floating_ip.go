@@ -177,6 +177,60 @@ func decodeFloatingIPWithIDGuard(body []byte, id string) (*FloatingIP, error) {
 	return &out, nil
 }
 
+// ResolveBinding is the binding RESOURCE's authoritative by-id read. Unlike the
+// CorroborateBinding listing (which proves only that top-level ids are present, NOT
+// that a per-entry staticIp key is present), this reads the floating IP by id and
+// inspects the RAW 200 body, so it distinguishes a staticIp key that is OMITTED
+// (structurally incomplete -> Inconclusive) from an explicit staticIp:null
+// (-> Unbound). It mirrors resolveUnboundProof's raw-body discipline.
+//
+//	transport / 403 / 206 / other  -> (Inconclusive, nil, false, err)  fail closed
+//	404                            -> (Inconclusive, nil, false, nil)  AUTHORITATIVE ABSENT
+//	                                  (found=false is the SOLE drop signal for the binding)
+//	200 + duplicate top-level keys -> (Inconclusive, nil, true, nil)
+//	                                  (json keeps the LAST value, so a duplicated
+//	                                  staticIp/id could decode to a false Unbound/target)
+//	200 + empty/mismatched id      -> (Inconclusive, nil, true, err)   id guard
+//	200 + staticIp OMITTED         -> (Inconclusive, fip, true, nil)
+//	200 + staticIp PRESENT         -> ClassifyFloatingIPBinding(fip, staticID), fip, true, nil
+//
+// found reports only "a 200 was received" (the FIP exists); the caller uses it as the
+// sole authoritative-absence signal. fip is returned whenever the body decoded (for
+// flattening floating_ip_address); the caller uses it only on a definite state.
+func (f *VPCFloatingIPClient) ResolveBinding(ctx context.Context, fipID, staticID string) (FloatingIPBindingState, *FloatingIP, bool, error) {
+	body, found, err := f.readByID(ctx, fipID)
+	if err != nil {
+		return FloatingIPBindingInconclusive, nil, false, err
+	}
+	if !found {
+		// Authoritative 404: the floating IP is gone -> the binding is gone.
+		return FloatingIPBindingInconclusive, nil, false, nil
+	}
+	// A body with duplicate top-level keys cannot be trusted: Go's json decode keeps
+	// the LAST value, so a duplicated staticIp (e.g. object then null) or id could
+	// falsely read as Unbound or as our target. Reject before inspecting any field.
+	if hasDuplicateTopLevelKeys(body) {
+		return FloatingIPBindingInconclusive, nil, true, nil
+	}
+	fip, derr := decodeFloatingIPWithIDGuard(body, fipID)
+	if derr != nil {
+		return FloatingIPBindingInconclusive, nil, true, derr
+	}
+	// An OMITTED staticIp decodes to a nil pointer exactly like an explicit null, so
+	// recover its PRESENCE from the raw bytes: an omitted association is structurally
+	// incomplete and must NEVER be read as Unbound (negative evidence).
+	var fields map[string]json.RawMessage
+	if uerr := json.Unmarshal(body, &fields); uerr != nil {
+		return FloatingIPBindingInconclusive, nil, true, uerr
+	}
+	if _, present := fields["staticIp"]; !present {
+		return FloatingIPBindingInconclusive, fip, true, nil
+	}
+	// staticIp present: null -> Unbound; object -> id-based 4-way via the shared
+	// classifier (so the rule cannot drift from the listing/deprovision paths).
+	return ClassifyFloatingIPBinding(fip, staticID), fip, true, nil
+}
+
 // ListStrict retrieves the floating IPs and accepts ONLY a complete,
 // structurally valid HTTP 200 array. It mirrors vpc_static_ip's ListStrict: it
 // is the corroboration channel for the binding resource, so it must prove
