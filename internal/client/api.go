@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	"github.com/golang-jwt/jwt/v4"
 	"github.com/hashicorp/go-cleanhttp"
 	"github.com/sethvargo/go-retry"
 )
@@ -25,6 +26,27 @@ const (
 	HTTPSchemeEnvName       = "CLOUDTEMPLE_HTTP_SCHEME"
 	HTTPClientIDEnvName     = "CLOUDTEMPLE_CLIENT_ID"
 	HTTPClientSecretEnvName = "CLOUDTEMPLE_SECRET_ID"
+	HTTPTimeoutEnvName      = "CLOUDTEMPLE_HTTP_TIMEOUT"
+)
+
+const (
+	// defaultHTTPTimeout bounds each HTTP request (dial + headers + body read).
+	// It is a safety guard: without it a slow/stuck endpoint hangs a read with no
+	// client-side bound. Generous on purpose so it never regresses a legitimately
+	// slow request, while still cutting an unbounded hang. Override with
+	// CLOUDTEMPLE_HTTP_TIMEOUT (seconds).
+	defaultHTTPTimeout = 600 * time.Second
+
+	// defaultReadRetryMax is the total number of attempts for an idempotent GET
+	// read (and the auth POST): 1 = no retry. It lets the provider absorb the rare
+	// intermittent transient error (e.g. an upstream 502) instead of failing a
+	// whole plan/apply on the first one.
+	defaultReadRetryMax = 3
+
+	// defaultReadRetryBackoffBase / readRetryBackoffMax bound the wait between
+	// read retries (capped exponential: base, 2*base, ... up to the max).
+	defaultReadRetryBackoffBase = 500 * time.Millisecond
+	readRetryBackoffMax         = 5 * time.Second
 )
 
 type Config struct {
@@ -40,6 +62,19 @@ type Config struct {
 
 	ClientID, SecretID string
 
+	// HTTPTimeout bounds each HTTP request. 0 means "use the default"
+	// (defaultHTTPTimeout); NewClient applies it to the http.Client it builds, and
+	// to a caller-supplied HttpClient that has no timeout of its own, so every
+	// client carries the hang guard regardless of how Config was created.
+	HTTPTimeout time.Duration
+
+	// ReadRetryMax is the total number of attempts for an idempotent GET read (and
+	// the auth POST), 1 meaning no retry. DefaultConfig sets it; a zero value
+	// disables retry. It is intentionally NOT backfilled by NewClient, so only a
+	// DefaultConfig-derived (production) client retries transient read failures — a
+	// minimal/bare Config{} keeps single-shot, deterministic behaviour.
+	ReadRetryMax int
+
 	// this parameter will only be used during the tests and not exposed to
 	// clients
 	ErrorOnUnexpectedActivity bool
@@ -47,13 +82,24 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	config := &Config{
-		Address:   "shiva.cloud-temple.com",
-		Scheme:    "https",
-		Transport: cleanhttp.DefaultPooledTransport(),
+		Address:      "shiva.cloud-temple.com",
+		Scheme:       "https",
+		Transport:    cleanhttp.DefaultPooledTransport(),
+		HTTPTimeout:  defaultHTTPTimeout,
+		ReadRetryMax: defaultReadRetryMax,
 	}
 
 	if addr := os.Getenv(HTTPAddrEnvName); addr != "" {
 		config.Address = addr
+	}
+
+	// CLOUDTEMPLE_HTTP_TIMEOUT overrides the per-request timeout, in seconds. A
+	// missing, non-numeric or non-positive value keeps the default (fail-safe):
+	// the timeout is a guard, so we never let a bad env value disable it.
+	if v := os.Getenv(HTTPTimeoutEnvName); v != "" {
+		if secs, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && secs > 0 {
+			config.HTTPTimeout = time.Duration(secs) * time.Second
+		}
 	}
 
 	if scheme := os.Getenv(HTTPSchemeEnvName); scheme != "" {
@@ -83,6 +129,14 @@ type Client struct {
 	config Config
 
 	UserAgent string
+
+	// readRetryMax / readRetryBackoffBase tune the bounded retry of idempotent GET
+	// reads and the auth POST (see doWithRetry). readRetryMax is carried from
+	// Config.ReadRetryMax (0 => no retry); readRetryBackoffBase is set from the
+	// constant default. Both are unexported so in-package tests can drive the retry
+	// path deterministically (small/zero backoff, explicit attempt count).
+	readRetryMax         int
+	readRetryBackoffBase time.Duration
 }
 
 func NewClient(config *Config) (*Client, error) {
@@ -100,11 +154,22 @@ func NewClient(config *Config) (*Client, error) {
 	if config.Scheme == "" {
 		config.Scheme = defConfig.Scheme
 	}
+	// Backfill the per-request timeout for every client (the hang guard must not
+	// depend on how Config was built). ReadRetryMax is deliberately NOT backfilled:
+	// retry stays opt-in via DefaultConfig (see Config.ReadRetryMax).
+	if config.HTTPTimeout <= 0 {
+		config.HTTPTimeout = defConfig.HTTPTimeout
+	}
 
 	if config.HttpClient == nil {
 		config.HttpClient = &http.Client{
 			Transport: config.Transport,
+			Timeout:   config.HTTPTimeout,
 		}
+	} else if config.HttpClient.Timeout <= 0 {
+		// A caller-supplied client without its own timeout still gets the hang
+		// guard; an explicit non-zero timeout is left untouched.
+		config.HttpClient.Timeout = config.HTTPTimeout
 	}
 
 	parts := strings.SplitN(config.Address, "://", 2)
@@ -113,7 +178,11 @@ func NewClient(config *Config) (*Client, error) {
 		config.Address = parts[1]
 	}
 
-	return &Client{config: *config}, nil
+	return &Client{
+		config:               *config,
+		readRetryMax:         config.ReadRetryMax,
+		readRetryBackoffBase: defaultReadRetryBackoffBase,
+	}, nil
 }
 
 type request struct {
@@ -218,11 +287,16 @@ func (c *Client) JWT(ctx context.Context) (*jwt.Token, error) {
 	defer c.lock.Unlock()
 
 	if c.SavedToken != nil {
-		expireAt := c.SavedToken.Claims.(jwt.MapClaims)["exp"].(float64)
-		tm := time.Unix(int64(expireAt), 0)
-
-		if time.Until(tm) > 5*time.Minute {
-			return c.SavedToken, nil
+		// Serve the cached token only while it stays valid for at least 5 more
+		// minutes. Read its expiry defensively: a token whose claims are nil, or
+		// whose "exp" is absent or non-numeric, is treated as unusable and falls
+		// through to re-authentication — never panicking on the type assertions.
+		if claims, ok := c.SavedToken.Claims.(jwt.MapClaims); ok {
+			if exp, ok := claims["exp"].(float64); ok {
+				if time.Until(time.Unix(int64(exp), 0)) > 5*time.Minute {
+					return c.SavedToken, nil
+				}
+			}
 		}
 	}
 
@@ -231,7 +305,16 @@ func (c *Client) JWT(ctx context.Context) (*jwt.Token, error) {
 		"id":     c.config.ClientID,
 		"secret": c.config.SecretID,
 	}
-	resp, err := c.doRequestWithToken(ctx, r, "")
+	// Retry the auth POST narrowly on transient failures. It is idempotent here
+	// (it returns a token; it creates nothing), so it is safe to replay. r.body is
+	// reset to nil before each attempt because toHTTP encodes r.obj into r.body
+	// only once — without the reset a retry would resend an already-consumed body.
+	// Running under c.lock, this also prevents a re-auth storm from concurrent
+	// callers (they queue behind the single in-flight auth).
+	resp, err := c.doWithRetry(ctx, func() (*http.Response, error) {
+		r.body = nil
+		return c.doRequestWithToken(ctx, r, "")
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -240,15 +323,22 @@ func (c *Client) JWT(ctx context.Context) (*jwt.Token, error) {
 		return nil, err
 	}
 
-	bytes, err := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, nil
+		// Surface the read failure (fail closed) instead of returning a nil token
+		// with no error — the caller would dereference token.Raw and panic.
+		return nil, fmt.Errorf("failed to read authentication response: %w", err)
 	}
 
-	token, _, err := new(jwt.Parser).ParseUnverified(string(bytes), jwt.MapClaims{})
+	token, _, err := new(jwt.Parser).ParseUnverified(string(body), jwt.MapClaims{})
+	if err != nil {
+		// Do NOT cache a partially-parsed token on error: a later cache hit reads
+		// its claims (the "exp" expiry) and would panic on a malformed token.
+		return nil, fmt.Errorf("failed to parse authentication token: %w", err)
+	}
 	c.SavedToken = token
 
-	return token, err
+	return token, nil
 }
 
 type LoginToken struct {
@@ -280,7 +370,22 @@ func (c *Client) Token(ctx context.Context) (*LoginToken, error) {
 
 }
 
+// doRequest performs an authenticated request. Idempotent GET reads are retried
+// on transient failures (see doWithRetry) so a slow/flaky API does not fail a
+// whole plan/apply on the first intermittent error. Non-GET requests (writes,
+// which may already have triggered an async activity via the Location header)
+// are sent exactly once — retrying them could double-create.
 func (c *Client) doRequest(ctx context.Context, r *request) (*http.Response, error) {
+	if r.method == http.MethodGet {
+		return c.doWithRetry(ctx, func() (*http.Response, error) {
+			return c.doRequestOnce(ctx, r)
+		})
+	}
+	return c.doRequestOnce(ctx, r)
+}
+
+// doRequestOnce performs a single authenticated request, with no retry.
+func (c *Client) doRequestOnce(ctx context.Context, r *request) (*http.Response, error) {
 	token, err := c.JWT(ctx)
 	if err != nil {
 		return nil, err
@@ -295,6 +400,134 @@ func (c *Client) doRequest(ctx context.Context, r *request) (*http.Response, err
 	}
 
 	return resp, nil
+}
+
+// doWithRetry runs send up to c.readRetryMax times (1 => no retry), retrying a
+// transient status (429 / 5xx, after draining the response body so the keep-alive
+// connection is reused) or a retryable transport error, with a bounded backoff
+// that honours Retry-After on 429. It NEVER retries a configured request timeout,
+// a context error, a 4xx or a decode error — those are returned at once. The last
+// attempt's result is handed to the caller, which validates the FINAL response
+// (requireOK / requireNotFoundOrOK) and decodes it. The caller guarantees send is
+// idempotent (a GET, or the auth POST whose body is rebuilt each attempt).
+func (c *Client) doWithRetry(ctx context.Context, send func() (*http.Response, error)) (*http.Response, error) {
+	attempts := c.readRetryMax
+	if attempts < 1 {
+		attempts = 1
+	}
+
+	var (
+		resp *http.Response
+		err  error
+	)
+	for attempt := 0; attempt < attempts; attempt++ {
+		resp, err = send()
+
+		if attempt == attempts-1 {
+			return resp, err // budget exhausted: the caller validates the final result
+		}
+
+		switch {
+		case err != nil:
+			if !retryableTransportError(err) {
+				return resp, err
+			}
+			if !c.waitBeforeRetry(ctx, attempt, 0) {
+				return nil, ctx.Err()
+			}
+		case resp != nil && transientStatus(resp.StatusCode):
+			retryAfter := parseRetryAfter(resp.Header.Get("Retry-After"))
+			// Drain+close the failed response before retrying so net/http can reuse
+			// the connection instead of opening a new one against a struggling gateway.
+			closeResponseBody(resp)
+			if !c.waitBeforeRetry(ctx, attempt, retryAfter) {
+				return nil, ctx.Err()
+			}
+		default:
+			return resp, err // success or a non-retryable status: let the caller handle it
+		}
+	}
+	return resp, err
+}
+
+// waitBeforeRetry sleeps the backoff for the just-failed attempt (or Retry-After,
+// capped), honouring ctx. It returns false if ctx is cancelled during the wait.
+func (c *Client) waitBeforeRetry(ctx context.Context, attempt int, retryAfter time.Duration) bool {
+	wait := c.readRetryBackoff(attempt)
+	if retryAfter > 0 {
+		if retryAfter > readRetryBackoffMax {
+			retryAfter = readRetryBackoffMax
+		}
+		wait = retryAfter
+	}
+	if wait <= 0 {
+		return ctx.Err() == nil
+	}
+	t := time.NewTimer(wait)
+	defer t.Stop()
+	select {
+	case <-ctx.Done():
+		return false
+	case <-t.C:
+		return true
+	}
+}
+
+// readRetryBackoff is the bounded wait before the retry following the 0-based
+// failed attempt: a capped exponential (base, 2*base, 4*base, ... up to the max).
+func (c *Client) readRetryBackoff(attempt int) time.Duration {
+	base := c.readRetryBackoffBase
+	if base <= 0 {
+		return 0
+	}
+	d := base << attempt
+	if d <= 0 || d > readRetryBackoffMax { // d<=0 guards a shift overflow on a large attempt
+		d = readRetryBackoffMax
+	}
+	return d
+}
+
+// transientStatus reports whether an HTTP status is worth retrying for an
+// idempotent request: rate limiting (429) or a server-side error (5xx, including
+// the 502 the upstream gateway emits intermittently).
+func transientStatus(code int) bool {
+	return code == http.StatusTooManyRequests || code >= 500
+}
+
+// retryableTransportError reports whether a transport-level error from an
+// idempotent request is worth retrying. It deliberately EXCLUDES timeouts (the
+// configured per-request http.Client.Timeout, or a ctx deadline) and context
+// cancellation: retrying a configured timeout would multiply the anti-hang bound
+// into a multi-minute stall. Remaining transport failures (connection reset,
+// unexpected EOF, connection refused, ...) are transient and retried.
+func retryableTransportError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		// A configured per-request timeout / deadline reports Timeout() == true and
+		// must not be retried; any other transport failure is transient.
+		return !urlErr.Timeout()
+	}
+	return false
+}
+
+// parseRetryAfter parses a Retry-After header expressed in delta-seconds. The
+// HTTP-date form is intentionally ignored (best-effort). Returns 0 when the header
+// is absent or not a positive integer.
+func parseRetryAfter(v string) time.Duration {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return 0
+	}
+	if secs, err := strconv.Atoi(v); err == nil && secs > 0 {
+		return time.Duration(secs) * time.Second
+	}
+	return 0
 }
 
 func (c *Client) doRequestAndReturnActivity(ctx context.Context, r *request) (string, error) {
@@ -362,7 +595,7 @@ func requireNotFoundOrOK(resp *http.Response, notFoundCode int) (bool, error) {
 	case 404, notFoundCode:
 		return false, nil
 	case 403:
-		return false, fmt.Errorf("Access denied: %s", resp.Status)
+		return false, fmt.Errorf("access denied: %s", resp.Status)
 	default:
 		return false, generateUnexpectedResponseCodeError(resp)
 	}
@@ -375,6 +608,22 @@ type StatusError struct {
 
 func (e StatusError) Error() string {
 	return fmt.Sprintf("Unexpected response code: %d (%s)", e.Code, e.Body)
+}
+
+// isTransientAPIError reports whether an error is worth retrying: throttling
+// (429), server-side errors (5xx) or a transient transport failure (connection
+// reset, unexpected EOF, ...). A CONFIGURED request timeout (http.Client.Timeout)
+// or a context deadline/cancellation is NOT transient — retrying it would
+// multiply the per-request bound into a multi-minute stall — and neither are
+// authentication, authorization or decoding errors. Shared by the read-retry
+// helper (doWithRetry) and the activity/backup waiters so the timeout doctrine
+// stays uniform across the client.
+func isTransientAPIError(err error) bool {
+	var statusErr StatusError
+	if errors.As(err, &statusErr) {
+		return statusErr.Code == http.StatusTooManyRequests || statusErr.Code >= 500
+	}
+	return retryableTransportError(err)
 }
 
 // generateUnexpectedResponseCodeError consumes the rest of the body, closes

@@ -74,6 +74,11 @@ func dataSourceOpenIaasVirtualMachines() *schema.Resource {
 							Computed:    true,
 							Description: "Whether the virtual machine is configured to automatically power on when the host starts.",
 						},
+						"high_availability": {
+							Type:        schema.TypeString,
+							Computed:    true,
+							Description: "The high availability configuration of the virtual machine.",
+						},
 						"dvd_drive": {
 							Type:        schema.TypeList,
 							Computed:    true,
@@ -108,6 +113,44 @@ func dataSourceOpenIaasVirtualMachines() *schema.Resource {
 										Type:        schema.TypeString,
 										Computed:    true,
 										Description: "The version of the virtualization tools installed in the virtual machine.",
+									},
+								},
+							},
+						},
+						"pv_drivers": {
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Information about the paravirtualization drivers of the virtual machine.",
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"detected": {
+										Type:        schema.TypeBool,
+										Computed:    true,
+										Description: "Whether the PV drivers are detected in the virtual machine.",
+									},
+									"version": {
+										Type:        schema.TypeString,
+										Computed:    true,
+										Description: "The version of the PV drivers.",
+									},
+									"are_up_to_date": {
+										Type:        schema.TypeBool,
+										Computed:    true,
+										Description: "Whether the PV drivers are up to date.",
+									},
+								},
+							},
+						},
+						"management_agent": {
+							Type:        schema.TypeList,
+							Computed:    true,
+							Description: "Information about the management agent of the virtual machine.",
+							Elem: &schema.Resource{
+								Schema: map[string]*schema.Schema{
+									"detected": {
+										Type:        schema.TypeBool,
+										Computed:    true,
+										Description: "Whether the management agent is detected in the virtual machine.",
 									},
 								},
 							},

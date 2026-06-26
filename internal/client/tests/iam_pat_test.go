@@ -15,12 +15,15 @@ const (
 
 func TestIAM_PATList(t *testing.T) {
 	ctx := context.Background()
-	tokens, err := client.IAM().PAT().List(ctx, testUserID(t), testTenantID(t))
+	lt, err := client.Token(ctx)
+	require.NoError(t, err)
+	tokens, err := client.IAM().PAT().List(ctx)
 	require.NoError(t, err)
 
 	found := false
 	for _, token := range tokens {
-		if token.Name == os.Getenv(PatName) {
+		// List(ctx) is unscoped (see #226); match the principal's own token.
+		if token.Name == os.Getenv(PatName) && token.UserId == lt.UserID() && token.TenantId == lt.TenantID() {
 			found = true
 			break
 		}
@@ -30,12 +33,15 @@ func TestIAM_PATList(t *testing.T) {
 
 func TestIAM_PATRead(t *testing.T) {
 	ctx := context.Background()
-	tokens, err := client.IAM().PAT().List(ctx, testUserID(t), testTenantID(t))
+	lt, err := client.Token(ctx)
+	require.NoError(t, err)
+	tokens, err := client.IAM().PAT().List(ctx)
 	require.NoError(t, err)
 
 	var id string
 	for _, token := range tokens {
-		if token.Name == os.Getenv(PatName) {
+		// List(ctx) is unscoped (see #226); match the principal's own token.
+		if token.Name == os.Getenv(PatName) && token.UserId == lt.UserID() && token.TenantId == lt.TenantID() {
 			id = token.ID
 			break
 		}
@@ -44,7 +50,7 @@ func TestIAM_PATRead(t *testing.T) {
 		t.Fatalf(`failed to find token named "Terraform"`)
 	}
 
-	token, err := client.IAM().PAT().Read(ctx, tokens[0].ID)
+	token, err := client.IAM().PAT().Read(ctx, id)
 	require.NoError(t, err)
 	require.Equal(t, os.Getenv(PatName), token.Name)
 	require.Equal(t, "", token.Secret)

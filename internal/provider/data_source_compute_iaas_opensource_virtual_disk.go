@@ -109,6 +109,11 @@ func dataSourceOpenIaasVirtualDisk() *schema.Resource {
 							Computed:    true,
 							Description: "Whether the disk is attached in read-only mode to this virtual machine.",
 						},
+						"connected": {
+							Type:        schema.TypeBool,
+							Computed:    true,
+							Description: "Whether the disk is connected to this virtual machine.",
+						},
 					},
 				},
 			},

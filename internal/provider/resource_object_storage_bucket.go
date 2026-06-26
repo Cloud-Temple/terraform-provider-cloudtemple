@@ -221,8 +221,18 @@ func objectStorageBucketRead(ctx context.Context, d *schema.ResourceData, meta a
 		return diag.Errorf("failed to read bucket: %s", err)
 	}
 	if bucket == nil {
-		d.SetId("")
-		return nil
+		// A nil read is NOT a deletion: the client maps HTTP 403 to nil. The
+		// bucket listing is unscoped and not provably complete, so we never
+		// auto-remove the resource; we fail closed (#281).
+		name := d.Get("name").(string)
+		return confirmObjectStorageOrKeep(ctx, name, "object storage bucket",
+			func(ctx context.Context) ([]string, error) {
+				buckets, err := c.ObjectStorage().Bucket().ListStrict(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return bucketNames(buckets), nil
+			})
 	}
 
 	// Use helper to flatten the bucket data

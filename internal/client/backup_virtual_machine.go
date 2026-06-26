@@ -85,12 +85,27 @@ func (c *BackupVirtualMachineClient) WaitForInventory(ctx context.Context, id st
 	b := retry.NewFibonacci(1 * time.Second)
 	b = retry.WithCappedDuration(30*time.Second, b)
 
+	return waitForBackupVirtualMachineInventory(ctx, id, func(ctx context.Context) (*BackupVirtualMachine, error) {
+		return c.Read(ctx, id)
+	}, b, options)
+}
+
+// backupVirtualMachineReadFunc abstracts the read so the inventory polling loop
+// can be unit tested without HTTP calls or real sleeps.
+type backupVirtualMachineReadFunc func(ctx context.Context) (*BackupVirtualMachine, error)
+
+// waitForBackupVirtualMachineInventory is the polling loop behind WaitForInventory,
+// with read and backoff injected. Behavior preserved exactly (same shape as the
+// disk inventory waiter): ANY read error is fatal at once (no transient distinction
+// — see #293 Finding F1; NOT changed here), a nil result keeps polling, a found VM
+// returns. The poll is bounded only by the injected backoff / context.
+func waitForBackupVirtualMachineInventory(ctx context.Context, id string, read backupVirtualMachineReadFunc, b retry.Backoff, options *WaiterOptions) (*BackupVirtualMachine, error) {
 	var res *BackupVirtualMachine
 	var count int
 
 	err := retry.Do(ctx, b, func(ctx context.Context) error {
 		count++
-		virtualMachine, err := c.Read(ctx, id)
+		virtualMachine, err := read(ctx)
 		if err != nil {
 			return options.error(err)
 		}

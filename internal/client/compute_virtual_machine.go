@@ -93,12 +93,17 @@ type VirtualMachineBootOptions struct {
 }
 
 type BootOptions struct {
-	BootDelay            int    `json:"bootDelay"`
-	BootRetryDelay       int    `json:"bootRetryDelay"`
-	BootRetryEnabled     bool   `json:"bootRetryEnabled"`
-	EnterBIOSSetup       bool   `json:"enterBIOSSetup"`
-	Firmware             string `json:"firmware"`
-	EFISecureBootEnabled bool   `json:"efiSecureBootEnabled"`
+	// Every attribute is a pointer or omitempty: the matching schema
+	// attributes are Optional+Computed, so only an explicitly configured
+	// value is write intent — an absent value is omitted from the payload
+	// while explicit zero values (boot_delay = 0, booleans false) stay
+	// expressible (#264 plan, Lot D + FF-4).
+	BootDelay            *int   `json:"bootDelay,omitempty"`
+	BootRetryDelay       *int   `json:"bootRetryDelay,omitempty"`
+	BootRetryEnabled     *bool  `json:"bootRetryEnabled,omitempty"`
+	EnterBIOSSetup       *bool  `json:"enterBIOSSetup,omitempty"`
+	Firmware             string `json:"firmware,omitempty"`
+	EFISecureBootEnabled *bool  `json:"efiSecureBootEnabled,omitempty"`
 }
 
 type PowerRequest struct {
@@ -160,6 +165,31 @@ func (v *VirtualMachineClient) List(ctx context.Context, filter *VirtualMachineF
 	}
 	defer closeResponseBody(resp)
 	if err := requireOK(resp); err != nil {
+		return nil, err
+	}
+
+	var out []*VirtualMachine
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
+// ListStrict behaves like List but requires a complete HTTP 200 answer: 206 is
+// a partial listing and cannot prove an absence, and any other code (including
+// 403) is an error rather than being mapped to an empty result. Callers using
+// the listing as state-safety evidence must fail closed on anything else
+// (#281).
+func (v *VirtualMachineClient) ListStrict(ctx context.Context, filter *VirtualMachineFilter) ([]*VirtualMachine, error) {
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_machines")
+	r.addFilter(filter)
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireHttpCodes(resp, 200); err != nil {
 		return nil, err
 	}
 

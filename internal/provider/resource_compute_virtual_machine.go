@@ -9,6 +9,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/customdiff"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -555,10 +556,11 @@ Independent persistent: Changes are immediately and permanently written to the v
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"firmware": {
-							Type:        schema.TypeString,
-							Optional:    true,
-							Computed:    true,
-							Description: "Firmware type. (BIOS or EFI)",
+							Type:         schema.TypeString,
+							Optional:     true,
+							Computed:     true,
+							ValidateFunc: validation.StringInSlice([]string{"bios", "efi"}, true),
+							Description:  "Firmware type. (BIOS or EFI)",
 						},
 						"boot_delay": {
 							Type:        schema.TypeInt,
@@ -1097,8 +1099,25 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 		return diag.Errorf("the virtual machine could not be read: %s", err)
 	}
 	if vm == nil {
-		d.SetId("") // La VM n'existe plus, marquer la ressource comme supprimée
-		return nil
+		// A nil read is NOT a deletion: the client maps HTTP 403 to nil, so a
+		// permission/scope blip would silently shrink the state. We never
+		// auto-remove the resource; we confirm liveness against a strict
+		// machine-manager-scoped listing and otherwise fail closed (#281).
+		mmID := d.Get("machine_manager_id").(string)
+		return confirmVMwareDeviceOrKeep(ctx, id, "virtual machine", "machine manager", mmID,
+			func(ctx context.Context) ([]string, error) {
+				vms, err := c.Compute().VirtualMachine().ListStrict(ctx, &client.VirtualMachineFilter{MachineManagerID: mmID})
+				if err != nil {
+					return nil, err
+				}
+				ids := make([]string, 0, len(vms))
+				for _, m := range vms {
+					if m != nil {
+						ids = append(ids, m.ID)
+					}
+				}
+				return ids, nil
+			})
 	}
 
 	// Normaliser le power state pour qu'il soit cohérent avec l'entrée
@@ -1190,6 +1209,64 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 	return diags
 }
 
+// buildVMwareBootOptionsFromRaw builds the boot options payload from the
+// merged block values and the raw-config block. The three Optional+Computed
+// booleans are only carried when the raw configuration explicitly sets
+// them: a value merged through Computed is not write intent (#246 class,
+// #264 plan Lot D).
+func buildVMwareBootOptionsFromRaw(rawBlock cty.Value, block map[string]interface{}) *client.BootOptions {
+	opts := &client.BootOptions{}
+	setBoolIfConfigured := func(attr string, target **bool) {
+		if v := rawBlock.GetAttr(attr); v.IsKnown() && !v.IsNull() {
+			b := v.True()
+			*target = &b
+		}
+	}
+	setIntIfConfigured := func(attr string, target **int) {
+		if v := rawBlock.GetAttr(attr); v.IsKnown() && !v.IsNull() {
+			big, _ := v.AsBigFloat().Int64()
+			i := int(big)
+			*target = &i
+		}
+	}
+	setIntIfConfigured("boot_delay", &opts.BootDelay)
+	setIntIfConfigured("boot_retry_delay", &opts.BootRetryDelay)
+	setBoolIfConfigured("boot_retry_enabled", &opts.BootRetryEnabled)
+	setBoolIfConfigured("enter_bios_setup", &opts.EnterBIOSSetup)
+	setBoolIfConfigured("efi_secure_boot_enabled", &opts.EFISecureBootEnabled)
+	if v := rawBlock.GetAttr("firmware"); v.IsKnown() && !v.IsNull() {
+		opts.Firmware = strings.ToLower(v.AsString())
+	}
+	if opts.BootDelay == nil && opts.BootRetryDelay == nil && opts.BootRetryEnabled == nil &&
+		opts.EnterBIOSSetup == nil && opts.EFISecureBootEnabled == nil && opts.Firmware == "" {
+		// A present block with no configured attribute carries no write
+		// intent: sending an empty bootOptions object could reset live
+		// values platform-side (FF-4).
+		return nil
+	}
+	return opts
+}
+
+// buildVMwareBootOptions returns the boot options payload only when the
+// boot_options block is explicitly present in the raw configuration: the
+// block is Optional+Computed, so the merged d.Get value re-pushed live
+// values on every update (the create chains into update).
+func buildVMwareBootOptions(d *schema.ResourceData) *client.BootOptions {
+	raw := d.GetRawConfig()
+	if raw.IsNull() || !raw.IsKnown() {
+		return nil
+	}
+	rawList := raw.GetAttr("boot_options")
+	if rawList.IsNull() || !rawList.IsKnown() || rawList.LengthInt() == 0 {
+		return nil
+	}
+	merged := d.Get("boot_options").([]interface{})
+	if len(merged) == 0 || merged[0] == nil {
+		return nil
+	}
+	return buildVMwareBootOptionsFromRaw(rawList.Index(cty.NumberIntVal(0)), merged[0].(map[string]interface{}))
+}
+
 func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	return updateVirtualMachine(ctx, d, meta, d.HasChange("power_state"), false)
 }
@@ -1209,17 +1286,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		ExposeHardwareVirtualization: d.Get("expose_hardware_virtualization").(bool),
 	}
 
-	if len(d.Get("boot_options").([]interface{})) > 0 {
-		bootOptions := d.Get("boot_options").([]interface{})[0]
-		req.BootOptions = &client.BootOptions{
-			BootDelay:            bootOptions.(map[string]interface{})["boot_delay"].(int),
-			BootRetryDelay:       bootOptions.(map[string]interface{})["boot_retry_delay"].(int),
-			BootRetryEnabled:     bootOptions.(map[string]interface{})["boot_retry_enabled"].(bool),
-			EnterBIOSSetup:       bootOptions.(map[string]interface{})["enter_bios_setup"].(bool),
-			Firmware:             strings.ToLower(bootOptions.(map[string]interface{})["firmware"].(string)),
-			EFISecureBootEnabled: bootOptions.(map[string]interface{})["efi_secure_boot_enabled"].(bool),
-		}
-	}
+	req.BootOptions = buildVMwareBootOptions(d)
 
 	activityId, err := c.Compute().VirtualMachine().Update(ctx, req)
 	if err != nil {

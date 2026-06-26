@@ -73,12 +73,28 @@ func (c *BackupVirtualDiskClient) WaitForInventory(ctx context.Context, id strin
 	b := retry.NewFibonacci(1 * time.Second)
 	b = retry.WithCappedDuration(30*time.Second, b)
 
+	return waitForBackupVirtualDiskInventory(ctx, id, func(ctx context.Context) (*BackupVirtualDisk, error) {
+		return c.Read(ctx, id)
+	}, b, options)
+}
+
+// backupVirtualDiskReadFunc abstracts the read so the inventory polling loop can
+// be unit tested without HTTP calls or real sleeps.
+type backupVirtualDiskReadFunc func(ctx context.Context) (*BackupVirtualDisk, error)
+
+// waitForBackupVirtualDiskInventory is the polling loop behind WaitForInventory,
+// with read and backoff injected. Behavior preserved exactly: ANY read error is
+// fatal at once (no transient-vs-permanent distinction — see #293 Finding F1; NOT
+// changed here), a nil result keeps polling (waiting for the disk to appear in the
+// inventory), and a found disk returns. The poll is bounded only by the injected
+// backoff / context.
+func waitForBackupVirtualDiskInventory(ctx context.Context, id string, read backupVirtualDiskReadFunc, b retry.Backoff, options *WaiterOptions) (*BackupVirtualDisk, error) {
 	var res *BackupVirtualDisk
 	var count int
 
 	err := retry.Do(ctx, b, func(ctx context.Context) error {
 		count++
-		virtualDisk, err := c.Read(ctx, id)
+		virtualDisk, err := read(ctx)
 		if err != nil {
 			return options.error(err)
 		}

@@ -57,6 +57,31 @@ func (v *VirtualDiskClient) List(ctx context.Context, filter *VirtualDiskFilter)
 	return out, nil
 }
 
+// ListStrict behaves like List but requires a complete HTTP 200 answer: 206 is
+// a partial listing and cannot prove an absence, and any other code (including
+// 403) is an error rather than being mapped to an empty result. Callers using
+// the listing as state-safety evidence must fail closed on anything else
+// (#281).
+func (v *VirtualDiskClient) ListStrict(ctx context.Context, filter *VirtualDiskFilter) ([]*VirtualDisk, error) {
+	r := v.c.newRequest("GET", "/compute/v1/vcenters/virtual_disks")
+	r.addFilter(filter)
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireHttpCodes(resp, 200); err != nil {
+		return nil, err
+	}
+
+	var out []*VirtualDisk
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 type CreateVirtualDiskRequest struct {
 	ControllerId       string `json:"controllerId,omitempty"`
 	ProvisioningType   string `json:"provisioningType"`

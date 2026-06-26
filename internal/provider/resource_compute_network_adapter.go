@@ -110,8 +110,24 @@ func computeNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, meta
 		return diag.FromErr(err)
 	}
 	if networkAdapter == nil {
-		d.SetId("") // L'adaptateur n'existe plus, marquer la ressource comme supprimée
-		return nil
+		// A nil read is NOT a deletion: the client maps HTTP 403 to nil. We
+		// never auto-remove the resource; we confirm liveness against a strict
+		// VM-scoped listing and otherwise fail closed (#281).
+		vmID := d.Get("virtual_machine_id").(string)
+		return confirmVMwareDeviceOrKeep(ctx, d.Id(), "network adapter", "virtual machine", vmID,
+			func(ctx context.Context) ([]string, error) {
+				adapters, err := c.Compute().NetworkAdapter().ListStrict(ctx, &client.NetworkAdapterFilter{VirtualMachineID: vmID})
+				if err != nil {
+					return nil, err
+				}
+				ids := make([]string, 0, len(adapters))
+				for _, a := range adapters {
+					if a != nil {
+						ids = append(ids, a.ID)
+					}
+				}
+				return ids, nil
+			})
 	}
 
 	// Mapper les données en utilisant la fonction helper

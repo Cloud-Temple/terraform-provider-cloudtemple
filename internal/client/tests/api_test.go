@@ -111,13 +111,15 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)
 	}
-	tokens, err := client.IAM().PAT().List(ctx, lt.UserID(), lt.TenantID())
+	tokens, err := client.IAM().PAT().List(ctx)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err.Error())
 		os.Exit(1)
 	}
 	for _, token := range tokens {
-		if _, found := names[token.Name]; found {
+		// PAT().List is no longer scoped server-side (see #226), so restrict
+		// this destructive cleanup to the authenticated principal's own tokens.
+		if _, found := names[token.Name]; found && token.UserId == lt.UserID() && token.TenantId == lt.TenantID() {
 			err := client.IAM().PAT().Delete(ctx, token.ID)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err.Error())

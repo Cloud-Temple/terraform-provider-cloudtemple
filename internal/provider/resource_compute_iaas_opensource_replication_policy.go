@@ -128,7 +128,27 @@ func openIaasReplicationPolicyRead(ctx context.Context, d *schema.ResourceData, 
 	var diags diag.Diagnostics
 
 	replicationPolicy, err := c.Compute().OpenIaaS().Replication().Policy().Read(ctx, d.Id())
-	if replicationPolicy == nil || err != nil {
+	// A read error is NOT a deletion: clearing the id on a transient
+	// failure would drop the resource from the state and the next apply
+	// would create a duplicate (#264 plan, Lot D).
+	if err != nil {
+		return diag.Errorf("failed to read replication policy: %s", err)
+	}
+	if replicationPolicy == nil {
+		// The API answers 403 for unknown AND forbidden ids alike, and the
+		// client maps both to nil: a deletion is only accepted after the
+		// strict listing (requireOK, 403 = error) confirms the absence —
+		// an access-denied answer must never silently remove the resource
+		// from the state (#275 doctrine, FF-5).
+		policies, err := c.Compute().OpenIaaS().Replication().Policy().ListStrict(ctx)
+		if err != nil {
+			return diag.Errorf("replication policy %s could not be read and its deletion could not be confirmed: %s", d.Id(), err)
+		}
+		for _, policy := range policies {
+			if policy != nil && policy.ID == d.Id() {
+				return diag.Errorf("replication policy %s could not be read but is still listed: refusing to drop it from the state (possible access restriction)", d.Id())
+			}
+		}
 		d.SetId("")
 		return nil
 	}

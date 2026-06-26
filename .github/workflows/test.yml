@@ -41,6 +41,64 @@ jobs:
       run: |
         go build -v .
 
+  # Platform-independent safety net: formatting, static analysis and unit
+  # tests of the pure packages. Protects the state-facing paths (flatten/
+  # expand helpers, reconciliation gates, Optional+Computed handling)
+  # without requiring a live Cloud Temple platform (#264).
+  unit:
+    name: Unit tests & vet
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+
+    - name: Check out code into the Go module directory
+      uses: actions/checkout@v3
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: 'go.mod'
+        cache: true
+
+    - name: Get dependencies
+      run: |
+        go mod download
+
+    - name: Check formatting (gofmt)
+      run: |
+        unformatted="$(gofmt -l .)"
+        if [ -n "$unformatted" ]; then
+          echo "The following files are not gofmt-formatted:"
+          echo "$unformatted"
+          exit 1
+        fi
+
+    - name: Vet (whole module — compiles every _test.go without running it)
+      run: |
+        # `go vet ./...` type-checks and compiles every package, including the
+        # acceptance-test packages (internal/client/tests, internal/provider/tests).
+        # It does NOT execute the tests, so no live Cloud Temple platform is needed.
+        # This is what catches client/test signature drift that the build job misses.
+        go vet ./...
+
+    - name: Static analysis (staticcheck)
+      run: |
+        # Pinned staticcheck (supports Go 1.24). Analyses the whole module,
+        # including the acceptance-test packages — which are compiled but not
+        # run — without any live Cloud Temple platform. Catches unused code,
+        # dead stores and suspicious constructs that build/vet miss (#264).
+        go run honnef.co/go/tools/cmd/staticcheck@2025.1.1 ./...
+
+    - name: Unit tests + coverage ratchet (platform-independent packages)
+      run: |
+        # Runs the pure packages under -race with coverage and fails if any
+        # package drops below its recorded floor (scripts/coverage_floor.txt).
+        # -race future-proofs the pure packages (token cache, httptest servers,
+        # timers); the ratchet makes "tests where they are missing" a systemic
+        # guard, not a discretionary habit (#264, #293). CGO is available on the
+        # GitHub ubuntu runners.
+        ./scripts/coverage_ratchet.sh
+
   generate:
     runs-on: ubuntu-latest
     steps:

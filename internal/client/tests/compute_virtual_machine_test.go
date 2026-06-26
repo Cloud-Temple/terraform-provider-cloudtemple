@@ -113,6 +113,8 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 		SLAPolicies:       []string{os.Getenv(PolicyId)},
 	})
 	require.NoError(t, err)
+	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
+	require.NoError(t, err)
 
 	vm, err := client.Compute().VirtualMachine().Read(ctx, instanceId)
 	require.NoError(t, err)
@@ -121,10 +123,10 @@ func TestCompute_UpdateAndPower(t *testing.T) {
 	activityId, err = client.Compute().VirtualMachine().Update(ctx, &clientpkg.UpdateVirtualMachineRequest{
 		Id: instanceId,
 		BootOptions: &clientpkg.BootOptions{
-			BootDelay:        0,
-			BootRetryDelay:   10000,
-			BootRetryEnabled: false,
-			EnterBIOSSetup:   false,
+			BootDelay:        intPtr(0),
+			BootRetryDelay:   intPtr(10000),
+			BootRetryEnabled: boolPtr(false),
+			EnterBIOSSetup:   boolPtr(false),
 			Firmware:         "bios",
 		},
 	})
@@ -301,3 +303,7 @@ func TestVirtualMachineClient_Guest(t *testing.T) {
 	_, err = client.Activity().WaitForCompletion(ctx, activityId, nil)
 	require.NoError(t, err)
 }
+
+func boolPtr(b bool) *bool { return &b }
+
+func intPtr(i int) *int { return &i }

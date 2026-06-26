@@ -1,7 +1,55 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.7.2 (June 15th, 2026)
+# 1.8.0 (June 26th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+SECURITY :
+
+  * Replaced the archived `github.com/dgrijalva/jwt-go` dependency with the maintained fork `github.com/golang-jwt/jwt/v4` (CVE-2020-26160).
+  * Updated `google.golang.org/grpc` to v1.79.3 (CVE-2026-33186), `golang.org/x/crypto` to v0.46.0 (CVE-2025-22869, CVE-2025-47914, CVE-2025-58181), `golang.org/x/net` to v0.48.0 (CVE-2025-22870, CVE-2025-22872) and `github.com/cloudflare/circl` to v1.6.3 (CVE-2025-8556, CVE-2026-1229).
+
+BUG FIXES :
+
+  * Fixed a permanent plan drift (`uefi -> null`) on `boot_firmware` for marketplace virtual machines: the property is now `Computed` on resource `cloudtemple_compute_iaas_opensource_virtual_machine`.
+  * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to push redundant network adapter and disk updates right after a marketplace deployment. OS devices are now reconciled against the live API state after creation and only real divergences are pushed.
+  * Fixed a bug causing resource `cloudtemple_compute_iaas_opensource_virtual_machine` to send an unconditional full-properties update on every apply. Properties are now only patched when they actually diverge from the live API state, and `secure_boot`, `num_cores_per_socket` and `boot_firmware` are only sent when explicitly configured (an explicit `num_cores_per_socket = 0` is rejected at plan time).
+  * Fixed a bug causing an explicit `tx_checksumming = false` to never be sent to the API on resources `cloudtemple_compute_iaas_opensource_virtual_machine` and `cloudtemple_compute_iaas_opensource_network_adapter`.
+  * Fixed a bug causing `tx_checksumming` to be pushed from resource `cloudtemple_compute_iaas_opensource_virtual_machine` when it was not explicitly configured.
+  * Fixed a bug causing the cloud-init config drive (`XO CloudConfigDrive`) to be captured as a managed `os_disk` at creation on resource `cloudtemple_compute_iaas_opensource_virtual_machine`, producing a permanent removal drift.
+  * Hardened the OS-disk flatten helpers of resource `cloudtemple_compute_iaas_opensource_virtual_machine` against a nil disk (the API maps a deleted/forbidden disk to nil): a nil disk is now skipped instead of being dereferenced, so refreshing a VM whose OS disk disappeared out-of-band can never panic. Defense-in-depth on top of the existing strict read handling; the same guard ships as hotfix `v1.7.2` (#320).
+  * Fixed OpenIaaS network adapter operations failing permanently when the platform reported a transient failure ("None of the workers were able to respond"): such operations are now retried with a bounded budget (3 attempts). The update payload is rebuilt against the live adapter before every retry. A failed create cleans up the half-created adapter it references before retrying — under strict evidence (the adapter must be confirmed present on the virtual machine), and an unconfirmed cleanup aborts the retry instead of risking a duplicate. The resource id is only ever seeded from a successful creation.
+  * Fixed a bug causing an in-progress operation to be reported as failed when a transient error (429, 5xx or a transport failure) occurred while polling its activity status. Transient read failures are now retried with a bounded consecutive budget, and the one-time tolerance for an activity not yet visible is independent of those retries.
+  * Fixed resources `cloudtemple_compute_iaas_opensource_replication_policy` and `cloudtemple_compute_iaas_opensource_virtual_disk` being dropped from the Terraform state when a transient API error occurred during refresh, which made the next apply create a duplicate. More generally, the deletion of an OpenIaaS resource (virtual machine, virtual disk, network adapter, replication policy) is now only accepted after a strict, complete listing confirms the absence: an access-denied answer can never silently remove a resource from the state, and a disk or adapter that was detached or moved platform-side is reported as drift instead of being treated as deleted.
+  * Fixed resource `cloudtemple_iam_personal_access_token` erasing `secret_id` from the state on refresh (the API only returns the secret at creation).
+  * Fixed resource `cloudtemple_iam_personal_access_token` being silently removed from the Terraform state on an unconfirmed read. The IAM API maps both an absent token and a transient server error to the same response, so a transient failure (or a credentials/scope change) could drop the token from the state and trigger its recreation on the next apply, rotating its secret and potentially leaving the previous credential live. The resource is now never auto-removed on such a read: its liveness is confirmed against a strict token listing, and otherwise the read fails closed with an actionable diagnostic, leaving the state untouched.
+  * Fixed resources `cloudtemple_compute_virtual_machine`, `cloudtemple_compute_virtual_disk`, `cloudtemple_compute_network_adapter` and `cloudtemple_compute_virtual_controller` being silently removed from the Terraform state when a read returned an access-denied or otherwise inconclusive answer (the client maps HTTP 403 to "not found"). These resources are now never auto-removed on such a read: their liveness is confirmed against a strict, scoped listing, and otherwise the read fails closed with an actionable diagnostic, leaving the state untouched.
+  * Fixed resources `cloudtemple_object_storage_bucket` and `cloudtemple_object_storage_storage_account` being silently removed from the Terraform state when a read returned an access-denied or otherwise inconclusive answer (the client maps HTTP 403 to "not found"). These resources are now never auto-removed on such a read: their existence is checked against a strict listing, and the read fails closed with an actionable diagnostic, leaving the state untouched.
+  * Fixed resource `cloudtemple_compute_virtual_machine` re-sending the full `boot_options` block (including values merely inherited from the live state) on every update. The block is now only sent when explicitly configured, and each of its attributes only when explicitly set (explicit zeros stay expressible; `firmware` is validated as `bios`/`efi` at plan time; a block with no configured attribute sends nothing).
+  * Fixed datasources `cloudtemple_compute_iaas_opensource_pools`, `cloudtemple_compute_iaas_opensource_virtual_machine`, `cloudtemple_compute_iaas_opensource_virtual_machines`, `cloudtemple_compute_iaas_opensource_virtual_disk` and `cloudtemple_compute_iaas_opensource_virtual_disks` failing at read time with an `Invalid address to set` error: the schemas now declare every attribute emitted by the flatten helpers.
+  * Fixed datasources `cloudtemple_compute_virtual_machine` and `cloudtemple_compute_virtual_machines` failing systematically at read time with `extra_config: '': source data must be an array or slice, got map` (reported since provider 1.6.1), which made both datasources unusable. `extra_config` is now exposed as a map of key to value — consistent with the `cloudtemple_compute_virtual_machine` resource and the actual API shape — instead of a list of `{key, value}` objects. Upgrade note: a configuration that referenced the previous list shape (e.g. `extra_config[0].key`) must switch to map access (e.g. `extra_config["disk.enableUUID"]`).
+  * Fixed error paths that could leave a virtual machine powered off after a provider-initiated shutdown on resource `cloudtemple_compute_iaas_opensource_virtual_machine`: the provider now restores the power state on failure (best effort, targeting the pre-shutdown host) and reports the outcome in the error.
+  * Fixed Terraform states polluted by pre-1.8.0 creations that captured the cloud-init config drive (`XO CloudConfigDrive`) as a managed `os_disk`: the refresh now drops the drive from the state — with an explicit warning and only under strict live evidence (exact XO name and read-only attachment to this virtual machine) — which stops the permanent removal drift for existing clients. Ambiguous disks stay in the state. No platform-side change is ever made.
+  * Fixed a crash (nil dereference) during refresh when an `os_disk` or `os_network_adapter` referenced in the state no longer exists platform-side: the deleted device is now dropped from the state so the next plan reflects reality. The deletion is confirmed by a second independent read (the VM-scoped device listing) before any state entry is dropped, so an access-denied answer can never silently shrink the state.
+  * Fixed a crash (nil dereference) on `terraform apply` (update) and `terraform destroy` of resource `cloudtemple_compute_iaas_opensource_virtual_disk` when the disk no longer exists platform-side or its read is access-denied (the client maps HTTP 403 to a nil read). Update and Delete now guard the nil read before dereferencing the disk's attachments: an update refuses to mutate blindly with an actionable diagnostic, and a destroy is treated as already satisfied only when the deletion is confirmed by independent strict listings — a forbidden-but-existing disk is never silently dropped from the state (never-orphan, symmetric with the read path). Same class as the `os_disk` crash fixed in `v1.7.2` (#320), but on the standalone virtual-disk resource (#325).
+  * Fixed datasource `cloudtemple_iam_features` being able to fail at read time with an `Invalid address to set` error, which would make the whole datasource unusable, if the feature tree were ever nested deeper than the schema declares (a sub-feature below the deepest declared level emitting a `subfeatures` key the schema does not declare). The flatten is now bounded to the schema's declared nesting depth: any deeper sub-features are truncated — the datasource stays readable — and a warning is emitted, instead of breaking the read. The real feature catalog is only two levels deep, so current outputs are unchanged.
+  * Fixed resource `cloudtemple_compute_iaas_opensource_virtual_machine` hanging at create when no `backup_sla_policies` were configured. The create issued an unconditional backup-SLA assignment, and an empty-list assign produces an activity the platform can leave stuck in "Waiting" indefinitely, blocking the apply until timeout (and, if hard-cancelled, leaving a virtual machine created platform-side but absent from the Terraform state). Assigning an empty policy list to a freshly created virtual machine has no effect, so it is now skipped; a non-empty list is assigned as before.
+  * Fixed resource `cloudtemple_compute_iaas_opensource_virtual_machine` silently ignoring a `host_id` change meant to migrate a running VM to another host in the same pool: the apply reported `Modifications complete` while the VM never moved, and every subsequent plan replayed the same `host_id` change (an endless apply loop). The provider now performs the intra-pool live migration through the dedicated relocate API when `host_id` genuinely changes on a running VM, waits for the migration activity, and verifies the VM actually converged onto the requested host — failing with an explicit diagnostic otherwise, instead of ever reporting a false success. `host_id` is acted upon only when it is explicitly configured (a value merely computed from the live API is never treated as a migration request), and a `host_id` change that would leave the VM powered off is rejected up front, before any change is made (intra-pool host placement requires a running VM and a powered-off VM has no stable resident host; keep `power_state = "on"`).
+  * Fixed resource `cloudtemple_compute_iaas_opensource_virtual_machine` powering a VM back on (a `power_state` change, or a reboot forced by a disk/network-adapter update) onto a possibly-stale host taken from the Terraform state when `host_id` is not configured: under `terraform apply -refresh=false` after the platform had migrated the VM out-of-band, the power-on could silently move the VM to that stale host. The power-on now targets the **live** current host (for a provider-initiated reboot, the host the VM was running on, preserved across the reboot) when `host_id` is not configured, and the user's host when it is; a live-read failure surfaces an explicit error instead of falling back to the stale state value.
+
+IMPROVEMENTS :
+
+  * Marketplace deployments now send `networkAdapterName` in the network data mapping (the deprecated `sourceNetworkName` is kept for compatibility).
+
+MISCELLANEOUS :
+
+  * The provider is now built with Go 1.24 (required by the updated dependencies).
+  * The continuous integration now runs a platform-independent safety net on every pull request: formatting and static-analysis checks, the state-safety unit-test suites, a datasource schema-vs-flatten validation and a write-guard registry for the `Optional`+`Computed` booleans.
+  * The datasource schema-vs-flatten CI validation now covers every datasource. It is driven by a reflection-based non-zero object filler and a coverage registry checked against the provider's datasource map: a newly added datasource must be either covered or explicitly listed as a known gap, so the read-breaking class behind #241/#243 cannot silently regain ground.
+  * Refreshed the repository README (build requirements, Terraform Registry links, usage example).
+  * Removed a broken CI workflow left over from the provider template.
+  * Added a schema golden gate: a committed, deterministic snapshot of the full declared provider schema contract (every resource and datasource, recursively into nested blocks: types, `Required`/`Optional`/`Computed`/`ForceNew`/`Sensitive`, `MinItems`/`MaxItems`/`ConfigMode`, primitive `Default` values, the presence of state/normalization functions and validators, plan constraints, the explicit `Elem` kind, `SchemaVersion`, `StateUpgrader` versions and types, and `CustomizeDiff` presence) checked by a CI test that fails on any divergence. Any change to the contract that an existing client's Terraform state depends on must be seen and explicitly justified by a human before the golden is regenerated; the regenerate path is refused in CI. This freezes the declared contract; runtime behaviour and the live API shape stay covered by the other test layers.
+
+# 1.7.2 (June 15th, 2026)
 
 BUG FIXES :
 
@@ -662,7 +710,6 @@ IMPROVEMENTS:
 
   * The provider now periodically logs information regarding the state of the activity or job running while waiting for them to complete.
 
-
 ## 0.2.2 (November 24, 2022)
 
 IMPROVEMENTS:
@@ -681,7 +728,6 @@ IMPROVEMENTS:
 
   * The Go client used by the Terraform provider now automatically renew the API token before expiration.
 
-
 ## 0.2.0 (November 18, 2022)
 
 BUG FIXES:
@@ -692,7 +738,6 @@ NEW FEATURES:
 
   * The `cloudtemple_compute_virtual_machine` resource can now clone an already existing virtual machine using the `clone_virtual_machine_id` argument.
   * The `cloudtemple_backup_sla_policy_assignment` resource can now be used to associate SLA policies to a virtual machine.
-
 
 ## 0.1.0 (November 17, 2022)
 

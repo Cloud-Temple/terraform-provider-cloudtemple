@@ -48,7 +48,7 @@ data "cloudtemple_compute_virtual_machine" "name" {
 - `datastore_name` (String) The name of the datastore where the virtual machine is stored.
 - `distributed_virtual_port_group_ids` (List of String) List of distributed virtual port group IDs associated with the virtual machine.
 - `expose_hardware_virtualization` (Boolean) Whether hardware virtualization is exposed to the guest operating system.
-- `extra_config` (List of Object) Extra configuration parameters for the virtual machine. (see [below for nested schema](#nestedatt--extra_config))
+- `extra_config` (Map of String) Extra configuration parameters for the virtual machine, as a map of key to value.
 - `guest_operating_system_moref` (String) The managed object reference ID of the guest operating system in the hypervisor.
 - `hardware_version` (String) The hardware version of the virtual machine.
 - `host_cluster_id` (String) The ID of the host cluster where the virtual machine is running.
@@ -80,15 +80,6 @@ Read-Only:
 - `efi_secure_boot_enabled` (Boolean)
 - `enter_bios_setup` (Boolean)
 - `firmware` (String)
-
-
-<a id="nestedatt--extra_config"></a>
-### Nested Schema for `extra_config`
-
-Read-Only:
-
-- `key` (String)
-- `value` (String)
 
 
 <a id="nestedatt--replication_config"></a>
