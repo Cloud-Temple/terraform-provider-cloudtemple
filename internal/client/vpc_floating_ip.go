@@ -68,11 +68,13 @@ func (f *VPCFloatingIPClient) List(ctx context.Context, filter *FloatingIPFilter
 	return out, nil
 }
 
-// Read retrieves a single floating IP by ID. It returns (nil, nil) when the
-// floating IP is not found: requireNotFoundOrOK maps BOTH 404 and 403 to not-found
-// (the VPC API conflates absent/forbidden, #303), so an absent floating IP —
-// whether the API answers 404 or 403 — surfaces as (nil, nil) for idempotent read
-// handling.
+// Read retrieves a single floating IP by ID, for DATASOURCE use. It returns
+// (nil, nil) when the floating IP is not found. Per the live contract a genuinely
+// absent floating IP answers 404; requireNotFoundOrOK ADDITIONALLY folds 403 into
+// not-found — a deliberate DATASOURCE tolerance (#303: a datasource treats a
+// forbidden floating IP as "absent"), NOT a claim that the API returns 403 for
+// absence. The RESOURCE must not use this: it reads via ResolveByID, which treats
+// 403 as a fail-closed error and ONLY an authoritative 404 as absence.
 func (f *VPCFloatingIPClient) Read(ctx context.Context, id string) (*FloatingIP, error) {
 	r := f.c.newRequest("GET", "/vpc/v1/floating_ips/%s", id)
 	resp, err := f.c.doRequest(ctx, r)
