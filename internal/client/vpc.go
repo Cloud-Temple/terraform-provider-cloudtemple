@@ -1,5 +1,10 @@
 package client
 
+import (
+	"context"
+	"fmt"
+)
+
 // VPC client for the Shiva /vpc/v1 API — UNDER ACTIVE REBUILD (v1.9.0).
 //
 // History: the platform replaced /vpc/v1 with breaking changes UNDER THE SAME URL
@@ -47,4 +52,37 @@ func (v *VPCClient) StaticIP() *VPCStaticIPClient {
 // FloatingIP returns the client for VPC floating IPs.
 func (v *VPCClient) FloatingIP() *VPCFloatingIPClient {
 	return &VPCFloatingIPClient{v.c}
+}
+
+// waitCreatedIDFromActivity is the shared R-M1 core for VPC async-create flows
+// (static IP create, floating IP provision). It waits for the create/provision
+// activity to complete, then extracts the new resource id from the activity's
+// SINGLE state Result — the same channel the provider reads via
+// setIdFromActivityState.
+//
+// It fails closed when the activity does NOT complete with EXACTLY ONE state, or
+// completes with an EMPTY Result: a created id we cannot read must surface as an
+// error, never as an empty id that would orphan the resource via SetId("").
+//
+// It deliberately does NOT validate the Result's FORMAT (no UUID check), so it is
+// a pure extraction of the original static WaitCreate behavior. A caller that
+// needs a stricter id shape adds its OWN, explicitly tested, local guard rather
+// than folding it in here. label names the operation in diagnostics (e.g.
+// "static IP create", "floating IP provision") so a failure is actionable.
+func (c *Client) waitCreatedIDFromActivity(ctx context.Context, activityID, label string, options *WaiterOptions) (string, error) {
+	act, err := c.Activity().WaitForCompletion(ctx, activityID, options)
+	if err != nil {
+		return "", err
+	}
+	if act == nil || len(act.State) != 1 {
+		return "", fmt.Errorf("%s activity %q did not complete with exactly one state; cannot resolve the created id", label, activityID)
+	}
+	var id string
+	for _, st := range act.State {
+		id = st.Result
+	}
+	if id == "" {
+		return "", fmt.Errorf("%s activity %q completed with an empty Result; cannot resolve the created id", label, activityID)
+	}
+	return id, nil
 }

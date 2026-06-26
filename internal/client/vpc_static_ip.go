@@ -236,22 +236,13 @@ func (s *VPCStaticIPClient) CreateStart(ctx context.Context, privateNetworkID st
 // cannot read must be an error, never an empty id that would orphan the resource
 // via SetId(""). options controls activity-poll logging (caller-supplied, like
 // every other waiter in this client).
+//
+// The R-M1 core is shared with floating-IP provisioning via
+// waitCreatedIDFromActivity (vpc.go); this method only supplies the static-IP
+// diagnostic label, so static behavior is UNCHANGED (the error strings are
+// byte-identical to the pre-extraction implementation).
 func (s *VPCStaticIPClient) WaitCreate(ctx context.Context, activityID string, options *WaiterOptions) (string, error) {
-	act, err := s.c.Activity().WaitForCompletion(ctx, activityID, options)
-	if err != nil {
-		return "", err
-	}
-	if act == nil || len(act.State) != 1 {
-		return "", fmt.Errorf("static IP create activity %q did not complete with exactly one state; cannot resolve the created id", activityID)
-	}
-	var id string
-	for _, st := range act.State {
-		id = st.Result
-	}
-	if id == "" {
-		return "", fmt.Errorf("static IP create activity %q completed with an empty Result; cannot resolve the created id", activityID)
-	}
-	return id, nil
+	return s.c.waitCreatedIDFromActivity(ctx, activityID, "static IP create", options)
 }
 
 // Create creates a static IP mapping on a private network and returns the new id by

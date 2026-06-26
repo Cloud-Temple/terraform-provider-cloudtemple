@@ -418,6 +418,74 @@ func (s vpcFIPBindSeam) CorroborateBinding(ctx context.Context, fipID, staticID 
 	return s.c.VPC().FloatingIP().CorroborateBinding(ctx, fipID, staticID)
 }
 
+// --- VPC floating IP (provision / deprovision) --------------------------------
+//
+// REBUILDING CONTRACT (/vpc/v1, v1.9.0 rebuild — see internal/client/vpc.go): used
+// only by the opt-in vpcCycle teardown, not on the default read-only path. This is
+// the C4 DEPROVISION teardown — DISTINCT from the FIP BIND teardown above (which
+// releases a pair): this one deletes the floating IP itself.
+
+// fipDeprovisionSeam is the subset of the floating-IP client a deprovision
+// teardown needs. The whole F3 destructive contract — gate on fully-unbound,
+// idempotent by-id 404 → success, positive-404 confirm — lives in the client's
+// DeprovisionUnbound (unit-tested at the client layer), so this seam is a THIN
+// pass-through and carries NO decision logic of its own to drift.
+type fipDeprovisionSeam interface {
+	DeprovisionUnbound(ctx context.Context, fipID string) error
+}
+
+// floatingIPTeardownRef carries the floating-IP identity for teardown, filled as
+// the cycle progresses (shared pointer, like the other refs). Unlike the static-IP
+// ref there is NO deterministic pre-create key: the provision body is count-only
+// ({"count":1}), so a created-but-UNRESOLVED floating IP CANNOT be swept by a
+// listing match — that is the irreducible orphan sub-window (§5(i) of the C4 plan),
+// recoverable only by a documented manual audit (GET /vpc/v1/floating_ips for an
+// unbound, recently-created, default-described IP → terraform import then destroy).
+// The teardown therefore acts ONLY on the RESOLVED id. ActivityID is captured for
+// postmortem diagnostics (the ct-validate analog of the provider's pre-wait tflog,
+// §5(ii)); the teardown never re-waits or re-resolves it. ExplicitlyDeleted records
+// that the cycle's OWN deprovision of the resolved id succeeded (diagnostics +
+// parity with the other refs); teardown idempotency does NOT depend on it, because
+// the FIP by-id read returns an authoritative 404 once gone and DeprovisionUnbound
+// maps that 404 to success.
+type floatingIPTeardownRef struct {
+	ID                string
+	ActivityID        string
+	Resolved          bool
+	ExplicitlyDeleted bool
+}
+
+// registerFloatingIPTeardown registers the FIP deprovision teardown BEFORE
+// ProvisionStart (F3). It can act ONLY once the id is resolved: the count-only
+// provision leaves no deterministic key to sweep by, so an UNRESOLVED provision is
+// left to the documented manual audit — a no-op success here, because there is
+// genuinely nothing the harness can safely delete without an id (deleting "some
+// unbound FIP" would risk destroying a billable resource that is not ours). When
+// resolved it calls DeprovisionUnbound, which is gated (only a fully-unbound IP is
+// ever deleted) and idempotent (a by-id 404 → success), so running it after the
+// cycle's own explicit deprovision is a safe no-op.
+func registerFloatingIPTeardown(cl *Cleanup, seam fipDeprovisionSeam, ref *floatingIPTeardownRef) {
+	cl.Register("vpc.floating_ip deprovision (by resolved id)", func(tctx context.Context) error {
+		if !ref.Resolved || ref.ID == "" {
+			// Irreducible orphan sub-window (§5(i)): no deterministic key to sweep by.
+			// The activity id was captured in ref.ActivityID after ProvisionStart for
+			// the documented manual audit. Nothing the harness can safely delete here.
+			return nil
+		}
+		return seam.DeprovisionUnbound(tctx, ref.ID)
+	})
+}
+
+// vpcFIPDeprovisionSeam adapts *client.Client to fipDeprovisionSeam.
+type vpcFIPDeprovisionSeam struct{ c *client.Client }
+
+func (s vpcFIPDeprovisionSeam) DeprovisionUnbound(ctx context.Context, fipID string) error {
+	// DeprovisionUnbound encodes the full F3 contract (gate on fully-unbound,
+	// idempotent by-id 404 → success, positive-404 confirm). Use the silent waiter
+	// so teardown output stays quiet like the other seams.
+	return s.c.VPC().FloatingIP().DeprovisionUnbound(ctx, fipID, silentWaiter)
+}
+
 // --- IAM personal access token ------------------------------------------------
 
 // patSeam is the subset of the PAT client a PAT teardown needs.

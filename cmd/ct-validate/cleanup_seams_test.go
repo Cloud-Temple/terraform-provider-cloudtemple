@@ -508,6 +508,105 @@ func TestFIPUnbind403ConfirmedBoundToOtherSucceeds(t *testing.T) {
 	}
 }
 
+// --- VPC floating IP (deprovision) --------------------------------------------
+
+// fakeFIPDeprovisionSeam is a RECORDING test double for the FIP deprovision seam.
+// Unlike fakeStaticIPSeam / fakeFIPSeam (which route through a shared production
+// helper so a mutation in that helper breaks both), the FIP deprovision seam is a
+// THIN pass-through: the WHOLE destructive contract — gate on fully-unbound,
+// idempotent by-id 404 → success, positive-404 confirm — lives in the client's
+// DeprovisionUnbound and is pinned with mutation proof at the client layer
+// (vpc_floating_ip_lifecycle_test.go). So the ONLY ct-validate-layer decision left
+// to test is registerFloatingIPTeardown's branching: act on a RESOLVED id, and
+// no-op (NEVER call DeprovisionUnbound) on an unresolved ref. This fake therefore
+// only records the ids it was asked to deprovision and replays an injected error.
+type fakeFIPDeprovisionSeam struct {
+	deprovisioned []string
+	err           error
+}
+
+func (f *fakeFIPDeprovisionSeam) DeprovisionUnbound(_ context.Context, fipID string) error {
+	f.deprovisioned = append(f.deprovisioned, fipID)
+	return f.err
+}
+
+// TestFloatingIPTeardownNoopWhenUnresolved proves the irreducible-orphan no-op: a
+// count-only provision leaves NO deterministic key, so a teardown whose ref never
+// resolved (or resolved with an empty id) must do NOTHING — never call
+// DeprovisionUnbound, never invent an id. Deleting "some unbound FIP" would risk
+// destroying a billable resource that is not ours. Non-complacent: drop the
+// `!ref.Resolved || ref.ID == ""` guard in registerFloatingIPTeardown and the seam
+// is called with an empty id → the recorded slice is non-empty → RED.
+func TestFloatingIPTeardownNoopWhenUnresolved(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ref  *floatingIPTeardownRef
+	}{
+		{"never resolved (zero ref)", &floatingIPTeardownRef{}},
+		{"resolved flag set but id empty", &floatingIPTeardownRef{Resolved: true}},
+		{"id present but not flagged resolved", &floatingIPTeardownRef{ID: "fip-1"}},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			seam := &fakeFIPDeprovisionSeam{}
+			cl := NewCleanup()
+			registerFloatingIPTeardown(cl, seam, tc.ref)
+			if cl.Pending() != 1 {
+				t.Fatalf("teardown must be registered before provision; Pending=%d", cl.Pending())
+			}
+			if fails := cl.TeardownAll(context.Background()); len(fails) != 0 {
+				t.Fatalf("an unresolved FIP teardown must be a no-op success, got %+v", fails)
+			}
+			if len(seam.deprovisioned) != 0 {
+				t.Fatalf("an unresolved FIP teardown must NEVER call DeprovisionUnbound (no key to sweep), called with %v", seam.deprovisioned)
+			}
+		})
+	}
+}
+
+// TestFloatingIPTeardownDeprovisionsWhenResolved proves that once the provision
+// resolves the id (shared ref, set AFTER registration — the F3 pattern), the
+// teardown deprovisions by THAT id. Non-complacent: the id is set post-registration
+// to prove the helper reads the shared pointer at teardown time, not at register
+// time.
+func TestFloatingIPTeardownDeprovisionsWhenResolved(t *testing.T) {
+	seam := &fakeFIPDeprovisionSeam{}
+	cl := NewCleanup()
+	ref := &floatingIPTeardownRef{}
+	registerFloatingIPTeardown(cl, seam, ref)
+	// The provision resolves the id AFTER registration (the shared-ref pattern).
+	ref.ID = "fip-resolved"
+	ref.Resolved = true
+
+	if fails := cl.TeardownAll(context.Background()); len(fails) != 0 {
+		t.Fatalf("a resolved FIP teardown should succeed, got %+v", fails)
+	}
+	if len(seam.deprovisioned) != 1 || seam.deprovisioned[0] != "fip-resolved" {
+		t.Fatalf("a resolved FIP must be deprovisioned by its id, called with %v", seam.deprovisioned)
+	}
+}
+
+// TestFloatingIPTeardownSurfacesDeprovisionError proves the teardown does NOT
+// swallow a real deprovision failure: a billable IP we could not delete must
+// surface as a teardown failure so the operator is alerted. (The client's
+// DeprovisionUnbound already maps a by-id 404 to a nil success, so this error path
+// is a GENUINE failure, not a benign already-gone.) Non-complacent: make
+// registerFloatingIPTeardown return nil unconditionally and fails drops to 0 → RED.
+func TestFloatingIPTeardownSurfacesDeprovisionError(t *testing.T) {
+	seam := &fakeFIPDeprovisionSeam{err: errors.New("deprovision activity did not complete")}
+	cl := NewCleanup()
+	ref := &floatingIPTeardownRef{ID: "fip-1", Resolved: true}
+	registerFloatingIPTeardown(cl, seam, ref)
+
+	fails := cl.TeardownAll(context.Background())
+	if len(fails) != 1 {
+		t.Fatalf("a deprovision failure must surface as exactly one teardown failure, got %+v", fails)
+	}
+	if len(seam.deprovisioned) != 1 || seam.deprovisioned[0] != "fip-1" {
+		t.Fatalf("the failing teardown must still have attempted the resolved id, called with %v", seam.deprovisioned)
+	}
+}
+
 // --- IAM PAT ------------------------------------------------------------------
 
 type fakePATSeam struct {
