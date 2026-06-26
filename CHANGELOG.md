@@ -1,6 +1,7 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.8.0 (Unreleased)
+# 1.8.0 (June 26th, 2026)
+<img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 SECURITY :
 
@@ -48,8 +49,13 @@ MISCELLANEOUS :
   * Removed a broken CI workflow left over from the provider template.
   * Added a schema golden gate: a committed, deterministic snapshot of the full declared provider schema contract (every resource and datasource, recursively into nested blocks: types, `Required`/`Optional`/`Computed`/`ForceNew`/`Sensitive`, `MinItems`/`MaxItems`/`ConfigMode`, primitive `Default` values, the presence of state/normalization functions and validators, plan constraints, the explicit `Elem` kind, `SchemaVersion`, `StateUpgrader` versions and types, and `CustomizeDiff` presence) checked by a CI test that fails on any divergence. Any change to the contract that an existing client's Terraform state depends on must be seen and explicitly justified by a human before the golden is regenerated; the regenerate path is refused in CI. This freezes the declared contract; runtime behaviour and the live API shape stay covered by the other test layers.
 
+# 1.7.2 (June 15th, 2026)
+
+BUG FIXES :
+
+  * Fixed a remaining nil pointer crash during `terraform plan` when refreshing a `cloudtemple_compute_iaas_opensource_virtual_machine` whose OS disk was deleted or became forbidden out-of-band (the disk reads back as nil). Completes the partial 1.7.1 fix. (#320)
+
 # 1.7.1 (April 15th, 2026)
-<img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 BUG FIXES :
 
