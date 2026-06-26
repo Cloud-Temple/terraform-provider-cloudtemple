@@ -288,6 +288,29 @@ func TestCreateVPCFloatingIPWith(t *testing.T) {
 			t.Fatalf("the just-provisioned id must be kept, got %q", d.Id())
 		}
 	})
+
+	// A SYNC description PATCH (2xx without Location) returns an empty activity id:
+	// there is nothing to wait on. A mutant that waited on the empty id would poll a
+	// non-existent activity and turn this success into a spurious WARNING -> reds via
+	// fipWaitFatal (wait must NOT be called) and the no-warning assertion.
+	t.Run("provision OK + SYNC description PATCH (empty activity id) succeeds without waiting", func(t *testing.T) {
+		d := newFloatingIPCreateData(t, "my fip")
+		diags := createVPCFloatingIPWith(ctx, d, vpcFloatingIPCreateFuncs{
+			provision:         func(ctx context.Context) (string, error) { return "fip-99", nil },
+			updateDescription: func(ctx context.Context, fipID, description string) (string, error) { return "", nil }, // sync 2xx, no activity
+			wait:              fipWaitFatal(t),                                                                         // must NOT be called for a sync PATCH
+			resolve:           fipResolve(&client.FloatingIP{ID: "fip-99", IPAddress: "198.51.100.7", Description: "my fip"}, true, nil),
+		})
+		if diags.HasError() {
+			t.Fatalf("a sync description PATCH must succeed, got error: %v", diags)
+		}
+		if fipHasWarning(diags) {
+			t.Fatal("a SUCCESSFUL sync description PATCH must not emit a warning")
+		}
+		if d.Id() != "fip-99" {
+			t.Fatalf("the provisioned id must be set, got %q", d.Id())
+		}
+	})
 }
 
 // ---- read -----------------------------------------------------------------
@@ -506,6 +529,27 @@ func TestUpdateVPCFloatingIPWith(t *testing.T) {
 		}
 		if d.Id() != "fip-1" {
 			t.Fatalf("the id must be KEPT after a post-update 404 (never orphan a billable IP), got %q", d.Id())
+		}
+	})
+
+	// A SYNC description PATCH (empty activity id) on update must succeed WITHOUT
+	// waiting. A mutant that waited on the empty id would poll a non-existent activity
+	// and fail a successful update -> reds via fipWaitFatal.
+	t.Run("a changed description with a SYNC PATCH (empty activity id) succeeds without waiting", func(t *testing.T) {
+		d := newFloatingIPState(t)
+		if err := d.Set("description", "renamed"); err != nil {
+			t.Fatalf("setting desired description: %v", err)
+		}
+		diags := updateVPCFloatingIPWith(ctx, d, vpcFloatingIPUpdateFuncs{
+			resolve: fipResolveSeq(t,
+				fipResolveResult{fip: &client.FloatingIP{ID: "fip-1", Description: "seeded"}, found: true},  // pre-read drives the PATCH
+				fipResolveResult{fip: &client.FloatingIP{ID: "fip-1", Description: "renamed"}, found: true}, // post-PATCH read-back
+			),
+			updateDescription: func(ctx context.Context, fipID, description string) (string, error) { return "", nil }, // sync 2xx, no activity
+			wait:              fipWaitFatal(t),                                                                         // must NOT be called
+		})
+		if diags.HasError() {
+			t.Fatalf("a sync description PATCH on update must succeed, got: %v", diags)
 		}
 	})
 }

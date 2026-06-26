@@ -202,12 +202,20 @@ func createVPCFloatingIPWith(ctx context.Context, d *schema.ResourceData, funcs 
 	return append(diags, readVPCFloatingIPInto(ctx, d, funcs.resolve, floatingIPReadAfterWrite)...)
 }
 
-// patchFloatingIPDescription issues the async description PATCH and waits for its
-// activity. Shared by create (best-effort) and update (authoritative).
+// patchFloatingIPDescription issues the description PATCH and waits for its activity
+// ONLY when the PATCH was async. UpdateDescription returns a non-empty activity id
+// for the async case and ("", nil) for a sync 2xx (no Location); waiting on an empty
+// id would poll a non-existent activity and turn a success into a spurious failure.
+// Shared by create (best-effort) and update (authoritative).
 func patchFloatingIPDescription(ctx context.Context, update func(ctx context.Context, fipID, description string) (string, error), wait vpcActivityWaitFunc, id, description string) error {
 	activityID, err := update(ctx, id, description)
 	if err != nil {
 		return err
+	}
+	if activityID == "" {
+		// Sync PATCH success (2xx without a Location): there is no activity to wait on
+		// (the UpdateDescription contract — the caller waits ONLY on a non-empty id).
+		return nil
 	}
 	return wait(ctx, activityID)
 }
