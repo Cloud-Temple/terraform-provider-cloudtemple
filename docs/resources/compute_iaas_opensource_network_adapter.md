@@ -51,6 +51,7 @@ resource "cloudtemple_compute_iaas_opensource_network_adapter" "VIF-1" {
 ### Optional
 
 - `attached` (Boolean) Whether the network adapter is attached.
+- `ip_address` (String) The VPC static IP to assign to this adapter. Requires `network_id` to reference a VPC-backed private network: when set, the adapter is given this address on the VPC; if omitted, the platform auto-assigns one (reflected here after apply). Mutable: changing it relocates the static IP. Setting it while `network_id` is not VPC-backed is rejected.
 - `mac_address` (String) The MAC address of the network adapter. If not specified, a random MAC address will be generated.
 - `tx_checksumming` (Boolean) Whether TX checksumming is enabled on the network adapter.
 

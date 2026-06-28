@@ -16,6 +16,10 @@ NEW FEATURES :
   * Added resource `cloudtemple_vpc_floating_ip` to provision and manage a floating (public) IP. Provisioning is asynchronous and the billable IP is never silently orphaned; destroying the resource deprovisions the IP only once a strict read proves it unbound and a positive absence check confirms its removal — destroying a floating IP that is still bound to a static IP is refused with an actionable error. Binding to a static IP is read-only on this resource.
   * Added resource `cloudtemple_vpc_floating_ip_binding` to bind/unbind a floating (public) IP to a static IP — the day-to-day "expose a VM publicly" action. The binding is reversible by construction (the floating IP is provisioned separately and is left intact on destroy); creating it refuses to clobber a floating IP already bound elsewhere, and both create and destroy confirm the outcome by a strict by-id read that tells an omitted association apart from a genuine one — so the binding is never silently clobbered, orphaned, or dropped on inconclusive evidence.
 
+ENHANCEMENTS :
+
+  * Added `ip_address` to resource `cloudtemple_compute_iaas_opensource_network_adapter`. When the adapter's `network_id` is a VPC-backed network, this assigns the adapter's VPC static IP to a chosen address (and relocates it in place on change); if omitted the platform auto-assigns one. The assigned address is read back into the state — resolved by MAC, as the platform does not echo it on the adapter object — so the plan converges, and destroying the adapter releases the static IP. Setting it while `network_id` is not VPC-backed is rejected.
+
 # 1.8.0 (Unreleased)
 
 SECURITY :
