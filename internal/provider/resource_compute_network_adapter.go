@@ -62,6 +62,13 @@ func resourceNetworkAdapter() *schema.Resource {
 				Optional:    true,
 				Description: "Whether the network adapter should be connected to the network. Defaults to true. ",
 			},
+			"ip_address": {
+				Type:         schema.TypeString,
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validation.IsIPv4Address,
+				Description:  "The VPC static IP to assign to this adapter. Requires `network_id` to reference a VPC-backed network: when set, the adapter is given this address on the VPC; if omitted, the platform auto-assigns one (reflected here after apply). Mutable: changing it relocates the static IP. Setting it while `network_id` is not VPC-backed is rejected.",
+			},
 
 			// Out
 			"name": {
@@ -81,11 +88,17 @@ func resourceNetworkAdapter() *schema.Resource {
 func computeNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
+	// Reject ip_address on a non-VPC network BEFORE creating anything.
+	if diags := ensureVMwareVPCForIPAddress(ctx, c, d); diags != nil {
+		return diags
+	}
+
 	activityId, err := c.Compute().NetworkAdapter().Create(ctx, &client.CreateNetworkAdapterRequest{
 		VirtualMachineId: d.Get("virtual_machine_id").(string),
 		MacAddress:       d.Get("mac_address").(string),
 		NetworkId:        d.Get("network_id").(string),
 		Type:             d.Get("type").(string),
+		IPAddress:        d.Get("ip_address").(string),
 	})
 	if err != nil {
 		return diag.Errorf("the network adapter could not be created: %s", err)
@@ -140,11 +153,34 @@ func computeNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, meta
 		}
 	}
 
+	// Converge ip_address: the assigned VPC static IP is addressable only by MAC
+	// (GET /vpc/v1/static_ips/mac/{mac}), not echoed on the adapter object
+	// (#375 / #1854). Only a VPC-backed adapter has one; fail closed on a read
+	// error rather than blanking ip_address (which would show a spurious diff).
+	ipAddress := ""
+	onVPC := networkAdapter.VPC != nil
+	if onVPC && networkAdapter.MacAddress != "" {
+		staticIP, err := c.VPC().StaticIP().ReadByMAC(ctx, networkAdapter.MacAddress)
+		if err != nil {
+			return diag.Errorf("failed to read the VPC static IP of network adapter %s: %s", d.Id(), err)
+		}
+		ipAddress = vmwareAdapterVPCStaticIP(onVPC, staticIP)
+	}
+	if err := d.Set("ip_address", ipAddress); err != nil {
+		return diag.FromErr(err)
+	}
+
 	return diags
 }
 
 func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
+
+	// Reject ip_address on a non-VPC network BEFORE mutating the adapter.
+	if diags := ensureVMwareVPCForIPAddress(ctx, c, d); diags != nil {
+		return diags
+	}
+
 	activityId, err := c.Compute().NetworkAdapter().Update(ctx, &client.UpdateNetworkAdapterRequest{
 		ID:           d.Id(),
 		NewNetworkId: d.Get("network_id").(string),
@@ -189,6 +225,57 @@ func computeNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, me
 		}
 	}
 
+	// VPC static IP reconciliation, AFTER the network/mac patch and against a
+	// FRESH read: a same-apply move onto a VPC-backed network then shows the
+	// adapter on the VPC, and the assigned IP is resolved by MAC (the platform
+	// does not echo it on the adapter, #1854). Push only on a genuine divergence
+	// so a no-op apply never relocates the static IP to itself.
+	// mac_address is in the trigger because the VPC static IP is keyed BY MAC:
+	// a MAC change re-targets the registration, so a configured ip_address must
+	// be re-applied to the new MAC in the same apply (not just on ip/network change).
+	if d.HasChange("ip_address") || d.HasChange("network_id") || d.HasChange("mac_address") {
+		ipConfigured := false
+		if raw := d.GetRawConfig(); !raw.IsNull() {
+			if v := raw.GetAttr("ip_address"); !v.IsNull() {
+				ipConfigured = true
+			}
+		}
+		configuredIP := d.Get("ip_address").(string)
+		if ipConfigured && configuredIP != "" {
+			fresh, err := c.Compute().NetworkAdapter().Read(ctx, d.Id())
+			if err != nil {
+				return diag.Errorf("failed to read network adapter %s before VPC IP reconciliation: %s", d.Id(), err)
+			}
+			if fresh == nil {
+				return diag.Errorf("network adapter %s not found", d.Id())
+			}
+			// A non-VPC target was already rejected up front; skip rather than
+			// error here (rare mid-apply drift) since the patch already ran.
+			if fresh.VPC != nil {
+				staticIP, err := c.VPC().StaticIP().ReadByMAC(ctx, fresh.MacAddress)
+				if err != nil {
+					return diag.Errorf("failed to read the current VPC static IP of network adapter %s: %s", d.Id(), err)
+				}
+				liveIP := vmwareAdapterVPCStaticIP(true, staticIP)
+				if ip := vmwareVPCStaticIPToPush(true, configuredIP, liveIP, true); ip != "" {
+					relocateActivity, err := c.Compute().NetworkAdapter().Update(ctx, &client.UpdateNetworkAdapterRequest{
+						ID:           d.Id(),
+						NewNetworkId: fresh.Network.ID,
+						AutoConnect:  d.Get("auto_connect").(bool),
+						MacAddress:   fresh.MacAddress,
+						IPAddress:    ip,
+					})
+					if err != nil {
+						return diag.Errorf("the VPC static IP of network adapter %s could not be set: %s", d.Id(), err)
+					}
+					if _, err := c.Activity().WaitForCompletion(ctx, relocateActivity, getWaiterOptions(ctx)); err != nil {
+						return diag.Errorf("the VPC static IP of network adapter %s could not be set: %s", d.Id(), err)
+					}
+				}
+			}
+		}
+	}
+
 	return computeNetworkAdapterRead(ctx, d, meta)
 }
 
@@ -203,4 +290,60 @@ func computeNetworkAdapterDelete(ctx context.Context, d *schema.ResourceData, me
 		return diag.Errorf("failed to delete network adapter, %s", err)
 	}
 	return nil
+}
+
+// ensureVMwareVPCForIPAddress fails closed BEFORE any side effect when ip_address
+// is explicitly configured but the target network_id is not a VPC-backed network.
+// ip_address only has meaning on a VPC network (it assigns the adapter's static IP
+// there); on a plain vCenter portgroup the platform ignores it, so the value could
+// never be applied nor recorded and the plan would never converge. (Mirrors the
+// OpenIaaS ensureVPCForIPAddress (#374); to be unified once both land.)
+func ensureVMwareVPCForIPAddress(ctx context.Context, c *client.Client, d *schema.ResourceData) diag.Diagnostics {
+	raw := d.GetRawConfig()
+	if raw.IsNull() {
+		return nil
+	}
+	if v := raw.GetAttr("ip_address"); v.IsNull() {
+		return nil
+	}
+	ip := d.Get("ip_address").(string)
+	if ip == "" {
+		return nil
+	}
+	networkID := d.Get("network_id").(string)
+	network, err := c.Compute().Network().Read(ctx, networkID)
+	if err != nil {
+		return diag.Errorf("failed to read network %s to validate ip_address: %s", networkID, err)
+	}
+	if network == nil {
+		return diag.Errorf("network %s not found while validating ip_address", networkID)
+	}
+	if network.VPC == nil {
+		return diag.Errorf("ip_address %q is set but network %s is not a VPC-backed network: ip_address requires network_id to reference a VPC private network — remove ip_address or use a VPC network", ip, networkID)
+	}
+	return nil
+}
+
+// vmwareVPCStaticIPToPush mirrors the OpenIaaS vpcStaticIPToPush (#374): returns the
+// VPC static IP to push, or "" to leave it untouched — push ONLY when ip_address is
+// configured, non-empty, on a VPC network, and diverges from the live address
+// (re-sending an unchanged address would relocate the static IP to itself).
+func vmwareVPCStaticIPToPush(ipConfigured bool, configuredIP, liveIP string, onVPC bool) string {
+	if !ipConfigured || configuredIP == "" || !onVPC {
+		return ""
+	}
+	if configuredIP == liveIP {
+		return ""
+	}
+	return configuredIP
+}
+
+// vmwareAdapterVPCStaticIP mirrors the OpenIaaS adapterVPCStaticIP (#374): maps a
+// by-MAC static IP read to the ip_address state value (empty off a VPC, or when no
+// static IP is registered yet — including the 403/absent the client maps to nil).
+func vmwareAdapterVPCStaticIP(onVPC bool, sip *client.StaticIP) string {
+	if !onVPC || sip == nil {
+		return ""
+	}
+	return sip.IPAddress
 }

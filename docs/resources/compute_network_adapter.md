@@ -8,6 +8,7 @@ description: |-
     - compute_iaas_vmware_management
     - compute_iaas_vmware_read
     - activity_read
+    - vpc_read
 ---
 
 # cloudtemple_compute_network_adapter (Resource)
@@ -18,6 +19,7 @@ To manage this resource you will need the following roles:
   - `compute_iaas_vmware_management`
   - `compute_iaas_vmware_read`
   - `activity_read`
+  - `vpc_read`
 
 ## Example Usage
 
@@ -68,6 +70,7 @@ resource "cloudtemple_compute_network_adapter" "foo" {
 
 - `auto_connect` (Boolean) Whether the network adapter should connect to the network automatically when the virtual machine is powered on.
 - `connected` (Boolean) Whether the network adapter should be connected to the network. Defaults to true.
+- `ip_address` (String) The VPC static IP to assign to this adapter. Requires `network_id` to reference a VPC-backed network: when set, the adapter is given this address on the VPC; if omitted, the platform auto-assigns one (reflected here after apply). Mutable: changing it relocates the static IP. Setting it while `network_id` is not VPC-backed is rejected.
 - `mac_address` (String) The MAC address of the network adapter. If not provided, a MAC address will be generated automatically.
 
 ### Read-Only

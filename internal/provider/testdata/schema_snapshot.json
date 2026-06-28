@@ -690,6 +690,13 @@
           "optional": true,
           "elem_kind": "nil"
         },
+        "ip_address": {
+          "type": "TypeString",
+          "optional": true,
+          "computed": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
         "mac_address": {
           "type": "TypeString",
           "optional": true,

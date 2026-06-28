@@ -19,6 +19,7 @@ NEW FEATURES :
 ENHANCEMENTS :
 
   * Added `ip_address` to resource `cloudtemple_compute_iaas_opensource_network_adapter`. When the adapter's `network_id` is a VPC-backed network, this assigns the adapter's VPC static IP to a chosen address (and relocates it in place on change); if omitted the platform auto-assigns one. The assigned address is read back into the state — resolved by MAC, as the platform does not echo it on the adapter object — so the plan converges, and destroying the adapter releases the static IP. Setting it while `network_id` is not VPC-backed is rejected.
+  * Added `ip_address` to resource `cloudtemple_compute_network_adapter` (VMware). When the adapter's `network_id` is a VPC-backed network, this assigns the adapter's VPC static IP to a chosen address (and relocates it in place on change); if omitted the platform auto-assigns one. The assigned address is read back into the state — resolved by MAC, as the platform does not echo it on the adapter object — so the plan converges, and destroying the adapter releases the static IP. Setting it while `network_id` is not VPC-backed is rejected.
 
 # 1.8.0 (Unreleased)
 
