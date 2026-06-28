@@ -367,7 +367,10 @@ func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, m
 	//     attempt, so resolving the live IP INSIDE the builder makes a retry after
 	//     a transient failure recognise an already-applied relocation (converged
 	//     => nil patch) instead of relocating the static IP to itself.
-	if d.HasChange("ip_address") || d.HasChange("network_id") {
+	// mac_address is in the trigger because the VPC static IP is keyed BY MAC: a
+	// MAC change re-targets the registration, so a configured ip_address must be
+	// re-applied to the new MAC in the same apply (not just on ip/network change).
+	if d.HasChange("ip_address") || d.HasChange("network_id") || d.HasChange("mac_address") {
 		ipConfigured := false
 		if raw := d.GetRawConfig(); !raw.IsNull() {
 			if v := raw.GetAttr("ip_address"); !v.IsNull() {

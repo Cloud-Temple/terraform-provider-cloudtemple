@@ -7,6 +7,7 @@ description: |-
     - compute_iaas_opensource_management
     - compute_iaas_opensource_read
     - activity_read
+    - vpc_read
 ---
 
 # cloudtemple_compute_iaas_opensource_network_adapter (Resource)
@@ -15,6 +16,7 @@ To manage this resource you will need the following roles:
   - `compute_iaas_opensource_management`
   - `compute_iaas_opensource_read`
   - `activity_read`
+  - `vpc_read`
 
 ## Example Usage
 
