@@ -57,6 +57,13 @@ func resourceOpenIaasNetworkAdapter() *schema.Resource {
 				Optional:    true,
 				Computed:    true,
 			},
+			"ip_address": {
+				Type:         schema.TypeString,
+				Description:  "The VPC static IP to assign to this adapter. Requires `network_id` to reference a VPC-backed private network: when set, the adapter is given this address on the VPC; if omitted, the platform auto-assigns one (reflected here after apply). Mutable: changing it relocates the static IP. Setting it while `network_id` is not VPC-backed is rejected.",
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validation.IsIPv4Address,
+			},
 
 			// Out
 			"id": {
@@ -127,6 +134,11 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 	c := getClient(meta)
 	vmID := d.Get("virtual_machine_id").(string)
 
+	// Reject ip_address on a non-VPC network BEFORE creating anything.
+	if diags := ensureVPCForIPAddress(ctx, c, d); diags != nil {
+		return diags
+	}
+
 	var activity *client.Activity
 	var err error
 	for attempt := 1; attempt <= maxTransientVIFAttempts; attempt++ {
@@ -138,6 +150,7 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 			VirtualMachineID: vmID,
 			NetworkID:        d.Get("network_id").(string),
 			MAC:              d.Get("mac_address").(string),
+			IPAddress:        d.Get("ip_address").(string),
 		})
 		if err != nil {
 			return diag.Errorf("the network adapter could not be created: %s", err)
@@ -257,11 +270,37 @@ func openIaasNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, met
 		}
 	}
 
+	// Resolve the VPC static IP assigned to this adapter so a configured
+	// `ip_address` converges. The adapter read does NOT echo it: the nested
+	// vpc.staticIpAddress reflects the live guest IP and is absent when the VM
+	// has no live address (e.g. powered off), whereas the platform-registered
+	// static IP is addressable only via GET /vpc/v1/static_ips/mac/{mac}. We
+	// only query for a VPC-backed adapter (VPC != nil); a plain-network adapter
+	// has no static IP, so ip_address is empty. Fail closed on a read error
+	// rather than blanking ip_address (which would show a spurious diff).
+	ipAddress := ""
+	onVPC := networkAdapter.VPC != nil
+	if onVPC && networkAdapter.MacAddress != "" {
+		staticIP, err := c.VPC().StaticIP().ReadByMAC(ctx, networkAdapter.MacAddress)
+		if err != nil {
+			return diag.Errorf("failed to read the VPC static IP of network adapter %s: %s", d.Id(), err)
+		}
+		ipAddress = adapterVPCStaticIP(onVPC, staticIP)
+	}
+	if err := d.Set("ip_address", ipAddress); err != nil {
+		return diag.FromErr(err)
+	}
+
 	return diags
 }
 
 func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
+
+	// Reject ip_address on a non-VPC network BEFORE moving the adapter.
+	if diags := ensureVPCForIPAddress(ctx, c, d); diags != nil {
+		return diags
+	}
 
 	if d.HasChange("network_id") || d.HasChange("mac_address") || d.HasChange("tx_checksumming") {
 		// At create time every HasChange is true while the Create request
@@ -317,6 +356,79 @@ func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
+	// VPC static IP (ip_address) is reconciled AFTER the network/mac patch above,
+	// against a FRESH read, for two reasons (both real):
+	//   - moving onto a VPC-backed network and setting ip_address in the SAME
+	//     apply: only the post-patch read shows the adapter on the VPC, so gating
+	//     on the pre-patch attachment would skip the assignment and let the
+	//     platform auto-assign instead of using the configured address;
+	//   - the assigned IP lives only on the VPC side (addressable by MAC), not on
+	//     the adapter object (#1854). runVIFUpdateWithRetry re-reads before every
+	//     attempt, so resolving the live IP INSIDE the builder makes a retry after
+	//     a transient failure recognise an already-applied relocation (converged
+	//     => nil patch) instead of relocating the static IP to itself.
+	// mac_address is in the trigger because the VPC static IP is keyed BY MAC: a
+	// MAC change re-targets the registration, so a configured ip_address must be
+	// re-applied to the new MAC in the same apply (not just on ip/network change).
+	if d.HasChange("ip_address") || d.HasChange("network_id") || d.HasChange("mac_address") {
+		ipConfigured := false
+		if raw := d.GetRawConfig(); !raw.IsNull() {
+			if v := raw.GetAttr("ip_address"); !v.IsNull() {
+				ipConfigured = true
+			}
+		}
+		configuredIP := d.Get("ip_address").(string)
+		if ipConfigured && configuredIP != "" {
+			fresh, err := c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, d.Id())
+			if err != nil {
+				return diag.Errorf("failed to read network adapter %s before VPC IP reconciliation: %s", d.Id(), err)
+			}
+			if fresh == nil {
+				return diag.Errorf("network adapter %s not found", d.Id())
+			}
+			// Reconcile only on a VPC-backed network. ensureVPCForIPAddress already
+			// rejected a non-VPC target up front, so a non-VPC `fresh` here means a
+			// rare mid-apply drift: skip rather than error after the network patch
+			// already ran. The live static IP is resolved by MAC INSIDE the builder
+			// (runVIFUpdateWithRetry re-reads before every attempt) so a retry after
+			// a transient failure recognises an already-applied relocation
+			// (converged => nil) instead of relocating the static IP to itself.
+			if fresh.VPC != nil {
+				var ipReadErr error
+				relocatePatch := func(actual *client.OpenIaaSNetworkAdapter) *client.UpdateOpenIaasNetworkAdapterRequest {
+					if actual.VPC == nil {
+						return nil
+					}
+					staticIP, err := c.VPC().StaticIP().ReadByMAC(ctx, actual.MacAddress)
+					if err != nil {
+						ipReadErr = err
+						return nil
+					}
+					liveIP := adapterVPCStaticIP(true, staticIP)
+					if ip := vpcStaticIPToPush(true, configuredIP, liveIP, true); ip != "" {
+						// The API requires networkId alongside ipAddress; re-sending
+						// the same networkId WITH a real ipAddress change is accepted
+						// (not the redundant-patch self-conflict of #246, verified live).
+						return &client.UpdateOpenIaasNetworkAdapterRequest{
+							NetworkID: actual.Network.ID,
+							IPAddress: ip,
+						}
+					}
+					return nil
+				}
+				if relocatePatch(fresh) != nil {
+					// Bounded retry on transient platform failures (#251 / #315).
+					if err := runVIFUpdateWithRetry(ctx, d.Id(), clientVIFUpdateFuncs(c, d.Id(), getWaiterOptions(ctx)), relocatePatch); err != nil {
+						return diag.Errorf("the VPC static IP of network adapter %s could not be set: %s", d.Id(), err)
+					}
+				}
+				if ipReadErr != nil {
+					return diag.Errorf("failed to read the current VPC static IP of network adapter %s: %s", d.Id(), ipReadErr)
+				}
+			}
+		}
+	}
+
 	if d.HasChange("attached") && !d.IsNewResource() {
 		switch d.Get("attached").(bool) {
 		case true:
@@ -352,6 +464,67 @@ func openIaasNetworkAdapterDelete(ctx context.Context, d *schema.ResourceData, m
 		return diag.Errorf("failed to delete network adapter, %s", err)
 	}
 	return nil
+}
+
+// ensureVPCForIPAddress fails closed BEFORE any side effect when ip_address is
+// explicitly configured but the target network_id is not a VPC-backed private
+// network. ip_address only has meaning on a VPC network (it assigns the
+// adapter's static IP there); on a plain network the platform ignores it, so
+// the value could never be applied nor recorded and the plan would never
+// converge. Validating the target network up front makes apply reject the bad
+// config instead of creating/moving the adapter and only then failing.
+func ensureVPCForIPAddress(ctx context.Context, c *client.Client, d *schema.ResourceData) diag.Diagnostics {
+	raw := d.GetRawConfig()
+	if raw.IsNull() {
+		return nil
+	}
+	if v := raw.GetAttr("ip_address"); v.IsNull() {
+		return nil
+	}
+	ip := d.Get("ip_address").(string)
+	if ip == "" {
+		return nil
+	}
+	networkID := d.Get("network_id").(string)
+	network, err := c.Compute().OpenIaaS().Network().Read(ctx, networkID)
+	if err != nil {
+		return diag.Errorf("failed to read network %s to validate ip_address: %s", networkID, err)
+	}
+	if network == nil {
+		return diag.Errorf("network %s not found while validating ip_address", networkID)
+	}
+	if network.VPC == nil {
+		return diag.Errorf("ip_address %q is set but network %s is not a VPC-backed private network: ip_address requires network_id to reference a VPC private network — remove ip_address or use a VPC network", ip, networkID)
+	}
+	return nil
+}
+
+// vpcStaticIPToPush decides the VPC static IP to send on an OpenIaaS adapter
+// update; it returns the address to push, or "" to leave the static IP
+// untouched. It pushes ONLY when ip_address is explicitly configured, non-empty,
+// the adapter is on a VPC-backed network, and the configured address diverges
+// from the live one: re-sending an unchanged address would relocate the static
+// IP to itself on every apply (a perpetual no-op activity), and ip_address has
+// no meaning on a non-VPC network. The live static IP is resolved by MAC by the
+// caller, because the platform does not echo it on the adapter object (#1854).
+func vpcStaticIPToPush(ipConfigured bool, configuredIP, liveIP string, onVPC bool) string {
+	if !ipConfigured || configuredIP == "" || !onVPC {
+		return ""
+	}
+	if configuredIP == liveIP {
+		return ""
+	}
+	return configuredIP
+}
+
+// adapterVPCStaticIP maps a by-MAC static IP read to the ip_address state value.
+// A non-VPC adapter has no static IP; a VPC adapter with none registered yet
+// (sip == nil — including the 403/absent the client maps to nil) also yields "".
+func adapterVPCStaticIP(onVPC bool, sip *client.StaticIP) string {
+	if !onVPC || sip == nil {
+		return ""
+	}
+	return sip.IPAddress
 }
 
 // vifCleanupTargets partitions the adapter ids referenced by the failed
