@@ -20,6 +20,11 @@ type NetworkAdapter struct {
 	MacAddress       string
 	Connected        bool
 	AutoConnect      bool
+	// VPC carries the VPC association of the adapter (vpcDetails, shared with the
+	// OpenIaaS shape). POINTER: the API emits the `vpc` object only when the
+	// adapter is on a VPC-backed network; a plain-network adapter decodes it to
+	// nil (#375, confirmed live on the recette vCenter).
+	VPC *OpenIaaSNetworkAdapterVPC `json:"vpc"`
 }
 
 type NetworkAdapterFilter struct {
@@ -77,6 +82,9 @@ type CreateNetworkAdapterRequest struct {
 	NetworkId        string `json:"networkId"`
 	Type             string `json:"type"`
 	MacAddress       string `json:"macAddress,omitempty"`
+	// IPAddress is the VPC static IP to assign when the target network is
+	// VPC-backed (compute API #1854, source=vmware). Ignored on a plain network.
+	IPAddress string `json:"ipAddress,omitempty"`
 }
 
 func (n *NetworkAdapterClient) Create(ctx context.Context, req *CreateNetworkAdapterRequest) (string, error) {
@@ -110,6 +118,10 @@ type UpdateNetworkAdapterRequest struct {
 	NewNetworkId string `json:"newNetworkId"`
 	AutoConnect  bool   `json:"autoConnect"`
 	MacAddress   string `json:"macAddress,omitempty"`
+	// IPAddress relocates the VPC static IP of a VPC-backed adapter to this
+	// address (compute API #1854, source=vmware). Sent only by the VPC IP
+	// reconciliation step, on a genuine divergence.
+	IPAddress string `json:"ipAddress,omitempty"`
 }
 
 func (n *NetworkAdapterClient) Update(ctx context.Context, req *UpdateNetworkAdapterRequest) (string, error) {

@@ -30,6 +30,11 @@ type Network struct {
 	VirtualMachinesNumber int
 	HostNumber            int
 	HostNames             []string
+	// VPC is the network's VPC association. POINTER: the API emits the `vpc`
+	// object only for a VPC-backed (vStack/VPC) portgroup, so a plain network
+	// decodes it to nil. Used to reject ip_address on a non-VPC network before
+	// any side effect (#375, confirmed live: the listing exposes `vpc`).
+	VPC *OpenIaaSNetworkAdapterVPC `json:"vpc"`
 }
 
 func (n *NetworkClient) List(
