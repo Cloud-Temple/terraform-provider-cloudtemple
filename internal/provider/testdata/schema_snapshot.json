@@ -52,6 +52,13 @@
           "computed": true,
           "elem_kind": "nil"
         },
+        "ip_address": {
+          "type": "TypeString",
+          "optional": true,
+          "computed": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
         "ipv4_address": {
           "type": "TypeString",
           "computed": true,
