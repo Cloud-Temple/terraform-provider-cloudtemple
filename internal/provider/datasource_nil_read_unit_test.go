@@ -66,7 +66,7 @@ func TestDataSourceStorageAccountReadNilDoesNotPanic(t *testing.T) {
 func TestDataSourceBucketReadSuccess(t *testing.T) {
 	c := newAssignTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"id":"bucket-123","name":"my-bucket"}`))
+		_, _ = w.Write([]byte(`{"id":"bucket-123","name":"my-bucket","endpoint":"https://s3.example"}`))
 	})
 	d := dataSourceBucket().TestResourceData()
 	_ = d.Set("name", "my-bucket")
@@ -78,12 +78,17 @@ func TestDataSourceBucketReadSuccess(t *testing.T) {
 	if d.Id() != "bucket-123" {
 		t.Fatalf("expected id %q, got %q", "bucket-123", d.Id())
 	}
+	// A computed field (not the input "name") must be flattened from the response,
+	// proving the success read populates state, not just the id.
+	if got := d.Get("endpoint").(string); got != "https://s3.example" {
+		t.Fatalf("expected endpoint flattened from the response, got %q", got)
+	}
 }
 
 func TestDataSourceStorageAccountReadSuccess(t *testing.T) {
 	c := newAssignTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"id":"acc-1","name":"my-account"}`))
+		_, _ = w.Write([]byte(`{"id":"acc-1","name":"my-account","arn":"arn:ct:acc-1"}`))
 	})
 	d := dataSourceStorageAccount().TestResourceData()
 	_ = d.Set("name", "my-account")
@@ -94,6 +99,10 @@ func TestDataSourceStorageAccountReadSuccess(t *testing.T) {
 	}
 	if d.Id() != "acc-1" {
 		t.Fatalf("expected id %q, got %q", "acc-1", d.Id())
+	}
+	// A computed field (not the input "name") must be flattened from the response.
+	if got := d.Get("arn").(string); got != "arn:ct:acc-1" {
+		t.Fatalf("expected arn flattened from the response, got %q", got)
 	}
 }
 
