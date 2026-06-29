@@ -1059,7 +1059,8 @@
         "cpu": {
           "type": "TypeInt",
           "optional": true,
-          "default": 1,
+          "computed": true,
+          "has_validate_func": true,
           "elem_kind": "nil"
         },
         "cpu_hot_add_enabled": {
@@ -1362,7 +1363,8 @@
         "memory": {
           "type": "TypeInt",
           "optional": true,
-          "default": 33554432,
+          "computed": true,
+          "has_validate_func": true,
           "elem_kind": "nil"
         },
         "memory_hot_add_enabled": {
@@ -1393,7 +1395,8 @@
         "num_cores_per_socket": {
           "type": "TypeInt",
           "optional": true,
-          "default": 1,
+          "computed": true,
+          "has_validate_func": true,
           "elem_kind": "nil"
         },
         "operating_system_name": {
