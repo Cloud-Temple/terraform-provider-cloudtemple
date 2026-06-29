@@ -25,7 +25,7 @@ func (v *OpenIaaSSnapshotClient) Read(ctx context.Context, id string) (*OpenIaaS
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func (v *OpenIaaSSnapshotClient) List(ctx context.Context, filter *OpenIaaSSnaps
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

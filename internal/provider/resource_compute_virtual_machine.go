@@ -1252,10 +1252,10 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 		return diag.Errorf("the virtual machine could not be read: %s", err)
 	}
 	if vm == nil {
-		// A nil read is NOT a deletion: the client maps HTTP 403 to nil, so a
-		// permission/scope blip would silently shrink the state. We never
-		// auto-remove the resource; we confirm liveness against a strict
-		// machine-manager-scoped listing and otherwise fail closed (#281).
+		// A nil read is NOT auto-treated as a deletion: since #384 it is a
+		// definitive 404 (a genuine 403 surfaces as an access-denied error
+		// above). We never auto-remove the resource; we confirm liveness against
+		// a strict machine-manager-scoped listing and otherwise fail closed (#281).
 		mmID := d.Get("machine_manager_id").(string)
 		return confirmVMwareDeviceOrKeep(ctx, id, "virtual machine", "machine manager", mmID,
 			func(ctx context.Context) ([]string, error) {
@@ -2001,10 +2001,11 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 }
 
 // readVirtualMachineForOp reads a VM by id for a CRUD operation and converts an
-// absent/forbidden (nil, nil) read into an actionable diagnostic instead of a
-// nil-pointer panic (#386). VirtualMachine().Read maps HTTP 404/403 to a nil
-// read (requireNotFoundOrOK), so an operation on a VM that no longer exists or
-// that the token cannot read must fail closed here rather than dereference nil.
+// absent (nil, nil) read into an actionable diagnostic instead of a nil-pointer
+// panic (#386). Since #384 VirtualMachine().Read maps a definitive 404 to a nil
+// read (a genuine 403 surfaces as an access-denied error, returned above), so an
+// operation on a VM that no longer exists must fail closed here rather than
+// dereference nil.
 func readVirtualMachineForOp(ctx context.Context, c *client.Client, id, action string) (*client.VirtualMachine, diag.Diagnostics) {
 	vm, err := c.Compute().VirtualMachine().Read(ctx, id)
 	if err != nil {

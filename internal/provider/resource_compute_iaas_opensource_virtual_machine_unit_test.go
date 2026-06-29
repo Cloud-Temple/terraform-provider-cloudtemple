@@ -519,7 +519,7 @@ func TestClassifyOSDiskOnRead(t *testing.T) {
 func TestDeviceConfirmedGone(t *testing.T) {
 	listed := map[string]bool{"disk-1": true}
 	if deviceConfirmedGone(listed, "disk-1") {
-		t.Fatal("a device still present in the VM-scoped listing must NOT be confirmed gone (403 ambiguity, fail closed)")
+		t.Fatal("a device still present in the VM-scoped listing must NOT be confirmed gone (require absence from both the per-id read and the listing)")
 	}
 	if !deviceConfirmedGone(listed, "disk-2") {
 		t.Fatal("a device absent from both the per-id read and the listing is confirmed gone")

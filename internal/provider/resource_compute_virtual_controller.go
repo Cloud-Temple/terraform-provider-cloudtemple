@@ -133,9 +133,10 @@ func computeVirtualControllerRead(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 	if virtualController == nil {
-		// A nil read is NOT a deletion: the client maps HTTP 403 to nil. We
-		// never auto-remove the resource; we confirm liveness against a strict
-		// VM-scoped listing (without the type filter) and otherwise fail
+		// A nil read is NOT auto-treated as a deletion: since #384 it is a
+		// definitive 404 (a genuine 403 surfaces as an access-denied error
+		// above). We never auto-remove the resource; we confirm liveness against
+		// a strict VM-scoped listing (without the type filter) and otherwise fail
 		// closed (#281).
 		vmID := d.Get("virtual_machine_id").(string)
 		return confirmVMwareDeviceOrKeep(ctx, d.Id(), "virtual controller", "virtual machine", vmID,

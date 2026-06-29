@@ -650,10 +650,10 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		return diag.Errorf("the virtual machine could not be read: %s", err)
 	}
 	if vm == nil {
-		// The API answers 403 for unknown AND forbidden ids alike, and the
-		// client maps both to nil: the VM deletion is only accepted after
-		// the strict tenant listing (complete 200 required) confirms the
-		// absence (#275 doctrine, FF-5).
+		// Since #384 a per-id 403 surfaces as an access-denied error and only a
+		// definitive 404 maps to nil; the VM deletion is still confirmed by the
+		// strict tenant listing (complete 200 required) before the absence
+		// is accepted (#275 doctrine, FF-5).
 		vms, err := c.Compute().OpenIaaS().VirtualMachine().ListStrict(ctx, &client.OpenIaaSVirtualMachineFilter{})
 		if err != nil {
 			return diag.Errorf("virtual machine %s could not be read and its deletion could not be confirmed: %s", d.Id(), err)
@@ -685,14 +685,16 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 
 	// Lazy, single fetch of the VM-scoped device lists: a nil per-id
 	// answer is only treated as a deletion after a second independent
-	// evidence, because the OpenIaaS API answers 403 for unknown AND
-	// forbidden ids alike and the client maps both to nil — a permission
-	// hiccup must never silently shrink the state (#273).
+	// evidence. Since #384 a per-id 403 surfaces as an access-denied error
+	// (so a nil answer now means a definitive 404, not a masked 403), but the
+	// second-evidence guard is retained — a permission hiccup must never
+	// silently shrink the state (#273).
 	var listedDiskIDs map[string]bool
 	confirmDiskGone := func(id string) (bool, error) {
 		if listedDiskIDs == nil {
 			// ListStrict: an access-denied listing must fail closed, not
-			// masquerade as an empty list (the regular List maps 403 to nil).
+			// masquerade as an empty list (the regular List maps a 404 to an
+			// empty result, and pre-#384 also masked a 403 the same way).
 			diskList, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{
 				VirtualMachineID: d.Id(),
 			})

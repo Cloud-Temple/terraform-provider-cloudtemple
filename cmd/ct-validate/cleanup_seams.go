@@ -78,12 +78,15 @@ func idempotentDeleteErr(err error) error {
 // 403 FAILS CLOSED (surfaced as a teardown failure) — never silently accepted.
 //
 // Why NOT a by-id Read re-check (unlike the VMware #330 confirmComputeDeleteErr):
-// the OpenIaaS Read maps BOTH 403 and 404 to "absent" (requireNotFoundOrOK(resp,
-// 403)), so a Read cannot distinguish a truly-absent resource from a
-// present-but-forbidden one — using it would let a real orphan (delete 403 +
-// read 403 on a still-present resource) be masked as success, exactly the
-// access-denied→absent inference the never-orphan doctrine forbids. The
-// same-cycle explicit-delete proof is the unambiguous positive signal instead.
+// historically (pre-#384) the OpenIaaS Read mapped BOTH 403 and 404 to "absent"
+// (it passed 403 as the not-found code), so a Read could not distinguish a
+// truly-absent resource from a present-but-forbidden one — using it would have let a real
+// orphan (delete 403 + read 403 on a still-present resource) be masked as success,
+// exactly the access-denied→absent inference the never-orphan doctrine forbids.
+// Since #384 the Read distinguishes them (404→absent, 403→access-denied error);
+// this path nonetheless keeps the unambiguous same-cycle explicit-delete proof
+// rather than adding a Read re-check (revisited in the #303 follow-up). The
+// same-cycle proof remains the positive signal.
 func confirmComputeDeleteByPriorDelete(err error, priorDeleteOK bool, id string) error {
 	if err == nil {
 		return nil
@@ -110,10 +113,10 @@ func confirmComputeDeleteByPriorDelete(err error, priorDeleteOK bool, id string)
 //     identical to confirmComputeDeleteByPriorDelete. A deferred 403-on-absent is
 //     then the conflation, not an orphan, and is accepted WITHOUT re-listing.
 //   - the strict 200-only listing of the private network: unlike the OpenIaaS
-//     compute delete (whose Read/list conflate 403/404 and so CANNOT prove
-//     absence, hence priorDeleteOK is its only channel), the VPC per-network
-//     listing CAN prove absence, so it is the independent fallback when there is
-//     no same-cycle proof. Found → still present → fail; provably-absent → success.
+//     compute delete path (which relies on the same-cycle priorDeleteOK proof —
+//     see confirmComputeDeleteByPriorDelete above), the VPC per-network listing CAN
+//     prove absence, so it is the independent fallback when there is no same-cycle
+//     proof. Found → still present → fail; provably-absent → success.
 //
 // Neither channel proving absence (no proof AND an inconclusive/failed listing)
 // FAILS CLOSED. listStrict is injected so the decision is unit-testable offline.
@@ -568,15 +571,18 @@ func (s iamPATSeam) FindIDByName(ctx context.Context, name string) (string, erro
 // undoes (F3), keyed by a deterministic identity, and finds its resource via a
 // STRICT listing when the create's activity did not resolve the id.
 //
-// 403-on-absent (#303): the OpenIaaS compute DELETE answers 403 (not 404) for an
-// ALREADY-ABSENT resource — observed live when the deferred net re-deletes what
-// the explicit deprovision already removed. The deferred delete is therefore
-// resolved by confirmComputeDeleteByPriorDelete: a definitive 404 is success; a
-// 403 is accepted as "already gone" ONLY when this cycle's explicit delete of
-// this exact id already succeeded (ExplicitlyDeleted — strict positive same-cycle
-// proof of absence), otherwise it FAILS CLOSED (a 403 with no such proof surfaces
-// as a teardown failure, never a masked orphan). A by-id Read re-check is NOT used
-// because the OpenIaaS Read conflates 403/404 → absent and so cannot prove absence.
+// 403-on-absent (#303): historically (pre-v1.144.0) the OpenIaaS compute DELETE
+// answered 403 (not 404) for an ALREADY-ABSENT resource — observed live when the
+// deferred net re-deletes what the explicit deprovision already removed (the
+// v1.144.0 contract returns 404; revisited in the #303 follow-up). The deferred
+// delete is therefore resolved by confirmComputeDeleteByPriorDelete: a definitive
+// 404 is success; a 403 is accepted as "already gone" ONLY when this cycle's
+// explicit delete of this exact id already succeeded (ExplicitlyDeleted — strict
+// positive same-cycle proof of absence), otherwise it FAILS CLOSED (a 403 with no
+// such proof surfaces as a teardown failure, never a masked orphan). A by-id Read
+// re-check is NOT used: since #384 the Read distinguishes 404 (absent) from 403
+// (access-denied), but this path keeps the same-cycle proof pending the #303
+// follow-up.
 
 // vmSeam is the subset of the VM client a VM teardown needs.
 type vmSeam interface {
