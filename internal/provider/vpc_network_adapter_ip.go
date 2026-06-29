@@ -40,7 +40,7 @@ func vpcStaticIPToPush(ipConfigured bool, configuredIP, liveIP string, onVPC boo
 
 // adapterVPCStaticIP maps a by-MAC static IP read to the ip_address state value.
 // A non-VPC adapter has no static IP; a VPC adapter with none registered yet
-// (sip == nil — including the 403/absent the client maps to nil) also yields "".
+// (sip == nil — a 404 absent; since #384 a 403 surfaces as an error instead) also yields "".
 func adapterVPCStaticIP(onVPC bool, sip *client.StaticIP) string {
 	if !onVPC || sip == nil {
 		return ""

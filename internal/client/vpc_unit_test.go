@@ -91,20 +91,18 @@ func TestVPCVPCListAndRead(t *testing.T) {
 		}
 	})
 
-	t.Run("Read treats 403 as not-found (the live VPC API returns 403 for an absent resource)", func(t *testing.T) {
-		// LIVE EVIDENCE (verified 2026-06-14 against a real tenant): the VPC API
-		// returns 403 Forbidden for an ABSENT resource, not 404 — despite the
-		// swagger documenting 404. So a single Read must treat 403 as not-found,
-		// like every other Cloud Temple read (the provider-wide convention). The
-		// trade-off — a genuine permission denial is indistinguishable from
-		// absence because the API conflates them — is an API-design limitation
-		// (anti-enumeration), not something the provider can resolve.
+	t.Run("Read surfaces a 403 as an access-denied error (404 is the absent signal; #384)", func(t *testing.T) {
+		// Since #384 the VPC API returns 404 for an absent resource and 403 ONLY for
+		// a permission denial (confirmed by the live absence probe). VPC.Read uses
+		// requireNotFoundOrOK(resp, 404), so a genuine 403 is surfaced as an error
+		// instead of being masked as not-found — a forbidden read can no longer be
+		// mistaken for an absence.
 		c := newVPCTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusForbidden)
 		})
-		vpc, err := c.VPC().VPC().Read(ctx, "absent")
-		if err != nil || vpc != nil {
-			t.Fatalf("403 must yield (nil,nil) (the API returns 403 for absent); got vpc=%+v err=%v", vpc, err)
+		vpc, err := c.VPC().VPC().Read(ctx, "forbidden")
+		if err == nil || vpc != nil {
+			t.Fatalf("403 must yield an access-denied error and a nil vpc; got vpc=%+v err=%v", vpc, err)
 		}
 	})
 }

@@ -149,7 +149,7 @@ func TestUpdateVPCStaticIPWith(t *testing.T) {
 		d := newStaticIPState(t)
 		var updateCalls int
 		funcs := vpcStaticIPUpdateFuncs{
-			read: func(ctx context.Context, id string) (*client.StaticIP, error) { return nil, nil }, // 403/absent
+			read: func(ctx context.Context, id string) (*client.StaticIP, error) { return nil, nil }, // 404 absent (post-#384 a 403 would error)
 			update: func(ctx context.Context, id string, req *client.UpdateStaticIPRequest) (string, error) {
 				updateCalls++
 				return "act", nil

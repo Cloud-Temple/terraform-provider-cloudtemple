@@ -69,12 +69,11 @@ func (f *VPCFloatingIPClient) List(ctx context.Context, filter *FloatingIPFilter
 }
 
 // Read retrieves a single floating IP by ID, for DATASOURCE use. It returns
-// (nil, nil) when the floating IP is not found. Per the live contract a genuinely
-// absent floating IP answers 404; requireNotFoundOrOK ADDITIONALLY folds 403 into
-// not-found — a deliberate DATASOURCE tolerance (#303: a datasource treats a
-// forbidden floating IP as "absent"), NOT a claim that the API returns 403 for
-// absence. The RESOURCE must not use this: it reads via ResolveByID, which treats
-// 403 as a fail-closed error and ONLY an authoritative 404 as absence.
+// (nil, nil) when the floating IP is absent (404). Since #384 it uses
+// requireNotFoundOrOK(resp, 404), so a genuine 403 is surfaced as an access-denied
+// error rather than masked as not-found. The RESOURCE must not use this: it reads
+// via ResolveByID, which treats 403 as a fail-closed error and ONLY an
+// authoritative 404 as absence.
 func (f *VPCFloatingIPClient) Read(ctx context.Context, id string) (*FloatingIP, error) {
 	r := f.c.newRequest("GET", "/vpc/v1/floating_ips/%s", id)
 	resp, err := f.c.doRequest(ctx, r)
@@ -82,7 +81,7 @@ func (f *VPCFloatingIPClient) Read(ctx context.Context, id string) (*FloatingIP,
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -97,7 +96,8 @@ func (f *VPCFloatingIPClient) Read(ctx context.Context, id string) (*FloatingIP,
 
 // ResolveByID is the STRICT by-id read used by the floating-IP RESOURCE (create
 // read-back, refresh, delete confirmation) — distinct from Read (datasources),
-// which folds 403 into not-found. ResolveByID returns a tri-state result and uses
+// which since #384 maps 404 to not-found and surfaces 403 as an error.
+// ResolveByID returns a tri-state result and uses
 // an EXPLICIT status switch instead of requireNotFoundOrOK, because for the
 // resource only an AUTHORITATIVE 404 may drop state. The floating IP has NO
 // listing-omission drop channel (unlike static IP's per-network strict listing),

@@ -23,8 +23,9 @@ ENHANCEMENTS :
 
 BUG FIXES :
 
-  * Fixed a possible provider crash (nil-pointer panic) when reading the `cloudtemple_object_storage_bucket`, `cloudtemple_object_storage_storage_account` or `cloudtemple_backup_metrics` datasource for a target that does not exist or that the token is not allowed to read. The underlying client maps such an HTTP 404/403 response to an empty result, which the datasources dereferenced without a guard; they now return an actionable error instead of panicking.
+  * Fixed a possible provider crash (nil-pointer panic) when reading the `cloudtemple_object_storage_bucket`, `cloudtemple_object_storage_storage_account` or `cloudtemple_backup_metrics` datasource for a target that does not exist or that the token is not allowed to read. The underlying client returned an empty result for such a not-found read, which the datasources dereferenced without a guard; they now return an actionable error instead of panicking.
   * Fixed a possible provider crash (nil-pointer panic) on `cloudtemple_compute_virtual_machine` update and destroy when the virtual machine could not be read (it no longer exists or the token is not allowed to read it). The operation now fails closed with an actionable error instead of panicking.
+  * Backup, Marketplace and VPC reads now surface a genuine HTTP 403 as an explicit "access denied" error instead of silently treating it as "not found". This relies on the API's not-found contract for these services (an absent resource returns 404, and 403 means access denied), so a forbidden read can no longer be mistaken for an absent resource and risk a wrong state drop. Compute is not affected by this change yet.
 
 # 1.8.0 (Unreleased)
 

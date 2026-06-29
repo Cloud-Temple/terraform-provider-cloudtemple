@@ -7,20 +7,22 @@ import (
 	"testing"
 )
 
-// These unit tests pin the #382 fix: a datasource read whose client method maps
-// an HTTP 404/403 to a (nil, nil) result must surface an actionable diagnostic,
-// never a nil-pointer panic — AND a normal 200 read must keep working unchanged.
+// These unit tests pin the #382 fix: a datasource read whose client method can
+// return (nil, nil) must surface an actionable diagnostic, never a nil-pointer
+// panic — AND a normal 200 read must keep working unchanged. Object storage maps
+// BOTH 404 and 403 to (nil,nil); since #384 backup metrics maps only 404 to nil
+// (a 403 surfaces as an access-denied error).
 //
-// Both the OLD not-found contract (absent -> 403) and the NEW one (absent -> 404)
-// reach the client helper requireNotFoundOrOK(resp, 403), which folds 404 AND 403
-// to (nil, nil); so each nil-read test is run under BOTH status codes to prove the
-// guard behaves identically before and after the API change.
+// Object storage reads still use requireNotFoundOrOK(resp, 403), which folds BOTH
+// 404 and 403 to (nil, nil); their nil-read tests therefore run under BOTH codes
+// (absentCodes). Backup metrics flipped to notFoundCode=404 in #384, so its tests
+// are split below: 404 -> nil-guard diagnostic, 403 -> access-denied error.
 //
 // Mutation proof (recorded): removing a guard makes the matching nil-read test go
 // RED via a nil-pointer dereference (d.SetId / Flatten* on a nil pointer).
 
-// absentCodes are the two HTTP statuses the client maps to (nil, nil): the new
-// not-found (404) and the old not-found / current forbidden (403).
+// absentCodes are the two HTTP statuses the object-storage reads map to (nil, nil)
+// via requireNotFoundOrOK(resp, 403): 404 and 403.
 var absentCodes = []int{http.StatusNotFound, http.StatusForbidden}
 
 // --- object storage: nil read must error (both 403 and 404), never panic ---
@@ -141,39 +143,59 @@ func backupMetricsHandler(t *testing.T, downPath string, downCode int) http.Hand
 	}
 }
 
-// --- backup metrics: a nil History / PlatformCPU read must error (both 403 and
-// 404), never panic ---
+// --- backup metrics: a nil/forbidden History or PlatformCPU read must error,
+// never panic. Since #384 backup_metrics uses notFoundCode=404, so the two codes
+// take different routes: a 404 (absent) returns (nil,nil) and is caught by the
+// datasource nil-guard ("is unavailable"); a 403 (forbidden) is surfaced by the
+// client as an "access denied" error BEFORE the guard. Both must error, neither
+// must panic in the Flatten* helper. ---
 
 func TestBackupMetricsReadNilHistoryDoesNotPanic(t *testing.T) {
-	for _, code := range absentCodes {
-		t.Run(fmt.Sprintf("HTTP_%d", code), func(t *testing.T) {
-			c := newAssignTestClient(t, backupMetricsHandler(t, "/backup/v1/spp/metrics/backup/history", code))
-			d := dataSourceBackupMetrics().TestResourceData()
-			_ = d.Set("range", 7)
-
-			diags := backupMetricsRead(context.Background(), d, c)
-			if !diags.HasError() {
-				t.Fatalf("a %d history read must return an error diagnostic, got none", code)
-			}
-			diagsContain(t, diags, "history is unavailable")
-		})
-	}
+	const path = "/backup/v1/spp/metrics/backup/history"
+	t.Run("HTTP_404_guarded", func(t *testing.T) {
+		c := newAssignTestClient(t, backupMetricsHandler(t, path, http.StatusNotFound))
+		d := dataSourceBackupMetrics().TestResourceData()
+		_ = d.Set("range", 7)
+		diags := backupMetricsRead(context.Background(), d, c)
+		if !diags.HasError() {
+			t.Fatal("a 404 history read must return an error diagnostic, got none")
+		}
+		diagsContain(t, diags, "history is unavailable")
+	})
+	t.Run("HTTP_403_access_denied", func(t *testing.T) {
+		c := newAssignTestClient(t, backupMetricsHandler(t, path, http.StatusForbidden))
+		d := dataSourceBackupMetrics().TestResourceData()
+		_ = d.Set("range", 7)
+		diags := backupMetricsRead(context.Background(), d, c)
+		if !diags.HasError() {
+			t.Fatal("a 403 history read must return an access-denied error, got none")
+		}
+		diagsContain(t, diags, "access denied")
+	})
 }
 
 func TestBackupMetricsReadNilPlatformCPUDoesNotPanic(t *testing.T) {
-	for _, code := range absentCodes {
-		t.Run(fmt.Sprintf("HTTP_%d", code), func(t *testing.T) {
-			c := newAssignTestClient(t, backupMetricsHandler(t, "/backup/v1/spp/metrics/plateform/cpu", code))
-			d := dataSourceBackupMetrics().TestResourceData()
-			_ = d.Set("range", 7)
-
-			diags := backupMetricsRead(context.Background(), d, c)
-			if !diags.HasError() {
-				t.Fatalf("a %d platform CPU read must return an error diagnostic, got none", code)
-			}
-			diagsContain(t, diags, "platform CPU is unavailable")
-		})
-	}
+	const path = "/backup/v1/spp/metrics/plateform/cpu"
+	t.Run("HTTP_404_guarded", func(t *testing.T) {
+		c := newAssignTestClient(t, backupMetricsHandler(t, path, http.StatusNotFound))
+		d := dataSourceBackupMetrics().TestResourceData()
+		_ = d.Set("range", 7)
+		diags := backupMetricsRead(context.Background(), d, c)
+		if !diags.HasError() {
+			t.Fatal("a 404 platform CPU read must return an error diagnostic, got none")
+		}
+		diagsContain(t, diags, "platform CPU is unavailable")
+	})
+	t.Run("HTTP_403_access_denied", func(t *testing.T) {
+		c := newAssignTestClient(t, backupMetricsHandler(t, path, http.StatusForbidden))
+		d := dataSourceBackupMetrics().TestResourceData()
+		_ = d.Set("range", 7)
+		diags := backupMetricsRead(context.Background(), d, c)
+		if !diags.HasError() {
+			t.Fatal("a 403 platform CPU read must return an access-denied error, got none")
+		}
+		diagsContain(t, diags, "access denied")
+	})
 }
 
 // TestBackupMetricsReadSuccessPopulatesState proves the success path is unchanged

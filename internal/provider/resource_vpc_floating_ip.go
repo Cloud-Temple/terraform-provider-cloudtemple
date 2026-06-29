@@ -233,7 +233,8 @@ func resourceVPCFloatingIPRead(ctx context.Context, d *schema.ResourceData, meta
 // overriding invariant: the resource is NEVER dropped on an inconclusive read.
 //
 // ResolveByID is the STRICT by-id read used ONLY by the resource: unlike Read
-// (datasources), it does NOT fold 403 into not-found. Its tri-state is therefore
+// (datasources), it returns an explicit tri-state (plus an id-consistency guard)
+// so the resource can act on each status distinctly. Its tri-state is therefore
 // unambiguous:
 //
 //   - error (403/206/transport/other) -> FAIL CLOSED: keep the resource, error. A

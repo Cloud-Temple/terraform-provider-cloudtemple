@@ -49,7 +49,7 @@ func (p *VPCPrivateNetworkClient) List(ctx context.Context, filter *PrivateNetwo
 }
 
 // Read retrieves a single private network by ID. It returns (nil, nil) when the
-// private network does not exist (403; the API returns 403 for an absent resource).
+// private network does not exist (404; since #384 the VPC API returns 404 for an absent resource, 403 only for access denied).
 func (p *VPCPrivateNetworkClient) Read(ctx context.Context, id string) (*PrivateNetwork, error) {
 	r := p.c.newRequest("GET", "/vpc/v1/private_networks/%s", id)
 	resp, err := p.c.doRequest(ctx, r)
@@ -57,7 +57,7 @@ func (p *VPCPrivateNetworkClient) Read(ctx context.Context, id string) (*Private
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

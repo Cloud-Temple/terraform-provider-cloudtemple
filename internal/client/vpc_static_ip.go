@@ -126,9 +126,8 @@ func (s *VPCStaticIPClient) ListStrict(ctx context.Context, privateNetworkID str
 }
 
 // Read retrieves a single static IP by ID. It returns (nil, nil) when the static
-// IP is not found: requireNotFoundOrOK maps BOTH 404 and 403 to not-found (the VPC
-// API conflates absent/forbidden, #303), so an absent static IP — whether the API
-// answers 404 or 403 — surfaces as (nil, nil) for idempotent read handling.
+// IP is absent (404). Since #384 it uses requireNotFoundOrOK(resp, 404): a genuine
+// 403 is surfaced as an access-denied error, not masked as not-found.
 func (s *VPCStaticIPClient) Read(ctx context.Context, id string) (*StaticIP, error) {
 	r := s.c.newRequest("GET", "/vpc/v1/static_ips/%s", id)
 	resp, err := s.c.doRequest(ctx, r)
@@ -136,7 +135,7 @@ func (s *VPCStaticIPClient) Read(ctx context.Context, id string) (*StaticIP, err
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -293,8 +292,8 @@ func (s *VPCStaticIPClient) Delete(ctx context.Context, id string) (string, erro
 }
 
 // ReadByMAC retrieves a single static IP by MAC address. It returns (nil, nil)
-// when no static IP matches: requireNotFoundOrOK maps BOTH 404 and 403 to not-found
-// (the VPC API conflates absent/forbidden, #303).
+// when no static IP matches (404). Since #384 it uses requireNotFoundOrOK(resp,
+// 404): a genuine 403 is surfaced as an access-denied error, not masked as not-found.
 func (s *VPCStaticIPClient) ReadByMAC(ctx context.Context, mac string) (*StaticIP, error) {
 	r := s.c.newRequest("GET", "/vpc/v1/static_ips/mac/%s", mac)
 	resp, err := s.c.doRequest(ctx, r)
@@ -302,7 +301,7 @@ func (s *VPCStaticIPClient) ReadByMAC(ctx context.Context, mac string) (*StaticI
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
