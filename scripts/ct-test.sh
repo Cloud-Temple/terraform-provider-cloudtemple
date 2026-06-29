@@ -43,6 +43,7 @@ scenarios() {
   cat <<'EOF'
 readonly|readonly|0|1|Read every service (no create/destroy). The safest scenario, validates the tool.
 machine-managers|machine_managers|0|1|OpenIaaS: just run_identity + machine_managers.list, repeatable, to characterize the #315 5xx flakiness. Read-only.
+probe-absence|probe_absence|0|1|GET every by-id read with a bogus id to map the 404-vs-403 absence contract per endpoint (#384). Read-only; needs a read-entitled token (a 403 is "not migrated" only if the token may read the type).
 vpc|vpc|1|0|QUARANTINED: /vpc/v1 is deprecated and frozen pending the rebuild (no cloudtemple_vpc_* provider surface ships in v1.8.0). The opt-in `ct-validate -cycles vpc -write` still runs it manually.
 storage|object_storage|1|1|Create an object-storage bucket + account + ACL, verify, then destroy.
 vm|compute_lifecycle|1|1|OpenIaaS: create a VM from a template, add a disk, connect the network, then destroy.
