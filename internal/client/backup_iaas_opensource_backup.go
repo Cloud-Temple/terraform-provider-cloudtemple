@@ -28,7 +28,7 @@ func (v *BackupOpenIaasBackupClient) Read(ctx context.Context, id string) (*Back
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (v *BackupOpenIaasBackupClient) List(ctx context.Context, filter *OpenIaasB
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

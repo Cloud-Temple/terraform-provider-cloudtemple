@@ -142,8 +142,8 @@ func resourceVPCStaticIP() *schema.Resource {
 //     POSITIVE evidence, so an absent listing is eventual consistency, NOT a
 //     deletion -> FAIL CLOSED keeping the id (never orphan, #348).
 //
-// In BOTH modes a bare nil per-id read (404/403, the #303 absent/forbidden
-// conflation) NEVER drops on its own: only a SUCCESSFUL strict listing that omits
+// In BOTH modes a bare nil per-id read (a 404; since #384 a 403 surfaces as an
+// error before this path) NEVER drops on its own: only a SUCCESSFUL strict listing that omits
 // the id can drop, and only in readForRefresh (R-Q10).
 type staticIPReadMode int
 
@@ -241,11 +241,11 @@ type vpcStaticIPListStrictFunc func(ctx context.Context, privateNetworkID string
 // readVPCStaticIPInto holds the testable read logic. State safety is the
 // overriding invariant: the resource is NEVER dropped on an inconclusive read.
 //
-// A nil per-id read is INCONCLUSIVE, not a deletion: the VPC read client maps
-// HTTP 403 to nil (the #303 access-denied-as-not-found convention), so an
-// access-denied answer is indistinguishable from a genuine absence. We therefore
-// confirm via a strict, complete (200-only) listing of the private network
-// before concluding anything:
+// A nil per-id read is INCONCLUSIVE, not a deletion: since #384 the VPC read
+// client maps only a 404 to nil (a 403 now surfaces as an access-denied error
+// before this path), but a per-id 404 alone is still not trusted to drop a
+// tracked resource. We therefore confirm via a strict, complete (200-only)
+// listing of the private network before concluding anything:
 //
 //   - listing error (includes any non-200 rejected by ListStrict, e.g. a 206
 //     partial, a 403, or a 5xx) -> FAIL CLOSED: keep the resource, error;
@@ -401,8 +401,8 @@ func resourceVPCStaticIPUpdate(ctx context.Context, d *schema.ResourceData, meta
 // and private_network_id are ForceNew and never reach this path) is rebuilt from a
 // FRESH LIVE read, never from the state alone:
 //
-//   - a nil/ambiguous read (403/absent) or an id-inconsistent body FAILS CLOSED:
-//     never PATCH on ambiguous evidence;
+//   - a nil read (a 404 absent; since #384 a 403 errors out before this) or an
+//     id-inconsistent body FAILS CLOSED: never PATCH on ambiguous evidence;
 //   - if the live state already matches the desired config (after MAC
 //     canonicalisation) it is converged: return success WITHOUT a PATCH;
 //   - otherwise issue the async PATCH and wait for its activity.
