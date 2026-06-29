@@ -24,6 +24,7 @@ ENHANCEMENTS :
 BUG FIXES :
 
   * Fixed a possible provider crash (nil-pointer panic) when reading the `cloudtemple_object_storage_bucket`, `cloudtemple_object_storage_storage_account` or `cloudtemple_backup_metrics` datasource for a target that does not exist or that the token is not allowed to read. The underlying client maps such an HTTP 404/403 response to an empty result, which the datasources dereferenced without a guard; they now return an actionable error instead of panicking.
+  * Fixed a possible provider crash (nil-pointer panic) on `cloudtemple_compute_virtual_machine` update and destroy when the virtual machine could not be read (it no longer exists or the token is not allowed to read it). The operation now fails closed with an actionable error instead of panicking.
 
 # 1.8.0 (Unreleased)
 
