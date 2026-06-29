@@ -23,10 +23,13 @@ type probeAbsenceEndpoint struct {
 // UUID shape for id routes, valid object-storage names, a valid MAC for ReadByMAC,
 // and a real marketplace provider target for the /items/%s/%s/info route.
 const (
-	probeBogusID     = "00000000-0000-0000-0000-000000000000"
-	probeBogusID2    = "11111111-1111-1111-1111-111111111111"
+	// Random-looking valid UUIDs (NOT the nil/all-ones UUID: a stricter route
+	// validator may special-case those and answer 405/400 instead of running the
+	// absence lookup).
+	probeBogusID     = "7f3e9a2b-1c4d-4e5f-8a6b-9c0d1e2f3a4b"
+	probeBogusID2    = "b2c3d4e5-6f70-4a1b-9c2d-3e4f5a6b7c8d"
 	probeBogusName   = "ctvalidateprobeabsent"
-	probeBogusMAC    = "00:00:00:00:00:00"
+	probeBogusMAC    = "02:00:5e:10:00:01"
 	probeMarketplace = "vmware"
 )
 
