@@ -1345,9 +1345,9 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 	}
 
 	if d.HasChange("customize") && !customizing {
-		vm, err := c.Compute().VirtualMachine().Read(ctx, d.Id())
-		if err != nil {
-			return diag.Errorf("failed to read virtual machine: %s", err)
+		vm, vmDiags := readVirtualMachineForOp(ctx, c, d.Id(), "update")
+		if vmDiags.HasError() {
+			return vmDiags
 		}
 		if vm.PowerState == "running" {
 			activityId, err := c.Compute().VirtualMachine().Power(ctx, &client.PowerRequest{
@@ -1554,9 +1554,9 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 	if updatePower {
 		powerState := d.Get("power_state").(string)
 
-		vm, err := c.Compute().VirtualMachine().Read(ctx, d.Id())
-		if err != nil {
-			return diag.Errorf("failed to read virtual machine: %s", err)
+		vm, vmDiags := readVirtualMachineForOp(ctx, c, d.Id(), "power")
+		if vmDiags.HasError() {
+			return vmDiags
 		}
 
 		recommendation, err := helpers.GetPowerRecommendation(vm, powerState, ctx, c)
@@ -1582,12 +1582,28 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 	return computeVirtualMachineRead(ctx, d, meta)
 }
 
+// readVirtualMachineForOp reads a VM by id for a CRUD operation and converts an
+// absent/forbidden (nil, nil) read into an actionable diagnostic instead of a
+// nil-pointer panic (#386). VirtualMachine().Read maps HTTP 404/403 to a nil
+// read (requireNotFoundOrOK), so an operation on a VM that no longer exists or
+// that the token cannot read must fail closed here rather than dereference nil.
+func readVirtualMachineForOp(ctx context.Context, c *client.Client, id, action string) (*client.VirtualMachine, diag.Diagnostics) {
+	vm, err := c.Compute().VirtualMachine().Read(ctx, id)
+	if err != nil {
+		return nil, diag.Errorf("cannot %s virtual machine %s: %s", action, id, err)
+	}
+	if vm == nil {
+		return nil, diag.Errorf("cannot %s virtual machine %s: it could not be read (it no longer exists or your access may have changed). If it was deleted outside Terraform, remove it from the state with `terraform state rm`.", action, id)
+	}
+	return vm, nil
+}
+
 func computeVirtualMachineDelete(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
-	vm, err := c.Compute().VirtualMachine().Read(ctx, d.Id())
-	if err != nil {
-		return diag.Errorf("failed to read virtual effect: %s", err)
+	vm, vmDiags := readVirtualMachineForOp(ctx, c, d.Id(), "delete")
+	if vmDiags.HasError() {
+		return vmDiags
 	}
 
 	if vm.PowerState == "running" {
