@@ -42,6 +42,7 @@ func buildRegistry() *Registry {
 		vpcCycle{},
 		objectStorageCycle{},
 		iamPATCycle{},
+		probeAbsenceCycle{},
 	)
 }
 

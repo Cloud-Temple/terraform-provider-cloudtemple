@@ -601,6 +601,24 @@ func requireNotFoundOrOK(resp *http.Response, notFoundCode int) (bool, error) {
 	}
 }
 
+// ProbeStatus issues a GET to path (with args) using the client's auth and base
+// URL and returns the RAW HTTP status code, WITHOUT the not-found/forbidden
+// folding that requireNotFoundOrOK applies in the resource read methods (which
+// collapse both 404 and 403 to a nil read). It is a read-only diagnostic helper
+// — it discards the body and never mutates — used by the ct-validate
+// absence-contract probe to observe whether an absent id yields 404 (the new
+// "absent -> 404" contract) or 403 (still 403-for-absent). A returned (0, err) is
+// a transport, auth or request failure that occurred before a status was observed.
+func (c *Client) ProbeStatus(ctx context.Context, path string, args ...interface{}) (int, error) {
+	r := c.newRequest("GET", path, args...)
+	resp, err := c.doRequest(ctx, r)
+	if err != nil {
+		return 0, err
+	}
+	defer closeResponseBody(resp)
+	return resp.StatusCode, nil
+}
+
 type StatusError struct {
 	Code int
 	Body string
