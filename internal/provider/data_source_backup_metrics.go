@@ -235,6 +235,13 @@ func backupMetricsRead(ctx context.Context, d *schema.ResourceData, meta any) di
 	if err != nil {
 		return diag.FromErr(err)
 	}
+	// History maps an HTTP 404/403 to a (nil, nil) result (requireNotFoundOrOK).
+	// A nil here means the metrics are unavailable (absent or access denied), so
+	// fail with an actionable diagnostic instead of dereferencing nil in
+	// FlattenBackupMetricsHistory below (#382).
+	if history == nil {
+		return diag.Errorf("backup metrics history is unavailable (the API returned no content; the token may lack the required backup permission)")
+	}
 	platform, err := c.Backup().Metrics().Platform(ctx)
 	if err != nil {
 		return diag.FromErr(err)
@@ -242,6 +249,11 @@ func backupMetricsRead(ctx context.Context, d *schema.ResourceData, meta any) di
 	platformCPU, err := c.Backup().Metrics().PlatformCPU(ctx)
 	if err != nil {
 		return diag.FromErr(err)
+	}
+	// Same (nil, nil)-on-404/403 contract as History above: guard before
+	// FlattenBackupMetricsPlatformCPU dereferences it (#382).
+	if platformCPU == nil {
+		return diag.Errorf("backup metrics platform CPU is unavailable (the API returned no content; the token may lack the required backup permission)")
 	}
 	policies, err := c.Backup().Metrics().Policies(ctx)
 	if err != nil {
