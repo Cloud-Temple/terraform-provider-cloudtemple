@@ -327,10 +327,11 @@ func resourceVirtualMachine() *schema.Resource {
 				ValidateFunc: validation.IsUUID,
 			},
 			"memory": {
-				Type:        schema.TypeInt,
-				Description: "In bytes. The quantity of memory to start the virtual machine with.",
-				Optional:    true,
-				Default:     33554432,
+				Type:         schema.TypeInt,
+				Description:  "In bytes. The quantity of memory to start the virtual machine with. Required when deploying from scratch (`guest_operating_system_moref`); inherited from the source and read back from the platform when omitted on clone / content library / marketplace deployments.",
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validation.IntAtLeast(1),
 			},
 			"memory_reservation": {
 				Type:        schema.TypeInt,
@@ -338,16 +339,18 @@ func resourceVirtualMachine() *schema.Resource {
 				Optional:    true,
 			},
 			"cpu": {
-				Type:        schema.TypeInt,
-				Description: "The number of CPUs to start the virtual machine with.",
-				Optional:    true,
-				Default:     1,
+				Type:         schema.TypeInt,
+				Description:  "The number of CPUs to start the virtual machine with. Required when deploying from scratch (`guest_operating_system_moref`); inherited from the source and read back from the platform when omitted on clone / content library / marketplace deployments.",
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validation.IntAtLeast(1),
 			},
 			"num_cores_per_socket": {
-				Type:        schema.TypeInt,
-				Optional:    true,
-				Default:     1,
-				Description: "Number of cores per socket.",
+				Type:         schema.TypeInt,
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validation.IntAtLeast(1),
+				Description:  "Number of cores per socket. Read back from the platform when omitted.",
 			},
 			"cpu_hot_add_enabled": {
 				Type:        schema.TypeBool,
@@ -848,8 +851,96 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 				}
 				return nil
 			},
+			// #395: memory and cpu have no schema Default (which would silently
+			// shrink a VM to 32 MiB / 1 vCPU). For a from-scratch deployment they are
+			// sent verbatim to the create API, so they must be declared explicitly.
+			// Detected from the raw config; FAIL-OPEN when the deployment mode or an
+			// attribute is unknown at plan time (the create-time guard is the backstop).
+			func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
+				raw := d.GetRawConfig()
+				if raw.IsNull() || !raw.IsKnown() {
+					return nil
+				}
+				knownAbsent := func(attr string) bool {
+					v := raw.GetAttr(attr)
+					if !v.IsKnown() {
+						return false
+					}
+					if v.IsNull() {
+						return true
+					}
+					return v.Type() == cty.String && v.AsString() == ""
+				}
+				missing := vmFromScratchMissingRequired(
+					d.Id() == "",
+					knownAbsent("clone_virtual_machine_id"),
+					knownAbsent("content_library_item_id"),
+					knownAbsent("marketplace_item_id"),
+					knownAbsent("memory"),
+					knownAbsent("cpu"),
+				)
+				if len(missing) > 0 {
+					return fmt.Errorf("%s must be set when deploying a virtual machine from scratch (`guest_operating_system_moref`)", strings.Join(missing, " and "))
+				}
+				return nil
+			},
 		),
 	}
+}
+
+// vmFromScratchMissingRequired returns the sizing attributes that must be set
+// for a from-scratch VMware deployment but are missing. A from-scratch
+// deployment has no clone / content-library / marketplace source; on those
+// source-based paths `memory` and `cpu` are inherited from the source and stay
+// optional (#395). It fails OPEN (returns nil) when the change is not a create,
+// or when a source selector is not known to be absent (unknown at plan time),
+// so a legitimate create is never blocked — the create-time guard is the
+// runtime backstop.
+func vmFromScratchMissingRequired(isCreate, cloneAbsent, clAbsent, mktAbsent, memoryAbsent, cpuAbsent bool) []string {
+	if !isCreate {
+		return nil
+	}
+	if !(cloneAbsent && clAbsent && mktAbsent) {
+		return nil
+	}
+	var missing []string
+	if memoryAbsent {
+		missing = append(missing, "`memory`")
+	}
+	if cpuAbsent {
+		missing = append(missing, "`cpu`")
+	}
+	return missing
+}
+
+// resolveVMwareUpdateSizing returns the memory, cpu and cores-per-socket to send
+// in a VMware update. The update API always carries these three fields (no
+// omitempty); since #395 removed the schema Defaults, an omitted attribute
+// resolves to 0. A configured value (>0) is used as-is; a 0 is replaced by the
+// live value so an update never shrinks an unspecified field to 0. It FAILS
+// CLOSED: if a 0 must be resolved but the live VM is nil or also reports 0, it
+// returns an error rather than pushing a 0 to the platform.
+func resolveVMwareUpdateSizing(dMemory, dCPU, dCores int, live *client.VirtualMachine) (memory, cpu, cores int, err error) {
+	memory, cpu, cores = dMemory, dCPU, dCores
+	if memory > 0 && cpu > 0 && cores > 0 {
+		return memory, cpu, cores, nil
+	}
+	if live == nil {
+		return 0, 0, 0, fmt.Errorf("cannot resolve unspecified memory/cpu/num_cores_per_socket: the virtual machine could not be read back from the platform")
+	}
+	if memory == 0 {
+		memory = live.Memory
+	}
+	if cpu == 0 {
+		cpu = live.Cpu
+	}
+	if cores == 0 {
+		cores = live.NumCoresPerSocket
+	}
+	if memory <= 0 || cpu <= 0 || cores <= 0 {
+		return 0, 0, 0, fmt.Errorf("refusing to update virtual machine with a zero memory/cpu/num_cores_per_socket (memory=%d cpu=%d num_cores_per_socket=%d): set the values explicitly or run `terraform refresh`", memory, cpu, cores)
+	}
+	return memory, cpu, cores, nil
 }
 
 func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
@@ -971,6 +1062,12 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			return diag.Errorf("failed to deploy marketplace item: %s", err)
 		}
 	} else {
+		// #395 runtime backstop: the from-scratch create sends memory and cpu
+		// verbatim. The plan-time guard fails open when the deployment mode is
+		// unknown, so reject a zero (omitted/uninitialised) value here too.
+		if d.Get("memory").(int) <= 0 || d.Get("cpu").(int) <= 0 {
+			return diag.Errorf("`memory` and `cpu` must be set (>= 1) when deploying a virtual machine from scratch (`guest_operating_system_moref`)")
+		}
 		activityId, err = c.Compute().VirtualMachine().Create(ctx, &client.CreateVirtualMachineRequest{
 			Name:                      name,
 			DatacenterId:              d.Get("datacenter_id").(string),
@@ -1274,12 +1371,36 @@ func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, me
 func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any, updatePower bool, customizing bool) diag.Diagnostics {
 	c := getClient(meta)
 
+	if d.Id() == "" {
+		return diag.Errorf("internal error: updateVirtualMachine called without a virtual machine id")
+	}
+
+	// #395: the VMware update payload always carries ram/cpu/corePerSocket. Now
+	// that the schema Defaults are gone, an omitted attribute resolves to 0; we
+	// resolve a 0 from the live VM instead of pushing it, so an update never
+	// shrinks an unspecified field (fail closed if the live value is also 0).
+	dMemory := d.Get("memory").(int)
+	dCPU := d.Get("cpu").(int)
+	dCores := d.Get("num_cores_per_socket").(int)
+	var live *client.VirtualMachine
+	if dMemory == 0 || dCPU == 0 || dCores == 0 {
+		var rerr error
+		live, rerr = c.Compute().VirtualMachine().Read(ctx, d.Id())
+		if rerr != nil {
+			return diag.Errorf("failed to read virtual machine to resolve memory/cpu/num_cores_per_socket: %s", rerr)
+		}
+	}
+	memory, cpu, cores, rerr := resolveVMwareUpdateSizing(dMemory, dCPU, dCores, live)
+	if rerr != nil {
+		return diag.Errorf("%s", rerr)
+	}
+
 	req := &client.UpdateVirtualMachineRequest{
 		Id:                           d.Id(),
-		Ram:                          d.Get("memory").(int),
+		Ram:                          memory,
 		MemoryReservation:            d.Get("memory_reservation").(int),
-		Cpu:                          d.Get("cpu").(int),
-		CorePerSocket:                d.Get("num_cores_per_socket").(int),
+		Cpu:                          cpu,
+		CorePerSocket:                cores,
 		HotCpuAdd:                    d.Get("cpu_hot_add_enabled").(bool),
 		HotCpuRemove:                 d.Get("cpu_hot_remove_enabled").(bool),
 		HotMemAdd:                    d.Get("memory_hot_add_enabled").(bool),

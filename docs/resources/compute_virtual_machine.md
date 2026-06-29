@@ -370,7 +370,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 	For exemple, you can use this [Ubuntu Cloud Image](https://cloud-images.ubuntu.com/) and convert it to an OVF.
 - `content_library_id` (String) The ID of the content library to clone from. Conflict with `clone_virtual_machine_id`.
 - `content_library_item_id` (String) The ID of the content library item to clone. Conflict with `clone_virtual_machine_id`.
-- `cpu` (Number) The number of CPUs to start the virtual machine with.
+- `cpu` (Number) The number of CPUs to start the virtual machine with. Required when deploying from scratch (`guest_operating_system_moref`); inherited from the source and read back from the platform when omitted on clone / content library / marketplace deployments.
 - `cpu_hot_add_enabled` (Boolean) Flag that indicate if hot add of CPU is enabled or not.
 - `cpu_hot_remove_enabled` (Boolean) Flag that indicate if hot remove of CPU is enabled or not.
 - `customize` (Block List, Max: 1) Customizes a virtual machine's guest operating system. (VMWare Tools has to be installed) (see [below for nested schema](#nestedblock--customize))
@@ -392,10 +392,10 @@ Note: Changes to extra_config may require a virtual machine restart to take effe
 - `guest_operating_system_moref` (String) The operating system to launch the virtual machine with.
 - `host_id` (String) The host to start the virtual machine on.
 - `marketplace_item_id` (String) The ID of the marketplace item to deploy. Conflict with `clone_virtual_machine_id` and `content_library_item_id`.
-- `memory` (Number) In bytes. The quantity of memory to start the virtual machine with.
+- `memory` (Number) In bytes. The quantity of memory to start the virtual machine with. Required when deploying from scratch (`guest_operating_system_moref`); inherited from the source and read back from the platform when omitted on clone / content library / marketplace deployments.
 - `memory_hot_add_enabled` (Boolean) Flag that indicate if hot add of memory is enabled or not.
 - `memory_reservation` (Number) In bytes. Amount of resource that is guaranteed available to the virtual machine. Reserved resources are not wasted if they are not used. If the utilization is less than the reservation, the resources can be utilized by other running virtual machines.
-- `num_cores_per_socket` (Number) Number of cores per socket.
+- `num_cores_per_socket` (Number) Number of cores per socket. Read back from the platform when omitted.
 - `os_disk` (Block List) OS disks created from content lib item deployment or virtual machine clone. (see [below for nested schema](#nestedblock--os_disk))
 - `os_network_adapter` (Block List) OS network adapters created from content lib item deployment or virtual machine clone. (see [below for nested schema](#nestedblock--os_network_adapter))
 - `power_state` (String) Whether to start the virtual machine.
