@@ -942,6 +942,12 @@
         }
       ],
       "schema": {
+        "allow_vm_restart": {
+          "type": "TypeBool",
+          "optional": true,
+          "default": false,
+          "elem_kind": "nil"
+        },
         "backup_sla_policies": {
           "type": "TypeSet",
           "optional": true,
