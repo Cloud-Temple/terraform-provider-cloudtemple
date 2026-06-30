@@ -527,7 +527,7 @@ Optional:
 
 Optional:
 
-- `capacity` (Number) The size of the disk in bytes. The size must be greater than or equal to the size of the virtual machine's operating system disk.
+- `capacity` (Number) The size of the disk in bytes. The size must be greater than or equal to the size of the virtual machine's operating system disk (vSphere cannot shrink a virtual disk).
 - `disk_mode` (String) Possible values are: persistent, independent_nonpersistent, independent_persistent.
 Persistent: Changes are immediately and permanently written to the virtual disk
 Independent non persistent: Changes to virtual disk are made to a redo log and discarded at power off. Not affected by snapshots

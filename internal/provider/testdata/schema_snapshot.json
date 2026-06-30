@@ -1420,6 +1420,7 @@
               "type": "TypeInt",
               "optional": true,
               "computed": true,
+              "has_validate_func": true,
               "elem_kind": "nil"
             },
             "controller_bus_number": {
