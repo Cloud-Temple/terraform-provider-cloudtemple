@@ -898,7 +898,13 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		return diag.Errorf("failed to find virtual machine: %s", d.Id())
 	}
 
-	patch, changed, needsReboot := buildOpenIaasVMPropertiesPatch(vm, openIaasVMDesiredPropertiesFromResourceData(d))
+	desiredProps := openIaasVMDesiredPropertiesFromResourceData(d)
+	patch, changed, needsReboot := buildOpenIaasVMPropertiesPatch(vm, desiredProps)
+	// #396: re-assert a sizing field the user explicitly changed even if the live API
+	// already reports the desired value (a prior apply may have been acknowledged
+	// without materialising). openIaasVMForcedFields returns nothing on create, so this
+	// never reintroduces the #267 redundant PATCH + reboot on the create->update chain.
+	changed, needsReboot = forceOpenIaasSizingReassert(patch, desiredProps, openIaasVMForcedFields(d), changed, needsReboot)
 	wasRunning := false
 
 	if changed {
@@ -967,6 +973,26 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 			if err != nil {
 				return diag.Errorf("failed to get PV drivers on virtual machine after power on, %s", err)
 			}
+		}
+	}
+
+	// #396 read-back: a "completed" update activity is not proof the change
+	// materialised — a lagging or silently-failed XCP-ng apply can leave the VM on
+	// the old sizing. Re-read the live VM and fail closed when a patched
+	// cpu/memory/num_cores_per_socket value did not take effect, instead of trusting
+	// the platform's acknowledgement and drifting silently. (Limit: a platform that
+	// reports the desired value while the guest still runs the old one is not
+	// detectable here.)
+	if needsReboot {
+		fresh, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, d.Id())
+		if err != nil {
+			return diag.Errorf("failed to read virtual machine to confirm the update materialised: %s", err)
+		}
+		if fresh == nil {
+			return diag.Errorf("the virtual machine %s could not be read back after an acknowledged update; cannot confirm the sizing change materialised", d.Id())
+		}
+		if mismatches := openIaasPatchNotMaterialised(patch, fresh); len(mismatches) > 0 {
+			return diag.Errorf("the platform acknowledged the update but the virtual machine still reports %s; the change did not materialise — re-run `terraform apply`", strings.Join(mismatches, ", "))
 		}
 	}
 
@@ -1307,6 +1333,85 @@ func buildOpenIaasVMPropertiesPatch(live *client.OpenIaaSVirtualMachine, desired
 	}
 
 	return req, changed, needsReboot
+}
+
+// openIaasVMChangedFields reports which #267-governed sizing attributes the user
+// explicitly changed in the configuration, used to force a re-PATCH even when the
+// live API value already equals the desired one (#396: a prior apply may have been
+// acknowledged by the platform without materialising). It is computed only for
+// genuine updates (never on create), so re-asserting a value never reintroduces
+// the redundant PATCH + reboot that #267 removed.
+type openIaasVMChangedFields struct {
+	CPU, Memory, NumCoresPerSocket bool
+}
+
+// vmChangeReader is the subset of *schema.ResourceData that openIaasVMForcedFields
+// needs. It is an interface so the create gate and the attribute-key mapping can be
+// unit-tested with a fake, without driving a live update diff.
+type vmChangeReader interface {
+	IsNewResource() bool
+	HasChange(key string) bool
+}
+
+// openIaasVMForcedFields reports which #267-governed sizing attributes the user
+// explicitly changed (#396). It returns the zero value on create, so re-asserting
+// a value never fires on the create->update chain (which would reintroduce the
+// redundant PATCH + reboot #267 removed).
+func openIaasVMForcedFields(d vmChangeReader) openIaasVMChangedFields {
+	if d.IsNewResource() {
+		return openIaasVMChangedFields{}
+	}
+	return openIaasVMChangedFields{
+		CPU:               d.HasChange("cpu"),
+		Memory:            d.HasChange("memory"),
+		NumCoresPerSocket: d.HasChange("num_cores_per_socket"),
+	}
+}
+
+// forceOpenIaasSizingReassert re-asserts a sizing field into the patch when the
+// user explicitly changed it (forced) but buildOpenIaasVMPropertiesPatch skipped
+// it because the live API value already equalled the desired one. It only adds a
+// field the build left out (req.X == 0), so when the live genuinely differs (build
+// already set it) nothing changes here. Returns the updated (changed, needsReboot).
+//
+// Limit (#396): this only helps when Terraform still holds an older value than the
+// pre-update API GET; it cannot detect a platform that reports the desired value
+// while the running guest keeps the old one and the config has already converged.
+func forceOpenIaasSizingReassert(req *client.UpdateOpenIaasVirtualMachineRequest, desired openIaasVMDesiredProperties, forced openIaasVMChangedFields, changed, needsReboot bool) (bool, bool) {
+	if forced.Memory && desired.Memory != 0 && req.Memory == 0 {
+		req.Memory = desired.Memory
+		changed = true
+		needsReboot = true
+	}
+	if forced.CPU && desired.CPU != 0 && req.CPU == 0 {
+		req.CPU = desired.CPU
+		changed = true
+		needsReboot = true
+	}
+	if forced.NumCoresPerSocket && desired.NumCoresPerSocket != nil && *desired.NumCoresPerSocket != 0 && req.NumCoresPerSocket == 0 {
+		req.NumCoresPerSocket = *desired.NumCoresPerSocket
+		changed = true
+		needsReboot = true
+	}
+	return changed, needsReboot
+}
+
+// openIaasPatchNotMaterialised returns descriptions of the patched sizing fields
+// (cpu / memory / num_cores_per_socket) whose value did not take effect on the
+// live VM after the update activity completed (#396 read-back). Only fields the
+// patch actually carried (non-zero) are checked.
+func openIaasPatchNotMaterialised(req *client.UpdateOpenIaasVirtualMachineRequest, live *client.OpenIaaSVirtualMachine) []string {
+	var m []string
+	if req.Memory != 0 && live.Memory != req.Memory {
+		m = append(m, fmt.Sprintf("memory=%d (requested %d)", live.Memory, req.Memory))
+	}
+	if req.CPU != 0 && live.CPU != req.CPU {
+		m = append(m, fmt.Sprintf("cpu=%d (requested %d)", live.CPU, req.CPU))
+	}
+	if req.NumCoresPerSocket != 0 && live.NumCoresPerSocket != req.NumCoresPerSocket {
+		m = append(m, fmt.Sprintf("num_cores_per_socket=%d (requested %d)", live.NumCoresPerSocket, req.NumCoresPerSocket))
+	}
+	return m
 }
 
 // adapterNeedsUpdate compares the desired os_network_adapter block against
