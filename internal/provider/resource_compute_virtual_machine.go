@@ -420,10 +420,11 @@ func resourceVirtualMachine() *schema.Resource {
 					Schema: map[string]*schema.Schema{
 						// In
 						"capacity": {
-							Type:        schema.TypeInt,
-							Optional:    true,
-							Computed:    true,
-							Description: "The size of the disk in bytes. The size must be greater than or equal to the size of the virtual machine's operating system disk.",
+							Type:         schema.TypeInt,
+							Optional:     true,
+							Computed:     true,
+							ValidateFunc: validation.IntAtLeast(1),
+							Description:  "The size of the disk in bytes. The size must be greater than or equal to the size of the virtual machine's operating system disk (vSphere cannot shrink a virtual disk).",
 						},
 						"disk_mode": {
 							Type:     schema.TypeString,
@@ -840,6 +841,25 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 				}
 				return nil
 			}),
+			// #394: refuse at plan time an explicit os_disk capacity shrink — vSphere
+			// cannot shrink a virtual disk, so the API rejects it with an opaque
+			// "Invalid operation" and the impossible diff re-triggers on every apply.
+			// capacity is Optional+Computed, so an omitted value adopts the live size;
+			// only an explicit value smaller than the live one is a shrink. Fail-open
+			// when the planned capacity is unknown at plan time.
+			func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
+				for i := range d.Get("os_disk").([]interface{}) {
+					key := fmt.Sprintf("os_disk.%d.capacity", i)
+					if !d.NewValueKnown(key) {
+						continue
+					}
+					oldCap, newCap := d.GetChange(key)
+					if osDiskCapacityShrink(oldCap.(int), newCap.(int)) {
+						return fmt.Errorf("cannot shrink os_disk[%d] capacity from %d to %d bytes: vSphere refuses shrinking a virtual disk; set `capacity` to at least %d or omit it to keep the current size", i, oldCap.(int), newCap.(int), oldCap.(int))
+					}
+				}
+				return nil
+			},
 			customdiff.ValidateChange("os_network_adapter", func(ctx context.Context, old, new, meta any) error {
 				o := len(old.([]interface{}))
 				n := len(new.([]interface{}))
@@ -1680,6 +1700,16 @@ func vmwareCompensatePowerOn(ctx context.Context, c *client.Client, vm *client.V
 	})
 }
 
+// osDiskCapacityShrink reports whether requestedCap is an explicit shrink of a
+// live OS disk. vSphere cannot shrink a virtual disk, so this must be refused at
+// plan time (and as an apply backstop) rather than failing with an opaque
+// "Invalid operation" activity on every apply (#394). An omitted capacity
+// (Optional+Computed) resolves to 0 here and is never treated as a shrink; an
+// explicit non-positive value is rejected upstream by the schema ValidateFunc.
+func osDiskCapacityShrink(liveCap, requestedCap int) bool {
+	return requestedCap > 0 && liveCap > 0 && requestedCap < liveCap
+}
+
 func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	return updateVirtualMachine(ctx, d, meta, d.HasChange("power_state"), false)
 }
@@ -1878,6 +1908,22 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 			}
 			disk := osDisk.(map[string]interface{})
 			if disk["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_disk.%d", i)) {
+				// #394 pre-flight backstop: refuse a capacity shrink against the LIVE
+				// disk size read right before the call, so a stale/unrefreshed plan or
+				// out-of-band drift can never push an impossible shrink that vSphere
+				// would reject with an opaque "Invalid operation" activity.
+				liveDisk, err := c.Compute().VirtualDisk().Read(ctx, disk["id"].(string))
+				if err != nil {
+					return diag.Errorf("failed to read os disk %s before update: %s", disk["id"].(string), err)
+				}
+				if liveDisk == nil {
+					// Fail closed: the client maps 403/404 to nil, so an unreadable disk
+					// must not slip through to a PATCH we cannot prove is not a shrink.
+					return diag.Errorf("os disk %s could not be read before update (it no longer exists or the token is not allowed to read it); refusing to update to avoid an unverifiable capacity change", disk["id"].(string))
+				}
+				if osDiskCapacityShrink(liveDisk.Capacity, disk["capacity"].(int)) {
+					return diag.Errorf("cannot shrink os_disk[%d] capacity from %d to %d bytes: vSphere refuses shrinking a virtual disk; set `capacity` to at least %d or omit it", i, liveDisk.Capacity, disk["capacity"].(int), liveDisk.Capacity)
+				}
 				activityId, err := c.Compute().VirtualDisk().Update(ctx, &client.UpdateVirtualDiskRequest{
 					ID:          disk["id"].(string),
 					NewCapacity: disk["capacity"].(int),
