@@ -32,6 +32,36 @@ Rules:
 - keep the piloting Project private if the tracking contains internal
   priorities, risks or trade-offs.
 
+### API / platform issues are out of provider scope — send feedback upstream
+
+A problem whose root cause AND fix live on the Cloud Temple API / platform side
+(not in the provider code) is NOT opened as an issue in the provider repository and
+is NOT tracked on the provider board. It is routed as feedback to the platform team
+through their support feedback endpoint:
+
+```
+POST https://shiva.cloud-temple.com/api/support/v1/tickets/feedback
+Authorization: Bearer <shiva token>     # never store the token in the repo/rules
+{
+  "note": <integer 1-4>,                 # severity/priority rating
+  "description": "<the issue, in factual English>"
+}
+```
+
+The provider board tracks ONLY:
+- provider-code work (bugs, features, hardening in this repository), and
+- provider-side MITIGATIONS of a platform problem — a mitigation PR *references* the
+  platform feedback (e.g. an existing platform issue id), it does not duplicate the
+  platform ticket on the provider board.
+
+Rationale: a platform ticket can never be closed by a provider PR, so recording it
+here leaves a permanently-open, unactionable item that pollutes the board and blurs
+what the provider team actually owns.
+
+Scope: this is a going-forward rule. Pre-existing API/platform issues already on the
+board are grandfathered and handled case by case — do not bulk-remove them. Never put
+a bearer token in an issue, PR, commit, log or these rules.
+
 ## Language of provider artifacts
 
 The Cloud Temple Terraform provider is a multi-client component. Any public
