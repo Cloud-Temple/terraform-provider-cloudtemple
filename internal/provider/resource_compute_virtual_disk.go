@@ -227,10 +227,10 @@ func computeVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta an
 		return diag.Errorf("the virtual machine could not be read: %s", err)
 	}
 	if disk == nil {
-		// A nil read is NOT a deletion: the client maps HTTP 403 to nil, so a
-		// permission/scope blip would silently shrink the state. We never
-		// auto-remove the resource; we confirm liveness against a strict
-		// VM-scoped listing and otherwise fail closed (#281).
+		// A nil read is NOT auto-treated as a deletion: since #384 it is a
+		// definitive 404 (a genuine 403 surfaces as an access-denied error
+		// above). We never auto-remove the resource; we confirm liveness against
+		// a strict VM-scoped listing and otherwise fail closed (#281).
 		vmID := d.Get("virtual_machine_id").(string)
 		return confirmVMwareDeviceOrKeep(ctx, id, "virtual disk", "virtual machine", vmID,
 			func(ctx context.Context) ([]string, error) {

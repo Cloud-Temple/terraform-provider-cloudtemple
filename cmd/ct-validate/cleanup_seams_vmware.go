@@ -9,14 +9,17 @@ import (
 )
 
 // confirmComputeDeleteErr resolves a VMware compute delete outcome. A 404 is a
-// definitive not-found → success (idempotent). A 403 is AMBIGUOUS: the VMware
-// compute API returns 403 for an ABSENT resource as well as a forbidden one (the
-// #303 conflation) — typically when the explicit deprovision already deleted the
-// resource and the deferred backstop re-deletes it. The 403 is CONFIRMED by
-// re-checking the resource's OWN existence (a Read by id, which maps 403/404 →
-// not-found): accepted ONLY when it is proven absent; surfaced when it still
-// exists; failed CLOSED when existence cannot be determined (a 5xx/transport
-// error on the re-check). Any other delete error surfaces unchanged.
+// definitive not-found → success (idempotent). A 403 on DELETE is treated
+// defensively: historically (pre-v1.144.0, the #303 conflation) the VMware compute
+// API returned 403 for an ABSENT resource as well as a forbidden one — typically
+// when the explicit deprovision already deleted the resource and the deferred
+// backstop re-deletes it (the v1.144.0 contract returns 404; revisited in the #303
+// follow-up). The 403 is CONFIRMED by re-checking the resource's OWN existence (a
+// Read by id, which since #384 maps a definitive 404 → not-found while a genuine
+// 403 surfaces as an access-denied error): accepted ONLY when it is proven absent
+// (a 404 re-check); surfaced when it still exists; failed CLOSED when existence
+// cannot be determined (a 403/5xx/transport error on the re-check). Any other
+// delete error surfaces unchanged.
 //
 // The existence re-check is BY ID and independent of the parent VM — so it stays
 // valid even when the deferred leaf teardown runs AFTER the explicit deprovision
@@ -55,7 +58,8 @@ func confirmComputeDeleteErr(err error, stillExists func() (bool, error), id str
 //   - 404-only idempotent deletes (shared idempotentDeleteErr): only a definitive
 //     not-found proves absence — a 403/409 is NOT "already gone" (mirrors the
 //     #303/#325 doctrine), so a compute DELETE that 403s for an absent resource
-//     surfaces here as a teardown FAILURE (a false alarm, never an orphan).
+//     (pre-v1.144.0 #303) surfaces here as a teardown FAILURE (a false alarm,
+//     never an orphan).
 //
 // Each registration takes a narrow SEAM interface (only the methods it needs),
 // not *client.Client, so it is unit-testable offline with a fake that returns an
@@ -101,10 +105,11 @@ func registerVMwareVMTeardown(cl *Cleanup, seam vmwareVMSeam, ref *vmwareVMTeard
 			id = found
 		}
 		_ = seam.PowerOffAndWait(tctx, id) // best-effort: a powered-on VM may refuse delete
-		// A 403 here is the VMware "absent-or-forbidden" conflation (#303): the
-		// explicit deprovision may have already deleted this VM, and a re-delete of
-		// an absent VM answers 403, not 404. Confirm via a by-id existence re-check
-		// before treating it as a failure.
+		// A 403 here is the (legacy, pre-v1.144.0) VMware "absent-or-forbidden"
+		// conflation (#303): the explicit deprovision may have already deleted this
+		// VM, and historically a re-delete of an absent VM answered 403, not 404 (the
+		// v1.144.0 contract returns 404 — #303 follow-up). Confirm via a by-id
+		// existence re-check before treating it as a failure.
 		delID := id
 		return confirmComputeDeleteErr(seam.DeleteAndWait(tctx, delID),
 			func() (bool, error) { return seam.Exists(tctx, delID) }, delID)
@@ -163,8 +168,9 @@ func (s computeVMwareVMSeam) FindIDByName(ctx context.Context, name, datacenterI
 	return found, nil
 }
 
-// Exists reads the VM by id; a definitive not-found (the client maps 403/404 → nil)
-// is reported as absent. A transport/5xx error surfaces so the caller fails closed.
+// Exists reads the VM by id; a definitive not-found (since #384 the client maps a
+// 404 → nil, while a genuine 403 surfaces as an access-denied error) is reported as
+// absent. A 403/transport/5xx error surfaces so the caller fails closed.
 func (s computeVMwareVMSeam) Exists(ctx context.Context, id string) (bool, error) {
 	vm, err := s.c.Compute().VirtualMachine().Read(ctx, id)
 	if err != nil {
@@ -207,10 +213,10 @@ type vmwareDiskTeardownRef struct {
 // create (F3).
 func registerVMwareDiskTeardown(cl *Cleanup, seam vmwareDiskSeam, ref *vmwareDiskTeardownRef) {
 	cl.Register(fmt.Sprintf("compute.vmware.virtual_disk on %s", ref.VMID), func(tctx context.Context) error {
-		// A 403 on delete is the VMware absent-or-forbidden conflation (#303) — the
-		// explicit deprovision may have already removed this disk; confirm via a
-		// by-id existence re-check (independent of the parent VM, which may itself be
-		// gone by now) before treating it as a failure.
+		// A 403 on delete is the (legacy, pre-v1.144.0) VMware absent-or-forbidden
+		// conflation (#303) — the explicit deprovision may have already removed this
+		// disk; confirm via a by-id existence re-check (independent of the parent VM,
+		// which may itself be gone by now) before treating it as a failure.
 		del := func(id string) error {
 			return confirmComputeDeleteErr(seam.DeleteAndWait(tctx, id),
 				func() (bool, error) { return seam.Exists(tctx, id) }, id)
@@ -233,7 +239,8 @@ func registerVMwareDiskTeardown(cl *Cleanup, seam vmwareDiskSeam, ref *vmwareDis
 
 type computeVMwareDiskSeam struct{ c *client.Client }
 
-// Exists reads the disk by id; a definitive not-found (403/404 → nil) is absent.
+// Exists reads the disk by id; a definitive not-found (since #384, 404 → nil; a
+// genuine 403 surfaces as an access-denied error) is absent.
 func (s computeVMwareDiskSeam) Exists(ctx context.Context, id string) (bool, error) {
 	disk, err := s.c.Compute().VirtualDisk().Read(ctx, id)
 	if err != nil {
@@ -292,10 +299,10 @@ type vmwareAdapterTeardownRef struct {
 // every adapter on the (run-unique, ours) VM.
 func registerVMwareNetworkAdapterTeardown(cl *Cleanup, seam vmwareAdapterSeam, ref *vmwareAdapterTeardownRef) {
 	cl.Register(fmt.Sprintf("compute.vmware.network_adapter %s", ref.VMID), func(tctx context.Context) error {
-		// A 403 on delete is the VMware absent-or-forbidden conflation (#303) — the
-		// explicit deprovision may have already removed this adapter; confirm via a
-		// by-id existence re-check (independent of the parent VM, which may be gone)
-		// before treating it as a failure.
+		// A 403 on delete is the (legacy, pre-v1.144.0) VMware absent-or-forbidden
+		// conflation (#303) — the explicit deprovision may have already removed this
+		// adapter; confirm via a by-id existence re-check (independent of the parent
+		// VM, which may be gone) before treating it as a failure.
 		del := func(id string) error {
 			return confirmComputeDeleteErr(seam.DeleteAndWait(tctx, id),
 				func() (bool, error) { return seam.Exists(tctx, id) }, id)
@@ -318,7 +325,8 @@ func registerVMwareNetworkAdapterTeardown(cl *Cleanup, seam vmwareAdapterSeam, r
 
 type computeVMwareAdapterSeam struct{ c *client.Client }
 
-// Exists reads the adapter by id; a definitive not-found (403/404 → nil) is absent.
+// Exists reads the adapter by id; a definitive not-found (since #384, 404 → nil; a
+// genuine 403 surfaces as an access-denied error) is absent.
 func (s computeVMwareAdapterSeam) Exists(ctx context.Context, id string) (bool, error) {
 	adapter, err := s.c.Compute().NetworkAdapter().Read(ctx, id)
 	if err != nil {

@@ -223,8 +223,8 @@ func openIaasNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, met
 		return diag.FromErr(err)
 	}
 	if networkAdapter == nil {
-		// The API answers 403 for unknown AND forbidden ids alike, and the
-		// client maps both to nil: a deletion is only accepted under
+		// Since #384 a per-id 403 surfaces as an access-denied error and only a
+		// definitive 404 maps to nil; the deletion is still confirmed under
 		// strict listing evidence (#275 doctrine, FF-5).
 		vmID := d.Get("virtual_machine_id").(string)
 		scoped, err := c.Compute().OpenIaaS().NetworkAdapter().ListStrict(ctx, &client.OpenIaaSNetworkAdapterFilter{

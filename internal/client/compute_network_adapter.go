@@ -39,7 +39,7 @@ func (n *NetworkAdapterClient) List(ctx context.Context, filter *NetworkAdapterF
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func (n *NetworkAdapterClient) Read(ctx context.Context, id string) (*NetworkAda
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

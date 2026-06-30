@@ -135,11 +135,11 @@ func openIaasReplicationPolicyRead(ctx context.Context, d *schema.ResourceData, 
 		return diag.Errorf("failed to read replication policy: %s", err)
 	}
 	if replicationPolicy == nil {
-		// The API answers 403 for unknown AND forbidden ids alike, and the
-		// client maps both to nil: a deletion is only accepted after the
-		// strict listing (requireOK, 403 = error) confirms the absence —
-		// an access-denied answer must never silently remove the resource
-		// from the state (#275 doctrine, FF-5).
+		// Since #384 a per-id 403 surfaces as an access-denied error and only a
+		// definitive 404 maps to nil; the deletion is still confirmed by the
+		// strict 200-only listing (any non-200, incl. 403, is an error) — an
+		// access-denied answer must never silently remove the resource from the
+		// state (#275 doctrine, FF-5).
 		policies, err := c.Compute().OpenIaaS().Replication().Policy().ListStrict(ctx)
 		if err != nil {
 			return diag.Errorf("replication policy %s could not be read and its deletion could not be confirmed: %s", d.Id(), err)

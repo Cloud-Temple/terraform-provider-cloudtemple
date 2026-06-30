@@ -1,8 +1,8 @@
 package provider
 
 // missingDeviceVerdict is the decision for a resource whose per-id read
-// returned nil: the OpenIaaS API answers 403 for unknown AND forbidden ids
-// alike and the client maps both to nil, so a deletion is only accepted
+// returned nil: since #384 a per-id 403 surfaces as an access-denied error and
+// only a definitive 404 maps to nil, and a deletion is still accepted only
 // under strict listing evidence (#275 doctrine, FF-5).
 type missingDeviceVerdict int
 

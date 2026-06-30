@@ -123,9 +123,10 @@ func computeNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, meta
 		return diag.FromErr(err)
 	}
 	if networkAdapter == nil {
-		// A nil read is NOT a deletion: the client maps HTTP 403 to nil. We
-		// never auto-remove the resource; we confirm liveness against a strict
-		// VM-scoped listing and otherwise fail closed (#281).
+		// A nil read is NOT auto-treated as a deletion: since #384 it is a
+		// definitive 404 (a genuine 403 surfaces as an access-denied error
+		// above). We never auto-remove the resource; we confirm liveness against
+		// a strict VM-scoped listing and otherwise fail closed (#281).
 		vmID := d.Get("virtual_machine_id").(string)
 		return confirmVMwareDeviceOrKeep(ctx, d.Id(), "network adapter", "virtual machine", vmID,
 			func(ctx context.Context) ([]string, error) {

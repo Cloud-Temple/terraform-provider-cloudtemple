@@ -34,7 +34,7 @@ func (v *VirtualControllerClient) List(ctx context.Context, filter *VirtualContr
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -91,7 +91,7 @@ func (v *VirtualControllerClient) Read(ctx context.Context, id string) (*Virtual
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
