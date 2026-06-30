@@ -54,6 +54,13 @@ type BackupOpenIaasPolicyFilter struct {
 
 func (v *BackupOpenIaasPolicyClient) List(ctx context.Context, filter *BackupOpenIaasPolicyFilter) ([]*BackupOpenIaasPolicy, error) {
 	r := v.c.newRequest("GET", "/backup/v1/open_iaas/policies")
+	// Opt in to the bounded per-call read timeout for this endpoint: it has been
+	// observed to intermittently hang for minutes (#391, platform-side), and the
+	// global 600s ceiling is far too lenient for a read this fast (~300ms healthy).
+	// A short per-call timeout + bounded retry turns a transient hang into a fast
+	// retry and a persistent one into a fast, actionable failure instead of a
+	// multi-minute stall. 0 (disabled) falls back to the global timeout.
+	r.timeout = v.c.config.FastReadTimeout
 	r.addFilter(filter)
 	resp, err := v.c.doRequest(ctx, r)
 	if err != nil {
