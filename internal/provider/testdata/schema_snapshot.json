@@ -11061,6 +11061,53 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_disks": {
+      "schema": {
+        "disks": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "is_primary": {
+              "type": "TypeBool",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "position": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "size_gb": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "storage_type": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "virtual_machine_id": {
+          "type": "TypeString",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_public_cloud_vm_flavor": {
       "schema": {
         "id": {
@@ -11675,6 +11722,48 @@
               "elem_kind": "nil"
             }
           }
+        }
+      }
+    },
+    "cloudtemple_public_cloud_vm_snapshots": {
+      "schema": {
+        "snapshots": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "created_at": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "status": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "virtual_machine_id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "virtual_machine_id": {
+          "type": "TypeString",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
         }
       }
     },
