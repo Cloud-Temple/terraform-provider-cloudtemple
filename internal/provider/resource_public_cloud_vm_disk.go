@@ -207,16 +207,29 @@ func createVMDiskWith(ctx context.Context, d *schema.ResourceData, funcs vmDiskC
 	}
 	d.SetId(candidate)
 
-	diags := readVMDiskInto(ctx, d, funcs, vmDiskReadAfterWrite)
-	if diags.HasError() {
-		return diags
+	// Validate the adopted id with a direct read BEFORE populating the state.
+	// The distinction matters because SDKv2 persists d.State() even on a create
+	// error: an UNREADABLE disk (error/nil) is eventual consistency — keep the id
+	// so a later refresh reconciles it — while a read-back that PROVES a wrong
+	// adoption (primary/system disk, or a size that is not the one we requested)
+	// must clear the id: a tainted wrong id would later make Terraform DELETE the
+	// wrong disk (data loss on the system disk).
+	disk, rerr := funcs.read(ctx, vmID, candidate)
+	if rerr != nil {
+		return diag.Errorf("data disk %s of VM %s was just created but could not be read back: %s; the resource is kept in the state with its id.", candidate, vmID, rerr)
 	}
-	// Hardening: the read-back disk must have the requested size; a mismatch means
-	// the adopted id is not the disk we created.
-	if got := d.Get("size").(int); got != req.Size {
-		return diag.Errorf("data disk %s on VM %s read back size %d GB, expected %d GB; refusing an inconsistent id", d.Id(), vmID, got, req.Size)
+	if disk == nil {
+		return diag.Errorf("data disk %s of VM %s was just created but is not yet readable (eventual consistency); the resource is kept in the state with its id.", candidate, vmID)
 	}
-	return diags
+	if disk.IsPrimary {
+		d.SetId("")
+		return diag.Errorf("disk %s on VM %s read back as the primary (system) disk; a wrong id was adopted. The resource was NOT recorded in the state. If a data disk was created it is ORPHANED — audit the VM's disks and import (terraform import <vmID>/<diskID>) or delete it.", candidate, vmID)
+	}
+	if disk.SizeGb != req.Size {
+		d.SetId("")
+		return diag.Errorf("data disk %s on VM %s read back size %d GB, expected %d GB; a different disk was adopted. The resource was NOT recorded in the state. If a disk was created it is ORPHANED — audit the VM's disks and import (terraform import <vmID>/<diskID>) or delete it.", candidate, vmID, disk.SizeGb, req.Size)
+	}
+	return readVMDiskInto(ctx, d, funcs, vmDiskReadAfterWrite)
 }
 
 // readVMDiskInto holds the testable read logic. The resource is NEVER dropped on

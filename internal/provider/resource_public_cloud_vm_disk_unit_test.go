@@ -155,6 +155,49 @@ func TestCreateVMDiskWith(t *testing.T) {
 		if diags := createVMDiskWith(context.Background(), d, funcs); !diags.HasError() {
 			t.Fatal("a primary disk read-back must fail (data-disk resource only)")
 		}
+		if d.Id() != "" {
+			t.Fatal("a primary read-back is a proven wrong-adoption and must clear the id (never leave the system disk id in state)")
+		}
+	})
+
+	t.Run("unreadable read-back (error) keeps the fresh id", func(t *testing.T) {
+		d := newDiskRD(t, 10)
+		funcs := vmDiskCRUDFuncs{
+			create: func(ctx context.Context, vmID string, r *client.CreateVMDiskRequest) (string, error) {
+				return "act", nil
+			},
+			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
+				return diskActivity(diskTestDiskID), nil
+			},
+			read: func(ctx context.Context, vmID, diskID string) (*client.PublicCloudVMDisk, error) {
+				return nil, errors.New("503")
+			},
+		}
+		if diags := createVMDiskWith(context.Background(), d, funcs); !diags.HasError() {
+			t.Fatal("an unreadable read-back must fail the create")
+		}
+		if d.Id() != diskTestDiskID {
+			t.Fatalf("an unreadable read-back is eventual consistency and must keep the fresh id, got %q", d.Id())
+		}
+	})
+
+	t.Run("not-yet-readable read-back (nil) keeps the fresh id", func(t *testing.T) {
+		d := newDiskRD(t, 10)
+		funcs := vmDiskCRUDFuncs{
+			create: func(ctx context.Context, vmID string, r *client.CreateVMDiskRequest) (string, error) {
+				return "act", nil
+			},
+			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
+				return diskActivity(diskTestDiskID), nil
+			},
+			read: func(ctx context.Context, vmID, diskID string) (*client.PublicCloudVMDisk, error) { return nil, nil },
+		}
+		if diags := createVMDiskWith(context.Background(), d, funcs); !diags.HasError() {
+			t.Fatal("a not-yet-readable read-back must fail the create")
+		}
+		if d.Id() != diskTestDiskID {
+			t.Fatalf("a nil read-back is eventual consistency and must keep the fresh id, got %q", d.Id())
+		}
 	})
 
 	t.Run("size mismatch on readback fails", func(t *testing.T) {
@@ -172,6 +215,9 @@ func TestCreateVMDiskWith(t *testing.T) {
 		}
 		if diags := createVMDiskWith(context.Background(), d, funcs); !diags.HasError() {
 			t.Fatal("a size mismatch on read-back must fail (inconsistent id)")
+		}
+		if d.Id() != "" {
+			t.Fatal("a proven wrong-adoption must clear the id (never leave a wrong disk in state to be destroyed later)")
 		}
 	})
 }
