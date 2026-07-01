@@ -131,10 +131,18 @@ func (i *PublicCloudVMInstanceClient) list(ctx context.Context, filter *PublicCl
 	return out, nil
 }
 
-// readPage issues one paginated request and decodes the bare-array page,
-// applying the strict (200-only) or lenient (requireOK) success contract. It
-// isolates the per-request body close so the pagination loop cannot leak a
-// response body.
+// publicCloudVMInstanceListResponse is the wrapped shape of the list endpoint,
+// GET /vm_instances/v1/virtual_machines: {"vms": [...], "total": N} (verified
+// live — the public spec's "bare array" is wrong). Total is the full tenant count
+// across pages; the pagination loop keys off the per-page vms length.
+type publicCloudVMInstanceListResponse struct {
+	Vms   []*PublicCloudVMInstance
+	Total int
+}
+
+// readPage issues one paginated request and decodes the wrapped page, applying
+// the strict (200-only) or lenient (requireOK) success contract. It isolates the
+// per-request body close so the pagination loop cannot leak a response body.
 func (i *PublicCloudVMInstanceClient) readPage(ctx context.Context, req *request, strict bool) ([]*PublicCloudVMInstance, error) {
 	resp, err := i.c.doRequest(ctx, req)
 	if err != nil {
@@ -152,11 +160,11 @@ func (i *PublicCloudVMInstanceClient) readPage(ctx context.Context, req *request
 		}
 	}
 
-	var page []*PublicCloudVMInstance
+	var page publicCloudVMInstanceListResponse
 	if err := decodeBody(resp, &page); err != nil {
 		return nil, err
 	}
-	return page, nil
+	return page.Vms, nil
 }
 
 // Read returns a single VM instance by UUID. A positive 404 maps to (nil, nil)

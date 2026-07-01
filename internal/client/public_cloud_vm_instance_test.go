@@ -11,8 +11,9 @@ import (
 	"testing"
 )
 
-// TestPublicCloudVMInstanceListDecode pins the decode of the bare-array,
-// camelCase GET /vm_instances/v1/virtual_machines response: nested {id,name}
+// TestPublicCloudVMInstanceListDecode pins the decode of the wrapped
+// ({"vms":[...],"total":N}), camelCase GET /vm_instances/v1/virtual_machines
+// response: nested {id,name}
 // refs (az, template, instanceFamily), int fields (vcpu, ramGb, disksSizeGb),
 // the bool guestToolsInstalled, and a nullable backupPolicy that decodes to nil.
 func TestPublicCloudVMInstanceListDecode(t *testing.T) {
@@ -22,7 +23,7 @@ func TestPublicCloudVMInstanceListDecode(t *testing.T) {
 			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`[
+		_, _ = w.Write([]byte(`{"total":2,"vms":[
 		  {"id":"vm-1","name":"web","status":"running",
 		   "az":{"id":"az-1","name":"fr1-az01"},
 		   "template":{"id":"tpl-1","name":"rocky-9"},
@@ -39,7 +40,7 @@ func TestPublicCloudVMInstanceListDecode(t *testing.T) {
 		   "backupPolicy":null,
 		   "guestToolsInstalled":false,
 		   "createdAt":"2026-04-14T12:50:41.881814","updatedAt":"2026-04-14T12:50:41.881814"}
-		]`))
+		]}`))
 	})
 
 	vms, err := c.PublicCloudVM().Instance().List(ctx, nil)
@@ -94,7 +95,7 @@ func TestPublicCloudVMInstanceListPaginates(t *testing.T) {
 			page = append(page, map[string]any{"id": fmt.Sprintf("vm-%d", n), "name": fmt.Sprintf("vm%d", n)})
 		}
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(page)
+		_ = json.NewEncoder(w).Encode(map[string]any{"vms": page, "total": len(page)})
 	})
 
 	vms, err := c.PublicCloudVM().Instance().List(ctx, nil)
@@ -134,7 +135,7 @@ func TestPublicCloudVMInstanceListRefusesRunawayPagination(t *testing.T) {
 			page[n] = map[string]any{"id": fmt.Sprintf("vm-%d", n)}
 		}
 		w.WriteHeader(http.StatusOK)
-		_ = json.NewEncoder(w).Encode(page)
+		_ = json.NewEncoder(w).Encode(map[string]any{"vms": page, "total": len(page)})
 	})
 
 	_, err := c.PublicCloudVM().Instance().List(ctx, nil)
@@ -160,7 +161,7 @@ func TestPublicCloudVMInstanceListStrictLaterPagePartial(t *testing.T) {
 				page[n] = map[string]any{"id": fmt.Sprintf("vm-%d", n)}
 			}
 			w.WriteHeader(http.StatusOK)
-			_ = json.NewEncoder(w).Encode(page)
+			_ = json.NewEncoder(w).Encode(map[string]any{"vms": page, "total": len(page)})
 			return
 		}
 		w.WriteHeader(http.StatusPartialContent)
@@ -180,7 +181,7 @@ func TestPublicCloudVMInstanceListFilters(t *testing.T) {
 	c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		q = r.URL.Query()
 		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`[]`))
+		_, _ = w.Write([]byte(`{"vms":[],"total":0}`))
 	})
 
 	_, err := c.PublicCloudVM().Instance().List(ctx, &PublicCloudVMInstanceFilter{
@@ -219,7 +220,7 @@ func TestPublicCloudVMInstanceListStrict(t *testing.T) {
 	t.Run("200 returns the listing", func(t *testing.T) {
 		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`[{"id":"vm-1","name":"web"}]`))
+			_, _ = w.Write([]byte(`{"vms":[{"id":"vm-1","name":"web"}],"total":1}`))
 		})
 		vms, err := c.PublicCloudVM().Instance().ListStrict(ctx, nil)
 		if err != nil {
@@ -233,7 +234,7 @@ func TestPublicCloudVMInstanceListStrict(t *testing.T) {
 	t.Run("206 partial fails closed", func(t *testing.T) {
 		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusPartialContent)
-			_, _ = w.Write([]byte(`[{"id":"vm-1","name":"web"}]`))
+			_, _ = w.Write([]byte(`{"vms":[{"id":"vm-1","name":"web"}],"total":1}`))
 		})
 		if _, err := c.PublicCloudVM().Instance().ListStrict(ctx, nil); err == nil {
 			t.Fatal("a 206 partial listing must fail closed (it cannot prove an absence)")

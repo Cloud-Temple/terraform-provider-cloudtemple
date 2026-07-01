@@ -11077,6 +11077,124 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_instance": {
+      "schema": {
+        "availability_zone": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "backup_policy": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "created_at": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "disks_size_gb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "guest_tools_installed": {
+          "type": "TypeBool",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "id": {
+          "type": "TypeString",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "instance_family": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "name": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "ram_gb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "status": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "template": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "updated_at": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "vcpu": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_public_cloud_vm_instance_families": {
       "schema": {
         "instance_families": {
@@ -11173,6 +11291,164 @@
         "vcpu_min": {
           "type": "TypeInt",
           "computed": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
+    "cloudtemple_public_cloud_vm_instances": {
+      "schema": {
+        "availability_zone_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "instance_family_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "instances": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "availability_zone": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "resource",
+              "elem_resource": {
+                "id": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "name": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                }
+              }
+            },
+            "backup_policy": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "resource",
+              "elem_resource": {
+                "id": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "name": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                }
+              }
+            },
+            "created_at": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "disks_size_gb": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "guest_tools_installed": {
+              "type": "TypeBool",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "instance_family": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "resource",
+              "elem_resource": {
+                "id": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "name": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                }
+              }
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "ram_gb": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "status": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "template": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "resource",
+              "elem_resource": {
+                "id": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "name": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                }
+              }
+            },
+            "updated_at": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "vcpu": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "name": {
+          "type": "TypeString",
+          "optional": true,
+          "elem_kind": "nil"
+        },
+        "order_by": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "order_dir": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "status": {
+          "type": "TypeString",
+          "optional": true,
           "elem_kind": "nil"
         }
       }

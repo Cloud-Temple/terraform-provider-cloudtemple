@@ -4,6 +4,8 @@
 
 NEW FEATURES :
 
+  * Added datasource `cloudtemple_public_cloud_vm_instance` to look up a single Public Cloud VM instance by `id`.
+  * Added datasource `cloudtemple_public_cloud_vm_instances` to list (and filter by name, status, availability zone or instance family) the tenant's Public Cloud VM instances; the full result set is paginated automatically.
   * Added resource `cloudtemple_public_cloud_vm_instance` to manage a Public Cloud VM instance. Creation (with optional boot at creation via `power_state = "on"`), in-place metadata updates (`name`, `backup_policy_id`), resize (`cpu`/`memory`, on a stopped VM — enforced at plan time) and deletion are all asynchronous and tracked through the Shiva Activities service. The VM id is taken only from the completed create activity (never guessed by name), and the resource fails closed on every ambiguous read: a just-created VM is never orphaned outside the state, and a still-present VM is never dropped on an inconclusive refresh (a deletion is confirmed against a strict, complete listing). The system disk is provided by the template and is not created here; data disks and additional network adapters are managed by their own resources.
 
 # 1.9.0 (Unreleased)
