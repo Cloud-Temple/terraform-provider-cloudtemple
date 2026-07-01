@@ -360,16 +360,10 @@ var datasourceCoverage = map[string]dsCoverage{
 	"cloudtemple_public_cloud_vm_regions":            {"regions", flat(helpers.FlattenPublicCloudVMRegion)},
 	"cloudtemple_public_cloud_vm_availability_zone":  {"", flat(helpers.FlattenPublicCloudVMAvailabilityZone)},
 	"cloudtemple_public_cloud_vm_availability_zones": {"availability_zones", flat(helpers.FlattenPublicCloudVMAvailabilityZone)},
-	"cloudtemple_public_cloud_vm_flavor":             {"", flat(helpers.FlattenPublicCloudVMFlavor)},
-	"cloudtemple_public_cloud_vm_flavors":            {"flavors", flat(helpers.FlattenPublicCloudVMFlavor)},
-	"cloudtemple_public_cloud_vm_instance_family":    {"", flat(helpers.FlattenPublicCloudVMInstanceFamily)},
+	"cloudtemple_public_cloud_vm_flavor":            {"", flat(helpers.FlattenPublicCloudVMFlavor)},
+	"cloudtemple_public_cloud_vm_flavors":           {"flavors", flat(helpers.FlattenPublicCloudVMFlavor)},
+	"cloudtemple_public_cloud_vm_instance_family":   {"", flat(helpers.FlattenPublicCloudVMInstanceFamily)},
 	"cloudtemple_public_cloud_vm_instance_families":  {"instance_families", flat(helpers.FlattenPublicCloudVMInstanceFamily)},
-	"cloudtemple_public_cloud_vm_storage_type":       {"", flat(helpers.FlattenPublicCloudVMStorageType)},
-	"cloudtemple_public_cloud_vm_storage_types":      {"storage_types", flat(helpers.FlattenPublicCloudVMStorageType)},
-	"cloudtemple_public_cloud_vm_template":           {"", flat(helpers.FlattenPublicCloudVMTemplate)},
-	"cloudtemple_public_cloud_vm_templates":          {"templates", flat(helpers.FlattenPublicCloudVMTemplate)},
-	"cloudtemple_public_cloud_vm_backup_policy":      {"", flat(helpers.FlattenPublicCloudVMBackupPolicy)},
-	"cloudtemple_public_cloud_vm_backup_policies":    {"backup_policies", flat(helpers.FlattenPublicCloudVMBackupPolicy)},
 }
 
 // datasourceKnownGaps lists datasources deliberately NOT covered by the walker
