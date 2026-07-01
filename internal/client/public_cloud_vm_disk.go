@@ -143,3 +143,13 @@ func (d *PublicCloudVMDiskClient) Delete(ctx context.Context, vmID, diskID strin
 	r := d.c.newRequest("DELETE", "/vm_instances/v1/virtual_machines/%s/disks/%s", vmID, diskID)
 	return d.c.doRequestAndReturnActivity(ctx, r)
 }
+
+// ExtendSystem grows the VM's system (primary) disk via the dedicated endpoint
+// (POST /disks/extend, no diskId — the worker targets the primary disk). Like a
+// by-id extend it is grow-only and requires the VM to be stopped (enforced
+// downstream). Used by the VM resource's os_disk, not by the data-disk resource.
+func (d *PublicCloudVMDiskClient) ExtendSystem(ctx context.Context, vmID string, size int) (string, error) {
+	r := d.c.newRequest("POST", "/vm_instances/v1/virtual_machines/%s/disks/extend", vmID)
+	r.obj = &extendVMDiskRequest{Size: size}
+	return d.c.doRequestAndReturnActivity(ctx, r)
+}

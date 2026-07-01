@@ -201,4 +201,24 @@ func TestPublicCloudVMDiskWrites(t *testing.T) {
 			t.Fatalf("Delete: id=%q err=%v", id, err)
 		}
 	})
+
+	t.Run("extend system posts {size} to /disks/extend (no diskId) and returns activityId", func(t *testing.T) {
+		var body map[string]any
+		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method != http.MethodPost || r.URL.Path != "/vm_instances/v1/virtual_machines/vm-1/disks/extend" {
+				t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			}
+			raw, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(raw, &body)
+			w.Header().Set("Location", "act-sysext")
+			w.WriteHeader(http.StatusCreated)
+		})
+		id, err := c.PublicCloudVM().Disk().ExtendSystem(ctx, "vm-1", 60)
+		if err != nil || id != "act-sysext" {
+			t.Fatalf("ExtendSystem: id=%q err=%v", id, err)
+		}
+		if body["size"] != float64(60) {
+			t.Fatalf("system extend size not sent: %v", body)
+		}
+	})
 }

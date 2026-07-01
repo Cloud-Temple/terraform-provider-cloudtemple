@@ -23,6 +23,12 @@ func vmiCompletedActivity(concernedID, result string) *client.Activity {
 	return a
 }
 
+// okListPrimaryDisk is the listDisks seam for the found read path (which now
+// enriches os_disk from the primary disk).
+func okListPrimaryDisk(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error) {
+	return []*client.PublicCloudVMDisk{{ID: "osdisk-1", Position: 0, SizeGb: 38, StorageType: "st-1", IsPrimary: true}}, nil
+}
+
 // --- resize precondition (CustomizeDiff logic) ---
 
 func TestVMInstanceResizeRequiresOff(t *testing.T) {
@@ -55,31 +61,49 @@ func TestPlanVMInstanceUpdate(t *testing.T) {
 		name            string
 		metadataChanged bool
 		resizing        bool
+		osDiskExtending bool
 		oldPS, newPS    string
 		want            []vmUpdateOp
 	}{
-		{"metadata only", true, false, "off", "off", []vmUpdateOp{vmOpPatch}},
-		{"stop before resize (on->off + resize)", false, true, "on", "off", []vmUpdateOp{vmOpStop, vmOpResize}},
-		{"start last (off->on)", false, false, "off", "on", []vmUpdateOp{vmOpStart}},
-		{"resize while already off", false, true, "off", "off", []vmUpdateOp{vmOpResize}},
-		{"full: metadata + stop + resize", true, true, "on", "off", []vmUpdateOp{vmOpPatch, vmOpStop, vmOpResize}},
-		{"no change", false, false, "off", "off", nil},
-		{"stop only", false, false, "on", "off", []vmUpdateOp{vmOpStop}},
+		{"metadata only", true, false, false, "off", "off", []vmUpdateOp{vmOpPatch}},
+		{"stop before resize (on->off + resize)", false, true, false, "on", "off", []vmUpdateOp{vmOpStop, vmOpResize}},
+		{"start last (off->on)", false, false, false, "off", "on", []vmUpdateOp{vmOpStart}},
+		{"resize while already off", false, true, false, "off", "off", []vmUpdateOp{vmOpResize}},
+		{"full: metadata + stop + resize", true, true, false, "on", "off", []vmUpdateOp{vmOpPatch, vmOpStop, vmOpResize}},
+		{"no change", false, false, false, "off", "off", nil},
+		{"stop only", false, false, false, "on", "off", []vmUpdateOp{vmOpStop}},
+		{"os_disk extend after resize (both, while off)", false, true, true, "off", "off", []vmUpdateOp{vmOpResize, vmOpExtendOSDisk}},
+		{"os_disk extend between resize and start", false, true, true, "off", "on", []vmUpdateOp{vmOpResize, vmOpExtendOSDisk, vmOpStart}},
+		{"stop then os_disk extend (on->off + extend, no resize)", false, false, true, "on", "off", []vmUpdateOp{vmOpStop, vmOpExtendOSDisk}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := planVMInstanceUpdate(tc.metadataChanged, tc.resizing, tc.oldPS, tc.newPS)
+			got := planVMInstanceUpdate(tc.metadataChanged, tc.resizing, tc.osDiskExtending, tc.oldPS, tc.newPS)
 			if !reflect.DeepEqual(got, tc.want) {
 				t.Fatalf("plan = %v, want %v", got, tc.want)
 			}
-			// Structural invariants: a stop always precedes a resize, and a start
-			// is always the last op.
-			stopIdx, resizeIdx, startIdx := indexOfVMOp(got, vmOpStop), indexOfVMOp(got, vmOpResize), indexOfVMOp(got, vmOpStart)
+			// Structural invariants: stop precedes resize and the os_disk extend;
+			// both write ops (resize, extend) precede a start; start is last.
+			stopIdx := indexOfVMOp(got, vmOpStop)
+			resizeIdx := indexOfVMOp(got, vmOpResize)
+			extendIdx := indexOfVMOp(got, vmOpExtendOSDisk)
+			startIdx := indexOfVMOp(got, vmOpStart)
 			if stopIdx >= 0 && resizeIdx >= 0 && stopIdx > resizeIdx {
 				t.Fatalf("stop must precede resize, got %v", got)
 			}
-			if startIdx >= 0 && startIdx != len(got)-1 {
-				t.Fatalf("start must be the last op, got %v", got)
+			if stopIdx >= 0 && extendIdx >= 0 && stopIdx > extendIdx {
+				t.Fatalf("stop must precede the os_disk extend, got %v", got)
+			}
+			if resizeIdx >= 0 && extendIdx >= 0 && resizeIdx > extendIdx {
+				t.Fatalf("resize must precede the os_disk extend, got %v", got)
+			}
+			if startIdx >= 0 {
+				if startIdx != len(got)-1 {
+					t.Fatalf("start must be the last op, got %v", got)
+				}
+				if extendIdx >= 0 && extendIdx > startIdx {
+					t.Fatalf("the os_disk extend must precede a start, got %v", got)
+				}
 			}
 		})
 	}
@@ -112,14 +136,18 @@ func TestExecuteVMInstanceUpdate(t *testing.T) {
 				order = append(order, "resize")
 				return "a", nil
 			},
+			extendSystem: func(ctx context.Context, id string, size int) (string, error) {
+				order = append(order, "extend")
+				return "a", nil
+			},
 			start:        func(ctx context.Context, id string) (string, error) { order = append(order, "start"); return "a", nil },
 			waitActivity: wait,
 		}
-		plan := []vmUpdateOp{vmOpPatch, vmOpStop, vmOpResize, vmOpStart}
-		if err := executeVMInstanceUpdate(context.Background(), "vm-1", plan, funcs, &client.PatchVMInstanceRequest{}, &client.ResizeVMInstanceRequest{}); err != nil {
+		plan := []vmUpdateOp{vmOpPatch, vmOpStop, vmOpResize, vmOpExtendOSDisk, vmOpStart}
+		if err := executeVMInstanceUpdate(context.Background(), "vm-1", plan, funcs, &client.PatchVMInstanceRequest{}, &client.ResizeVMInstanceRequest{}, 50); err != nil {
 			t.Fatalf("execute: %v", err)
 		}
-		want := []string{"patch", "stop", "resize", "start"}
+		want := []string{"patch", "stop", "resize", "extend", "start"}
 		if !reflect.DeepEqual(order, want) {
 			t.Fatalf("call order = %v, want %v", order, want)
 		}
@@ -141,7 +169,7 @@ func TestExecuteVMInstanceUpdate(t *testing.T) {
 			},
 			waitActivity: wait,
 		}
-		err := executeVMInstanceUpdate(context.Background(), "vm-1", []vmUpdateOp{vmOpStop, vmOpResize}, funcs, nil, &client.ResizeVMInstanceRequest{})
+		err := executeVMInstanceUpdate(context.Background(), "vm-1", []vmUpdateOp{vmOpStop, vmOpResize}, funcs, nil, &client.ResizeVMInstanceRequest{}, 0)
 		if err == nil {
 			t.Fatal("a failing op must return an error")
 		}
@@ -181,7 +209,8 @@ func TestCreateVMInstanceWith(t *testing.T) {
 			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
 				return vmiCompletedActivity("vm-1", "vm-1"), nil
 			},
-			read: okRead,
+			read:      okRead,
+			listDisks: okListPrimaryDisk,
 		}
 		if diags := createVMInstanceWith(context.Background(), d, funcs); diags.HasError() {
 			t.Fatalf("unexpected diags: %v", diags)
@@ -201,7 +230,8 @@ func TestCreateVMInstanceWith(t *testing.T) {
 			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
 				return vmiCompletedActivity("", "vm-2"), nil
 			},
-			read: okRead,
+			read:      okRead,
+			listDisks: okListPrimaryDisk,
 		}
 		if diags := createVMInstanceWith(context.Background(), d, funcs); diags.HasError() {
 			t.Fatalf("unexpected diags: %v", diags)
@@ -270,7 +300,10 @@ func TestReadVMInstanceInto(t *testing.T) {
 	t.Run("found populates state and maps power_state from status", func(t *testing.T) {
 		d := createRD(t)
 		d.SetId("vm-1")
-		funcs := vmInstanceCRUDFuncs{read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) { return vm, nil }}
+		funcs := vmInstanceCRUDFuncs{
+			read:      func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) { return vm, nil },
+			listDisks: okListPrimaryDisk,
+		}
 		if diags := readVMInstanceInto(context.Background(), d, funcs, vmInstanceReadForRefresh); diags.HasError() {
 			t.Fatalf("unexpected diags: %v", diags)
 		}
@@ -380,9 +413,12 @@ func TestReadVMInstanceInto(t *testing.T) {
 	t.Run("a case-different UUID is accepted (UUIDs are case-insensitive)", func(t *testing.T) {
 		d := createRD(t)
 		d.SetId("ABCDEF00-0000-0000-0000-000000000000")
-		funcs := vmInstanceCRUDFuncs{read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
-			return &client.PublicCloudVMInstance{ID: "abcdef00-0000-0000-0000-000000000000", Name: "web", Status: "running"}, nil
-		}}
+		funcs := vmInstanceCRUDFuncs{
+			read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
+				return &client.PublicCloudVMInstance{ID: "abcdef00-0000-0000-0000-000000000000", Name: "web", Status: "running"}, nil
+			},
+			listDisks: okListPrimaryDisk,
+		}
 		if diags := readVMInstanceInto(context.Background(), d, funcs, vmInstanceReadForRefresh); diags.HasError() {
 			t.Fatalf("a case-only UUID difference must not be rejected, got %v", diags)
 		}
@@ -393,9 +429,12 @@ func TestReadVMInstanceInto(t *testing.T) {
 		d.SetId("vm-1")
 		// status lags at "stopped" right after a write; power_state must stay the
 		// declared "on" (refresh mode is what reconciles power_state from status).
-		funcs := vmInstanceCRUDFuncs{read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
-			return &client.PublicCloudVMInstance{ID: "vm-1", Status: "stopped", VCPU: 1, RAMGb: 2}, nil
-		}}
+		funcs := vmInstanceCRUDFuncs{
+			read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
+				return &client.PublicCloudVMInstance{ID: "vm-1", Status: "stopped", VCPU: 1, RAMGb: 2}, nil
+			},
+			listDisks: okListPrimaryDisk,
+		}
 		if diags := readVMInstanceInto(context.Background(), d, funcs, vmInstanceReadAfterWrite); diags.HasError() {
 			t.Fatalf("unexpected diags: %v", diags)
 		}
@@ -472,6 +511,68 @@ func TestDeleteVMInstanceWith(t *testing.T) {
 		}
 		if diags := deleteVMInstanceWith(context.Background(), d, funcs); !diags.HasError() {
 			t.Fatal("a delete error must fail")
+		}
+	})
+}
+
+func TestSetVMInstanceOSDisk(t *testing.T) {
+	t.Run("populates os_disk and os_disk_size_gb from the primary disk", func(t *testing.T) {
+		d := createRD(t)
+		d.SetId("vm-1")
+		funcs := vmInstanceCRUDFuncs{
+			listDisks: func(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error) {
+				return []*client.PublicCloudVMDisk{
+					{ID: "data-1", Position: 1, SizeGb: 10, IsPrimary: false},
+					{ID: "sys", Position: 0, SizeGb: 38, StorageType: "st-1", IsPrimary: true},
+				}, nil
+			},
+		}
+		if diags := setVMInstanceOSDisk(context.Background(), d, funcs, "vm-1"); diags.HasError() {
+			t.Fatalf("unexpected diags: %v", diags)
+		}
+		if d.Get("os_disk_size_gb").(int) != 38 {
+			t.Fatalf("os_disk_size_gb = %d, want 38 (primary size)", d.Get("os_disk_size_gb"))
+		}
+		osd := d.Get("os_disk").([]interface{})
+		if len(osd) != 1 {
+			t.Fatalf("os_disk must have exactly the primary disk, got %d", len(osd))
+		}
+		m := osd[0].(map[string]interface{})
+		if m["id"] != "sys" || m["is_primary"] != true || m["size_gb"].(int) != 38 {
+			t.Fatalf("os_disk primary not mapped: %v", m)
+		}
+	})
+
+	t.Run("listDisks error fails closed", func(t *testing.T) {
+		d := createRD(t)
+		d.SetId("vm-1")
+		funcs := vmInstanceCRUDFuncs{
+			listDisks: func(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error) {
+				return nil, errors.New("403")
+			},
+		}
+		if diags := setVMInstanceOSDisk(context.Background(), d, funcs, "vm-1"); !diags.HasError() {
+			t.Fatal("a disk-listing error must fail closed")
+		}
+	})
+
+	t.Run("no primary disk clears any stale os_disk without error", func(t *testing.T) {
+		d := createRD(t)
+		d.SetId("vm-1")
+		// Seed a stale os_disk to prove the no-primary path clears it.
+		if err := d.Set("os_disk", []map[string]interface{}{{"id": "stale", "size_gb": 99, "is_primary": true, "position": 0}}); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		funcs := vmInstanceCRUDFuncs{
+			listDisks: func(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error) {
+				return []*client.PublicCloudVMDisk{{ID: "data", Position: 1, IsPrimary: false}}, nil
+			},
+		}
+		if diags := setVMInstanceOSDisk(context.Background(), d, funcs, "vm-1"); diags.HasError() {
+			t.Fatalf("no primary must not error, got %v", diags)
+		}
+		if len(d.Get("os_disk").([]interface{})) != 0 {
+			t.Fatal("os_disk must be cleared when there is no primary (no stale value)")
 		}
 	})
 }

@@ -2083,6 +2083,45 @@
             }
           }
         },
+        "os_disk": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "is_primary": {
+              "type": "TypeBool",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "position": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "size_gb": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "storage_type": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "os_disk_size_gb": {
+          "type": "TypeInt",
+          "optional": true,
+          "computed": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
         "power_state": {
           "type": "TypeString",
           "optional": true,

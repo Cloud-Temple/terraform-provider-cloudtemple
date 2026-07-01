@@ -198,6 +198,27 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				Computed:    true,
 				Description: "The last update date of the VM (RFC3339).",
 			},
+			"os_disk_size_gb": {
+				Type:         schema.TypeInt,
+				Optional:     true,
+				Computed:     true,
+				ValidateFunc: validation.IntAtLeast(1),
+				Description:  "The size of the system (primary) disk in GB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the template's size is kept. Data disks are managed by the separate disk resource.",
+			},
+			"os_disk": {
+				Type:        schema.TypeList,
+				Computed:    true,
+				Description: "The system (primary) disk of the VM, provided by the template.",
+				Elem: &schema.Resource{
+					Schema: map[string]*schema.Schema{
+						"id":           {Type: schema.TypeString, Computed: true, Description: "The unique identifier of the system disk."},
+						"size_gb":      {Type: schema.TypeInt, Computed: true, Description: "The size of the system disk in GB."},
+						"storage_type": {Type: schema.TypeString, Computed: true, Description: "The ID of the storage type."},
+						"position":     {Type: schema.TypeInt, Computed: true, Description: "The position of the disk (0 for the system disk)."},
+						"is_primary":   {Type: schema.TypeBool, Computed: true, Description: "Always true for the system disk."},
+					},
+				},
+			},
 		},
 	}
 }
@@ -207,7 +228,30 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 // on an existing resource — on create, cpu/memory necessarily "change" from their
 // zero value and an `on` power_state is the legitimate boot-at-create case.
 func customizeVMInstanceDiff(ctx context.Context, d *schema.ResourceDiff, meta any) error {
-	return vmInstanceResizeRequiresOff(d.Id() != "", d.HasChange("cpu") || d.HasChange("memory"), d.Get("power_state").(string))
+	exists := d.Id() != ""
+	// os_disk_size_gb cannot be set at CREATE: the VM is created with the
+	// template's system disk size, and create never extends it — so a configured
+	// value that differs from the template would produce an inconsistent result.
+	// Grow the system disk in a subsequent apply (with power_state = "off").
+	if !exists {
+		if raw := d.GetRawConfig(); !raw.IsNull() {
+			if osd := raw.GetAttr("os_disk_size_gb"); !osd.IsNull() {
+				return fmt.Errorf("os_disk_size_gb cannot be set when creating the VM: the template's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
+			}
+		}
+	}
+	// The system disk is grow-only, like a data disk.
+	if d.HasChange("os_disk_size_gb") {
+		o, n := d.GetChange("os_disk_size_gb")
+		if err := vmDiskGrowOnlyCheck(o.(int), n.(int)); err != nil {
+			return err
+		}
+		// Extending the system disk, like a resize, requires a stopped VM.
+		if exists && d.Get("power_state").(string) != "off" {
+			return fmt.Errorf("os_disk_size_gb can only be changed while power_state = \"off\" (extending the system disk requires a stopped VM); set power_state = \"off\" in the same change, then power the VM back on in a subsequent apply")
+		}
+	}
+	return vmInstanceResizeRequiresOff(exists, d.HasChange("cpu") || d.HasChange("memory"), d.Get("power_state").(string))
 }
 
 // vmInstanceResizeRequiresOff is the pure resize precondition: on an EXISTING VM,
@@ -247,6 +291,8 @@ type vmInstanceCRUDFuncs struct {
 	del          func(ctx context.Context, id string) (string, error)
 	read         func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error)
 	listStrict   func(ctx context.Context) ([]*client.PublicCloudVMInstance, error)
+	listDisks    func(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error)
+	extendSystem func(ctx context.Context, id string, size int) (string, error)
 	waitActivity func(ctx context.Context, activityID string) (*client.Activity, error)
 }
 
@@ -269,6 +315,8 @@ func vmInstanceClientFuncs(c *client.Client) vmInstanceCRUDFuncs {
 		listStrict: func(ctx context.Context) ([]*client.PublicCloudVMInstance, error) {
 			return inst.ListStrict(ctx, &client.PublicCloudVMInstanceFilter{})
 		},
+		listDisks:    c.PublicCloudVM().Disk().List,
+		extendSystem: c.PublicCloudVM().Disk().ExtendSystem,
 		waitActivity: func(ctx context.Context, activityID string) (*client.Activity, error) {
 			return c.Activity().WaitForCompletion(ctx, activityID, vmInstanceWaiterOptions(ctx))
 		},
@@ -375,7 +423,7 @@ func readVMInstanceInto(ctx context.Context, d *schema.ResourceData, funcs vmIns
 			)
 		}
 		for _, listed := range vms {
-			if listed != nil && listed.ID == id {
+			if listed != nil && sameUUID(listed.ID, id) {
 				return diag.Errorf(
 					"VM instance %s could not be read but is still listed: refusing to drop it from the state (possible access restriction).",
 					id,
@@ -395,7 +443,48 @@ func readVMInstanceInto(ctx context.Context, d *schema.ResourceData, funcs vmIns
 		return diag.Errorf("VM instance %s read returned a different id %q; refusing to adopt it", id, vm.ID)
 	}
 
-	return setVMInstanceState(d, vm, mode)
+	diags := setVMInstanceState(d, vm, mode)
+	if diags.HasError() {
+		return diags
+	}
+	return append(diags, setVMInstanceOSDisk(ctx, d, funcs, id)...)
+}
+
+// setVMInstanceOSDisk enriches the state with the VM's system (primary) disk:
+// the read-only os_disk block and the mutable os_disk_size_gb. The disk list is
+// fetched fresh; a failure fails closed (the VM itself is kept, but the read
+// errors — a forbidden/broken disk listing is surfaced, not silently ignored).
+func setVMInstanceOSDisk(ctx context.Context, d *schema.ResourceData, funcs vmInstanceCRUDFuncs, vmID string) diag.Diagnostics {
+	disks, err := funcs.listDisks(ctx, vmID)
+	if err != nil {
+		return diag.Errorf("VM instance %s: failed to read its disks to populate os_disk: %s", vmID, err)
+	}
+	var primary *client.PublicCloudVMDisk
+	for _, dk := range disks {
+		if dk != nil && dk.IsPrimary {
+			primary = dk
+			break
+		}
+	}
+	if primary == nil {
+		// No primary disk reported (e.g. a never-booted template edge case): clear
+		// any stale os_disk block rather than keep a previously-read primary. Leave
+		// os_disk_size_gb (Optional+Computed) as-is — there is no primary to size it.
+		sw := newStateWriter(d)
+		sw.set("os_disk", []map[string]interface{}{})
+		return sw.diags
+	}
+
+	sw := newStateWriter(d)
+	sw.set("os_disk_size_gb", primary.SizeGb)
+	sw.set("os_disk", []map[string]interface{}{{
+		"id":           primary.ID,
+		"size_gb":      primary.SizeGb,
+		"storage_type": primary.StorageType,
+		"position":     primary.Position,
+		"is_primary":   primary.IsPrimary,
+	}})
+	return sw.diags
 }
 
 // setVMInstanceState writes the API view of the VM into the resource state. The
@@ -450,6 +539,7 @@ const (
 	vmOpPatch vmUpdateOp = iota
 	vmOpStop
 	vmOpResize
+	vmOpExtendOSDisk
 	vmOpStart
 )
 
@@ -461,6 +551,8 @@ func (op vmUpdateOp) String() string {
 		return "stop"
 	case vmOpResize:
 		return "resize"
+	case vmOpExtendOSDisk:
+		return "system disk extend"
 	case vmOpStart:
 		return "start"
 	default:
@@ -473,7 +565,7 @@ func (op vmUpdateOp) String() string {
 // a resize (the resize requires a stopped VM) and a start MUST come LAST (after any
 // resize), so a resize never runs against a running VM and the VM ends in its
 // declared power state.
-func planVMInstanceUpdate(metadataChanged, resizing bool, oldPS, newPS string) []vmUpdateOp {
+func planVMInstanceUpdate(metadataChanged, resizing, osDiskExtending bool, oldPS, newPS string) []vmUpdateOp {
 	var ops []vmUpdateOp
 	if metadataChanged {
 		ops = append(ops, vmOpPatch)
@@ -483,6 +575,11 @@ func planVMInstanceUpdate(metadataChanged, resizing bool, oldPS, newPS string) [
 	}
 	if resizing {
 		ops = append(ops, vmOpResize)
+	}
+	// The system-disk extend, like a resize, requires a stopped VM: it runs after
+	// the resize and before any start, so it never targets a running VM.
+	if osDiskExtending {
+		ops = append(ops, vmOpExtendOSDisk)
 	}
 	if oldPS == "off" && newPS == "on" {
 		ops = append(ops, vmOpStart)
@@ -494,7 +591,7 @@ func planVMInstanceUpdate(metadataChanged, resizing bool, oldPS, newPS string) [
 // seams, surfacing a failed activity as an error. Separating this from the plan
 // keeps the ordering purely testable and the execution order verifiable with
 // recording fakes.
-func executeVMInstanceUpdate(ctx context.Context, id string, plan []vmUpdateOp, funcs vmInstanceCRUDFuncs, patchReq *client.PatchVMInstanceRequest, resizeReq *client.ResizeVMInstanceRequest) error {
+func executeVMInstanceUpdate(ctx context.Context, id string, plan []vmUpdateOp, funcs vmInstanceCRUDFuncs, patchReq *client.PatchVMInstanceRequest, resizeReq *client.ResizeVMInstanceRequest, osDiskSize int) error {
 	for _, op := range plan {
 		var err error
 		switch op {
@@ -504,6 +601,8 @@ func executeVMInstanceUpdate(ctx context.Context, id string, plan []vmUpdateOp, 
 			err = runVMInstanceActivity(ctx, funcs.waitActivity, func() (string, error) { return funcs.stop(ctx, id) })
 		case vmOpResize:
 			err = runVMInstanceActivity(ctx, funcs.waitActivity, func() (string, error) { return funcs.resize(ctx, id, resizeReq) })
+		case vmOpExtendOSDisk:
+			err = runVMInstanceActivity(ctx, funcs.waitActivity, func() (string, error) { return funcs.extendSystem(ctx, id, osDiskSize) })
 		case vmOpStart:
 			err = runVMInstanceActivity(ctx, funcs.waitActivity, func() (string, error) { return funcs.start(ctx, id) })
 		}
@@ -550,8 +649,11 @@ func updateVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 		}
 	}
 
-	plan := planVMInstanceUpdate(metadataChanged, resizing, oldPS.(string), newPS.(string))
-	if err := executeVMInstanceUpdate(ctx, id, plan, funcs, patchReq, resizeReq); err != nil {
+	osDiskExtending := d.HasChange("os_disk_size_gb")
+	osDiskSize := d.Get("os_disk_size_gb").(int)
+
+	plan := planVMInstanceUpdate(metadataChanged, resizing, osDiskExtending, oldPS.(string), newPS.(string))
+	if err := executeVMInstanceUpdate(ctx, id, plan, funcs, patchReq, resizeReq, osDiskSize); err != nil {
 		return diag.Errorf("failed to update VM instance %s: %s", id, err)
 	}
 
