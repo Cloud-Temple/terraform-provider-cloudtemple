@@ -150,6 +150,7 @@ func genericFlattenCases() []zeroFlattenCase {
 		// --- Public Cloud VM Instances ------------------------------------
 		{"FlattenPublicCloudVMRegion", zeroOf(FlattenPublicCloudVMRegion)},
 		{"FlattenPublicCloudVMAvailabilityZone", zeroOf(FlattenPublicCloudVMAvailabilityZone)},
+		{"FlattenPublicCloudVMFlavor", zeroOf(FlattenPublicCloudVMFlavor)},
 	}
 }
 

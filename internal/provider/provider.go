@@ -191,6 +191,8 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_public_cloud_vm_regions":           documentDatasource(dataSourcePublicCloudVMRegions(), "public_cloud_vm_instances_read"),
 				"cloudtemple_public_cloud_vm_availability_zone":  documentDatasource(dataSourcePublicCloudVMAvailabilityZone(), "public_cloud_vm_instances_read"),
 				"cloudtemple_public_cloud_vm_availability_zones": documentDatasource(dataSourcePublicCloudVMAvailabilityZones(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_flavor":             documentDatasource(dataSourcePublicCloudVMFlavor(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_flavors":            documentDatasource(dataSourcePublicCloudVMFlavors(), "public_cloud_vm_instances_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				// Compute - IaaS VMWare
