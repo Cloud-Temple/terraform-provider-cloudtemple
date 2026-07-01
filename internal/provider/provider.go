@@ -235,6 +235,7 @@ func New(version string) func() *schema.Provider {
 				// Public Cloud VM Instances
 				"cloudtemple_public_cloud_vm_instance": documentResource(resourcePublicCloudVMInstance(), "public_cloud_vm_instances_management", "public_cloud_vm_instances_read", "activity_read"),
 				"cloudtemple_public_cloud_vm_disk":     documentResource(resourcePublicCloudVMDisk(), "public_cloud_vm_instances_management", "public_cloud_vm_instances_read", "activity_read"),
+				"cloudtemple_public_cloud_vm_snapshot": documentResource(resourcePublicCloudVMSnapshot(), "public_cloud_vm_instances_management", "public_cloud_vm_instances_read", "activity_read"),
 			},
 		}
 

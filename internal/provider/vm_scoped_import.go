@@ -32,6 +32,21 @@ func isStatusCode(err error, code int) bool {
 	return errors.As(err, &se) && se.Code == code
 }
 
+// activityConcernedItemID returns the id of the (first) concerned item of the
+// given type, or "" if none. NON-mutating (unlike setIdFromActivityConcernedItems),
+// so the caller can validate the candidate before adopting it as the resource id.
+func activityConcernedItemID(a *client.Activity, expectedType string) string {
+	if a == nil {
+		return ""
+	}
+	for _, ci := range a.ConcernedItems {
+		if ci.Type == expectedType {
+			return ci.ID
+		}
+	}
+	return ""
+}
+
 // parseVMScopedID splits a composite "<virtual_machine_id>/<childID>" import id
 // into its two parts. It requires EXACTLY two non-empty UUID parts; any other
 // shape is an error, so a malformed import id never produces a partial or wrong
