@@ -4,6 +4,26 @@
 
 NEW FEATURES :
 
+  * Added datasource `cloudtemple_public_cloud_vm_region` to retrieve a Public Cloud VM Instances region, by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_regions` to list all Public Cloud VM Instances regions of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_availability_zone` to retrieve a Public Cloud VM Instances availability zone, by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_availability_zones` to list all Public Cloud VM Instances availability zones of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_flavor` to retrieve a Public Cloud VM Instances flavor (a predefined vCPU/RAM sizing pair), by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_flavors` to list all Public Cloud VM Instances flavors of the tenant, optionally filtered by instance family.
+  * Added datasource `cloudtemple_public_cloud_vm_instance_family` to retrieve a Public Cloud VM Instances instance family, by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_instance_families` to list all Public Cloud VM Instances instance families of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_storage_type` to retrieve a Public Cloud VM Instances storage type, by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_storage_types` to list all Public Cloud VM Instances storage types available to the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_template` to retrieve a Public Cloud VM Instances template (OS image), by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_templates` to list all Public Cloud VM Instances templates (OS images) of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_backup_policy` to retrieve a Public Cloud VM Instances backup policy, by `id` or by `name` — a backup policy is required to create a VM (`backup_policy_id`).
+  * Added datasource `cloudtemple_public_cloud_vm_backup_policies` to list all Public Cloud VM Instances backup policies of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_quota` to retrieve the Public Cloud VM Instances quota of the tenant (limits and current usage).
+  * Added datasource `cloudtemple_public_cloud_vm_task` to retrieve a single Public Cloud VM Instances task by `id`. Tasks are a diagnostic object; the provider tracks its own writes through the Activities service, never through tasks.
+  * Added datasource `cloudtemple_public_cloud_vm_tasks` to list Public Cloud VM Instances tasks (diagnostic objects), optionally scoped to a VM.
+  * Added datasource `cloudtemple_public_cloud_vm_network` to retrieve a Public Cloud VM Instances network from the catalogue, by `id` or by `name`. Network names are not guaranteed unique: a `name` that matches several networks fails with the candidate ids instead of picking one arbitrarily.
+  * Added datasource `cloudtemple_public_cloud_vm_networks` to list the full Public Cloud VM Instances network catalogue of the tenant. The server-side filters documented upstream are not wired through the API, so this datasource intentionally exposes none — filter in HCL.
+  * Added resource `cloudtemple_public_cloud_vm_network_adapter` to manage a network adapter (NIC) attached to a Public Cloud VM instance. Attach, change-network and delete are asynchronous and fail closed: the adapter id is taken only from the completed create activity (validated, never the VM id) and the create read-back must match the requested `device_index` and `network_id` (a proven mismatch is never recorded in the state), the resource is never dropped on an inconclusive read (the platform answers 400 — not 404 — for an unknown adapter, so a removal is only accepted once the parent VM's absence or a complete strict adapter listing proves it), re-pointing the adapter to another network (`network_id`) and deleting it require the VM to be stopped (refused at apply, no hidden auto-stop) and a network change is confirmed by a read-back (hot-plug is not guaranteed by the platform), `ip_address` is write-only and only honoured on VPC networks (a warning is emitted otherwise), and `device_index` is immutable. Imported by the composite id `<virtual_machine_id>/<network_adapter_id>`.
   * Added datasource `cloudtemple_public_cloud_vm_instance` to look up a single Public Cloud VM instance by `id`.
   * Added datasource `cloudtemple_public_cloud_vm_instances` to list (and filter by name, status, availability zone or instance family) the tenant's Public Cloud VM instances; the full result set is paginated automatically.
   * Added datasource `cloudtemple_public_cloud_vm_disks` to list the disks (system and data) of a Public Cloud VM instance.
