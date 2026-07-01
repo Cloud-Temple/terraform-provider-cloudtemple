@@ -11610,6 +11610,56 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_network": {
+      "schema": {
+        "id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "conflicts_with": [
+            "name"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "name": {
+          "type": "TypeString",
+          "optional": true,
+          "conflicts_with": [
+            "id"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        }
+      }
+    },
+    "cloudtemple_public_cloud_vm_networks": {
+      "schema": {
+        "networks": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        }
+      }
+    },
     "cloudtemple_public_cloud_vm_quota": {
       "schema": {
         "ram_limit_mb": {
