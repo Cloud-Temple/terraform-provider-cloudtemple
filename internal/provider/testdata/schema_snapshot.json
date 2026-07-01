@@ -2153,6 +2153,66 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_network_adapter": {
+      "schema": {
+        "device_index": {
+          "type": "TypeInt",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "ip_address": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "ipv4_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "ipv6_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "mac_address": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "network_id": {
+          "type": "TypeString",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "network_name": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "provision_status": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "type": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "virtual_machine_id": {
+          "type": "TypeString",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_public_cloud_vm_snapshot": {
       "schema": {
         "created_at": {
