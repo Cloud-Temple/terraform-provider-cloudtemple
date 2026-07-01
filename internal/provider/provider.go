@@ -206,6 +206,8 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_public_cloud_vm_tasks":              documentDatasource(dataSourcePublicCloudVMTasks(), "public_cloud_vm_instances_read"),
 				"cloudtemple_public_cloud_vm_instance":           documentDatasource(dataSourcePublicCloudVMInstance(), "public_cloud_vm_instances_read"),
 				"cloudtemple_public_cloud_vm_instances":          documentDatasource(dataSourcePublicCloudVMInstances(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_disks":              documentDatasource(dataSourcePublicCloudVMDisks(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_snapshots":          documentDatasource(dataSourcePublicCloudVMSnapshots(), "public_cloud_vm_instances_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				// Compute - IaaS VMWare
