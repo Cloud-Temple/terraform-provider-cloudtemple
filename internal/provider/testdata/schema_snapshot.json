@@ -10750,6 +10750,106 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_backup_policies": {
+      "schema": {
+        "backup_policies": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "description": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "retention": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "schedule_cron": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "schedule_window_duration_minutes": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "schedule_window_start_hour": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        }
+      }
+    },
+    "cloudtemple_public_cloud_vm_backup_policy": {
+      "schema": {
+        "description": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "conflicts_with": [
+            "name"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "name": {
+          "type": "TypeString",
+          "optional": true,
+          "conflicts_with": [
+            "id"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "retention": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "schedule_cron": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "schedule_window_duration_minutes": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "schedule_window_start_hour": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_public_cloud_vm_flavor": {
       "schema": {
         "id": {
