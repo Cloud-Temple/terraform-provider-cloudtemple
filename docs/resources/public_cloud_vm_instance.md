@@ -83,6 +83,7 @@ output "vm_status" {
 ### Optional
 
 - `cloud_init` (Map of String) The cloud-init configuration applied at creation (keys `cloud_config` and/or `network_config`). Immutable and not readable back, so it is not reconciled on refresh.
+- `os_disk_size_gb` (Number) The size of the system (primary) disk in GB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the template's size is kept. Data disks are managed by the separate disk resource.
 - `power_state` (String) The desired power state (`on` or `off`, default `off`). Honoured from the first apply (passed to the create call, so an `on` VM boots at creation). Changing it later issues a start (`off`->`on`) or stop (`on`->`off`).
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
@@ -95,6 +96,7 @@ output "vm_status" {
 - `guest_tools_installed` (Boolean) Whether the guest tools are installed.
 - `id` (String) The ID of this resource.
 - `instance_family_name` (String) The name of the instance family.
+- `os_disk` (List of Object) The system (primary) disk of the VM, provided by the template. (see [below for nested schema](#nestedatt--os_disk))
 - `status` (String) The current status of the VM (e.g. `running`, `stopped`).
 - `template_name` (String) The name of the OS template.
 - `updated_at` (String) The last update date of the VM (RFC3339).
@@ -120,6 +122,18 @@ Optional:
 - `create` (String)
 - `delete` (String)
 - `update` (String)
+
+
+<a id="nestedatt--os_disk"></a>
+### Nested Schema for `os_disk`
+
+Read-Only:
+
+- `id` (String)
+- `is_primary` (Boolean)
+- `position` (Number)
+- `size_gb` (Number)
+- `storage_type` (String)
 
 ## Import
 
