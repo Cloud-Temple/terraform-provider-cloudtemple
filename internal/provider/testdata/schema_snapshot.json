@@ -10837,6 +10837,106 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_instance_families": {
+      "schema": {
+        "instance_families": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "description": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "ram_max_gb": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "ram_min_gb": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "vcpu_max": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "vcpu_min": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        }
+      }
+    },
+    "cloudtemple_public_cloud_vm_instance_family": {
+      "schema": {
+        "description": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "conflicts_with": [
+            "name"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "name": {
+          "type": "TypeString",
+          "optional": true,
+          "conflicts_with": [
+            "id"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "ram_max_gb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "ram_min_gb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "vcpu_max": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "vcpu_min": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_public_cloud_vm_region": {
       "schema": {
         "az_count": {
