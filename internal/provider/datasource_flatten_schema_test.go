@@ -360,9 +360,9 @@ var datasourceCoverage = map[string]dsCoverage{
 	"cloudtemple_public_cloud_vm_regions":            {"regions", flat(helpers.FlattenPublicCloudVMRegion)},
 	"cloudtemple_public_cloud_vm_availability_zone":  {"", flat(helpers.FlattenPublicCloudVMAvailabilityZone)},
 	"cloudtemple_public_cloud_vm_availability_zones": {"availability_zones", flat(helpers.FlattenPublicCloudVMAvailabilityZone)},
-	"cloudtemple_public_cloud_vm_flavor":            {"", flat(helpers.FlattenPublicCloudVMFlavor)},
-	"cloudtemple_public_cloud_vm_flavors":           {"flavors", flat(helpers.FlattenPublicCloudVMFlavor)},
-	"cloudtemple_public_cloud_vm_instance_family":   {"", flat(helpers.FlattenPublicCloudVMInstanceFamily)},
+	"cloudtemple_public_cloud_vm_flavor":             {"", flat(helpers.FlattenPublicCloudVMFlavor)},
+	"cloudtemple_public_cloud_vm_flavors":            {"flavors", flat(helpers.FlattenPublicCloudVMFlavor)},
+	"cloudtemple_public_cloud_vm_instance_family":    {"", flat(helpers.FlattenPublicCloudVMInstanceFamily)},
 	"cloudtemple_public_cloud_vm_instance_families":  {"instance_families", flat(helpers.FlattenPublicCloudVMInstanceFamily)},
 }
 
