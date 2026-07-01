@@ -11057,6 +11057,106 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_storage_type": {
+      "schema": {
+        "description": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "conflicts_with": [
+            "name"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "iops_hint": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "is_available": {
+          "type": "TypeBool",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "max_size_gb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "min_size_gb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "name": {
+          "type": "TypeString",
+          "optional": true,
+          "conflicts_with": [
+            "id"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        }
+      }
+    },
+    "cloudtemple_public_cloud_vm_storage_types": {
+      "schema": {
+        "storage_types": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "description": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "iops_hint": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "is_available": {
+              "type": "TypeBool",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "max_size_gb": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "min_size_gb": {
+              "type": "TypeInt",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        }
+      }
+    },
     "cloudtemple_vpc_floating_ip": {
       "schema": {
         "description": {
