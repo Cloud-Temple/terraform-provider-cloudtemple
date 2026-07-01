@@ -153,6 +153,7 @@ func genericFlattenCases() []zeroFlattenCase {
 		{"FlattenPublicCloudVMFlavor", zeroOf(FlattenPublicCloudVMFlavor)},
 		{"FlattenPublicCloudVMInstanceFamily", zeroOf(FlattenPublicCloudVMInstanceFamily)},
 		{"FlattenPublicCloudVMStorageType", zeroOf(FlattenPublicCloudVMStorageType)},
+		{"FlattenPublicCloudVMTemplate", zeroOf(FlattenPublicCloudVMTemplate)},
 	}
 }
 
