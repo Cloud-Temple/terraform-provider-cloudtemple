@@ -185,6 +185,10 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_vpc_static_ips":       documentDatasource(dataSourceVPCStaticIPs(), "vpc_read"),
 				"cloudtemple_vpc_floating_ip":      documentDatasource(dataSourceVPCFloatingIP(), "vpc_read"),
 				"cloudtemple_vpc_floating_ips":     documentDatasource(dataSourceVPCFloatingIPs(), "vpc_read"),
+
+				// Public Cloud VM Instances
+				"cloudtemple_public_cloud_vm_region":  documentDatasource(dataSourcePublicCloudVMRegion(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_regions": documentDatasource(dataSourcePublicCloudVMRegions(), "public_cloud_vm_instances_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				// Compute - IaaS VMWare

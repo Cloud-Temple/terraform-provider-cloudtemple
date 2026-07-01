@@ -146,6 +146,9 @@ func genericFlattenCases() []zeroFlattenCase {
 
 		// --- Marketplace --------------------------------------------------
 		{"FlattenMarketplaceItem", zeroOf(FlattenMarketplaceItem)},
+
+		// --- Public Cloud VM Instances ------------------------------------
+		{"FlattenPublicCloudVMRegion", zeroOf(FlattenPublicCloudVMRegion)},
 	}
 }
 
