@@ -4,33 +4,33 @@
 
 NEW FEATURES :
 
-  * Added datasource `cloudtemple_public_cloud_vm_region` to retrieve a Public Cloud VM Instances region, by `id` or by `name`.
-  * Added datasource `cloudtemple_public_cloud_vm_regions` to list all Public Cloud VM Instances regions of the tenant.
-  * Added datasource `cloudtemple_public_cloud_vm_availability_zone` to retrieve a Public Cloud VM Instances availability zone, by `id` or by `name`.
-  * Added datasource `cloudtemple_public_cloud_vm_availability_zones` to list all Public Cloud VM Instances availability zones of the tenant.
-  * Added datasource `cloudtemple_public_cloud_vm_flavor` to retrieve a Public Cloud VM Instances flavor (a predefined vCPU/RAM sizing pair), by `id` or by `name`.
-  * Added datasource `cloudtemple_public_cloud_vm_flavors` to list all Public Cloud VM Instances flavors of the tenant, optionally filtered by instance family.
-  * Added datasource `cloudtemple_public_cloud_vm_instance_family` to retrieve a Public Cloud VM Instances instance family, by `id` or by `name`.
-  * Added datasource `cloudtemple_public_cloud_vm_instance_families` to list all Public Cloud VM Instances instance families of the tenant.
-  * Added datasource `cloudtemple_public_cloud_vm_storage_type` to retrieve a Public Cloud VM Instances storage type, by `id` or by `name`.
-  * Added datasource `cloudtemple_public_cloud_vm_storage_types` to list all Public Cloud VM Instances storage types available to the tenant.
-  * Added datasource `cloudtemple_public_cloud_vm_template` to retrieve a Public Cloud VM Instances template (OS image), by `id` or by `name`.
-  * Added datasource `cloudtemple_public_cloud_vm_templates` to list all Public Cloud VM Instances templates (OS images) of the tenant.
-  * Added datasource `cloudtemple_public_cloud_vm_backup_policy` to retrieve a Public Cloud VM Instances backup policy, by `id` or by `name` — a backup policy is required to create a VM (`backup_policy_id`).
-  * Added datasource `cloudtemple_public_cloud_vm_backup_policies` to list all Public Cloud VM Instances backup policies of the tenant.
-  * Added datasource `cloudtemple_public_cloud_vm_quota` to retrieve the Public Cloud VM Instances quota of the tenant (limits and current usage).
-  * Added datasource `cloudtemple_public_cloud_vm_task` to retrieve a single Public Cloud VM Instances task by `id`. Tasks are a diagnostic object; the provider tracks its own writes through the Activities service, never through tasks.
-  * Added datasource `cloudtemple_public_cloud_vm_tasks` to list Public Cloud VM Instances tasks (diagnostic objects), optionally scoped to a VM.
-  * Added datasource `cloudtemple_public_cloud_vm_network` to retrieve a Public Cloud VM Instances network from the catalogue, by `id` or by `name`. Network names are not guaranteed unique: a `name` that matches several networks fails with the candidate ids instead of picking one arbitrarily.
-  * Added datasource `cloudtemple_public_cloud_vm_networks` to list the full Public Cloud VM Instances network catalogue of the tenant. The server-side filters documented upstream are not wired through the API, so this datasource intentionally exposes none — filter in HCL.
-  * Added resource `cloudtemple_public_cloud_vm_network_adapter` to manage a network adapter (NIC) attached to a Public Cloud VM instance. Attach, change-network and delete are asynchronous and fail closed: the adapter id is taken only from the completed create activity (validated, never the VM id) and the create read-back must match the requested `device_index` and `network_id` (a proven mismatch is never recorded in the state), the resource is never dropped on an inconclusive read (the platform answers 400 — not 404 — for an unknown adapter, so a removal is only accepted once the parent VM's absence or a complete strict adapter listing proves it), re-pointing the adapter to another network (`network_id`) and deleting it require the VM to be stopped (refused at apply, no hidden auto-stop) and a network change is confirmed by a read-back (hot-plug is not guaranteed by the platform), `ip_address` is write-only and only honoured on VPC networks (a warning is emitted otherwise), and `device_index` is immutable. Imported by the composite id `<virtual_machine_id>/<network_adapter_id>`.
-  * Added datasource `cloudtemple_public_cloud_vm_instance` to look up a single Public Cloud VM instance by `id`.
-  * Added datasource `cloudtemple_public_cloud_vm_instances` to list (and filter by name, status, availability zone or instance family) the tenant's Public Cloud VM instances; the full result set is paginated automatically.
-  * Added datasource `cloudtemple_public_cloud_vm_disks` to list the disks (system and data) of a Public Cloud VM instance.
-  * Added datasource `cloudtemple_public_cloud_vm_snapshots` to list the snapshots of a Public Cloud VM instance.
-  * Added resource `cloudtemple_public_cloud_vm_disk` to manage a **data** disk attached to a Public Cloud VM instance. Create, grow-only extend and delete are asynchronous and fail closed: the new disk id is taken only from the completed create activity (validated, never the VM id), the resource is never dropped on an inconclusive read (a deletion is confirmed against the parent VM's absence or a complete strict disk listing), extending or deleting a disk requires the VM to be stopped (refused at apply, no hidden auto-stop), and the primary/system disk can never be managed (created, extended or deleted) here. Imported by the composite id `<virtual_machine_id>/<disk_id>`.
-  * Added resource `cloudtemple_public_cloud_vm_snapshot` to manage a snapshot of a Public Cloud VM instance. Create and delete are asynchronous and fail closed: the snapshot id is taken only from the completed create activity (validated), the resource is never dropped on an inconclusive read (a deletion is confirmed against the parent VM's absence or a complete strict snapshot listing), and a delete that races with an external removal is accepted only after that same absence proof. `name` and `virtual_machine_id` are immutable; reverting a VM to a snapshot is intentionally not exposed. Imported by the composite id `<virtual_machine_id>/<snapshot_id>`.
-  * Added resource `cloudtemple_public_cloud_vm_instance` to manage a Public Cloud VM instance. Creation (with optional boot at creation via `power_state = "on"`), in-place metadata updates (`name`, `backup_policy_id`), resize (`cpu`/`memory`, on a stopped VM — enforced at plan time) and deletion are all asynchronous and tracked through the Shiva Activities service. The VM id is taken only from the completed create activity (never guessed by name), and the resource fails closed on every ambiguous read: a just-created VM is never orphaned outside the state, and a still-present VM is never dropped on an inconclusive refresh (a deletion is confirmed against a strict, complete listing). The system disk is provided by the template and is not created here; its size is exposed as `os_disk` and can be grown in place via `os_disk_size_gb` (grow-only, on a stopped VM). Data disks and additional network adapters are managed by their own resources.
+  * Added resource `cloudtemple_public_cloud_vm_instance` to manage a Public Cloud VM instance: create, start/stop (`power_state`), rename, change the backup policy, resize `cpu`/`memory` and grow the OS disk (`os_disk_size_gb`) — resize and OS disk growth require the VM to be stopped.
+  * Added resource `cloudtemple_public_cloud_vm_disk` to manage a data disk attached to a Public Cloud VM instance: create, grow-only extend and delete (extend and delete require the VM to be stopped). Import with `<virtual_machine_id>/<disk_id>`.
+  * Added resource `cloudtemple_public_cloud_vm_snapshot` to manage a snapshot of a Public Cloud VM instance (`name` is immutable). Import with `<virtual_machine_id>/<snapshot_id>`.
+  * Added resource `cloudtemple_public_cloud_vm_network_adapter` to manage a network adapter attached to a Public Cloud VM instance. Changing `network_id` or deleting the adapter requires the VM to be stopped; `ip_address` is only honoured on VPC networks; `device_index` is immutable. Import with `<virtual_machine_id>/<network_adapter_id>`.
+  * Added datasource `cloudtemple_public_cloud_vm_instance` to retrieve a VM instance by `id`.
+  * Added datasource `cloudtemple_public_cloud_vm_instances` to list the tenant's VM instances (filterable by name, status, availability zone or instance family).
+  * Added datasource `cloudtemple_public_cloud_vm_disks` to list the disks of a VM instance.
+  * Added datasource `cloudtemple_public_cloud_vm_snapshots` to list the snapshots of a VM instance.
+  * Added datasource `cloudtemple_public_cloud_vm_network` to retrieve a network by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_networks` to list the network catalogue of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_region` to retrieve a region by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_regions` to list the regions of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_availability_zone` to retrieve an availability zone by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_availability_zones` to list the availability zones of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_flavor` to retrieve a flavor (vCPU/RAM sizing pair) by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_flavors` to list the flavors of the tenant (filterable by instance family).
+  * Added datasource `cloudtemple_public_cloud_vm_instance_family` to retrieve an instance family by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_instance_families` to list the instance families of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_storage_type` to retrieve a storage type by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_storage_types` to list the storage types of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_template` to retrieve a template (OS image) by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_templates` to list the templates of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_backup_policy` to retrieve a backup policy by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_backup_policies` to list the backup policies of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_quota` to retrieve the tenant's quota (limits and current usage).
+  * Added datasource `cloudtemple_public_cloud_vm_task` to retrieve a diagnostic task by `id`.
+  * Added datasource `cloudtemple_public_cloud_vm_tasks` to list diagnostic tasks (optionally scoped to a VM).
 
 # 1.9.0 (Unreleased)
 
