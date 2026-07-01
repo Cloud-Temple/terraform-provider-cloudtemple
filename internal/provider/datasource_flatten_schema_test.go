@@ -356,8 +356,8 @@ var datasourceCoverage = map[string]dsCoverage{
 	// --- Public Cloud VM Instances ----------------------------------------
 	// FlattenPublicCloudVMRegion emits "id" itself and the plural Read does not
 	// inject it afterwards; mirror that with flat, not flatID.
-	"cloudtemple_public_cloud_vm_region":            {"", flat(helpers.FlattenPublicCloudVMRegion)},
-	"cloudtemple_public_cloud_vm_regions":           {"regions", flat(helpers.FlattenPublicCloudVMRegion)},
+	"cloudtemple_public_cloud_vm_region":             {"", flat(helpers.FlattenPublicCloudVMRegion)},
+	"cloudtemple_public_cloud_vm_regions":            {"regions", flat(helpers.FlattenPublicCloudVMRegion)},
 	"cloudtemple_public_cloud_vm_availability_zone":  {"", flat(helpers.FlattenPublicCloudVMAvailabilityZone)},
 	"cloudtemple_public_cloud_vm_availability_zones": {"availability_zones", flat(helpers.FlattenPublicCloudVMAvailabilityZone)},
 }
