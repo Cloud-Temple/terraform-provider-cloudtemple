@@ -11037,6 +11037,40 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_quota": {
+      "schema": {
+        "ram_limit_mb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "ram_used_mb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "storage_limit_gb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "storage_used_gb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "vcpu_limit": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "vcpu_used": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_public_cloud_vm_region": {
       "schema": {
         "az_count": {
