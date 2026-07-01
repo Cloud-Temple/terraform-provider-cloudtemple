@@ -1931,6 +1931,49 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_disk": {
+      "has_customize_diff": true,
+      "schema": {
+        "is_primary": {
+          "type": "TypeBool",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "name": {
+          "type": "TypeString",
+          "optional": true,
+          "computed": true,
+          "force_new": true,
+          "elem_kind": "nil"
+        },
+        "position": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "size": {
+          "type": "TypeInt",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "storage_type": {
+          "type": "TypeString",
+          "optional": true,
+          "computed": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "virtual_machine_id": {
+          "type": "TypeString",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_public_cloud_vm_instance": {
       "has_customize_diff": true,
       "schema": {
