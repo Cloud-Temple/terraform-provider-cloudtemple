@@ -373,6 +373,8 @@ var datasourceCoverage = map[string]dsCoverage{
 	"cloudtemple_public_cloud_vm_quota":              {"", flat(helpers.FlattenPublicCloudVMQuota)},
 	"cloudtemple_public_cloud_vm_task":               {"", flat(helpers.FlattenPublicCloudVMTask)},
 	"cloudtemple_public_cloud_vm_tasks":              {"tasks", flat(helpers.FlattenPublicCloudVMTask)},
+	"cloudtemple_public_cloud_vm_instance":           {"", flat(helpers.FlattenPublicCloudVMInstance)},
+	"cloudtemple_public_cloud_vm_instances":          {"instances", flat(helpers.FlattenPublicCloudVMInstance)},
 }
 
 // datasourceKnownGaps lists datasources deliberately NOT covered by the walker
