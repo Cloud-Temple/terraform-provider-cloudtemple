@@ -1,5 +1,11 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.10.0 (Unreleased)
+
+NEW FEATURES :
+
+  * Added resource `cloudtemple_public_cloud_vm_instance` to manage a Public Cloud VM instance. Creation (with optional boot at creation via `power_state = "on"`), in-place metadata updates (`name`, `backup_policy_id`), resize (`cpu`/`memory`, on a stopped VM — enforced at plan time) and deletion are all asynchronous and tracked through the Shiva Activities service. The VM id is taken only from the completed create activity (never guessed by name), and the resource fails closed on every ambiguous read: a just-created VM is never orphaned outside the state, and a still-present VM is never dropped on an inconclusive refresh (a deletion is confirmed against a strict, complete listing). The system disk is provided by the template and is not created here; data disks and additional network adapters are managed by their own resources.
+
 # 1.9.0 (Unreleased)
 
 UPGRADE NOTES :

@@ -1931,6 +1931,146 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_instance": {
+      "has_customize_diff": true,
+      "schema": {
+        "availability_zone_id": {
+          "type": "TypeString",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "availability_zone_name": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "backup_policy_id": {
+          "type": "TypeString",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "backup_policy_name": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "cloud_init": {
+          "type": "TypeMap",
+          "optional": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "value_type:TypeString"
+        },
+        "cpu": {
+          "type": "TypeInt",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "created_at": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "disks_size_gb": {
+          "type": "TypeInt",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "guest_tools_installed": {
+          "type": "TypeBool",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "instance_family_id": {
+          "type": "TypeString",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "instance_family_name": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "memory": {
+          "type": "TypeInt",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "name": {
+          "type": "TypeString",
+          "required": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "network_interfaces": {
+          "type": "TypeList",
+          "required": true,
+          "force_new": true,
+          "min_items": 1,
+          "max_items": 8,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "device_index": {
+              "type": "TypeInt",
+              "required": true,
+              "force_new": true,
+              "has_validate_func": true,
+              "elem_kind": "nil"
+            },
+            "ip_address": {
+              "type": "TypeString",
+              "optional": true,
+              "force_new": true,
+              "has_validate_func": true,
+              "elem_kind": "nil"
+            },
+            "network_id": {
+              "type": "TypeString",
+              "required": true,
+              "force_new": true,
+              "has_validate_func": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "power_state": {
+          "type": "TypeString",
+          "optional": true,
+          "default": "off",
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "status": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "template_id": {
+          "type": "TypeString",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "template_name": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "updated_at": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_vpc_floating_ip": {
       "schema": {
         "description": {
