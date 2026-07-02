@@ -24,23 +24,43 @@ To manage this resource you will need the following roles:
 ```terraform
 variable "virtual_machine_id" {
   type        = string
-  description = "The ID of the VM to attach the network adapter to."
+  description = "The ID of the VM to attach the network adapters to."
 }
 
-# Resolve a network from the catalogue by name.
+# --- Private Backbone network -------------------------------------------
+
 data "cloudtemple_public_cloud_vm_network" "lan" {
   name = "LAN01"
 }
 
-# Attach a network adapter as eth1. Re-pointing it to another network
-# (changing network_id) and destroying it both require the VM to be stopped.
+# Re-pointing the adapter to another network (changing network_id) and
+# destroying it both require the VM to be stopped.
 resource "cloudtemple_public_cloud_vm_network_adapter" "eth1" {
   virtual_machine_id = var.virtual_machine_id
   device_index       = 1
   network_id         = data.cloudtemple_public_cloud_vm_network.lan.id
+}
 
-  # ip_address is only honoured on VPC networks (ignored on Private Backbone).
-  # ip_address = "10.0.0.5"
+# --- VPC network ---------------------------------------------------------
+
+# A network with a non-empty `vpc` block is a VPC network.
+data "cloudtemple_public_cloud_vm_network" "vpc_net" {
+  name = "my-vpc-private-network"
+}
+
+resource "cloudtemple_public_cloud_vm_network_adapter" "eth2" {
+  virtual_machine_id = var.virtual_machine_id
+  device_index       = 2
+  network_id         = data.cloudtemple_public_cloud_vm_network.vpc_net.id
+
+  # Optional static IPv4, registered on the VPC private network. Only honoured
+  # on VPC networks (ignored on Private Backbone, with a warning); when omitted
+  # the platform assigns one. Write-only: the observed address is `ipv4_address`.
+  ip_address = "10.0.0.50"
+}
+
+output "eth2_type" {
+  value = cloudtemple_public_cloud_vm_network_adapter.eth2.type
 }
 ```
 

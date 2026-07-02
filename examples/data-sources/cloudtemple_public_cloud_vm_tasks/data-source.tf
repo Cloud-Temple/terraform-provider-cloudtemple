@@ -1,13 +1,16 @@
-# Retrieve recent diagnostic tasks (optionally scoped to a VM).
-data "cloudtemple_public_cloud_vm_tasks" "recent" {
-  limit = 20
+variable "virtual_machine_id" {
+  type        = string
+  description = "Scope the diagnostic tasks to this VM."
 }
 
-# Or only the tasks of a given VM.
-data "cloudtemple_public_cloud_vm_tasks" "for_vm" {
-  virtual_machine_id = "e2f77153-21a9-4147-9638-6fba09a97b0e"
+# List the diagnostic tasks of a VM (e.g. to investigate a failed operation).
+data "cloudtemple_public_cloud_vm_tasks" "vm" {
+  virtual_machine_id = var.virtual_machine_id
 }
 
-output "recent_task_types" {
-  value = [for t in data.cloudtemple_public_cloud_vm_tasks.recent.tasks : t.task_type]
+output "failed_tasks" {
+  value = [
+    for t in data.cloudtemple_public_cloud_vm_tasks.vm.tasks :
+    "${t.task_type}: ${t.message}" if t.status == "failed"
+  ]
 }

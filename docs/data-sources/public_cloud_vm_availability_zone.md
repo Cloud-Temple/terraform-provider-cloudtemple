@@ -16,8 +16,8 @@ To query this datasource you will need the `public_cloud_vm_instances_read` role
 ## Example Usage
 
 ```terraform
-# Retrieve a Public Cloud VM Instances availability zone by name.
-data "cloudtemple_public_cloud_vm_availability_zone" "az01" {
+# Retrieve an availability zone by name.
+data "cloudtemple_public_cloud_vm_availability_zone" "az1" {
   name = "fr1-az01"
 }
 
@@ -26,8 +26,13 @@ data "cloudtemple_public_cloud_vm_availability_zone" "by_id" {
   id = "18eea4f6-b4a1-40c1-8435-457ee7a9ab8e"
 }
 
-output "az_region" {
-  value = data.cloudtemple_public_cloud_vm_availability_zone.az01.region_id
+# The zone id is what a VM instance deploys into.
+output "az_id" {
+  value = data.cloudtemple_public_cloud_vm_availability_zone.az1.id
+}
+
+output "az_compatible_families" {
+  value = data.cloudtemple_public_cloud_vm_availability_zone.az1.compatible_families
 }
 ```
 

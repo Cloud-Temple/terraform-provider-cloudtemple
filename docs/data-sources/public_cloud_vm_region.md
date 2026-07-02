@@ -16,7 +16,7 @@ To query this datasource you will need the `public_cloud_vm_instances_read` role
 ## Example Usage
 
 ```terraform
-# Retrieve a Public Cloud VM Instances region by name.
+# Retrieve a region by name.
 data "cloudtemple_public_cloud_vm_region" "fr1" {
   name = "fr1"
 }
@@ -28,6 +28,10 @@ data "cloudtemple_public_cloud_vm_region" "by_id" {
 
 output "region_country" {
   value = data.cloudtemple_public_cloud_vm_region.fr1.country_code
+}
+
+output "region_az_count" {
+  value = data.cloudtemple_public_cloud_vm_region.fr1.az_count
 }
 ```
 

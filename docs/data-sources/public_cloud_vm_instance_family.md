@@ -16,13 +16,19 @@ To query this datasource you will need the `public_cloud_vm_instances_read` role
 ## Example Usage
 
 ```terraform
-# Retrieve a Public Cloud VM Instances instance family by name.
-data "cloudtemple_public_cloud_vm_instance_family" "general" {
-  name = "General Purpose"
+# Retrieve an instance family by name.
+data "cloudtemple_public_cloud_vm_instance_family" "family" {
+  name = "Development"
 }
 
-output "general_vcpu_max" {
-  value = data.cloudtemple_public_cloud_vm_instance_family.general.vcpu_max
+# The family id is required to create a VM, and bounds its cpu/memory sizing.
+output "family_sizing_bounds" {
+  value = {
+    vcpu_min   = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_min
+    vcpu_max   = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_max
+    ram_min_gb = data.cloudtemple_public_cloud_vm_instance_family.family.ram_min_gb
+    ram_max_gb = data.cloudtemple_public_cloud_vm_instance_family.family.ram_max_gb
+  }
 }
 ```
 
