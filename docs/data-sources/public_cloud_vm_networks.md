@@ -39,5 +39,23 @@ Read-Only:
 
 - `id` (String)
 - `name` (String)
+- `vpc` (List of Object) (see [below for nested schema](#nestedobjatt--networks--vpc))
+
+<a id="nestedobjatt--networks--vpc"></a>
+### Nested Schema for `networks.vpc`
+
+Read-Only:
+
+- `id` (String)
+- `name` (String)
+- `private_network` (List of Object) (see [below for nested schema](#nestedobjatt--networks--vpc--private_network))
+
+<a id="nestedobjatt--networks--vpc--private_network"></a>
+### Nested Schema for `networks.vpc.private_network`
+
+Read-Only:
+
+- `id` (String)
+- `name` (String)
 
 

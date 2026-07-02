@@ -12,3 +12,16 @@ data "cloudtemple_public_cloud_vm_network" "by_id" {
 output "network_id" {
   value = data.cloudtemple_public_cloud_vm_network.lan.id
 }
+
+# A non-empty `vpc` block identifies a VPC network (empty for Private Backbone).
+data "cloudtemple_public_cloud_vm_network" "vpc_net" {
+  name = "fsn-pn-01"
+}
+
+output "is_vpc" {
+  value = length(data.cloudtemple_public_cloud_vm_network.vpc_net.vpc) > 0
+}
+
+output "vpc_name" {
+  value = one(data.cloudtemple_public_cloud_vm_network.vpc_net.vpc[*].name)
+}

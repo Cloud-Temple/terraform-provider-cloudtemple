@@ -12,6 +12,34 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
+// publicCloudVMNetworkVPCSchema returns the Computed `vpc` block shared by the
+// single and list network datasources: empty for a Private Backbone network,
+// populated ({id, name, private_network{id, name}}) for a VPC-backed one.
+func publicCloudVMNetworkVPCSchema() *schema.Schema {
+	return &schema.Schema{
+		Type:        schema.TypeList,
+		Computed:    true,
+		Description: "The VPC this network belongs to. Empty for a Private Backbone network — a non-empty `vpc` identifies a VPC network.",
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"id":   {Type: schema.TypeString, Computed: true, Description: "The unique identifier of the VPC."},
+				"name": {Type: schema.TypeString, Computed: true, Description: "The name of the VPC."},
+				"private_network": {
+					Type:        schema.TypeList,
+					Computed:    true,
+					Description: "The VPC private network backing this network.",
+					Elem: &schema.Resource{
+						Schema: map[string]*schema.Schema{
+							"id":   {Type: schema.TypeString, Computed: true, Description: "The unique identifier of the private network."},
+							"name": {Type: schema.TypeString, Computed: true, Description: "The name of the private network."},
+						},
+					},
+				},
+			},
+		},
+	}
+}
+
 func dataSourcePublicCloudVMNetwork() *schema.Resource {
 	return &schema.Resource{
 		Description: "Used to retrieve a Public Cloud VM Instances network from the catalogue, by `id` or by `name`. The resolved network `id` is the value a VM network adapter attaches to via its `network_id`.",
@@ -35,6 +63,9 @@ func dataSourcePublicCloudVMNetwork() *schema.Resource {
 				AtLeastOneOf:  []string{"id", "name"},
 				Description:   "The name of the network to retrieve. Conflicts with `id`. Network names are not guaranteed unique — if several networks share the name the lookup fails and you must use `id`.",
 			},
+
+			// Out
+			"vpc": publicCloudVMNetworkVPCSchema(),
 		},
 	}
 }
