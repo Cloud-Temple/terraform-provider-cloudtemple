@@ -31,7 +31,7 @@ const (
 
 func resourcePublicCloudVMDisk() *schema.Resource {
 	return &schema.Resource{
-		Description: "Manages a DATA disk attached to a Public Cloud VM instance. The system disk is provided by the template and is not managed here. Create, extend (grow-only) and delete are asynchronous; extending and deleting a disk both require the VM to be stopped.",
+		Description: "Manages a DATA disk attached to a Public Cloud VM instance. The system disk is provided by the template and is not managed here. Create, extend (grow-only) and delete are asynchronous; extending requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete).",
 
 		CreateContext: resourcePublicCloudVMDiskCreate,
 		ReadContext:   resourcePublicCloudVMDiskRead,
@@ -126,6 +126,7 @@ type vmDiskCRUDFuncs struct {
 	create       func(ctx context.Context, vmID string, req *client.CreateVMDiskRequest) (string, error)
 	extend       func(ctx context.Context, vmID, diskID string, size int) (string, error)
 	del          func(ctx context.Context, vmID, diskID string) (string, error)
+	vmStop       func(ctx context.Context, vmID string) (string, error)
 	read         func(ctx context.Context, vmID, diskID string) (*client.PublicCloudVMDisk, error)
 	listStrict   func(ctx context.Context, vmID string) ([]*client.PublicCloudVMDisk, error)
 	vmRead       func(ctx context.Context, vmID string) (*client.PublicCloudVMInstance, error)
@@ -140,6 +141,7 @@ func vmDiskClientFuncs(c *client.Client) vmDiskCRUDFuncs {
 		create:     disk.Create,
 		extend:     disk.ExtendById,
 		del:        disk.Delete,
+		vmStop:     inst.Stop,
 		read:       disk.Read,
 		listStrict: disk.ListStrict,
 		vmRead:     inst.Read,
@@ -367,8 +369,10 @@ func deleteVMDiskWith(ctx context.Context, d *schema.ResourceData, funcs vmDiskC
 
 	// Deleting a data disk requires the VM to be stopped (verified live: a delete
 	// against a running VM fails with an opaque platform error and leaves the disk
-	// in place). Preflight and refuse clearly (no hidden auto-stop), mirroring
-	// extend.
+	// in place). Destroy must stay a single command, so a running VM is stopped
+	// here (tracked activity) instead of refusing: in a full destroy the VM is
+	// deleted right after, and in a partial removal the next apply converges the
+	// VM back to its declared power_state.
 	vm, err := funcs.vmRead(ctx, vmID)
 	if err != nil {
 		return diag.Errorf("failed to read VM %s before deleting disk %s: %s", vmID, diskID, err)
@@ -377,7 +381,13 @@ func deleteVMDiskWith(ctx context.Context, d *schema.ResourceData, funcs vmDiskC
 		return diag.Errorf("disk %s of VM %s is present but its VM could not be read; refusing to delete on an inconsistent/ambiguous signal.", diskID, vmID)
 	}
 	if vm.Status != "stopped" {
-		return diag.Errorf("disk %s cannot be deleted while VM %s is %q: the VM must be stopped (set power_state = \"off\" on the VM, apply, then destroy the disk).", diskID, vmID, vm.Status)
+		stopActivity, serr := funcs.vmStop(ctx, vmID)
+		if serr != nil {
+			return diag.Errorf("disk %s requires VM %s to be stopped and the provider-issued stop failed: %s; the disk is kept in the state.", diskID, vmID, serr)
+		}
+		if _, serr := funcs.waitActivity(ctx, stopActivity); serr != nil {
+			return diag.Errorf("disk %s requires VM %s to be stopped and the provider-issued stop (activity %q) did not complete: %s; the disk is kept in the state.", diskID, vmID, stopActivity, serr)
+		}
 	}
 
 	activityID, err := funcs.del(ctx, vmID, diskID)

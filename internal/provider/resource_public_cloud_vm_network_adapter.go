@@ -20,7 +20,7 @@ const (
 
 func resourcePublicCloudVMNetworkAdapter() *schema.Resource {
 	return &schema.Resource{
-		Description: "Manages a network adapter (NIC) attached to a Public Cloud VM instance. Create, change-network and delete are asynchronous; changing the network and deleting the adapter both require the VM to be stopped. Attaching (create) is attempted hot but is not guaranteed on every network (hot-plug limitation).",
+		Description: "Manages a network adapter (NIC) attached to a Public Cloud VM instance. Create, change-network and delete are asynchronous; changing the network requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete). Attaching (create) is attempted hot but is not guaranteed on every network (hot-plug limitation).",
 
 		CreateContext: resourcePublicCloudVMNetworkAdapterCreate,
 		ReadContext:   resourcePublicCloudVMNetworkAdapterRead,
@@ -114,6 +114,7 @@ type vmNICCRUDFuncs struct {
 	create        func(ctx context.Context, vmID string, req *client.CreateVMNetworkAdapterRequest) (string, error)
 	changeNetwork func(ctx context.Context, vmID, nicID string, req *client.ChangeVMNetworkAdapterRequest) (string, error)
 	del           func(ctx context.Context, vmID, nicID string) (string, error)
+	vmStop        func(ctx context.Context, vmID string) (string, error)
 	read          func(ctx context.Context, vmID, nicID string) (*client.PublicCloudVMNetworkAdapter, error)
 	listStrict    func(ctx context.Context, vmID string) ([]*client.PublicCloudVMNetworkAdapter, error)
 	vmRead        func(ctx context.Context, vmID string) (*client.PublicCloudVMInstance, error)
@@ -128,6 +129,7 @@ func vmNICClientFuncs(c *client.Client) vmNICCRUDFuncs {
 		create:        nic.Create,
 		changeNetwork: nic.ChangeNetwork,
 		del:           nic.Delete,
+		vmStop:        inst.Stop,
 		read:          nic.Read,
 		listStrict:    nic.ListStrict,
 		vmRead:        inst.Read,
@@ -392,8 +394,11 @@ func deleteVMNICWith(ctx context.Context, d *schema.ResourceData, funcs vmNICCRU
 	}
 
 	// Removing an adapter requires the VM to be stopped (worker guard: a delete
-	// against a running VM fails and leaves the adapter in place). Preflight and
-	// refuse clearly (no hidden auto-stop), mirroring the disk resource.
+	// against a running VM fails and leaves the adapter in place). Destroy must
+	// stay a single command, so a running VM is stopped here (tracked activity)
+	// instead of refusing: in a full destroy the VM is deleted right after, and
+	// in a partial removal the next apply converges the VM back to its declared
+	// power_state.
 	vm, err := funcs.vmRead(ctx, vmID)
 	if err != nil {
 		return diag.Errorf("failed to read VM %s before deleting network adapter %s: %s", vmID, nicID, err)
@@ -402,7 +407,13 @@ func deleteVMNICWith(ctx context.Context, d *schema.ResourceData, funcs vmNICCRU
 		return diag.Errorf("network adapter %s of VM %s is present but its VM could not be read; refusing to delete on an inconsistent/ambiguous signal.", nicID, vmID)
 	}
 	if vm.Status != "stopped" {
-		return diag.Errorf("network adapter %s cannot be removed while VM %s is %q: the VM must be stopped (set power_state = \"off\" on the VM, apply, then destroy the adapter).", nicID, vmID, vm.Status)
+		stopActivity, serr := funcs.vmStop(ctx, vmID)
+		if serr != nil {
+			return diag.Errorf("network adapter %s requires VM %s to be stopped and the provider-issued stop failed: %s; the adapter is kept in the state.", nicID, vmID, serr)
+		}
+		if _, serr := funcs.waitActivity(ctx, stopActivity); serr != nil {
+			return diag.Errorf("network adapter %s requires VM %s to be stopped and the provider-issued stop (activity %q) did not complete: %s; the adapter is kept in the state.", nicID, vmID, stopActivity, serr)
+		}
 	}
 
 	activityID, err := funcs.del(ctx, vmID, nicID)
