@@ -114,7 +114,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				ForceNew:    true,
 				MinItems:    1,
 				MaxItems:    8,
-				Description: "The network interfaces attached at creation. Immutable here; additional adapters are managed by the dedicated network adapter resource.",
+				Description: "The network interfaces attached at creation (Private Backbone networks only — attach VPC networks with the dedicated network adapter resource). Immutable here; additional adapters are managed by the dedicated network adapter resource.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"device_index": {
@@ -347,6 +347,7 @@ type vmInstanceCRUDFuncs struct {
 	listStrict   func(ctx context.Context) ([]*client.PublicCloudVMInstance, error)
 	listDisks    func(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error)
 	extendSystem func(ctx context.Context, id string, size int) (string, error)
+	networkRead  func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error)
 	waitActivity func(ctx context.Context, activityID string) (*client.Activity, error)
 }
 
@@ -371,6 +372,7 @@ func vmInstanceClientFuncs(c *client.Client) vmInstanceCRUDFuncs {
 		},
 		listDisks:    c.PublicCloudVM().Disk().List,
 		extendSystem: c.PublicCloudVM().Disk().ExtendSystem,
+		networkRead:  c.PublicCloudVM().Network().Read,
 		waitActivity: func(ctx context.Context, activityID string) (*client.Activity, error) {
 			return c.Activity().WaitForCompletion(ctx, activityID, vmInstanceWaiterOptions(ctx))
 		},
@@ -410,6 +412,24 @@ func createVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 	req, err := buildCreateVMInstanceRequest(d)
 	if err != nil {
 		return diag.FromErr(err)
+	}
+
+	// VPC phase 1: the inline os_network_adapter block only supports Private
+	// Backbone networks — VPC attachments go through the standalone
+	// cloudtemple_public_cloud_vm_network_adapter resource. Each declared network
+	// is resolved BEFORE the create POST; a network that cannot be read fails
+	// closed (never create a VM against an unverifiable network).
+	for _, nic := range req.NetworkInterfaces {
+		network, nerr := funcs.networkRead(ctx, nic.NetworkID)
+		if nerr != nil {
+			return diag.Errorf("failed to verify network %s of os_network_adapter (device_index %d) before creating VM %q: %s. Refusing to create against an unverifiable network.", nic.NetworkID, nic.DeviceIndex, req.Name, nerr)
+		}
+		if network == nil {
+			return diag.Errorf("network %s of os_network_adapter (device_index %d) could not be found before creating VM %q; refusing to create against an unverifiable network.", nic.NetworkID, nic.DeviceIndex, req.Name)
+		}
+		if network.VPC != nil {
+			return diag.Errorf("network %s (%q) of os_network_adapter (device_index %d) is a VPC network: the inline os_network_adapter block only supports Private Backbone networks. Create the VM on a Private Backbone network and attach the VPC network with a cloudtemple_public_cloud_vm_network_adapter resource.", nic.NetworkID, network.Name, nic.DeviceIndex)
+		}
 	}
 
 	activityID, err := funcs.create(ctx, req)
