@@ -26,6 +26,31 @@ func TestPublicCloudVMNetworkList(t *testing.T) {
 	if nets[0].ID != "net-1" || nets[0].Name != "LAN01" || nets[1].ID != "net-2" {
 		t.Fatalf("networks not decoded: %+v", nets)
 	}
+	// A Private Backbone network omits the vpc key entirely -> nil.
+	if nets[0].VPC != nil || nets[1].VPC != nil {
+		t.Fatalf("non-VPC networks must decode a nil VPC, got %+v / %+v", nets[0].VPC, nets[1].VPC)
+	}
+}
+
+// TestPublicCloudVMNetworkVPCDecode pins the live shape of a VPC-backed network:
+// {"vpc":{"id","name","privateNetwork":{"id","name"}}} — the discriminator the
+// provider uses to tell VPC networks apart from Private Backbone ones.
+func TestPublicCloudVMNetworkVPCDecode(t *testing.T) {
+	ctx := context.Background()
+	c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"id":"net-vpc","name":"fsn-pn-01","vpc":{"id":"vpc-1","name":"fsn-01","privateNetwork":{"id":"net-vpc","name":"fsn-pn-01"}}}`))
+	})
+	net, err := c.PublicCloudVM().Network().Read(ctx, "net-vpc")
+	if err != nil || net == nil {
+		t.Fatalf("Read: net=%+v err=%v", net, err)
+	}
+	if net.VPC == nil || net.VPC.ID != "vpc-1" || net.VPC.Name != "fsn-01" {
+		t.Fatalf("vpc block not decoded: %+v", net.VPC)
+	}
+	if net.VPC.PrivateNetwork == nil || net.VPC.PrivateNetwork.ID != "net-vpc" || net.VPC.PrivateNetwork.Name != "fsn-pn-01" {
+		t.Fatalf("privateNetwork not decoded: %+v", net.VPC.PrivateNetwork)
+	}
 }
 
 func TestPublicCloudVMNetworkListStrict(t *testing.T) {

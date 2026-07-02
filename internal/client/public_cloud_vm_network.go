@@ -14,11 +14,26 @@ func (v *PublicCloudVMClient) Network() *PublicCloudVMNetworkClient {
 	return &PublicCloudVMNetworkClient{v.c}
 }
 
-// PublicCloudVMNetwork mirrors an element of GET /networks. The live shape is a
-// bare JSON array of {"id","name"} (verified live). The spec documents an
-// optional `vpc` block, but no VPC network was observable on the live platform,
-// so modelling it is deferred rather than freezing an unverified schema shape.
+// PublicCloudVMNetwork mirrors an element of GET /networks (bare JSON array,
+// verified live). VPC-backed networks carry a `vpc` block (verified live since
+// 2026-07); the key is omitted entirely on Private Backbone networks, so VPC is
+// nil there — which is how a caller tells the two kinds apart.
 type PublicCloudVMNetwork struct {
+	ID   string
+	Name string
+	VPC  *PublicCloudVMNetworkVPC
+}
+
+// PublicCloudVMNetworkVPC is the `vpc` block of a VPC-backed network:
+// {"id","name","privateNetwork":{"id","name"}}.
+type PublicCloudVMNetworkVPC struct {
+	ID             string
+	Name           string
+	PrivateNetwork *PublicCloudVMNetworkRef
+}
+
+// PublicCloudVMNetworkRef is a minimal {id,name} reference.
+type PublicCloudVMNetworkRef struct {
 	ID   string
 	Name string
 }

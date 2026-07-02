@@ -32,6 +32,7 @@ func dataSourcePublicCloudVMNetworks() *schema.Resource {
 							Computed:    true,
 							Description: "The name of the network.",
 						},
+						"vpc": publicCloudVMNetworkVPCSchema(),
 					},
 				},
 			},
