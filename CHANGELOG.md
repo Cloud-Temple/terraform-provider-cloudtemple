@@ -5,9 +5,9 @@
 NEW FEATURES :
 
   * Added resource `cloudtemple_public_cloud_vm_instance` to manage a Public Cloud VM instance: create, start/stop (`power_state`), rename, change the backup policy, resize `cpu`/`memory` and grow the OS disk (`os_disk.size_gb`) — resize and OS disk growth require the VM to be stopped.
-  * Added resource `cloudtemple_public_cloud_vm_disk` to manage a data disk attached to a Public Cloud VM instance: create, grow-only extend and delete (extend and delete require the VM to be stopped). Import with `<virtual_machine_id>/<disk_id>`.
+  * Added resource `cloudtemple_public_cloud_vm_disk` to manage a data disk attached to a Public Cloud VM instance: create, grow-only extend and delete (extend requires the VM to be stopped; delete stops a running VM automatically). Import with `<virtual_machine_id>/<disk_id>`.
   * Added resource `cloudtemple_public_cloud_vm_snapshot` to manage a snapshot of a Public Cloud VM instance (`name` is immutable). Import with `<virtual_machine_id>/<snapshot_id>`.
-  * Added resource `cloudtemple_public_cloud_vm_network_adapter` to manage a network adapter attached to a Public Cloud VM instance. Changing `network_id` or deleting the adapter requires the VM to be stopped; `ip_address` is only honoured on VPC networks; `device_index` is immutable. Import with `<virtual_machine_id>/<network_adapter_id>`.
+  * Added resource `cloudtemple_public_cloud_vm_network_adapter` to manage a network adapter attached to a Public Cloud VM instance. Changing `network_id` requires the VM to be stopped (deleting stops a running VM automatically); `ip_address` is only honoured on VPC networks; `device_index` is immutable. Import with `<virtual_machine_id>/<network_adapter_id>`.
   * Added datasource `cloudtemple_public_cloud_vm_instance` to retrieve a VM instance by `id`.
   * Added datasource `cloudtemple_public_cloud_vm_instances` to list the tenant's VM instances (filterable by name, status, availability zone or instance family).
   * Added datasource `cloudtemple_public_cloud_vm_disks` to list the disks of a VM instance.

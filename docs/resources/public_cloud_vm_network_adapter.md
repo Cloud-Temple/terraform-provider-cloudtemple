@@ -3,7 +3,7 @@
 page_title: "cloudtemple_public_cloud_vm_network_adapter Resource - terraform-provider-cloudtemple"
 subcategory: "Public Cloud VM Instances"
 description: |-
-  Manages a network adapter (NIC) attached to a Public Cloud VM instance. Create, change-network and delete are asynchronous; changing the network and deleting the adapter both require the VM to be stopped. Attaching (create) is attempted hot but is not guaranteed on every network (hot-plug limitation).
+  Manages a network adapter (NIC) attached to a Public Cloud VM instance. Create, change-network and delete are asynchronous; changing the network requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete). Attaching (create) is attempted hot but is not guaranteed on every network (hot-plug limitation).
   To manage this resource you will need the following roles:
     - public_cloud_vm_instances_management
     - public_cloud_vm_instances_read
@@ -12,7 +12,7 @@ description: |-
 
 # cloudtemple_public_cloud_vm_network_adapter (Resource)
 
-Manages a network adapter (NIC) attached to a Public Cloud VM instance. Create, change-network and delete are asynchronous; changing the network and deleting the adapter both require the VM to be stopped. Attaching (create) is attempted hot but is not guaranteed on every network (hot-plug limitation).
+Manages a network adapter (NIC) attached to a Public Cloud VM instance. Create, change-network and delete are asynchronous; changing the network requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete). Attaching (create) is attempted hot but is not guaranteed on every network (hot-plug limitation).
 
 To manage this resource you will need the following roles:
   - `public_cloud_vm_instances_management`
@@ -33,8 +33,8 @@ data "cloudtemple_public_cloud_vm_network" "lan" {
   name = "LAN01"
 }
 
-# Re-pointing the adapter to another network (changing network_id) and
-# destroying it both require the VM to be stopped.
+# Re-pointing the adapter to another network (changing network_id) requires
+# the VM to be stopped; destroying it stops a running VM automatically.
 resource "cloudtemple_public_cloud_vm_network_adapter" "eth1" {
   virtual_machine_id = var.virtual_machine_id
   device_index       = 1

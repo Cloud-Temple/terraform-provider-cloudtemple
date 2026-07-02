@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -483,7 +484,40 @@ func TestDeleteVMDiskWith(t *testing.T) {
 		}
 	})
 
-	t.Run("delete refused while VM running (no del call)", func(t *testing.T) {
+	t.Run("delete on a running VM stops it first, then deletes", func(t *testing.T) {
+		d := newDiskRD(t, 10)
+		d.SetId(diskTestDiskID)
+		var order []string
+		funcs := vmDiskCRUDFuncs{
+			read: func(ctx context.Context, vmID, diskID string) (*client.PublicCloudVMDisk, error) {
+				return dataDisk(diskID, 10), nil
+			},
+			vmRead: func(ctx context.Context, vmID string) (*client.PublicCloudVMInstance, error) {
+				return &client.PublicCloudVMInstance{ID: vmID, Status: "running"}, nil
+			},
+			vmStop: func(ctx context.Context, vmID string) (string, error) {
+				order = append(order, "stop")
+				return "act-stop", nil
+			},
+			del: func(ctx context.Context, vmID, diskID string) (string, error) {
+				order = append(order, "del")
+				return "act", nil
+			},
+			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
+				order = append(order, "wait:"+a)
+				return diskActivity(diskTestDiskID), nil
+			},
+		}
+		if diags := deleteVMDiskWith(context.Background(), d, funcs); diags.HasError() {
+			t.Fatalf("destroy must be a single command (stop then delete), got %v", diags)
+		}
+		want := []string{"stop", "wait:act-stop", "del", "wait:act"}
+		if !reflect.DeepEqual(order, want) {
+			t.Fatalf("the stop activity must COMPLETE before the delete, got %v, want %v", order, want)
+		}
+	})
+
+	t.Run("a failed stop ACTIVITY keeps the disk (no del call)", func(t *testing.T) {
 		d := newDiskRD(t, 10)
 		d.SetId(diskTestDiskID)
 		deleted := false
@@ -494,13 +528,40 @@ func TestDeleteVMDiskWith(t *testing.T) {
 			vmRead: func(ctx context.Context, vmID string) (*client.PublicCloudVMInstance, error) {
 				return &client.PublicCloudVMInstance{ID: vmID, Status: "running"}, nil
 			},
-			del: func(ctx context.Context, vmID, diskID string) (string, error) { deleted = true; return "act", nil },
+			vmStop:       func(ctx context.Context, vmID string) (string, error) { return "act-stop", nil },
+			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) { return nil, errors.New("stop failed") },
+			del:          func(ctx context.Context, vmID, diskID string) (string, error) { deleted = true; return "act", nil },
 		}
 		if diags := deleteVMDiskWith(context.Background(), d, funcs); !diags.HasError() {
-			t.Fatal("deleting a data disk while the VM is running must be refused")
+			t.Fatal("a failed stop activity must fail the destroy")
 		}
 		if deleted {
-			t.Fatal("delete must NOT be called while the VM is running")
+			t.Fatal("delete must NOT be called when the stop activity failed")
+		}
+	})
+
+	t.Run("a failed provider-issued stop keeps the disk (no del call)", func(t *testing.T) {
+		d := newDiskRD(t, 10)
+		d.SetId(diskTestDiskID)
+		deleted := false
+		funcs := vmDiskCRUDFuncs{
+			read: func(ctx context.Context, vmID, diskID string) (*client.PublicCloudVMDisk, error) {
+				return dataDisk(diskID, 10), nil
+			},
+			vmRead: func(ctx context.Context, vmID string) (*client.PublicCloudVMInstance, error) {
+				return &client.PublicCloudVMInstance{ID: vmID, Status: "running"}, nil
+			},
+			vmStop: func(ctx context.Context, vmID string) (string, error) { return "", errors.New("stop refused") },
+			del:    func(ctx context.Context, vmID, diskID string) (string, error) { deleted = true; return "act", nil },
+		}
+		if diags := deleteVMDiskWith(context.Background(), d, funcs); !diags.HasError() {
+			t.Fatal("a failed stop must fail the destroy")
+		}
+		if deleted {
+			t.Fatal("delete must NOT be called when the stop failed")
+		}
+		if d.Id() == "" {
+			t.Fatal("the disk must stay in the state when the stop failed")
 		}
 	})
 

@@ -9,8 +9,8 @@ data "cloudtemple_public_cloud_vm_network" "lan" {
   name = "LAN01"
 }
 
-# Re-pointing the adapter to another network (changing network_id) and
-# destroying it both require the VM to be stopped.
+# Re-pointing the adapter to another network (changing network_id) requires
+# the VM to be stopped; destroying it stops a running VM automatically.
 resource "cloudtemple_public_cloud_vm_network_adapter" "eth1" {
   virtual_machine_id = var.virtual_machine_id
   device_index       = 1
