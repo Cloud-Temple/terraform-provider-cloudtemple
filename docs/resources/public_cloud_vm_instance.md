@@ -83,7 +83,7 @@ output "vm_status" {
 - `instance_family_id` (String) The ID of the instance family. Immutable.
 - `memory` (Number) The amount of RAM in GB. Mutable via resize, which requires `power_state = "off"`.
 - `name` (String) The name of the virtual machine. Mutable (issues a metadata update).
-- `os_network_adapter` (Block List, Min: 1, Max: 8) The network interfaces attached at creation. Immutable here; additional adapters are managed by the dedicated network adapter resource. (see [below for nested schema](#nestedblock--os_network_adapter))
+- `os_network_adapter` (Block List, Min: 1, Max: 8) The network interfaces attached at creation (Private Backbone networks only — attach VPC networks with the dedicated network adapter resource). Immutable here; additional adapters are managed by the dedicated network adapter resource. (see [below for nested schema](#nestedblock--os_network_adapter))
 - `template_id` (String) The ID of the OS template the VM is created from. Immutable.
 
 ### Optional

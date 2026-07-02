@@ -30,6 +30,12 @@ func okListPrimaryDisk(ctx context.Context, id string) ([]*client.PublicCloudVMD
 	return []*client.PublicCloudVMDisk{{ID: "osdisk-1", Position: 0, SizeGb: 38, StorageType: "st-1", IsPrimary: true}}, nil
 }
 
+// okNetworkReadPB is the networkRead seam for the create preflight: a plain
+// Private Backbone network (no vpc block), which the inline block accepts.
+func okNetworkReadPB(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
+	return &client.PublicCloudVMNetwork{ID: id, Name: "pb-net"}, nil
+}
+
 // --- resize precondition (CustomizeDiff logic) ---
 
 func TestVMInstanceResizeRequiresOff(t *testing.T) {
@@ -206,7 +212,8 @@ func TestCreateVMInstanceWith(t *testing.T) {
 	t.Run("id comes from the activity concernedItems (vmi)", func(t *testing.T) {
 		d := createRD(t)
 		funcs := vmInstanceCRUDFuncs{
-			create: func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) { return "act-1", nil },
+			networkRead: okNetworkReadPB,
+			create:      func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) { return "act-1", nil },
 			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
 				return vmiCompletedActivity("vm-1", "vm-1"), nil
 			},
@@ -227,7 +234,8 @@ func TestCreateVMInstanceWith(t *testing.T) {
 	t.Run("id falls back to the terminal state result when no vmi concernedItem", func(t *testing.T) {
 		d := createRD(t)
 		funcs := vmInstanceCRUDFuncs{
-			create: func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) { return "act-1", nil },
+			networkRead: okNetworkReadPB,
+			create:      func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) { return "act-1", nil },
 			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
 				return vmiCompletedActivity("", "vm-2"), nil
 			},
@@ -245,7 +253,8 @@ func TestCreateVMInstanceWith(t *testing.T) {
 	t.Run("no id reported fails closed without setting an id", func(t *testing.T) {
 		d := createRD(t)
 		funcs := vmInstanceCRUDFuncs{
-			create: func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) { return "act-1", nil },
+			networkRead: okNetworkReadPB,
+			create:      func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) { return "act-1", nil },
 			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
 				return vmiCompletedActivity("", ""), nil
 			},
@@ -262,7 +271,8 @@ func TestCreateVMInstanceWith(t *testing.T) {
 	t.Run("a wait failure fails and never sets an id", func(t *testing.T) {
 		d := createRD(t)
 		funcs := vmInstanceCRUDFuncs{
-			create: func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) { return "act-1", nil },
+			networkRead: okNetworkReadPB,
+			create:      func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) { return "act-1", nil },
 			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
 				return nil, errors.New("activity failed")
 			},
@@ -279,6 +289,7 @@ func TestCreateVMInstanceWith(t *testing.T) {
 	t.Run("a create error fails and never sets an id", func(t *testing.T) {
 		d := createRD(t)
 		funcs := vmInstanceCRUDFuncs{
+			networkRead: okNetworkReadPB,
 			create: func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) {
 				return "", errors.New("bad request")
 			},
@@ -289,6 +300,84 @@ func TestCreateVMInstanceWith(t *testing.T) {
 		}
 		if d.Id() != "" {
 			t.Fatalf("a create error must not set an id, got %q", d.Id())
+		}
+	})
+}
+
+// TestCreateVMInstanceVPCGuard pins the phase-1 VPC rule: the inline
+// os_network_adapter block only supports Private Backbone networks. The
+// preflight resolves each declared network BEFORE the create POST — a VPC
+// network, an unreadable network or an absent network all refuse the create
+// without ever calling the API.
+func TestCreateVMInstanceVPCGuard(t *testing.T) {
+	newFuncs := func(networkRead func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error)) (vmInstanceCRUDFuncs, *bool) {
+		created := false
+		return vmInstanceCRUDFuncs{
+			networkRead: networkRead,
+			create: func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) {
+				created = true
+				return "act-1", nil
+			},
+			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
+				return vmiCompletedActivity("vm-1", "vm-1"), nil
+			},
+			read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
+				return &client.PublicCloudVMInstance{ID: id, Name: "web", Status: "running", VCPU: 2, RAMGb: 4}, nil
+			},
+			listDisks: okListPrimaryDisk,
+		}, &created
+	}
+
+	t.Run("a Private Backbone network passes", func(t *testing.T) {
+		d := createRD(t)
+		funcs, created := newFuncs(okNetworkReadPB)
+		if diags := createVMInstanceWith(context.Background(), d, funcs); diags.HasError() {
+			t.Fatalf("a PB network must pass the preflight: %v", diags)
+		}
+		if !*created {
+			t.Fatal("create must be called for a PB network")
+		}
+	})
+
+	t.Run("a VPC network is refused BEFORE the create POST", func(t *testing.T) {
+		d := createRD(t)
+		funcs, created := newFuncs(func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
+			return &client.PublicCloudVMNetwork{ID: id, Name: "fsn-pn-01", VPC: &client.PublicCloudVMNetworkVPC{ID: "vpc-1", Name: "fsn-01"}}, nil
+		})
+		if diags := createVMInstanceWith(context.Background(), d, funcs); !diags.HasError() {
+			t.Fatal("a VPC network must refuse the create")
+		}
+		if *created {
+			t.Fatal("create must NOT be called when a NIC targets a VPC network")
+		}
+		if d.Id() != "" {
+			t.Fatal("no id must be set on a refused create")
+		}
+	})
+
+	t.Run("an unreadable network fails closed (no create)", func(t *testing.T) {
+		d := createRD(t)
+		funcs, created := newFuncs(func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
+			return nil, errors.New("400")
+		})
+		if diags := createVMInstanceWith(context.Background(), d, funcs); !diags.HasError() {
+			t.Fatal("an unreadable network must refuse the create")
+		}
+		if *created {
+			t.Fatal("create must NOT be called against an unverifiable network")
+		}
+	})
+
+	t.Run("a nil network fails closed (no create)", func(t *testing.T) {
+		d := createRD(t)
+		funcs, created := newFuncs(func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
+			return nil, nil
+		})
+		if diags := createVMInstanceWith(context.Background(), d, funcs); !diags.HasError() {
+			t.Fatal("a nil network must refuse the create")
+		}
+		if *created {
+			t.Fatal("create must NOT be called against an absent network")
 		}
 	})
 }
