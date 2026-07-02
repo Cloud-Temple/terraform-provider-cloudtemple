@@ -16,13 +16,18 @@ To query this datasource you will need the `public_cloud_vm_instances_read` role
 ## Example Usage
 
 ```terraform
+variable "virtual_machine_id" {
+  type        = string
+  description = "The ID of the VM whose snapshots are listed."
+}
+
 # List the snapshots of a VM.
-data "cloudtemple_public_cloud_vm_snapshots" "all" {
-  virtual_machine_id = "00000000-0000-0000-0000-000000000000"
+data "cloudtemple_public_cloud_vm_snapshots" "vm" {
+  virtual_machine_id = var.virtual_machine_id
 }
 
 output "snapshot_names" {
-  value = [for s in data.cloudtemple_public_cloud_vm_snapshots.all.snapshots : s.name]
+  value = [for s in data.cloudtemple_public_cloud_vm_snapshots.vm.snapshots : s.name]
 }
 ```
 

@@ -16,16 +16,20 @@ To query this datasource you will need the `public_cloud_vm_instances_read` role
 ## Example Usage
 
 ```terraform
-# Retrieve all flavors of the tenant.
-data "cloudtemple_public_cloud_vm_flavors" "all" {}
-
-# Or only those of a given instance family.
-data "cloudtemple_public_cloud_vm_flavors" "dev" {
-  instance_family_id = "287e8d20-4f07-4107-8b86-8642f6864d3c"
+data "cloudtemple_public_cloud_vm_instance_family" "family" {
+  name = "Development"
 }
 
-output "flavor_names" {
-  value = [for f in data.cloudtemple_public_cloud_vm_flavors.all.flavors : f.name]
+# Retrieve the flavors of an instance family.
+data "cloudtemple_public_cloud_vm_flavors" "dev" {
+  instance_family_id = data.cloudtemple_public_cloud_vm_instance_family.family.id
+}
+
+output "dev_sizings" {
+  value = [
+    for f in data.cloudtemple_public_cloud_vm_flavors.dev.flavors :
+    "${f.name}: ${f.vcpu} vCPU / ${f.ram_gb} GB"
+  ]
 }
 ```
 

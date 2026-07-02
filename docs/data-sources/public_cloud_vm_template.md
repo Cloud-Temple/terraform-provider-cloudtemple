@@ -16,13 +16,17 @@ To query this datasource you will need the `public_cloud_vm_instances_read` role
 ## Example Usage
 
 ```terraform
-# Retrieve a Public Cloud VM Instances template (OS image) by name.
-data "cloudtemple_public_cloud_vm_template" "rocky9" {
-  name = "Rocky Linux 9"
+# Retrieve a template (OS image) by name.
+data "cloudtemple_public_cloud_vm_template" "os" {
+  name = "Debian 13"
 }
 
-output "rocky9_disk_sizes" {
-  value = data.cloudtemple_public_cloud_vm_template.rocky9.disk_sizes_gb
+output "template" {
+  value = {
+    id         = data.cloudtemple_public_cloud_vm_template.os.id
+    os_family  = data.cloudtemple_public_cloud_vm_template.os.os_family
+    os_version = data.cloudtemple_public_cloud_vm_template.os.os_version
+  }
 }
 ```
 

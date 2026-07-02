@@ -1,8 +1,13 @@
-# Retrieve a Public Cloud VM Instances storage type by name.
-data "cloudtemple_public_cloud_vm_storage_type" "standard" {
-  name = "Standard"
+# Retrieve a storage type by name.
+data "cloudtemple_public_cloud_vm_storage_type" "fast" {
+  name = "Enterprise"
 }
 
-output "standard_max_size_gb" {
-  value = data.cloudtemple_public_cloud_vm_storage_type.standard.max_size_gb
+# The storage type id is consumed by the data-disk resource.
+output "storage_type" {
+  value = {
+    id          = data.cloudtemple_public_cloud_vm_storage_type.fast.id
+    iops_hint   = data.cloudtemple_public_cloud_vm_storage_type.fast.iops_hint
+    max_size_gb = data.cloudtemple_public_cloud_vm_storage_type.fast.max_size_gb
+  }
 }

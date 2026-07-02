@@ -16,14 +16,17 @@ To query this datasource you will need the `public_cloud_vm_instances_read` role
 ## Example Usage
 
 ```terraform
-# Retrieve a Public Cloud VM Instances backup policy by name.
-# A backup policy is required to create a VM (backup_policy_id).
+# Retrieve a backup policy by name. A policy id is required to create a VM
+# (backup_policy_id).
 data "cloudtemple_public_cloud_vm_backup_policy" "daily" {
   name = "Daily backup — 30 days"
 }
 
-output "daily_retention" {
-  value = data.cloudtemple_public_cloud_vm_backup_policy.daily.retention
+output "policy" {
+  value = {
+    id        = data.cloudtemple_public_cloud_vm_backup_policy.daily.id
+    retention = data.cloudtemple_public_cloud_vm_backup_policy.daily.retention
+  }
 }
 ```
 

@@ -1,8 +1,8 @@
-# Retrieve a diagnostic task by id.
-# NOTE: tasks are diagnostic only and are unrelated to the activities that track
-# writes; never use a task to follow a resource create/update/delete.
+# Retrieve a diagnostic task by id. Tasks are upstream diagnostic objects — the
+# provider tracks its own writes through the Activities service, never through
+# tasks.
 data "cloudtemple_public_cloud_vm_task" "t" {
-  id = "441e1d65-6639-497b-b41b-540955b83a03"
+  id = "00000000-0000-0000-0000-000000000000"
 }
 
 output "task_status" {
