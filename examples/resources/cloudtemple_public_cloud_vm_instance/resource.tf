@@ -31,7 +31,7 @@ resource "cloudtemple_public_cloud_vm_instance" "web" {
   backup_policy_id     = data.cloudtemple_public_cloud_vm_backup_policy.policy.id
   power_state          = "on"
 
-  network_interfaces {
+  os_network_adapter {
     device_index = 0
     network_id   = var.network_id
   }

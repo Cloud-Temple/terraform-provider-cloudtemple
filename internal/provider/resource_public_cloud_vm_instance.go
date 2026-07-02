@@ -107,7 +107,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				ValidateFunc: validation.IsUUID,
 				Description:  "The ID of the instance family. Immutable.",
 			},
-			"network_interfaces": {
+			"os_network_adapter": {
 				Type:        schema.TypeList,
 				Required:    true,
 				ForceNew:    true,
@@ -489,7 +489,7 @@ func setVMInstanceOSDisk(ctx context.Context, d *schema.ResourceData, funcs vmIn
 
 // setVMInstanceState writes the API view of the VM into the resource state. The
 // immutable ids (az/template/family) are reconciled to their API values to catch
-// an out-of-band replacement; network_interfaces and cloud_init are not returned
+// an out-of-band replacement; os_network_adapter and cloud_init are not returned
 // by the API and are ForceNew, so they are left untouched (kept from config).
 func setVMInstanceState(d *schema.ResourceData, vm *client.PublicCloudVMInstance, mode vmInstanceReadMode) diag.Diagnostics {
 	sw := newStateWriter(d)
@@ -692,7 +692,7 @@ func buildCreateVMInstanceRequest(d *schema.ResourceData) (*client.CreateVMInsta
 		Memory:             d.Get("memory").(int),
 		BackupPolicyID:     d.Get("backup_policy_id").(string),
 		PowerState:         d.Get("power_state").(string),
-		NetworkInterfaces:  expandVMInstanceNICs(d.Get("network_interfaces").([]interface{})),
+		NetworkInterfaces:  expandVMInstanceNICs(d.Get("os_network_adapter").([]interface{})),
 	}
 	req.CloudInit = expandVMInstanceCloudInit(d.Get("cloud_init").(map[string]interface{}))
 	return req, nil
