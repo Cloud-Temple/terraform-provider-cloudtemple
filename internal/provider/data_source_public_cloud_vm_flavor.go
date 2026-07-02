@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -68,14 +69,20 @@ func publicCloudVMFlavorRead(ctx context.Context, d *schema.ResourceData, meta a
 
 	var flavor *client.PublicCloudVMFlavor
 	if name := d.Get("name").(string); name != "" {
+		// Names are not guaranteed unique: refuse an ambiguous match rather
+		// than silently picking one.
+		var matches []string
 		for _, f := range flavors {
 			if f.Name == name {
 				flavor = f
-				break
+				matches = append(matches, f.ID)
 			}
 		}
 		if flavor == nil {
 			return diag.FromErr(fmt.Errorf("failed to find flavor named %q", name))
+		}
+		if len(matches) > 1 {
+			return diag.FromErr(fmt.Errorf("found %d flavors named %q (ids: %s); narrow with instance_family_id or use id", len(matches), name, strings.Join(matches, ", ")))
 		}
 	} else {
 		id := d.Get("id").(string)

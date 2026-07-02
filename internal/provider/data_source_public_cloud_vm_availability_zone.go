@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -97,14 +98,20 @@ func publicCloudVMAvailabilityZoneRead(ctx context.Context, d *schema.ResourceDa
 		if err != nil {
 			return diag.FromErr(fmt.Errorf("failed to find availability zone named %q: %s", name, err))
 		}
+		// Names are not guaranteed unique: refuse an ambiguous match rather
+		// than silently picking one.
+		var matches []string
 		for _, z := range zones {
 			if z.Name == name {
 				az = z
-				break
+				matches = append(matches, z.ID)
 			}
 		}
 		if az == nil {
 			return diag.FromErr(fmt.Errorf("failed to find availability zone named %q", name))
+		}
+		if len(matches) > 1 {
+			return diag.FromErr(fmt.Errorf("found %d availability zones named %q (ids: %s); narrow with region_id or use id", len(matches), name, strings.Join(matches, ", ")))
 		}
 	} else {
 		id := d.Get("id").(string)

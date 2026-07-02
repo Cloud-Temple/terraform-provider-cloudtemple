@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -75,14 +76,20 @@ func publicCloudVMBackupPolicyRead(ctx context.Context, d *schema.ResourceData, 
 
 	var policy *client.PublicCloudVMBackupPolicy
 	if name := d.Get("name").(string); name != "" {
+		// Names are not guaranteed unique: refuse an ambiguous match rather
+		// than silently picking one.
+		var matches []string
 		for _, p := range policies {
 			if p.Name == name {
 				policy = p
-				break
+				matches = append(matches, p.ID)
 			}
 		}
 		if policy == nil {
 			return diag.FromErr(fmt.Errorf("failed to find backup policy named %q", name))
+		}
+		if len(matches) > 1 {
+			return diag.FromErr(fmt.Errorf("found %d backup policies named %q (ids: %s); use id to disambiguate", len(matches), name, strings.Join(matches, ", ")))
 		}
 	} else {
 		id := d.Get("id").(string)
