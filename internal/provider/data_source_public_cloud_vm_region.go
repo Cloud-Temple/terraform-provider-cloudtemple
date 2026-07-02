@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -85,14 +86,20 @@ func publicCloudVMRegionRead(ctx context.Context, d *schema.ResourceData, meta a
 		if err != nil {
 			return diag.FromErr(fmt.Errorf("failed to find region named %q: %s", name, err))
 		}
+		// Names are not guaranteed unique: refuse an ambiguous match rather
+		// than silently picking one.
+		var matches []string
 		for _, r := range regions {
 			if r.Name == name {
 				region = r
-				break
+				matches = append(matches, r.ID)
 			}
 		}
 		if region == nil {
 			return diag.FromErr(fmt.Errorf("failed to find region named %q", name))
+		}
+		if len(matches) > 1 {
+			return diag.FromErr(fmt.Errorf("found %d regions named %q (ids: %s); use id to disambiguate", len(matches), name, strings.Join(matches, ", ")))
 		}
 	} else {
 		id := d.Get("id").(string)

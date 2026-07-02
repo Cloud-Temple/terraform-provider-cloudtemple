@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -76,14 +77,20 @@ func publicCloudVMTemplateRead(ctx context.Context, d *schema.ResourceData, meta
 		if err != nil {
 			return diag.FromErr(fmt.Errorf("failed to find template named %q: %s", name, err))
 		}
+		// Names are not guaranteed unique: refuse an ambiguous match rather
+		// than silently picking one.
+		var matches []string
 		for _, t := range tpls {
 			if t.Name == name {
 				tpl = t
-				break
+				matches = append(matches, t.ID)
 			}
 		}
 		if tpl == nil {
 			return diag.FromErr(fmt.Errorf("failed to find template named %q", name))
+		}
+		if len(matches) > 1 {
+			return diag.FromErr(fmt.Errorf("found %d templates named %q (ids: %s); narrow with instance_family_id and availability_zone_id, or use id", len(matches), name, strings.Join(matches, ", ")))
 		}
 	} else {
 		id := d.Get("id").(string)

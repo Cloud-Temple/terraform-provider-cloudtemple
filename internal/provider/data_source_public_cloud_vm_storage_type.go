@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -75,14 +76,20 @@ func publicCloudVMStorageTypeRead(ctx context.Context, d *schema.ResourceData, m
 
 	var st *client.PublicCloudVMStorageType
 	if name := d.Get("name").(string); name != "" {
+		// Names are not guaranteed unique: refuse an ambiguous match rather
+		// than silently picking one.
+		var matches []string
 		for _, s := range storageTypes {
 			if s.Name == name {
 				st = s
-				break
+				matches = append(matches, s.ID)
 			}
 		}
 		if st == nil {
 			return diag.FromErr(fmt.Errorf("failed to find storage type named %q", name))
+		}
+		if len(matches) > 1 {
+			return diag.FromErr(fmt.Errorf("found %d storage types named %q (ids: %s); use id to disambiguate", len(matches), name, strings.Join(matches, ", ")))
 		}
 	} else {
 		id := d.Get("id").(string)

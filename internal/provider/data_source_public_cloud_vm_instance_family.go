@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -74,14 +75,20 @@ func publicCloudVMInstanceFamilyRead(ctx context.Context, d *schema.ResourceData
 		if err != nil {
 			return diag.FromErr(fmt.Errorf("failed to find instance family named %q: %s", name, err))
 		}
+		// Names are not guaranteed unique: refuse an ambiguous match rather
+		// than silently picking one.
+		var matches []string
 		for _, f := range families {
 			if f.Name == name {
 				family = f
-				break
+				matches = append(matches, f.ID)
 			}
 		}
 		if family == nil {
 			return diag.FromErr(fmt.Errorf("failed to find instance family named %q", name))
+		}
+		if len(matches) > 1 {
+			return diag.FromErr(fmt.Errorf("found %d instance families named %q (ids: %s); use id to disambiguate", len(matches), name, strings.Join(matches, ", ")))
 		}
 	} else {
 		id := d.Get("id").(string)
