@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
@@ -516,7 +517,7 @@ func TestDeleteVMInstanceWith(t *testing.T) {
 }
 
 func TestSetVMInstanceOSDisk(t *testing.T) {
-	t.Run("populates os_disk and os_disk_size_gb from the primary disk", func(t *testing.T) {
+	t.Run("populates the full os_disk block from the primary disk", func(t *testing.T) {
 		d := createRD(t)
 		d.SetId("vm-1")
 		funcs := vmInstanceCRUDFuncs{
@@ -530,16 +531,35 @@ func TestSetVMInstanceOSDisk(t *testing.T) {
 		if diags := setVMInstanceOSDisk(context.Background(), d, funcs, "vm-1"); diags.HasError() {
 			t.Fatalf("unexpected diags: %v", diags)
 		}
-		if d.Get("os_disk_size_gb").(int) != 38 {
-			t.Fatalf("os_disk_size_gb = %d, want 38 (primary size)", d.Get("os_disk_size_gb"))
-		}
 		osd := d.Get("os_disk").([]interface{})
 		if len(osd) != 1 {
 			t.Fatalf("os_disk must have exactly the primary disk, got %d", len(osd))
 		}
 		m := osd[0].(map[string]interface{})
-		if m["id"] != "sys" || m["is_primary"] != true || m["size_gb"].(int) != 38 {
+		if m["id"] != "sys" || m["is_primary"] != true || m["size_gb"].(int) != 38 || m["storage_type"] != "st-1" {
 			t.Fatalf("os_disk primary not mapped: %v", m)
+		}
+	})
+
+	t.Run("a partially declared block is overwritten by the full API view (no sibling wipe)", func(t *testing.T) {
+		d := createRD(t)
+		d.SetId("vm-1")
+		// Simulate the state after a config that only declares size_gb: the
+		// Computed siblings must be (re)filled from the API, never left empty.
+		if err := d.Set("os_disk", []map[string]interface{}{{"size_gb": 45}}); err != nil {
+			t.Fatalf("seed: %v", err)
+		}
+		funcs := vmInstanceCRUDFuncs{
+			listDisks: func(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error) {
+				return []*client.PublicCloudVMDisk{{ID: "sys", Position: 0, SizeGb: 45, StorageType: "st-1", IsPrimary: true}}, nil
+			},
+		}
+		if diags := setVMInstanceOSDisk(context.Background(), d, funcs, "vm-1"); diags.HasError() {
+			t.Fatalf("unexpected diags: %v", diags)
+		}
+		m := d.Get("os_disk").([]interface{})[0].(map[string]interface{})
+		if m["id"] != "sys" || m["storage_type"] != "st-1" || m["size_gb"].(int) != 45 || m["is_primary"] != true {
+			t.Fatalf("computed siblings must be refilled from the API view: %v", m)
 		}
 	})
 
@@ -575,4 +595,74 @@ func TestSetVMInstanceOSDisk(t *testing.T) {
 			t.Fatal("os_disk must be cleared when there is no primary (no stale value)")
 		}
 	})
+}
+
+// TestOSDiskSizeSetInRawConfig pins the create-time rejection detector: it must
+// read the RAW config (Optional+Computed cannot be told apart in the diff),
+// never panic on absent/null/unknown shapes, and treat an unknown size_gb as
+// set (create cannot honour it either).
+func TestOSDiskSizeSetInRawConfig(t *testing.T) {
+	block := func(sizeGb cty.Value) cty.Value {
+		return cty.ObjectVal(map[string]cty.Value{
+			"os_disk": cty.ListVal([]cty.Value{
+				cty.ObjectVal(map[string]cty.Value{"size_gb": sizeGb}),
+			}),
+		})
+	}
+	cases := []struct {
+		name string
+		raw  cty.Value
+		want bool
+	}{
+		{"null raw config", cty.NullVal(cty.Object(map[string]cty.Type{"os_disk": cty.List(cty.Object(map[string]cty.Type{"size_gb": cty.Number}))})), false},
+		{"no os_disk attribute", cty.ObjectVal(map[string]cty.Value{"name": cty.StringVal("x")}), false},
+		{"null os_disk", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.NullVal(cty.List(cty.Object(map[string]cty.Type{"size_gb": cty.Number})))}), false},
+		{"empty os_disk list", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.ListValEmpty(cty.Object(map[string]cty.Type{"size_gb": cty.Number}))}), false},
+		{"block without size_gb (null)", block(cty.NullVal(cty.Number)), false},
+		{"block with size_gb set", block(cty.NumberIntVal(80)), true},
+		{"block with size_gb unknown counts as set", block(cty.UnknownVal(cty.Number)), true},
+		// A declared-but-unknown os_disk cannot be inspected; create cannot honour
+		// a size that only resolves later -> conservative reject.
+		{"unknown os_disk list counts as set", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.UnknownVal(cty.List(cty.Object(map[string]cty.Type{"size_gb": cty.Number})))}), true},
+		// Raw config can surface blocks as a tuple; the iterator must handle it.
+		{"tuple-shaped os_disk with size_gb set", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.TupleVal([]cty.Value{cty.ObjectVal(map[string]cty.Value{"size_gb": cty.NumberIntVal(80)})})}), true},
+		{"tuple-shaped os_disk without size_gb", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.TupleVal([]cty.Value{cty.ObjectVal(map[string]cty.Value{"size_gb": cty.NullVal(cty.Number)})})}), false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := osDiskSizeSetInRawConfig(tc.raw); got != tc.want {
+				t.Fatalf("osDiskSizeSetInRawConfig = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestVMInstanceOSDiskChangeCheck pins the pure grow rule on the size_gb leaf:
+// zero/no-op sizes are skipped, a shrink is rejected, a grow requires
+// power_state = "off".
+func TestVMInstanceOSDiskChangeCheck(t *testing.T) {
+	cases := []struct {
+		name       string
+		old, new   int
+		powerState string
+		wantErr    bool
+	}{
+		{"grow while off", 38, 45, "off", false},
+		{"grow while on rejected", 38, 45, "on", true},
+		{"shrink rejected even off", 45, 38, "off", true},
+		{"no change is a no-op", 38, 38, "on", false},
+		// A zero old size cannot prove a shrink, but the update WILL issue an
+		// extend — the stopped-VM precondition still applies.
+		{"zero old: extend while on still rejected", 0, 45, "on", true},
+		{"zero old: extend while off allowed", 0, 45, "off", false},
+		{"zero new (block removed) skipped", 45, 0, "on", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := vmInstanceOSDiskChangeCheck(tc.old, tc.new, tc.powerState)
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("vmInstanceOSDiskChangeCheck(%d,%d,%q) err=%v wantErr=%v", tc.old, tc.new, tc.powerState, err, tc.wantErr)
+			}
+		})
+	}
 }

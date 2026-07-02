@@ -2054,7 +2054,9 @@
         },
         "os_disk": {
           "type": "TypeList",
+          "optional": true,
           "computed": true,
+          "max_items": 1,
           "elem_kind": "resource",
           "elem_resource": {
             "id": {
@@ -2074,7 +2076,9 @@
             },
             "size_gb": {
               "type": "TypeInt",
+              "optional": true,
               "computed": true,
+              "has_validate_func": true,
               "elem_kind": "nil"
             },
             "storage_type": {
@@ -2083,13 +2087,6 @@
               "elem_kind": "nil"
             }
           }
-        },
-        "os_disk_size_gb": {
-          "type": "TypeInt",
-          "optional": true,
-          "computed": true,
-          "has_validate_func": true,
-          "elem_kind": "nil"
         },
         "os_network_adapter": {
           "type": "TypeList",
