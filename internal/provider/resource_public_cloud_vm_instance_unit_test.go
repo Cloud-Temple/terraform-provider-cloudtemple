@@ -191,7 +191,7 @@ func createRD(t *testing.T) *schema.ResourceData {
 		"memory":               4,
 		"backup_policy_id":     "44444444-4444-4444-4444-444444444444",
 		"power_state":          "on",
-		"network_interfaces": []interface{}{
+		"os_network_adapter": []interface{}{
 			map[string]interface{}{"device_index": 0, "network_id": "55555555-5555-5555-5555-555555555555"},
 		},
 	})

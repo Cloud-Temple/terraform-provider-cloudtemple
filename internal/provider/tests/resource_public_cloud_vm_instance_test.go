@@ -19,7 +19,7 @@ const (
 
 // TestAccResourcePublicCloudVMInstance exercises the full lifecycle live:
 // create (booted at creation via power_state = "on"), a read-back that populates
-// the computed attributes, then import. cloud_init / network_interfaces are not
+// the computed attributes, then import. cloud_init / os_network_adapter are not
 // returned by the API (and are ForceNew), and power_state is derived from the
 // status, so they are excluded from the import verification.
 func TestAccResourcePublicCloudVMInstance(t *testing.T) {
@@ -52,7 +52,7 @@ func TestAccResourcePublicCloudVMInstance(t *testing.T) {
 				ImportState:       true,
 				ImportStateVerify: true,
 				// Not readable from the API (and ForceNew) / derived from status.
-				ImportStateVerifyIgnore: []string{"network_interfaces", "cloud_init", "power_state"},
+				ImportStateVerifyIgnore: []string{"os_network_adapter", "cloud_init", "power_state"},
 			},
 		},
 	})
@@ -69,7 +69,7 @@ resource "cloudtemple_public_cloud_vm_instance" "test" {
   backup_policy_id     = "%s"
   power_state          = "on"
 
-  network_interfaces {
+  os_network_adapter {
     device_index = 0
     network_id   = "%s"
   }

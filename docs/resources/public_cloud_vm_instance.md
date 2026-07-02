@@ -55,7 +55,7 @@ resource "cloudtemple_public_cloud_vm_instance" "web" {
   backup_policy_id     = data.cloudtemple_public_cloud_vm_backup_policy.policy.id
   power_state          = "on"
 
-  network_interfaces {
+  os_network_adapter {
     device_index = 0
     network_id   = var.network_id
   }
@@ -77,7 +77,7 @@ output "vm_status" {
 - `instance_family_id` (String) The ID of the instance family. Immutable.
 - `memory` (Number) The amount of RAM in GB. Mutable via resize, which requires `power_state = "off"`.
 - `name` (String) The name of the virtual machine. Mutable (issues a metadata update).
-- `network_interfaces` (Block List, Min: 1, Max: 8) The network interfaces attached at creation. Immutable here; additional adapters are managed by the dedicated network adapter resource. (see [below for nested schema](#nestedblock--network_interfaces))
+- `os_network_adapter` (Block List, Min: 1, Max: 8) The network interfaces attached at creation. Immutable here; additional adapters are managed by the dedicated network adapter resource. (see [below for nested schema](#nestedblock--os_network_adapter))
 - `template_id` (String) The ID of the OS template the VM is created from. Immutable.
 
 ### Optional
@@ -101,8 +101,8 @@ output "vm_status" {
 - `template_name` (String) The name of the OS template.
 - `updated_at` (String) The last update date of the VM (RFC3339).
 
-<a id="nestedblock--network_interfaces"></a>
-### Nested Schema for `network_interfaces`
+<a id="nestedblock--os_network_adapter"></a>
+### Nested Schema for `os_network_adapter`
 
 Required:
 
@@ -140,7 +140,7 @@ Read-Only:
 Import is supported using the following syntax:
 
 ```shell
-# A VM instance is imported by its UUID. cloud_init and network_interfaces are
+# A VM instance is imported by its UUID. cloud_init and os_network_adapter are
 # not returned by the API and cannot be reconciled on import; power_state is
 # derived from the VM status.
 terraform import cloudtemple_public_cloud_vm_instance.web 00000000-0000-0000-0000-000000000000

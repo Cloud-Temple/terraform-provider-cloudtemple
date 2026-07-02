@@ -2052,37 +2052,6 @@
           "has_validate_func": true,
           "elem_kind": "nil"
         },
-        "network_interfaces": {
-          "type": "TypeList",
-          "required": true,
-          "force_new": true,
-          "min_items": 1,
-          "max_items": 8,
-          "elem_kind": "resource",
-          "elem_resource": {
-            "device_index": {
-              "type": "TypeInt",
-              "required": true,
-              "force_new": true,
-              "has_validate_func": true,
-              "elem_kind": "nil"
-            },
-            "ip_address": {
-              "type": "TypeString",
-              "optional": true,
-              "force_new": true,
-              "has_validate_func": true,
-              "elem_kind": "nil"
-            },
-            "network_id": {
-              "type": "TypeString",
-              "required": true,
-              "force_new": true,
-              "has_validate_func": true,
-              "elem_kind": "nil"
-            }
-          }
-        },
         "os_disk": {
           "type": "TypeList",
           "computed": true,
@@ -2121,6 +2090,37 @@
           "computed": true,
           "has_validate_func": true,
           "elem_kind": "nil"
+        },
+        "os_network_adapter": {
+          "type": "TypeList",
+          "required": true,
+          "force_new": true,
+          "min_items": 1,
+          "max_items": 8,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "device_index": {
+              "type": "TypeInt",
+              "required": true,
+              "force_new": true,
+              "has_validate_func": true,
+              "elem_kind": "nil"
+            },
+            "ip_address": {
+              "type": "TypeString",
+              "optional": true,
+              "force_new": true,
+              "has_validate_func": true,
+              "elem_kind": "nil"
+            },
+            "network_id": {
+              "type": "TypeString",
+              "required": true,
+              "force_new": true,
+              "has_validate_func": true,
+              "elem_kind": "nil"
+            }
+          }
         },
         "power_state": {
           "type": "TypeString",
