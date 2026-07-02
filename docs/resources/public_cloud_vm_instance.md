@@ -105,7 +105,7 @@ output "web_os_disk_size_gb" {
 
 ### Optional
 
-- `cloud_init` (Map of String) The cloud-init configuration applied at creation (keys `cloud_config` and/or `network_config`). Immutable and not readable back, so it is not reconciled on refresh.
+- `cloud_init` (Map of String) The cloud-init configuration applied at creation (keys `cloud_config` and/or `network_config`), as plain YAML — the provider base64-encodes it for the API. Immutable and not readable back, so it is not reconciled on refresh.
 - `os_disk` (Block List, Max: 1) The system (primary) disk of the VM, provided by the template. Declare the block with `size_gb` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the template's size is used. Data disks are managed by the separate disk resource. (see [below for nested schema](#nestedblock--os_disk))
 - `power_state` (String) The desired power state (`on` or `off`, default `off`). Honoured from the first apply (passed to the create call, so an `on` VM boots at creation). Changing it later issues a start (`off`->`on`) or stop (`on`->`off`).
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
