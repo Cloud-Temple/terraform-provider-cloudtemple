@@ -4,7 +4,7 @@
 
 NEW FEATURES :
 
-  * Added resource `cloudtemple_public_cloud_vm_instance` to manage a Public Cloud VM instance: create, start/stop (`power_state`), rename, change the backup policy, resize `cpu`/`memory` and grow the OS disk (`os_disk_size_gb`) — resize and OS disk growth require the VM to be stopped.
+  * Added resource `cloudtemple_public_cloud_vm_instance` to manage a Public Cloud VM instance: create, start/stop (`power_state`), rename, change the backup policy, resize `cpu`/`memory` and grow the OS disk (`os_disk.size_gb`) — resize and OS disk growth require the VM to be stopped.
   * Added resource `cloudtemple_public_cloud_vm_disk` to manage a data disk attached to a Public Cloud VM instance: create, grow-only extend and delete (extend and delete require the VM to be stopped). Import with `<virtual_machine_id>/<disk_id>`.
   * Added resource `cloudtemple_public_cloud_vm_snapshot` to manage a snapshot of a Public Cloud VM instance (`name` is immutable). Import with `<virtual_machine_id>/<snapshot_id>`.
   * Added resource `cloudtemple_public_cloud_vm_network_adapter` to manage a network adapter attached to a Public Cloud VM instance. Changing `network_id` or deleting the adapter requires the VM to be stopped; `ip_address` is only honoured on VPC networks; `device_index` is immutable. Import with `<virtual_machine_id>/<network_adapter_id>`.

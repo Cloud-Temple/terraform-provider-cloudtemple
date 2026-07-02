@@ -35,6 +35,12 @@ resource "cloudtemple_public_cloud_vm_instance" "web" {
     device_index = 0
     network_id   = var.network_id
   }
+
+  # The system disk comes from the template. To grow it later (grow-only),
+  # declare the block with the new size while power_state = "off":
+  # os_disk {
+  #   size_gb = 45
+  # }
 }
 
 output "vm_status" {

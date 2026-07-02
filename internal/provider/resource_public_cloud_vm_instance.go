@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
@@ -198,21 +199,22 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				Computed:    true,
 				Description: "The last update date of the VM (RFC3339).",
 			},
-			"os_disk_size_gb": {
-				Type:         schema.TypeInt,
-				Optional:     true,
-				Computed:     true,
-				ValidateFunc: validation.IntAtLeast(1),
-				Description:  "The size of the system (primary) disk in GB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the template's size is kept. Data disks are managed by the separate disk resource.",
-			},
 			"os_disk": {
 				Type:        schema.TypeList,
+				Optional:    true,
 				Computed:    true,
-				Description: "The system (primary) disk of the VM, provided by the template.",
+				MaxItems:    1,
+				Description: "The system (primary) disk of the VM, provided by the template. Declare the block with `size_gb` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the template's size is used. Data disks are managed by the separate disk resource.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
-						"id":           {Type: schema.TypeString, Computed: true, Description: "The unique identifier of the system disk."},
-						"size_gb":      {Type: schema.TypeInt, Computed: true, Description: "The size of the system disk in GB."},
+						"id": {Type: schema.TypeString, Computed: true, Description: "The unique identifier of the system disk."},
+						"size_gb": {
+							Type:         schema.TypeInt,
+							Optional:     true,
+							Computed:     true,
+							ValidateFunc: validation.IntAtLeast(1),
+							Description:  "The size of the system disk in GB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the current size is kept.",
+						},
 						"storage_type": {Type: schema.TypeString, Computed: true, Description: "The ID of the storage type."},
 						"position":     {Type: schema.TypeInt, Computed: true, Description: "The position of the disk (0 for the system disk)."},
 						"is_primary":   {Type: schema.TypeBool, Computed: true, Description: "Always true for the system disk."},
@@ -229,29 +231,81 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 // zero value and an `on` power_state is the legitimate boot-at-create case.
 func customizeVMInstanceDiff(ctx context.Context, d *schema.ResourceDiff, meta any) error {
 	exists := d.Id() != ""
-	// os_disk_size_gb cannot be set at CREATE: the VM is created with the
+	// os_disk.size_gb cannot be set at CREATE: the VM is created with the
 	// template's system disk size, and create never extends it — so a configured
 	// value that differs from the template would produce an inconsistent result.
-	// Grow the system disk in a subsequent apply (with power_state = "off").
+	// Detected on the RAW config (never the diff/state: the attribute is
+	// Optional+Computed, so d.Get would report a computed value as "set").
 	if !exists {
-		if raw := d.GetRawConfig(); !raw.IsNull() {
-			if osd := raw.GetAttr("os_disk_size_gb"); !osd.IsNull() {
-				return fmt.Errorf("os_disk_size_gb cannot be set when creating the VM: the template's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
+		if osDiskSizeSetInRawConfig(d.GetRawConfig()) {
+			return fmt.Errorf("os_disk.size_gb cannot be set when creating the VM: the template's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
+		}
+	} else if d.HasChange("os_disk.0.size_gb") {
+		// Grow-only + requires-off, validated on the LEAF only: a refresh of a
+		// Computed sibling (id, storage_type, ...) must never look like an extend.
+		o, n := d.GetChange("os_disk.0.size_gb")
+		oldSize, okOld := o.(int)
+		newSize, okNew := n.(int)
+		if okOld && okNew {
+			if err := vmInstanceOSDiskChangeCheck(oldSize, newSize, d.Get("power_state").(string)); err != nil {
+				return err
 			}
 		}
 	}
-	// The system disk is grow-only, like a data disk.
-	if d.HasChange("os_disk_size_gb") {
-		o, n := d.GetChange("os_disk_size_gb")
-		if err := vmDiskGrowOnlyCheck(o.(int), n.(int)); err != nil {
-			return err
+	return vmInstanceResizeRequiresOff(exists, d.HasChange("cpu") || d.HasChange("memory"), d.Get("power_state").(string))
+}
+
+// osDiskSizeSetInRawConfig reports whether the raw config declares an os_disk
+// block with an explicitly set size_gb (null-, absent- and unknown-safe: an
+// unknown value counts as set, since create cannot honour it either). It reads
+// the RAW config because os_disk.size_gb is Optional+Computed — the diff/state
+// view cannot tell an explicit value from a computed one.
+func osDiskSizeSetInRawConfig(raw cty.Value) bool {
+	if raw.IsNull() || !raw.Type().IsObjectType() || !raw.Type().HasAttribute("os_disk") {
+		return false
+	}
+	osd := raw.GetAttr("os_disk")
+	if osd.IsNull() {
+		return false
+	}
+	// A declared-but-unknown os_disk cannot be inspected — and create cannot
+	// honour a size that only resolves later. Reject conservatively.
+	if !osd.IsKnown() {
+		return true
+	}
+	if !osd.CanIterateElements() {
+		return false
+	}
+	for it := osd.ElementIterator(); it.Next(); {
+		_, el := it.Element()
+		if el.IsNull() || !el.Type().IsObjectType() || !el.Type().HasAttribute("size_gb") {
+			continue
 		}
-		// Extending the system disk, like a resize, requires a stopped VM.
-		if exists && d.Get("power_state").(string) != "off" {
-			return fmt.Errorf("os_disk_size_gb can only be changed while power_state = \"off\" (extending the system disk requires a stopped VM); set power_state = \"off\" in the same change, then power the VM back on in a subsequent apply")
+		if sg := el.GetAttr("size_gb"); !sg.IsNull() {
+			return true
 		}
 	}
-	return vmInstanceResizeRequiresOff(exists, d.HasChange("cpu") || d.HasChange("memory"), d.Get("power_state").(string))
+	return false
+}
+
+// vmInstanceOSDiskChangeCheck is the pure os_disk.size_gb change rule on an
+// EXISTING VM. A zero new size (block removed, value resolved by Computed) is
+// not a change to validate. A zero OLD size (no readable primary in state)
+// cannot prove a shrink — the grow-only check is skipped — but the update will
+// still issue an extend, so the stopped-VM precondition applies regardless.
+func vmInstanceOSDiskChangeCheck(oldSize, newSize int, powerState string) error {
+	if newSize == 0 || newSize == oldSize {
+		return nil
+	}
+	if oldSize != 0 {
+		if err := vmDiskGrowOnlyCheck(oldSize, newSize); err != nil {
+			return err
+		}
+	}
+	if powerState != "off" {
+		return fmt.Errorf("os_disk.size_gb can only be changed while power_state = \"off\" (extending the system disk requires a stopped VM); set power_state = \"off\" in the same change, then power the VM back on in a subsequent apply")
+	}
+	return nil
 }
 
 // vmInstanceResizeRequiresOff is the pure resize precondition: on an EXISTING VM,
@@ -450,10 +504,12 @@ func readVMInstanceInto(ctx context.Context, d *schema.ResourceData, funcs vmIns
 	return append(diags, setVMInstanceOSDisk(ctx, d, funcs, id)...)
 }
 
-// setVMInstanceOSDisk enriches the state with the VM's system (primary) disk:
-// the read-only os_disk block and the mutable os_disk_size_gb. The disk list is
-// fetched fresh; a failure fails closed (the VM itself is kept, but the read
-// errors — a forbidden/broken disk listing is surfaced, not silently ignored).
+// setVMInstanceOSDisk enriches the state with the VM's system (primary) disk —
+// the FULL os_disk block is always written from the API view, so a partially
+// declared config block (only size_gb) can never wipe the Computed siblings.
+// The disk list is fetched fresh; a failure fails closed (the VM itself is
+// kept, but the read errors — a forbidden/broken disk listing is surfaced, not
+// silently ignored).
 func setVMInstanceOSDisk(ctx context.Context, d *schema.ResourceData, funcs vmInstanceCRUDFuncs, vmID string) diag.Diagnostics {
 	disks, err := funcs.listDisks(ctx, vmID)
 	if err != nil {
@@ -468,15 +524,13 @@ func setVMInstanceOSDisk(ctx context.Context, d *schema.ResourceData, funcs vmIn
 	}
 	if primary == nil {
 		// No primary disk reported (e.g. a never-booted template edge case): clear
-		// any stale os_disk block rather than keep a previously-read primary. Leave
-		// os_disk_size_gb (Optional+Computed) as-is — there is no primary to size it.
+		// any stale os_disk block rather than keep a previously-read primary.
 		sw := newStateWriter(d)
 		sw.set("os_disk", []map[string]interface{}{})
 		return sw.diags
 	}
 
 	sw := newStateWriter(d)
-	sw.set("os_disk_size_gb", primary.SizeGb)
 	sw.set("os_disk", []map[string]interface{}{{
 		"id":           primary.ID,
 		"size_gb":      primary.SizeGb,
@@ -649,8 +703,15 @@ func updateVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 		}
 	}
 
-	osDiskExtending := d.HasChange("os_disk_size_gb")
-	osDiskSize := d.Get("os_disk_size_gb").(int)
+	// LEAF-only detection: HasChange("os_disk") would also fire on a refresh of a
+	// Computed sibling (id, storage_type, ...) and trigger an extend the user
+	// never asked for.
+	osDiskExtending := d.HasChange("os_disk.0.size_gb")
+	osDiskSize := d.Get("os_disk.0.size_gb").(int)
+	if osDiskExtending && osDiskSize == 0 {
+		// Block removed / no concrete target size: nothing to extend to.
+		osDiskExtending = false
+	}
 
 	plan := planVMInstanceUpdate(metadataChanged, resizing, osDiskExtending, oldPS.(string), newPS.(string))
 	if err := executeVMInstanceUpdate(ctx, id, plan, funcs, patchReq, resizeReq, osDiskSize); err != nil {

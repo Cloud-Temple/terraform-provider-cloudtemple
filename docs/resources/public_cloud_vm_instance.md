@@ -59,6 +59,12 @@ resource "cloudtemple_public_cloud_vm_instance" "web" {
     device_index = 0
     network_id   = var.network_id
   }
+
+  # The system disk comes from the template. To grow it later (grow-only),
+  # declare the block with the new size while power_state = "off":
+  # os_disk {
+  #   size_gb = 45
+  # }
 }
 
 output "vm_status" {
@@ -83,7 +89,7 @@ output "vm_status" {
 ### Optional
 
 - `cloud_init` (Map of String) The cloud-init configuration applied at creation (keys `cloud_config` and/or `network_config`). Immutable and not readable back, so it is not reconciled on refresh.
-- `os_disk_size_gb` (Number) The size of the system (primary) disk in GB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the template's size is kept. Data disks are managed by the separate disk resource.
+- `os_disk` (Block List, Max: 1) The system (primary) disk of the VM, provided by the template. Declare the block with `size_gb` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the template's size is used. Data disks are managed by the separate disk resource. (see [below for nested schema](#nestedblock--os_disk))
 - `power_state` (String) The desired power state (`on` or `off`, default `off`). Honoured from the first apply (passed to the create call, so an `on` VM boots at creation). Changing it later issues a start (`off`->`on`) or stop (`on`->`off`).
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
@@ -96,7 +102,6 @@ output "vm_status" {
 - `guest_tools_installed` (Boolean) Whether the guest tools are installed.
 - `id` (String) The ID of this resource.
 - `instance_family_name` (String) The name of the instance family.
-- `os_disk` (List of Object) The system (primary) disk of the VM, provided by the template. (see [below for nested schema](#nestedatt--os_disk))
 - `status` (String) The current status of the VM (e.g. `running`, `stopped`).
 - `template_name` (String) The name of the OS template.
 - `updated_at` (String) The last update date of the VM (RFC3339).
@@ -114,6 +119,21 @@ Optional:
 - `ip_address` (String) The fixed IPv4 address to assign. When omitted, the platform assigns one.
 
 
+<a id="nestedblock--os_disk"></a>
+### Nested Schema for `os_disk`
+
+Optional:
+
+- `size_gb` (Number) The size of the system disk in GB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the current size is kept.
+
+Read-Only:
+
+- `id` (String) The unique identifier of the system disk.
+- `is_primary` (Boolean) Always true for the system disk.
+- `position` (Number) The position of the disk (0 for the system disk).
+- `storage_type` (String) The ID of the storage type.
+
+
 <a id="nestedblock--timeouts"></a>
 ### Nested Schema for `timeouts`
 
@@ -122,18 +142,6 @@ Optional:
 - `create` (String)
 - `delete` (String)
 - `update` (String)
-
-
-<a id="nestedatt--os_disk"></a>
-### Nested Schema for `os_disk`
-
-Read-Only:
-
-- `id` (String)
-- `is_primary` (Boolean)
-- `position` (Number)
-- `size_gb` (Number)
-- `storage_type` (String)
 
 ## Import
 
