@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"reflect"
 	"testing"
@@ -556,13 +557,25 @@ func TestBuildCreateVMInstanceRequest(t *testing.T) {
 	}
 }
 
+// TestExpandVMInstanceCloudInit pins the wire contract verified live: the API
+// only accepts base64-encoded cloud-init payloads, so the provider ALWAYS
+// encodes the user's plain YAML (never conditionally — a payload that happens
+// to look like base64 must not be passed through).
 func TestExpandVMInstanceCloudInit(t *testing.T) {
 	if ci := expandVMInstanceCloudInit(map[string]interface{}{}); ci != nil {
 		t.Fatalf("empty cloud_init must be nil, got %+v", ci)
 	}
 	ci := expandVMInstanceCloudInit(map[string]interface{}{"cloud_config": "#cloud-config", "network_config": "version: 2"})
-	if ci == nil || ci.CloudConfig != "#cloud-config" || ci.NetworkConfig != "version: 2" {
-		t.Fatalf("cloud_init mapping wrong: %+v", ci)
+	wantCC := base64.StdEncoding.EncodeToString([]byte("#cloud-config"))
+	wantNC := base64.StdEncoding.EncodeToString([]byte("version: 2"))
+	if ci == nil || ci.CloudConfig != wantCC || ci.NetworkConfig != wantNC {
+		t.Fatalf("cloud_init must be base64-encoded: got %+v, want cc=%q nc=%q", ci, wantCC, wantNC)
+	}
+	// base64-looking input is still (re-)encoded — never passed through on a guess.
+	in := "Zm9v" // valid base64 of "foo", but the user meant the literal string
+	ci = expandVMInstanceCloudInit(map[string]interface{}{"cloud_config": in})
+	if want := base64.StdEncoding.EncodeToString([]byte(in)); ci == nil || ci.CloudConfig != want {
+		t.Fatalf("base64-looking input must be re-encoded verbatim: got %+v, want %q", ci, want)
 	}
 }
 

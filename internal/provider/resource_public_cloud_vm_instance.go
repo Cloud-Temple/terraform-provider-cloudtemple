@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strings"
@@ -145,7 +146,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				Type:        schema.TypeMap,
 				Optional:    true,
 				ForceNew:    true,
-				Description: "The cloud-init configuration applied at creation (keys `cloud_config` and/or `network_config`). Immutable and not readable back, so it is not reconciled on refresh.",
+				Description: "The cloud-init configuration applied at creation (keys `cloud_config` and/or `network_config`), as plain YAML — the provider base64-encodes it for the API. Immutable and not readable back, so it is not reconciled on refresh.",
 				Elem:        &schema.Schema{Type: schema.TypeString},
 				ValidateDiagFunc: validation.MapKeyMatch(
 					regexp.MustCompile("^cloud_config$|^network_config$"),
@@ -795,16 +796,21 @@ func expandVMInstanceNICs(raw []interface{}) []client.CreateVMInstanceNIC {
 	return nics
 }
 
+// expandVMInstanceCloudInit maps the cloud_init config into the create body.
+// The API only accepts base64-encoded payloads (verified live: a raw YAML is
+// rejected with "Must be a valid base64-encoded string"), so the user writes
+// plain YAML and the provider encodes it — always, never conditionally, so a
+// payload that happens to look like base64 is never double-interpreted.
 func expandVMInstanceCloudInit(raw map[string]interface{}) *client.CreateVMInstanceCloudInit {
 	if len(raw) == 0 {
 		return nil
 	}
 	ci := &client.CreateVMInstanceCloudInit{}
-	if v, ok := raw["cloud_config"].(string); ok {
-		ci.CloudConfig = v
+	if v, ok := raw["cloud_config"].(string); ok && v != "" {
+		ci.CloudConfig = base64.StdEncoding.EncodeToString([]byte(v))
 	}
-	if v, ok := raw["network_config"].(string); ok {
-		ci.NetworkConfig = v
+	if v, ok := raw["network_config"].(string); ok && v != "" {
+		ci.NetworkConfig = base64.StdEncoding.EncodeToString([]byte(v))
 	}
 	return ci
 }
