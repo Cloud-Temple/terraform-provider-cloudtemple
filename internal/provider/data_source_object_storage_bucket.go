@@ -110,6 +110,12 @@ func dataSourceBucketRead(ctx context.Context, d *schema.ResourceData, meta any)
 	if err != nil {
 		return diag.FromErr(fmt.Errorf("error reading bucket with name %s: %s", bucketName, err))
 	}
+	// The client maps a not-found (HTTP 404) / access-denied answer to (nil, nil).
+	// A data source must resolve, so fail closed with an actionable diagnostic
+	// instead of dereferencing a nil bucket (which would panic).
+	if bucket == nil {
+		return diag.Errorf("no bucket found with name %q", bucketName)
+	}
 
 	// Définir l'ID de la datasource
 	d.SetId(bucket.ID)

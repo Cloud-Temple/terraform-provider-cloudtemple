@@ -84,6 +84,12 @@ func dataSourceStorageAccountRead(ctx context.Context, d *schema.ResourceData, m
 	if err != nil {
 		return diag.FromErr(fmt.Errorf("error reading storage account with name %s: %s", accountName, err))
 	}
+	// The client maps a not-found (HTTP 404) / access-denied answer to (nil, nil).
+	// A data source must resolve, so fail closed with an actionable diagnostic
+	// instead of dereferencing a nil account (which would panic).
+	if account == nil {
+		return diag.Errorf("no storage account found with name %q", accountName)
+	}
 
 	// Définir l'ID de la datasource
 	d.SetId(account.ID)
