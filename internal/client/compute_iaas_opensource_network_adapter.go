@@ -50,6 +50,11 @@ type CreateOpenIaasNetworkAdapterRequest struct {
 	VirtualMachineID string `json:"virtualMachineId"`
 	NetworkID        string `json:"networkId"`
 	MAC              string `json:"mac,omitempty"`
+	// IPAddress is the VPC static IP to assign when the target network is
+	// VPC-backed (compute API #1854). When set, the create registers a static
+	// IP at this address on the private network for the adapter's MAC; when
+	// omitted the platform auto-assigns one. Ignored on a non-VPC network.
+	IPAddress string `json:"ipAddress,omitempty"`
 }
 
 func (v *OpenIaaSNetworkAdapterClient) Create(ctx context.Context, req *CreateOpenIaasNetworkAdapterRequest) (string, error) {
@@ -65,7 +70,7 @@ func (v *OpenIaaSNetworkAdapterClient) Read(ctx context.Context, id string) (*Op
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -114,7 +119,7 @@ func (v *OpenIaaSNetworkAdapterClient) List(ctx context.Context, filter *OpenIaa
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -137,6 +142,10 @@ type UpdateOpenIaasNetworkAdapterRequest struct {
 	// Pointer so that an explicit `false` is serialized: with a plain bool
 	// and omitempty, disabling TX checksumming could never be sent (#246).
 	TxChecksumming *bool `json:"txChecksumming,omitempty"`
+	// IPAddress relocates the VPC static IP of a VPC-backed adapter to this
+	// address (compute API #1854). The API requires networkId alongside
+	// ipAddress, so callers set NetworkID when they set IPAddress.
+	IPAddress string `json:"ipAddress,omitempty"`
 }
 
 func (v *OpenIaaSNetworkAdapterClient) Update(ctx context.Context, id string, req *UpdateOpenIaasNetworkAdapterRequest) (string, error) {

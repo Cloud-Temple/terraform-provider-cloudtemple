@@ -84,6 +84,12 @@ func dataSourceStorageAccountRead(ctx context.Context, d *schema.ResourceData, m
 	if err != nil {
 		return diag.FromErr(fmt.Errorf("error reading storage account with name %s: %s", accountName, err))
 	}
+	// Read maps an HTTP 404/403 to a (nil, nil) result (requireNotFoundOrOK), so
+	// a nil account means it does not exist or access is denied. Fail with an
+	// actionable diagnostic instead of dereferencing nil at d.SetId below (#382).
+	if account == nil {
+		return diag.Errorf("object storage storage account %q could not be read (it does not exist or access is denied)", accountName)
+	}
 
 	// Définir l'ID de la datasource
 	d.SetId(account.ID)

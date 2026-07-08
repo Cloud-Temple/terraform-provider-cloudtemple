@@ -110,6 +110,12 @@ func dataSourceBucketRead(ctx context.Context, d *schema.ResourceData, meta any)
 	if err != nil {
 		return diag.FromErr(fmt.Errorf("error reading bucket with name %s: %s", bucketName, err))
 	}
+	// Read maps an HTTP 404/403 to a (nil, nil) result (requireNotFoundOrOK), so
+	// a nil bucket means it does not exist or access is denied. Fail with an
+	// actionable diagnostic instead of dereferencing nil at d.SetId below (#382).
+	if bucket == nil {
+		return diag.Errorf("object storage bucket %q could not be read (it does not exist or access is denied)", bucketName)
+	}
 
 	// Définir l'ID de la datasource
 	d.SetId(bucket.ID)

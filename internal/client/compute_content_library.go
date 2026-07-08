@@ -52,7 +52,7 @@ func (c *ContentLibraryClient) Read(ctx context.Context, id string) (*ContentLib
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (c *ContentLibraryClient) ListItems(ctx context.Context, filter *ContentLib
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (c *ContentLibraryClient) ReadItem(ctx context.Context, contentLibraryId, c
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

@@ -2,12 +2,28 @@
 # Raised as coverage improves (scripts/coverage_ratchet.sh --update);
 # CI fails if coverage drops below these values. Never lower by hand.
 #
-# v1.8.0 re-baseline: removing the VPC provider surface changed the statement mix
-# of internal/provider and internal/provider/helpers, so their floors below were
-# regenerated with --update to the measured post-removal coverage (verified equal
-# to the current value) — honest measurements, not hand-lowered floors. The CI
-# gate ignores comment lines; a future --update regenerates the header and drops
-# this note.
+# v1.9.0 C2 re-baseline (issue #238): restoring the VPC datasource surface
+# re-adds 8 read-only Read handlers to internal/provider. As with every other
+# datasource in the provider, those Read bodies are exercised only by acceptance
+# tests (TF_ACC, not run in CI), while their schema constructors AND flatten
+# helpers ARE unit-covered (schema-vs-flatten walker, golden snapshot,
+# helper_vpc_test.go). The added uncovered Read statements lower internal/provider
+# 12.4 -> 12.2 (the symmetric inverse of the v1.8.0 removal that had raised it),
+# while internal/provider/helpers rises 66.7 -> 70.0 from the new flatten tests.
+# These are honest measurements, not hand-lowered floors. internal/client is left
+# at 24.8 (its C1 slack is out of C2 scope; a future --update can lock it in).
+#
+# v1.9.0 C3 (issue #367): the restored resource cloudtemple_vpc_static_ip adds its
+# create/read/update/delete orchestration to internal/provider behind func-seams
+# that are exhaustively unit-tested (create R-Q2/#348 never-orphan, read never-drop
+# in both readForRefresh/readAfterWrite modes, diff-driven PATCH with no retry,
+# delete 403-confirm). The #311 source guard requires POSITIVE proof (source ==
+# "custom") on both the read and the write paths: an empty/unknown source fails
+# closed (keeping the id) instead of adopting/patching a possibly platform-managed
+# IP. That RAISES internal/provider 12.2 -> 14.3. internal/client (untouched by C3)
+# stays 24.8 and internal/provider/helpers stays 70.0 (FlattenStaticIP was already
+# unit-covered at C2). Only the floor that C3's own tests improved is raised here;
+# the client slack remains deferred per the C2 note.
 internal/client 24.8
-internal/provider 12.4
-internal/provider/helpers 66.7
+internal/provider 14.3
+internal/provider/helpers 70.0

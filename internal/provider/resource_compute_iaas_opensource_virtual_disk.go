@@ -179,9 +179,9 @@ func openIaasVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta
 	return openIaasVirtualDiskRead(ctx, d, meta)
 }
 
-// confirmOpenIaaSVirtualDiskDeleted resolves the ambiguity of a nil per-id disk
-// read: the OpenIaaS API answers 403 for unknown AND forbidden ids alike and the
-// client maps both to nil, so an absence is only treated as a deletion under
+// confirmOpenIaaSVirtualDiskDeleted resolves a nil per-id disk read into a verdict:
+// since #384 a nil read is a definitive 404 (a genuine 403 surfaces as an
+// access-denied error), but an absence is still treated as a deletion only under
 // strict listing EVIDENCE. It runs two independent strict listings (scoped to
 // the VM, then tenant-wide) and returns the verdict; a listing failure yields a
 // non-nil diags so callers fail closed. Shared by Read and Delete so the
@@ -288,8 +288,8 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 		return diag.Errorf("failed to read virtual disk: %s", err)
 	}
 	if virtualDisk == nil {
-		// The API answers 403 for unknown AND forbidden ids alike, and the
-		// client maps both to nil: a deletion is only accepted under
+		// Since #384 a per-id 403 surfaces as an access-denied error and only a
+		// definitive 404 maps to nil; a deletion is still accepted only under
 		// strict listing evidence — and a disk absent from the VM-scoped
 		// listing may have been DETACHED or MOVED, which is drift, never a
 		// deletion (#275 doctrine, FF-5).
@@ -327,9 +327,10 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 			return diag.Errorf("failed to read virtual machine %s to resolve disk %s connection state: %s", vmID, d.Id(), vmErr)
 		}
 		if vm == nil {
-			// The OpenIaaS API maps 403 for an unknown OR forbidden id to nil:
-			// we cannot tell a halted VM from a running one, so we must not decide
-			// the connection state. Fail closed rather than risk a wrong plug state.
+			// A nil VM read (since #384 a definitive 404; a genuine 403 surfaces
+			// as an access-denied error above) means we cannot tell a halted VM
+			// from a running one, so we must not decide the connection state. Fail
+			// closed rather than risk a wrong plug state.
 			return diag.Errorf("virtual machine %s (attached to disk %s) could not be read; refusing to resolve the disk connection state on ambiguous evidence", vmID, d.Id())
 		}
 		connected, resErr := resolveOpenIaaSDiskConnected(virtualDisk, vmID, d.Get("connected").(bool), vm.PowerState)
@@ -357,11 +358,11 @@ func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta
 		return diag.Errorf("failed to read virtual disk state before update: %s", err)
 	}
 	if disk == nil {
-		// A nil read (403 for an unknown OR forbidden id, mapped to nil by the
-		// client) means we cannot enumerate the disk's attachments to compute
-		// the update cycle safely: refuse to mutate blindly rather than
-		// dereferencing disk.VirtualMachines and panicking (#325). The next
-		// refresh's Read resolves the drop-or-drift decision under strict
+		// A nil read (since #384 a definitive 404; a genuine 403 surfaces as an
+		// access-denied error above) means we cannot enumerate the disk's
+		// attachments to compute the update cycle safely: refuse to mutate blindly
+		// rather than dereferencing disk.VirtualMachines and panicking (#325). The
+		// next refresh's Read resolves the drop-or-drift decision under strict
 		// evidence.
 		return diag.Errorf("virtual disk %s could not be read before update (it may have been deleted out-of-band or access is restricted): refusing to apply changes — refresh or re-import, then retry", d.Id())
 	}
@@ -512,11 +513,11 @@ func openIaasVirtualDiskDelete(ctx context.Context, d *schema.ResourceData, meta
 		return diag.Errorf("failed to read virtual disk state before delete: %s", err)
 	}
 	if disk == nil {
-		// The client maps a 403 (unknown OR forbidden id) to a nil read.
-		// Treating the destroy as already satisfied is correct ONLY when the
-		// deletion is positively confirmed; a forbidden disk that still exists
-		// must never be silently dropped from the state (never-orphan doctrine,
-		// SYMMETRIC with Read — #325). Without this guard the loop below would
+		// Since #384 a nil read is a definitive 404 (a genuine 403 surfaces as an
+		// access-denied error above). Treating the destroy as already satisfied is
+		// correct ONLY when the deletion is positively confirmed; a disk that still
+		// exists must never be silently dropped from the state (never-orphan
+		// doctrine, SYMMETRIC with Read — #325). Without this guard the loop below would
 		// dereference disk.VirtualMachines and panic.
 		vmID := d.Get("virtual_machine_id").(string)
 		verdict, confirmDiags := confirmOpenIaaSVirtualDiskDeleted(ctx, c, d.Id(), vmID)

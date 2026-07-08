@@ -63,7 +63,7 @@ func (v *ComputeOpenIaaSReplicationPolicyClient) Read(ctx context.Context, id st
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

@@ -184,8 +184,9 @@ func TestSelectAllExcludesQuarantinedButExplicitRuns(t *testing.T) {
 
 // TestBuildRegistryQuarantinesVPC proves the REAL registry wiring: the shipped
 // vpcCycle declares itself quarantined, so the production `-cycles all -write`
-// path can never fire the deprecated /vpc/v1 write cycle, while `-cycles vpc
-// -write` still does. Without vpcCycle.Quarantined()==true this fails.
+// path can never fire the (still-rebuilding, not yet E2E-validated) /vpc/v1 write
+// cycle, while `-cycles vpc -write` still does. Without vpcCycle.Quarantined()==true
+// this fails.
 func TestBuildRegistryQuarantinesVPC(t *testing.T) {
 	reg := buildRegistry()
 

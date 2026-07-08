@@ -36,15 +36,17 @@ func (f *fakeStaticIPSeam) ListStrict(_ context.Context, _ string) ([]*client.St
 
 // DeleteAndWait routes the injected delete error through the SAME production
 // helper (staticIPDeleteErrResult) the real vpcStaticIPSeam uses, so a mutation
-// in that helper breaks both production and this test (no parallel copy).
-func (f *fakeStaticIPSeam) DeleteAndWait(ctx context.Context, privateNetworkID, id string) error {
+// in that helper breaks both production and this test (no parallel copy). It
+// forwards priorDeleteOK (the same-cycle explicit-delete proof) untouched, so a
+// test can exercise channel 1 (proof) and channel 2 (strict listing) distinctly.
+func (f *fakeStaticIPSeam) DeleteAndWait(ctx context.Context, privateNetworkID, id string, priorDeleteOK bool) error {
 	f.deleted = append(f.deleted, id)
 	err := f.deleteErr
 	if len(f.deleteErrs) > 0 {
 		err = f.deleteErrs[0]
 		f.deleteErrs = f.deleteErrs[1:]
 	}
-	return staticIPDeleteErrResult(err, func() ([]*client.StaticIP, error) {
+	return staticIPDeleteErrResult(err, priorDeleteOK, func() ([]*client.StaticIP, error) {
 		return f.ListStrict(ctx, privateNetworkID)
 	}, privateNetworkID, id)
 }
@@ -64,7 +66,7 @@ func TestStaticIPTeardownSweepsCreatedButUnresolved(t *testing.T) {
 		},
 	}
 	cl := NewCleanup()
-	registerStaticIPTeardown(cl, seam, "pn-1", "02:00:5e:f0:00:00")
+	registerStaticIPTeardown(cl, seam, &staticIPTeardownRef{PrivateNetworkID: "pn-1", MAC: "02:00:5e:f0:00:00"})
 	if cl.Pending() != 1 {
 		t.Fatalf("teardown must be registered before Create; Pending=%d", cl.Pending())
 	}
@@ -81,12 +83,83 @@ func TestStaticIPTeardownSweepsCreatedButUnresolved(t *testing.T) {
 func TestStaticIPTeardownIdempotentWhenAbsent(t *testing.T) {
 	seam := &fakeStaticIPSeam{list: []*client.StaticIP{}}
 	cl := NewCleanup()
-	registerStaticIPTeardown(cl, seam, "pn-1", "02:00:5e:f0:00:00")
+	registerStaticIPTeardown(cl, seam, &staticIPTeardownRef{PrivateNetworkID: "pn-1", MAC: "02:00:5e:f0:00:00"})
 	if fails := cl.TeardownAll(context.Background()); len(fails) != 0 {
 		t.Fatalf("absent static IP must be idempotent success, got %+v", fails)
 	}
 	if len(seam.deleted) != 0 {
 		t.Fatalf("nothing should be deleted when absent, deleted %v", seam.deleted)
+	}
+}
+
+// TestStaticIPTeardownByIDWhenResolved proves that once the create resolves the
+// id (shared ref, set AFTER registration — the adapter/disk/PAT precedent), the
+// teardown deletes by THAT id and does NOT fall back to the by-MAC strict
+// listing. Non-complacent: the listing is seeded with a DIFFERENT custom id for
+// the same MAC, so dropping the resolved branch (always listing) deletes the
+// wrong id → RED.
+func TestStaticIPTeardownByIDWhenResolved(t *testing.T) {
+	seam := &fakeStaticIPSeam{
+		list: []*client.StaticIP{{ID: "by-mac-id", MacAddress: "02:00:5e:f0:00:00", Source: "custom"}},
+	}
+	cl := NewCleanup()
+	ref := &staticIPTeardownRef{PrivateNetworkID: "pn-1", MAC: "02:00:5e:f0:00:00"}
+	registerStaticIPTeardown(cl, seam, ref)
+	// The create resolves the id AFTER registration (the shared-ref pattern).
+	ref.ID = "si-resolved"
+	ref.Resolved = true
+
+	if fails := cl.TeardownAll(context.Background()); len(fails) != 0 {
+		t.Fatalf("resolved teardown should succeed, got %+v", fails)
+	}
+	if len(seam.deleted) != 1 || seam.deleted[0] != "si-resolved" {
+		t.Fatalf("a resolved static IP must be deleted by its id, not the by-MAC listing match, deleted=%v", seam.deleted)
+	}
+}
+
+// TestStaticIPTeardownResolved403WithProofSucceeds proves the same-cycle
+// explicit-delete proof (ref.ExplicitlyDeleted) is a REAL, non-vestigial accept
+// channel: a deferred 403-on-absent for the RESOLVED id is accepted WITHOUT a
+// confirming listing — even a listing that STILL shows the id — because this
+// cycle already deleted it (#303 conflates absent/forbidden). Non-complacent: the
+// listing is rigged to still contain the id, so success comes ONLY via the
+// priorDeleteOK short-circuit; dropping `if priorDeleteOK { return nil }` in
+// staticIPDeleteErrResult makes the still-present listing fail closed → RED.
+func TestStaticIPTeardownResolved403WithProofSucceeds(t *testing.T) {
+	seam := &fakeStaticIPSeam{
+		list:      []*client.StaticIP{{ID: "si-resolved", MacAddress: "02:00:5e:f0:00:00", Source: "custom"}}, // STILL present
+		deleteErr: client.StatusError{Code: 403},
+	}
+	cl := NewCleanup()
+	ref := &staticIPTeardownRef{
+		PrivateNetworkID: "pn-1", MAC: "02:00:5e:f0:00:00",
+		ID: "si-resolved", Resolved: true, ExplicitlyDeleted: true,
+	}
+	registerStaticIPTeardown(cl, seam, ref)
+	if fails := cl.TeardownAll(context.Background()); len(fails) != 0 {
+		t.Fatalf("a deferred 403 WITH a same-cycle delete proof must be accepted without re-listing, got %+v", fails)
+	}
+}
+
+// TestStaticIPTeardownResolved403WithoutProofFailsClosed proves the converse and
+// is what makes ExplicitlyDeleted non-vestigial: with the SAME 403 and the SAME
+// still-present listing but NO same-cycle proof, the teardown confirms via the
+// strict listing, finds the id still present, and FAILS CLOSED (never assumes
+// gone). The pair — with-proof succeeds, without-proof fails — pins that the
+// proof is the only thing that flips the outcome.
+func TestStaticIPTeardownResolved403WithoutProofFailsClosed(t *testing.T) {
+	seam := &fakeStaticIPSeam{
+		list:      []*client.StaticIP{{ID: "si-resolved", MacAddress: "02:00:5e:f0:00:00", Source: "custom"}}, // STILL present
+		deleteErr: client.StatusError{Code: 403},
+	}
+	cl := NewCleanup()
+	ref := &staticIPTeardownRef{
+		PrivateNetworkID: "pn-1", MAC: "02:00:5e:f0:00:00",
+		ID: "si-resolved", Resolved: true, ExplicitlyDeleted: false,
+	}
+	registerStaticIPTeardown(cl, seam, ref)
+	if fails := cl.TeardownAll(context.Background()); len(fails) != 1 {
+		t.Fatalf("a deferred 403 with NO same-cycle proof and a still-present listing must fail closed, got %+v", fails)
 	}
 }
 
@@ -435,6 +508,105 @@ func TestFIPUnbind403ConfirmedBoundToOtherSucceeds(t *testing.T) {
 	}
 }
 
+// --- VPC floating IP (deprovision) --------------------------------------------
+
+// fakeFIPDeprovisionSeam is a RECORDING test double for the FIP deprovision seam.
+// Unlike fakeStaticIPSeam / fakeFIPSeam (which route through a shared production
+// helper so a mutation in that helper breaks both), the FIP deprovision seam is a
+// THIN pass-through: the WHOLE destructive contract — gate on fully-unbound,
+// idempotent by-id 404 → success, positive-404 confirm — lives in the client's
+// DeprovisionUnbound and is pinned with mutation proof at the client layer
+// (vpc_floating_ip_lifecycle_test.go). So the ONLY ct-validate-layer decision left
+// to test is registerFloatingIPTeardown's branching: act on a RESOLVED id, and
+// no-op (NEVER call DeprovisionUnbound) on an unresolved ref. This fake therefore
+// only records the ids it was asked to deprovision and replays an injected error.
+type fakeFIPDeprovisionSeam struct {
+	deprovisioned []string
+	err           error
+}
+
+func (f *fakeFIPDeprovisionSeam) DeprovisionUnbound(_ context.Context, fipID string) error {
+	f.deprovisioned = append(f.deprovisioned, fipID)
+	return f.err
+}
+
+// TestFloatingIPTeardownNoopWhenUnresolved proves the irreducible-orphan no-op: a
+// count-only provision leaves NO deterministic key, so a teardown whose ref never
+// resolved (or resolved with an empty id) must do NOTHING — never call
+// DeprovisionUnbound, never invent an id. Deleting "some unbound FIP" would risk
+// destroying a billable resource that is not ours. Non-complacent: drop the
+// `!ref.Resolved || ref.ID == ""` guard in registerFloatingIPTeardown and the seam
+// is called with an empty id → the recorded slice is non-empty → RED.
+func TestFloatingIPTeardownNoopWhenUnresolved(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		ref  *floatingIPTeardownRef
+	}{
+		{"never resolved (zero ref)", &floatingIPTeardownRef{}},
+		{"resolved flag set but id empty", &floatingIPTeardownRef{Resolved: true}},
+		{"id present but not flagged resolved", &floatingIPTeardownRef{ID: "fip-1"}},
+	} {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			seam := &fakeFIPDeprovisionSeam{}
+			cl := NewCleanup()
+			registerFloatingIPTeardown(cl, seam, tc.ref)
+			if cl.Pending() != 1 {
+				t.Fatalf("teardown must be registered before provision; Pending=%d", cl.Pending())
+			}
+			if fails := cl.TeardownAll(context.Background()); len(fails) != 0 {
+				t.Fatalf("an unresolved FIP teardown must be a no-op success, got %+v", fails)
+			}
+			if len(seam.deprovisioned) != 0 {
+				t.Fatalf("an unresolved FIP teardown must NEVER call DeprovisionUnbound (no key to sweep), called with %v", seam.deprovisioned)
+			}
+		})
+	}
+}
+
+// TestFloatingIPTeardownDeprovisionsWhenResolved proves that once the provision
+// resolves the id (shared ref, set AFTER registration — the F3 pattern), the
+// teardown deprovisions by THAT id. Non-complacent: the id is set post-registration
+// to prove the helper reads the shared pointer at teardown time, not at register
+// time.
+func TestFloatingIPTeardownDeprovisionsWhenResolved(t *testing.T) {
+	seam := &fakeFIPDeprovisionSeam{}
+	cl := NewCleanup()
+	ref := &floatingIPTeardownRef{}
+	registerFloatingIPTeardown(cl, seam, ref)
+	// The provision resolves the id AFTER registration (the shared-ref pattern).
+	ref.ID = "fip-resolved"
+	ref.Resolved = true
+
+	if fails := cl.TeardownAll(context.Background()); len(fails) != 0 {
+		t.Fatalf("a resolved FIP teardown should succeed, got %+v", fails)
+	}
+	if len(seam.deprovisioned) != 1 || seam.deprovisioned[0] != "fip-resolved" {
+		t.Fatalf("a resolved FIP must be deprovisioned by its id, called with %v", seam.deprovisioned)
+	}
+}
+
+// TestFloatingIPTeardownSurfacesDeprovisionError proves the teardown does NOT
+// swallow a real deprovision failure: a billable IP we could not delete must
+// surface as a teardown failure so the operator is alerted. (The client's
+// DeprovisionUnbound already maps a by-id 404 to a nil success, so this error path
+// is a GENUINE failure, not a benign already-gone.) Non-complacent: make
+// registerFloatingIPTeardown return nil unconditionally and fails drops to 0 → RED.
+func TestFloatingIPTeardownSurfacesDeprovisionError(t *testing.T) {
+	seam := &fakeFIPDeprovisionSeam{err: errors.New("deprovision activity did not complete")}
+	cl := NewCleanup()
+	ref := &floatingIPTeardownRef{ID: "fip-1", Resolved: true}
+	registerFloatingIPTeardown(cl, seam, ref)
+
+	fails := cl.TeardownAll(context.Background())
+	if len(fails) != 1 {
+		t.Fatalf("a deprovision failure must surface as exactly one teardown failure, got %+v", fails)
+	}
+	if len(seam.deprovisioned) != 1 || seam.deprovisioned[0] != "fip-1" {
+		t.Fatalf("the failing teardown must still have attempted the resolved id, called with %v", seam.deprovisioned)
+	}
+}
+
 // --- IAM PAT ------------------------------------------------------------------
 
 type fakePATSeam struct {
@@ -572,10 +744,14 @@ func TestPATDelete403Surfaced(t *testing.T) {
 // classifyStaticDeleteErr drives the REAL production helper
 // (staticIPDeleteErrResult) against an injected delete error and confirmation
 // listing, so the contract is unit-tested offline without a client and a
-// mutation in the helper is caught here.
+// mutation in the helper is caught here. priorDeleteOK is false: this harness
+// exercises CHANNEL 2 (the strict-listing confirmation), so a 403 is resolved
+// purely by the listing. The same-cycle-proof CHANNEL 1 (priorDeleteOK=true) is
+// exercised end-to-end by the registration tests (a resolved ref + a 403 the
+// listing CANNOT clear, accepted only via the proof).
 func classifyStaticDeleteErr(t *testing.T, deleteErr error, confirmList []*client.StaticIP, listErr error) error {
 	t.Helper()
-	return staticIPDeleteErrResult(deleteErr, func() ([]*client.StaticIP, error) {
+	return staticIPDeleteErrResult(deleteErr, false, func() ([]*client.StaticIP, error) {
 		return confirmList, listErr
 	}, "pn-1", "sip-1")
 }
@@ -597,7 +773,7 @@ func TestStaticIPDoubleDeleteNoFalseFailure(t *testing.T) {
 		deleteErrs: []error{client.StatusError{Code: 404}}, // the deferred (second) delete
 	}
 	cl := NewCleanup()
-	registerStaticIPTeardown(cl, seam, "pn-1", "02:00:5e:f0:00:00")
+	registerStaticIPTeardown(cl, seam, &staticIPTeardownRef{PrivateNetworkID: "pn-1", MAC: "02:00:5e:f0:00:00"})
 	if fails := cl.TeardownAll(context.Background()); len(fails) != 0 {
 		t.Fatalf("a deferred delete of an already-removed static IP (404) must NOT be a failure, got %+v", fails)
 	}
@@ -628,7 +804,7 @@ type transientThenStaticSeam struct {
 func (s *transientThenStaticSeam) ListStrict(_ context.Context, _ string) ([]*client.StaticIP, error) {
 	return []*client.StaticIP{{ID: "custom-1", MacAddress: "02:00:5e:f0:00:00", Source: "custom"}}, nil
 }
-func (s *transientThenStaticSeam) DeleteAndWait(_ context.Context, _, _ string) error {
+func (s *transientThenStaticSeam) DeleteAndWait(_ context.Context, _, _ string, _ bool) error {
 	s.calls++
 	if s.until > 0 && s.calls >= s.until {
 		return nil
@@ -641,7 +817,7 @@ func (s *transientThenStaticSeam) DeleteAndWait(_ context.Context, _, _ string) 
 func TestStaticIPDeleteTransientRetriedThenSucceeds(t *testing.T) {
 	seam := &transientThenStaticSeam{until: 2}
 	cl := NewCleanup()
-	registerStaticIPTeardown(cl, seam, "pn-1", "02:00:5e:f0:00:00")
+	registerStaticIPTeardown(cl, seam, &staticIPTeardownRef{PrivateNetworkID: "pn-1", MAC: "02:00:5e:f0:00:00"})
 	if fails := cl.TeardownAll(context.Background()); len(fails) != 0 {
 		t.Fatalf("a transient 5xx that recovers must succeed, got %+v", fails)
 	}
@@ -656,7 +832,7 @@ func TestStaticIPDeleteTransientRetriedThenSucceeds(t *testing.T) {
 func TestStaticIPDeleteTransientExhaustedSurfaced(t *testing.T) {
 	seam := &transientThenStaticSeam{} // never succeeds
 	cl := NewCleanup()
-	registerStaticIPTeardown(cl, seam, "pn-1", "02:00:5e:f0:00:00")
+	registerStaticIPTeardown(cl, seam, &staticIPTeardownRef{PrivateNetworkID: "pn-1", MAC: "02:00:5e:f0:00:00"})
 	fails := cl.TeardownAll(context.Background())
 	if len(fails) != 1 {
 		t.Fatalf("a persistent 5xx must surface as a teardown failure, got %+v", fails)
@@ -671,7 +847,7 @@ func TestStaticIPDeleteTransientExhaustedSurfaced(t *testing.T) {
 func TestStaticIPTeardownSurfacesListError(t *testing.T) {
 	seam := &fakeStaticIPSeam{listErr: client.StatusError{Code: 403}}
 	cl := NewCleanup()
-	registerStaticIPTeardown(cl, seam, "pn-1", "02:00:5e:f0:00:00")
+	registerStaticIPTeardown(cl, seam, &staticIPTeardownRef{PrivateNetworkID: "pn-1", MAC: "02:00:5e:f0:00:00"})
 	fails := cl.TeardownAll(context.Background())
 	if len(fails) != 1 {
 		t.Fatalf("a strict-listing error must surface as a teardown failure, got %+v", fails)

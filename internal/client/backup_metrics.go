@@ -30,7 +30,7 @@ func (c *BackupMetricsClient) History(ctx context.Context, rang int) (*BackupMet
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -161,7 +161,7 @@ func (c *BackupMetricsClient) PlatformCPU(ctx context.Context) (*BackupMetricsPl
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

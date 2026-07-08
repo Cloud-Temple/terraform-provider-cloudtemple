@@ -44,7 +44,7 @@ func (v *VirtualDiskClient) List(ctx context.Context, filter *VirtualDiskFilter)
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -105,7 +105,7 @@ func (v *VirtualDiskClient) Read(ctx context.Context, id string) (*VirtualDisk, 
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

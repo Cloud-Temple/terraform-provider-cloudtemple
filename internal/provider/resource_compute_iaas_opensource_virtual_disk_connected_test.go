@@ -152,23 +152,26 @@ func TestOpenIaasVirtualDiskReadRunningMirrorsRuntime(t *testing.T) {
 }
 
 // TestOpenIaasVirtualDiskReadFailsClosedWhenVMUnreadable pins the fail-closed
-// guard: if the VM read maps to nil (403), the provider cannot tell halted from
-// running, so it must error rather than guess the connection state.
+// guard: if the VM read maps to nil (since #384 a definitive 404), the provider
+// cannot tell halted from running, so it must error rather than guess the
+// connection state. (A genuine 403 errors at the client and is covered by
+// TestOpenIaasVirtualDiskReadFailsClosedWhenVMReadErrors.)
 func TestOpenIaasVirtualDiskReadFailsClosedWhenVMUnreadable(t *testing.T) {
-	c := newAssignTestClient(t, vdReadHandler(vdPresentDiskBody, http.StatusForbidden, ``))
+	c := newAssignTestClient(t, vdReadHandler(vdPresentDiskBody, http.StatusNotFound, ``))
 	d := diskTestData("disk-x", "vm-1")
 	if err := d.Set("connected", true); err != nil {
 		t.Fatalf("seeding connected: %v", err)
 	}
 	diags := openIaasVirtualDiskRead(context.Background(), d, c)
 	if !diags.HasError() {
-		t.Fatal("an unreadable VM (403 -> nil) must fail closed, never silently keep or guess the connection state")
+		t.Fatal("a VM read that maps to nil (404) must fail closed, never silently keep or guess the connection state")
 	}
 }
 
 // TestOpenIaasVirtualDiskReadFailsClosedWhenVMReadErrors pins that a VM read that
-// ERRORS (a non-403 HTTP error, distinct from the 403 -> nil path) also fails
-// closed — the provider never decides the connection state on a failed VM read.
+// ERRORS (here a 400; since #384 a genuine 403 is also an error path, distinct
+// from the 404 -> nil path) also fails closed — the provider never decides the
+// connection state on a failed VM read.
 func TestOpenIaasVirtualDiskReadFailsClosedWhenVMReadErrors(t *testing.T) {
 	c := newAssignTestClient(t, vdReadHandler(vdPresentDiskBody, http.StatusBadRequest, ``))
 	d := diskTestData("disk-x", "vm-1")

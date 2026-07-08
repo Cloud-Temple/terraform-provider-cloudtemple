@@ -56,7 +56,7 @@ func (v *OpenIaaSVirtualDiskClient) Read(ctx context.Context, id string) (*OpenI
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -78,7 +78,8 @@ type OpenIaaSVirtualDiskFilter struct {
 // ListStrict behaves like List but treats an access-denied answer as an
 // error instead of an empty result: callers using the listing as EVIDENCE
 // for state-shrinking decisions must fail closed (#273). The regular List
-// maps 403 to an empty result like the rest of the API surface.
+// maps a definitive 404 to an empty result; since #384 a genuine 403 surfaces
+// as an access-denied error rather than being masked as empty.
 func (v *OpenIaaSVirtualDiskClient) ListStrict(ctx context.Context, filter *OpenIaaSVirtualDiskFilter) ([]*OpenIaaSVirtualDisk, error) {
 	r := v.c.newRequest("GET", "/compute/v1/open_iaas/virtual_disks")
 	r.addFilter(filter)
@@ -108,7 +109,7 @@ func (v *OpenIaaSVirtualDiskClient) List(ctx context.Context, filter *OpenIaaSVi
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

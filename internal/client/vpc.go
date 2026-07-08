@@ -1,22 +1,30 @@
 package client
 
-// DEPRECATED CONTRACT / FROZEN — DO NOT EXTEND.
+import (
+	"context"
+	"fmt"
+)
+
+// VPC client for the Shiva /vpc/v1 API — UNDER ACTIVE REBUILD (v1.9.0).
 //
-// This VPC client targets the Shiva VPC API at base path /vpc/v1, which is
-// deprecated. A new contract is landing UNDER THE SAME /vpc/v1 URL with
-// breaking changes (no /v2 coexistence), so this code cannot speak the new
-// shape. The client-facing provider surface that consumed it (the
-// cloudtemple_vpc_* datasources and resources) was removed from v1.8.0 to
-// avoid shipping endpoints that will break server-side with no client
-// recourse; the VPC features will be rebuilt against the new contract.
+// History: the platform replaced /vpc/v1 with breaking changes UNDER THE SAME URL
+// (no /v2 coexistence). v1.8.0 removed the client-facing provider surface (the
+// cloudtemple_vpc_* datasources and resources) and FROZE this client, to avoid
+// shipping endpoints that would break server-side with no client recourse.
 //
-// This package is intentionally KEPT (it compiles and its tests run) as the
-// foundation for that rebuild, but it is QUARANTINED: no provider surface
-// references it, and ct-validate no longer exercises it in the default
-// read-only path (only the opt-in, -write "vpc" cycle does). Treat any change
-// here as part of the rebuild, not as maintenance of a live contract.
+// v1.9.0 rebuilds VPC against the new contract, chunk by chunk: this client is the
+// foundation, updated first (e.g. static IP create is now ASYNC — see
+// vpc_static_ip.go CreateStart/WaitCreate), then the provider surface (Layer A) is
+// restored on top in later chunks. So this package is NO LONGER FROZEN — changes
+// here ARE the rebuild — but it is also not yet complete.
 //
-// VPCClient is the entry point for that (frozen) /vpc/v1 API.
+// SAFETY (kept until the rebuild is end-to-end validated): no provider surface
+// references this client on the default path, and ct-validate exercises the /vpc/v1
+// WRITE cycle ONLY via the explicit, opt-in "-cycles vpc -write" — never the blanket
+// "-cycles all" (see vpcCycle.Quarantined in cmd/ct-validate/cycle_vpc.go). A routine
+// sweep can therefore never fire VPC writes against this still-evolving contract.
+//
+// VPCClient is the entry point for the (rebuilding) /vpc/v1 API.
 type VPCClient struct {
 	c *Client
 }
@@ -44,4 +52,37 @@ func (v *VPCClient) StaticIP() *VPCStaticIPClient {
 // FloatingIP returns the client for VPC floating IPs.
 func (v *VPCClient) FloatingIP() *VPCFloatingIPClient {
 	return &VPCFloatingIPClient{v.c}
+}
+
+// waitCreatedIDFromActivity is the shared R-M1 core for VPC async-create flows
+// (static IP create, floating IP provision). It waits for the create/provision
+// activity to complete, then extracts the new resource id from the activity's
+// SINGLE state Result — the same channel the provider reads via
+// setIdFromActivityState.
+//
+// It fails closed when the activity does NOT complete with EXACTLY ONE state, or
+// completes with an EMPTY Result: a created id we cannot read must surface as an
+// error, never as an empty id that would orphan the resource via SetId("").
+//
+// It deliberately does NOT validate the Result's FORMAT (no UUID check), so it is
+// a pure extraction of the original static WaitCreate behavior. A caller that
+// needs a stricter id shape adds its OWN, explicitly tested, local guard rather
+// than folding it in here. label names the operation in diagnostics (e.g.
+// "static IP create", "floating IP provision") so a failure is actionable.
+func (c *Client) waitCreatedIDFromActivity(ctx context.Context, activityID, label string, options *WaiterOptions) (string, error) {
+	act, err := c.Activity().WaitForCompletion(ctx, activityID, options)
+	if err != nil {
+		return "", err
+	}
+	if act == nil || len(act.State) != 1 {
+		return "", fmt.Errorf("%s activity %q did not complete with exactly one state; cannot resolve the created id", label, activityID)
+	}
+	var id string
+	for _, st := range act.State {
+		id = st.Result
+	}
+	if id == "" {
+		return "", fmt.Errorf("%s activity %q completed with an empty Result; cannot resolve the created id", label, activityID)
+	}
+	return id, nil
 }

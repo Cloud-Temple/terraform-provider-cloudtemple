@@ -7,10 +7,10 @@ import (
 )
 
 // confirmVMwareDeviceLiveness reports whether a device id is still present in a
-// strict, scoped listing. It NEVER concludes a deletion: a nil per-id read on a
-// VMware resource is ambiguous (the client maps HTTP 403 to nil), and the
-// scoped listing is not provably complete tenant-wide, so absence is not
-// deletion evidence. The caller never drops the resource on this signal (#281).
+// strict, scoped listing. It NEVER concludes a deletion: even a nil per-id read
+// (since #384 a definitive 404; a genuine 403 surfaces as an access-denied error)
+// is not deletion evidence here, because the scoped listing is not provably
+// complete tenant-wide. The caller never drops the resource on this signal (#281).
 //
 // Empty ids in the listing are skipped; matching is on the exact id.
 func confirmVMwareDeviceLiveness(ctx context.Context, id string, listScoped func(ctx context.Context) ([]string, error)) (bool, error) {
@@ -32,7 +32,8 @@ func confirmVMwareDeviceLiveness(ctx context.Context, id string, listScoped func
 // resource is kept in the state in every case, and the read never succeeds on
 // an unreadable resource.
 //
-// A nil per-id read is inconclusive (the client maps HTTP 403 to nil). The
+// A nil per-id read is handled conservatively (since #384 a definitive 404; a
+// genuine 403 surfaces as an access-denied error before reaching here). The
 // resource is never auto-removed; but it is also never reported as a SUCCESSFUL
 // refresh, because the attributes could not be re-read and the state may be
 // stale — silently succeeding would make Terraform treat unrefreshed,

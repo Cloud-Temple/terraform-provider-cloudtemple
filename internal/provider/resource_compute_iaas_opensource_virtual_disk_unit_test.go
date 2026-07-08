@@ -49,8 +49,9 @@ func (g *vdMutationGuard) flag(w http.ResponseWriter, r *http.Request) {
 }
 
 // vdHandler routes the OpenIaaS virtual disk endpoints for these unit tests:
-//   - GET .../virtual_disks/{id}  -> 403, which the client maps to a nil read
-//     (requireNotFoundOrOK(resp, 403)); this is the exact crash trigger of #325.
+//   - GET .../virtual_disks/{id}  -> 404, which the client maps to a nil read
+//     (since #384, requireNotFoundOrOK(resp, 404)); this is the exact crash
+//     trigger of #325 (a nil per-id read the resource must resolve by listing).
 //   - GET .../virtual_disks       -> a strict listing; scoped (?virtualMachineId)
 //     vs tenant-wide is distinguished by the filter query param.
 //
@@ -65,7 +66,7 @@ func vdHandler(g *vdMutationGuard, scopedBody, tenantBody string) http.HandlerFu
 			!strings.HasSuffix(path, "/connect") && !strings.HasSuffix(path, "/disconnect") &&
 			!strings.HasSuffix(path, "/attach") && !strings.HasSuffix(path, "/detach") &&
 			!strings.HasSuffix(path, "/relocate"):
-			w.WriteHeader(http.StatusForbidden)
+			w.WriteHeader(http.StatusNotFound)
 		// Strict listing (no id segment): /virtual_disks exactly.
 		case r.Method == http.MethodGet && strings.HasSuffix(path, "/virtual_disks"):
 			body := tenantBody
@@ -240,9 +241,10 @@ func TestOpenIaasVirtualDiskDeleteListingErrorFailsClosed(t *testing.T) {
 		// Strict listing fails: an absence can never be proven.
 		case r.Method == http.MethodGet && strings.HasSuffix(r.URL.Path, "/virtual_disks"):
 			w.WriteHeader(http.StatusInternalServerError)
-		// Per-id read: 403 -> nil, the crash trigger.
+		// Per-id read: 404 -> nil (absent), so Delete proceeds to the strict
+		// listing — which 500s here, so the deletion can never be confirmed.
 		case r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/virtual_disks/"):
-			w.WriteHeader(http.StatusForbidden)
+			w.WriteHeader(http.StatusNotFound)
 		default:
 			g.flag(w, r)
 		}

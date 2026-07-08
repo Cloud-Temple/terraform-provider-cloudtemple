@@ -20,6 +20,12 @@ type OpenIaaSNetwork struct {
 	NetworkAdapters            []string
 	NetworkBlockDevice         bool
 	InsecureNetworkBlockDevice bool
+	// VPC is the network's VPC association (swagger.comput.yml openIaasNetwork
+	// `vpc`). It is a POINTER: the API emits the `vpc` object only for a
+	// VPC-backed network, so a plain network decodes it to nil. The provider
+	// uses VPC != nil to tell a VPC-backed network apart from a plain one
+	// before assigning a static IP (#1854).
+	VPC *OpenIaaSNetworkAdapterVPC `json:"vpc"`
 }
 
 type OpenIaaSNetworkFilter struct {
@@ -57,7 +63,7 @@ func (n *OpenIaaSNetworkClient) Read(ctx context.Context, id string) (*OpenIaaSN
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}

@@ -58,12 +58,14 @@ type Cycle interface {
 }
 
 // quarantined is an OPTIONAL capability a Cycle may implement to exclude itself
-// from the "all" selector. It exists for a cycle that drives a deprecated or
-// frozen contract and is kept only as an explicit, opt-in harness (currently
-// vpcCycle, on the frozen /vpc/v1). A quarantined cycle still runs when named
-// explicitly (`-cycles <name>`), but a blanket `-cycles all` must NEVER reach
-// it — so a full validation sweep can never accidentally hammer a dead contract
-// (the 2026-06-15 incident was exactly a VPC write loop amplifying an outage).
+// from the "all" selector. It exists for a cycle whose contract is not safe to
+// reach from a blanket sweep — currently because it is under active rebuild —
+// and is kept only as an explicit, opt-in harness (currently vpcCycle: /vpc/v1
+// is UNDER ACTIVE REBUILD for v1.9.0 and stays quarantined until its end-to-end
+// write cycle is proven). A quarantined cycle still runs when named explicitly
+// (`-cycles <name>`), but a blanket `-cycles all` must NEVER reach it — so a
+// full validation sweep can never accidentally hammer an unstable contract (the
+// 2026-06-15 incident was exactly a VPC write loop amplifying an outage).
 type quarantined interface {
 	Quarantined() bool
 }
@@ -240,7 +242,7 @@ func (r *Registry) All() []Cycle {
 
 // unquarantinedNames returns the sorted names of every registered cycle that is
 // NOT quarantined. The "all" selector expands to exactly these: a quarantined
-// cycle (e.g. the frozen /vpc/v1 write cycle) is reachable only by naming it
+// cycle (e.g. the rebuilding /vpc/v1 write cycle) is reachable only by naming it
 // explicitly, so a blanket `-cycles all -write` never fires it.
 func (r *Registry) unquarantinedNames() []string {
 	all := r.Names()
@@ -262,7 +264,7 @@ func (r *Registry) unquarantinedNames() []string {
 //     ignored; an all-empty spec is an error.
 //   - the special token "all" expands to every registered UNQUARANTINED cycle
 //     (ordered by name); "all" combined with other tokens is still just "all".
-//     A quarantined cycle (opt-in only, frozen contract) is excluded from "all"
+//     A quarantined cycle (opt-in only, e.g. under rebuild) is excluded from "all"
 //     and runs only when named explicitly.
 //   - an unknown name is a hard error (no silent skip).
 //   - duplicates collapse to a single entry, preserving first-seen order.
@@ -292,7 +294,7 @@ func (r *Registry) Select(spec string, write bool) (selected []Cycle, skipped []
 
 	if useAll {
 		// "all" supersedes any explicit list — but it expands only to the
-		// UNQUARANTINED cycles. A quarantined cycle (frozen contract, opt-in
+		// UNQUARANTINED cycles. A quarantined cycle (e.g. under rebuild, opt-in
 		// only) is excluded from the sweep even if it was also named alongside
 		// "all": fail closed, so a blanket run can never fire it.
 		names = r.unquarantinedNames()

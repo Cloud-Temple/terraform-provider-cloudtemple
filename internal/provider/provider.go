@@ -175,10 +175,20 @@ func New(version string) func() *schema.Provider {
 				// Marketplace
 				"cloudtemple_marketplace_item":  documentDatasource(dataSourceMarketplaceItem(), ""),
 				"cloudtemple_marketplace_items": documentDatasource(dataSourceMarketplaceItems(), ""),
+
+				// VPC
+				"cloudtemple_vpc_vpc":              documentDatasource(dataSourceVPCVPC(), "vpc_read"),
+				"cloudtemple_vpc_vpcs":             documentDatasource(dataSourceVPCVPCs(), "vpc_read"),
+				"cloudtemple_vpc_private_network":  documentDatasource(dataSourceVPCPrivateNetwork(), "vpc_read"),
+				"cloudtemple_vpc_private_networks": documentDatasource(dataSourceVPCPrivateNetworks(), "vpc_read"),
+				"cloudtemple_vpc_static_ip":        documentDatasource(dataSourceVPCStaticIP(), "vpc_read"),
+				"cloudtemple_vpc_static_ips":       documentDatasource(dataSourceVPCStaticIPs(), "vpc_read"),
+				"cloudtemple_vpc_floating_ip":      documentDatasource(dataSourceVPCFloatingIP(), "vpc_read"),
+				"cloudtemple_vpc_floating_ips":     documentDatasource(dataSourceVPCFloatingIPs(), "vpc_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				// Compute - IaaS VMWare
-				"cloudtemple_compute_network_adapter":    documentResource(resourceNetworkAdapter(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
+				"cloudtemple_compute_network_adapter":    documentResource(resourceNetworkAdapter(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read", "vpc_read"),
 				"cloudtemple_compute_virtual_controller": documentResource(resourceVirtualController(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
 				"cloudtemple_compute_virtual_disk":       documentResource(resourceVirtualDisk(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
 				"cloudtemple_compute_virtual_machine":    documentResource(resourceVirtualMachine(), "compute_iaas_vmware_infrastructure_read", "compute_iaas_vmware_infrastructure_write", "compute_iaas_vmware_management", "compute_iaas_vmware_read", "compute_iaas_vmware_virtual_machine_power", "backup_iaas_spp_read", "backup_iaas_spp_write", "activity_read", "tag_read", "tag_write"),
@@ -187,7 +197,7 @@ func New(version string) func() *schema.Provider {
 				// Compute - Open IaaS
 				"cloudtemple_compute_iaas_opensource_virtual_machine":    documentResource(resourceOpenIaasVirtualMachine(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "compute_iaas_opensource_virtual_machine_power", "backup_iaas_opensource_read", "backup_iaas_opensource_write", "activity_read", "tag_read", "tag_write"),
 				"cloudtemple_compute_iaas_opensource_virtual_disk":       documentResource(resourceOpenIaasVirtualDisk(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
-				"cloudtemple_compute_iaas_opensource_network_adapter":    documentResource(resourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
+				"cloudtemple_compute_iaas_opensource_network_adapter":    documentResource(resourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read", "vpc_read"),
 				"cloudtemple_compute_iaas_opensource_replication_policy": documentResource(resourceOpenIaasReplicationPolicy(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
 
 				// Object Storage
@@ -195,6 +205,11 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_object_storage_storage_account":   documentResource(resourceStorageAccount(), "object-storage_iam_management"),
 				"cloudtemple_object_storage_acl_entry":         documentResource(resourceACLEntry(), "object-storage_iam_management"),
 				"cloudtemple_object_storage_global_access_key": documentResource(resourceGlobalAccessKey(), "object-storage_iam_management"),
+
+				// VPC
+				"cloudtemple_vpc_static_ip":           documentResource(resourceVPCStaticIP(), "vpc_write", "vpc_read", "activity_read"),
+				"cloudtemple_vpc_floating_ip":         documentResource(resourceVPCFloatingIP(), "vpc_write", "vpc_read", "activity_read"),
+				"cloudtemple_vpc_floating_ip_binding": documentResource(resourceVPCFloatingIPBinding(), "vpc_write", "vpc_read", "activity_read"),
 			},
 		}
 

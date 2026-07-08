@@ -27,6 +27,7 @@ const (
 	HTTPClientIDEnvName     = "CLOUDTEMPLE_CLIENT_ID"
 	HTTPClientSecretEnvName = "CLOUDTEMPLE_SECRET_ID"
 	HTTPTimeoutEnvName      = "CLOUDTEMPLE_HTTP_TIMEOUT"
+	FastReadTimeoutEnvName  = "CLOUDTEMPLE_FAST_READ_TIMEOUT"
 )
 
 const (
@@ -36,6 +37,13 @@ const (
 	// slow request, while still cutting an unbounded hang. Override with
 	// CLOUDTEMPLE_HTTP_TIMEOUT (seconds).
 	defaultHTTPTimeout = 600 * time.Second
+
+	// defaultFastReadTimeout is the OPT-IN, shorter per-call timeout applied only to
+	// designated fast idempotent reads (currently the backup OpenIaaS policies List).
+	// Unlike defaultHTTPTimeout, a per-call timeout that fires IS retried (bounded),
+	// so it must be short. Override with CLOUDTEMPLE_FAST_READ_TIMEOUT (seconds); an
+	// explicit 0 disables it (the read falls back to the global timeout).
+	defaultFastReadTimeout = 30 * time.Second
 
 	// defaultReadRetryMax is the total number of attempts for an idempotent GET
 	// read (and the auth POST): 1 = no retry. It lets the provider absorb the rare
@@ -48,6 +56,13 @@ const (
 	defaultReadRetryBackoffBase = 500 * time.Millisecond
 	readRetryBackoffMax         = 5 * time.Second
 )
+
+// errPerCallReadTimeout marks an OPT-IN per-call read timeout: OUR child-context
+// deadline expired while the parent (caller) context was still alive. Unlike the
+// global http.Client.Timeout — which is never retried — this sentinel IS retried by
+// doWithRetry (bounded), which is safe precisely because the per-call timeout is
+// short. It is produced ONLY by classifyPerCallTimeout.
+var errPerCallReadTimeout = errors.New("per-call read timeout")
 
 type Config struct {
 	Address string
@@ -68,6 +83,13 @@ type Config struct {
 	// client carries the hang guard regardless of how Config was created.
 	HTTPTimeout time.Duration
 
+	// FastReadTimeout is an OPT-IN, shorter per-call timeout applied ONLY to reads
+	// that opt in (currently the backup OpenIaaS policies List). 0 disables it (the
+	// read uses the global HTTPTimeout). Unlike HTTPTimeout, a per-call timeout that
+	// fires IS retried (bounded). DefaultConfig sets it; NewClient does NOT backfill
+	// it, so a bare Config{} keeps it disabled.
+	FastReadTimeout time.Duration
+
 	// ReadRetryMax is the total number of attempts for an idempotent GET read (and
 	// the auth POST), 1 meaning no retry. DefaultConfig sets it; a zero value
 	// disables retry. It is intentionally NOT backfilled by NewClient, so only a
@@ -82,11 +104,12 @@ type Config struct {
 
 func DefaultConfig() *Config {
 	config := &Config{
-		Address:      "shiva.cloud-temple.com",
-		Scheme:       "https",
-		Transport:    cleanhttp.DefaultPooledTransport(),
-		HTTPTimeout:  defaultHTTPTimeout,
-		ReadRetryMax: defaultReadRetryMax,
+		Address:         "shiva.cloud-temple.com",
+		Scheme:          "https",
+		Transport:       cleanhttp.DefaultPooledTransport(),
+		HTTPTimeout:     defaultHTTPTimeout,
+		FastReadTimeout: defaultFastReadTimeout,
+		ReadRetryMax:    defaultReadRetryMax,
 	}
 
 	if addr := os.Getenv(HTTPAddrEnvName); addr != "" {
@@ -99,6 +122,16 @@ func DefaultConfig() *Config {
 	if v := os.Getenv(HTTPTimeoutEnvName); v != "" {
 		if secs, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && secs > 0 {
 			config.HTTPTimeout = time.Duration(secs) * time.Second
+		}
+	}
+
+	// CLOUDTEMPLE_FAST_READ_TIMEOUT overrides the per-call fast-read timeout, in
+	// seconds. An explicit "0" DISABLES it (the opt-in reads fall back to the global
+	// timeout); a missing or non-numeric value keeps the default. Unlike the global
+	// timeout, 0 is honoured here — it is an opt-in convenience, not the hang guard.
+	if v := os.Getenv(FastReadTimeoutEnvName); v != "" {
+		if secs, err := strconv.Atoi(strings.TrimSpace(v)); err == nil && secs >= 0 {
+			config.FastReadTimeout = time.Duration(secs) * time.Second
 		}
 	}
 
@@ -192,6 +225,12 @@ type request struct {
 	params url.Values
 	body   io.Reader
 	obj    any
+
+	// timeout, when > 0, is an OPT-IN per-call deadline for this single request
+	// (covering headers AND body); a deadline that fires is retried by doWithRetry
+	// (bounded). 0 means the request relies only on the global http.Client.Timeout.
+	// See doRequestOnce.
+	timeout time.Duration
 }
 
 func (c *Client) newRequest(method, path string, args ...interface{}) *request {
@@ -384,32 +423,93 @@ func (c *Client) doRequest(ctx context.Context, r *request) (*http.Response, err
 	return c.doRequestOnce(ctx, r)
 }
 
+// classifyPerCallTimeout wraps err in the errPerCallReadTimeout sentinel IFF it is
+// OUR per-call child deadline that expired while the parent context is still alive.
+// It deliberately does NOT wrap the global http.Client.Timeout (which does not make
+// callCtx itself expire) nor a parent cancellation/deadline (parent.Err() != nil) —
+// so doWithRetry retries ONLY a genuine per-call timeout, never the global timeout
+// nor caller cancellation. Extracted as a pure function so the guard is unit-tested
+// directly, independently of the retry loop.
+func classifyPerCallTimeout(callCtx, parent context.Context, err error) error {
+	if err != nil && callCtx.Err() == context.DeadlineExceeded && parent.Err() == nil {
+		return fmt.Errorf("%w: %w", errPerCallReadTimeout, err)
+	}
+	return err
+}
+
 // doRequestOnce performs a single authenticated request, with no retry.
+//
+// When r.timeout > 0 (an OPT-IN per-call timeout, currently only the backup
+// policies List), the request AND its response body are bounded by a child context
+// of that duration, and the body is buffered in memory before returning so the
+// deadline covers the whole read (a stalled body is bounded too). A per-call
+// deadline that fires while the parent context is still alive is wrapped in
+// errPerCallReadTimeout so doWithRetry retries it (bounded); the global
+// http.Client.Timeout and a parent cancellation/deadline are never wrapped, so they
+// are never retried as a timeout. When r.timeout == 0 the path is unchanged (the
+// body is streamed to the caller).
 func (c *Client) doRequestOnce(ctx context.Context, r *request) (*http.Response, error) {
 	token, err := c.JWT(ctx)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.doRequestWithToken(ctx, r, token.Raw)
-	if err != nil {
-		return nil, err
+
+	if r.timeout <= 0 {
+		resp, err := c.doRequestWithToken(ctx, r, token.Raw)
+		if err != nil {
+			return nil, err
+		}
+		if c.config.ErrorOnUnexpectedActivity && resp.Header.Get("Location") != "" {
+			closeResponseBody(resp)
+			return nil, fmt.Errorf("an unexpected Location header has been found")
+		}
+		return resp, nil
 	}
 
+	// Opt-in per-call timeout: bound headers AND body with a child context. cancel()
+	// is safe on return because the body is fully read (buffered) before we return.
+	callCtx, cancel := context.WithTimeout(ctx, r.timeout)
+	defer cancel()
+	resp, err := c.doRequestWithToken(callCtx, r, token.Raw)
+	if err != nil {
+		return nil, classifyPerCallTimeout(callCtx, ctx, err)
+	}
 	if c.config.ErrorOnUnexpectedActivity && resp.Header.Get("Location") != "" {
+		closeResponseBody(resp)
 		return nil, fmt.Errorf("an unexpected Location header has been found")
 	}
 
+	buf, rerr := io.ReadAll(resp.Body)
+	if rerr != nil {
+		resp.Body.Close()
+		// (a) our own per-call deadline -> sentinel (doWithRetry retries it).
+		if wrapped := classifyPerCallTimeout(callCtx, ctx, rerr); errors.Is(wrapped, errPerCallReadTimeout) {
+			return nil, wrapped
+		}
+		// (b) a body-read failure on a transient status -> hand the response back so
+		// doWithRetry retries by STATUS, identical to the existing streaming path.
+		if transientStatus(resp.StatusCode) {
+			resp.Body = io.NopCloser(bytes.NewReader(buf))
+			return resp, nil
+		}
+		// (c) a genuine body error on a non-retryable status -> surface unchanged.
+		return nil, rerr
+	}
+	resp.Body.Close()
+	resp.Body = io.NopCloser(bytes.NewReader(buf))
 	return resp, nil
 }
 
 // doWithRetry runs send up to c.readRetryMax times (1 => no retry), retrying a
 // transient status (429 / 5xx, after draining the response body so the keep-alive
-// connection is reused) or a retryable transport error, with a bounded backoff
-// that honours Retry-After on 429. It NEVER retries a configured request timeout,
-// a context error, a 4xx or a decode error — those are returned at once. The last
-// attempt's result is handed to the caller, which validates the FINAL response
-// (requireOK / requireNotFoundOrOK) and decodes it. The caller guarantees send is
-// idempotent (a GET, or the auth POST whose body is rebuilt each attempt).
+// connection is reused), a retryable transport error, or the OPT-IN per-call read
+// timeout (errPerCallReadTimeout, produced by doRequestOnce when r.timeout fires),
+// with a bounded backoff that honours Retry-After on 429. It NEVER retries the
+// GLOBAL request timeout (http.Client.Timeout), a parent context error, a 4xx or a
+// decode error — those are returned at once. The last attempt's result is handed to
+// the caller, which validates the FINAL response (requireOK / requireNotFoundOrOK)
+// and decodes it. The caller guarantees send is idempotent (a GET, or the auth POST
+// whose body is rebuilt each attempt).
 func (c *Client) doWithRetry(ctx context.Context, send func() (*http.Response, error)) (*http.Response, error) {
 	attempts := c.readRetryMax
 	if attempts < 1 {
@@ -429,7 +529,7 @@ func (c *Client) doWithRetry(ctx context.Context, send func() (*http.Response, e
 
 		switch {
 		case err != nil:
-			if !retryableTransportError(err) {
+			if !retryableTransportError(err) && !errors.Is(err, errPerCallReadTimeout) {
 				return resp, err
 			}
 			if !c.waitBeforeRetry(ctx, attempt, 0) {

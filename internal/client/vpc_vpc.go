@@ -42,7 +42,7 @@ func (v *VPCVPCClient) List(ctx context.Context) ([]*VPC, error) {
 }
 
 // Read retrieves a single VPC by ID. It returns (nil, nil) when the VPC does
-// not exist (403; the API returns 403 for an absent resource) so callers can surface a precise not-found error.
+// not exist (404; since #384 the VPC API returns 404 for an absent resource, and 403 only for access denied) so callers can surface a precise not-found error.
 func (v *VPCVPCClient) Read(ctx context.Context, id string) (*VPC, error) {
 	r := v.c.newRequest("GET", "/vpc/v1/vpc/%s", id)
 	resp, err := v.c.doRequest(ctx, r)
@@ -50,7 +50,7 @@ func (v *VPCVPCClient) Read(ctx context.Context, id string) (*VPC, error) {
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
