@@ -57,10 +57,17 @@ output "network_adapter-2" {
 
 - `attached` (Boolean) Whether the network adapter is attached to a virtual machine.
 - `internal_id` (String) The internal identifier of the network adapter in the Open IaaS system.
+- `ipv4_address` (String) The IPv4 address of the network adapter.
+- `ipv6_address` (String) The IPv6 address of the network adapter.
 - `mac_address` (String) The MAC address of the network adapter.
 - `machine_manager_id` (String) The ID of the machine manager this network adapter belongs to.
 - `mtu` (Number) The Maximum Transmission Unit (MTU) size in bytes.
 - `network_id` (String) The ID of the network this adapter is connected to.
+- `private_network_id` (String) The ID of the VPC private network the network adapter is associated with, or an empty string when the adapter is not on a VPC network.
+- `private_network_name` (String) The name of the VPC private network the network adapter is associated with, or an empty string when the adapter is not on a VPC network.
+- `static_ip_address` (String) The static IP address assigned to the network adapter on its VPC, or an empty string when the adapter is not on a VPC network.
 - `tx_checksumming` (Boolean) Whether TX checksumming is enabled on the network adapter.
+- `vpc_id` (String) The ID of the VPC the network adapter is associated with, or an empty string when the adapter is not on a VPC network.
+- `vpc_name` (String) The name of the VPC the network adapter is associated with, or an empty string when the adapter is not on a VPC network.
 
 

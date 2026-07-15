@@ -45,6 +45,30 @@ func (p *PATClient) List(ctx context.Context) ([]*Token, error) {
 	return out, nil
 }
 
+// ListStrict behaves like List but requires a complete HTTP 200 answer.
+// Callers using the listing as EVIDENCE for a state-shrinking decision must
+// fail closed on anything else: 206 is a partial listing and cannot prove an
+// absence, 201/403/5xx are not usable evidence either. Unlike List, it does
+// NOT go through requireOK (which also accepts 201 and 206).
+func (p *PATClient) ListStrict(ctx context.Context) ([]*Token, error) {
+	r := p.c.newRequest("GET", "/iam/v2/personal_access_tokens")
+	resp, err := p.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireHttpCodes(resp, 200); err != nil {
+		return nil, err
+	}
+
+	var out []*Token
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (p *PATClient) Read(ctx context.Context, patID string) (*Token, error) {
 	r := p.c.newRequest("GET", "/iam/v2/personal_access_tokens/%s", patID)
 	resp, err := p.c.doRequest(ctx, r)

@@ -2,6 +2,7 @@ package provider
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
@@ -178,15 +179,132 @@ func openIaasVirtualDiskCreate(ctx context.Context, d *schema.ResourceData, meta
 	return openIaasVirtualDiskRead(ctx, d, meta)
 }
 
+// confirmOpenIaaSVirtualDiskDeleted resolves a nil per-id disk read into a verdict:
+// since #384 a nil read is a definitive 404 (a genuine 403 surfaces as an
+// access-denied error), but an absence is still treated as a deletion only under
+// strict listing EVIDENCE. It runs two independent strict listings (scoped to
+// the VM, then tenant-wide) and returns the verdict; a listing failure yields a
+// non-nil diags so callers fail closed. Shared by Read and Delete so the
+// never-drop / never-orphan doctrine stays SYMMETRIC across both paths (#325).
+// On the error path it returns deviceStillInScope (fail-closed), never the
+// zero-value deviceDeletionConfirmed, in case a caller ever ignored the diags.
+func confirmOpenIaaSVirtualDiskDeleted(ctx context.Context, c *client.Client, id, vmID string) (missingDeviceVerdict, diag.Diagnostics) {
+	scoped, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{
+		VirtualMachineID: vmID,
+	})
+	if err != nil {
+		return deviceStillInScope, diag.Errorf("virtual disk %s could not be read and its deletion could not be confirmed: %s", id, err)
+	}
+	tenant, err := c.Compute().OpenIaaS().VirtualDisk().ListStrict(ctx, &client.OpenIaaSVirtualDiskFilter{})
+	if err != nil {
+		return deviceStillInScope, diag.Errorf("virtual disk %s could not be read and its deletion could not be confirmed: %s", id, err)
+	}
+	scopedIDs := map[string]bool{}
+	for _, disk := range scoped {
+		if disk != nil {
+			scopedIDs[disk.ID] = true
+		}
+	}
+	tenantIDs := map[string]bool{}
+	for _, disk := range tenant {
+		if disk != nil {
+			tenantIDs[disk.ID] = true
+		}
+	}
+	return classifyMissingDevice(id, scopedIDs, tenantIDs), nil
+}
+
+// normalizeOpenIaaSPowerState maps the platform power state to "on"/"off", or
+// "" when it is none of the known states (so the caller can fail closed). It
+// mirrors the normalisation used by the VM resource's Read.
+func normalizeOpenIaaSPowerState(s string) string {
+	switch s {
+	case "Running":
+		return "on"
+	case "Halted", "Paused":
+		return "off"
+	default:
+		return ""
+	}
+}
+
+// resolveOpenIaaSDiskConnected decides the `connected` value to write to state
+// for the disk's attachment to vmID, guarding against the power-off drift (#350).
+//
+// `connected` maps to the VBD PLUG state (connect/disconnect = currently_attached,
+// a RUNTIME fact), NOT to the attach/detach LINK. On a halted/paused VM the
+// platform reports every VBD unplugged (Connected=false), which does not reflect
+// the user's intent (it re-plugs on boot). So:
+//   - VM running  -> mirror the runtime (vm.Connected): a real disconnect is visible;
+//   - VM off       -> preserve the known intent (priorConnected) to avoid a drift;
+//   - power unknown -> fail closed (cannot decide).
+//
+// A disk that is readable but NO LONGER attached to vmID is an ATTACHMENT drift
+// (attach/detach), never a mere connected=false (connect/disconnect cannot fix
+// it): fail closed so it is surfaced, not silently flattened away.
+func resolveOpenIaaSDiskConnected(disk *client.OpenIaaSVirtualDisk, vmID string, priorConnected bool, powerState string) (bool, error) {
+	found := false
+	vbdConnected := false
+	for _, vm := range disk.VirtualMachines {
+		if vm.ID == vmID {
+			found = true
+			vbdConnected = vm.Connected
+			break
+		}
+	}
+	if !found {
+		return false, fmt.Errorf(
+			"virtual disk %s is readable but is no longer attached to virtual machine %s (attachment drift); refusing to report it as merely disconnected — re-attach the disk or fix the configuration",
+			disk.ID, vmID,
+		)
+	}
+	switch normalizeOpenIaaSPowerState(powerState) {
+	case "on":
+		// VM running: the runtime plug state is the source of truth (a genuine
+		// disconnect is observable and must surface as drift).
+		return vbdConnected, nil
+	case "off":
+		// VM halted/paused: every VBD is reported unplugged, which is NOT the
+		// intent — preserve the known intent to avoid a perpetual power-off drift.
+		return priorConnected, nil
+	default:
+		return false, fmt.Errorf(
+			"virtual machine %s (attached to disk %s) has an unknown power state %q; refusing to decide the disk connection state on ambiguous evidence",
+			vmID, disk.ID, powerState,
+		)
+	}
+}
+
 func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
 	var diags diag.Diagnostics
 
 	// Récupérer le disque virtuel par son ID
 	virtualDisk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
-	if virtualDisk == nil || err != nil {
-		// Si le disque virtuel n'existe pas, on définit l'ID à une chaîne vide
-		// pour indiquer à Terraform que la ressource n'existe plus
+	// A read error is NOT a deletion: clearing the id on a transient
+	// failure would drop the resource from the state and the next apply
+	// would create a duplicate (#264 plan, Lot D).
+	if err != nil {
+		return diag.Errorf("failed to read virtual disk: %s", err)
+	}
+	if virtualDisk == nil {
+		// Since #384 a per-id 403 surfaces as an access-denied error and only a
+		// definitive 404 maps to nil; a deletion is still accepted only under
+		// strict listing evidence — and a disk absent from the VM-scoped
+		// listing may have been DETACHED or MOVED, which is drift, never a
+		// deletion (#275 doctrine, FF-5).
+		vmID := d.Get("virtual_machine_id").(string)
+		verdict, confirmDiags := confirmOpenIaaSVirtualDiskDeleted(ctx, c, d.Id(), vmID)
+		if confirmDiags != nil {
+			return confirmDiags
+		}
+		switch verdict {
+		case deviceStillInScope:
+			return diag.Errorf("virtual disk %s could not be read but is still listed on virtual machine %s: refusing to drop it from the state (possible access restriction)", d.Id(), vmID)
+		case deviceExistsOutOfScope:
+			return diag.Errorf("virtual disk %s could not be read and is no longer attached to virtual machine %s but still exists platform-side (detached or moved): refusing to treat this drift as a deletion — refresh or import after fixing the attachment", d.Id(), vmID)
+		}
+		// Deletion confirmed by independent strict reads.
 		d.SetId("")
 		return nil
 	}
@@ -194,6 +312,33 @@ func openIaasVirtualDiskRead(ctx context.Context, d *schema.ResourceData, meta i
 	// Mapper les données en utilisant la fonction helper
 	vmID := d.Get("virtual_machine_id").(string)
 	diskData := helpers.FlattenOpenIaaSVirtualDisk(virtualDisk, vmID)
+
+	// #350: the flatten copies `connected` from the runtime VBD plug state, which
+	// the platform reports false for EVERY VBD of a halted VM — not the user's
+	// intent. Override it with a power-state-aware decision so stopping a VM never
+	// produces a perpetual `connected: false -> true` drift. Done HERE (not in the
+	// pure flatten helper) because it needs the VM power state and the prior intent.
+	// Only meaningful when the disk is attached to a configured VM; an id-only
+	// import (virtual_machine_id not yet known) keeps the flattened value until the
+	// configuration provides the VM.
+	if vmID != "" {
+		vm, vmErr := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, vmID)
+		if vmErr != nil {
+			return diag.Errorf("failed to read virtual machine %s to resolve disk %s connection state: %s", vmID, d.Id(), vmErr)
+		}
+		if vm == nil {
+			// A nil VM read (since #384 a definitive 404; a genuine 403 surfaces
+			// as an access-denied error above) means we cannot tell a halted VM
+			// from a running one, so we must not decide the connection state. Fail
+			// closed rather than risk a wrong plug state.
+			return diag.Errorf("virtual machine %s (attached to disk %s) could not be read; refusing to resolve the disk connection state on ambiguous evidence", vmID, d.Id())
+		}
+		connected, resErr := resolveOpenIaaSDiskConnected(virtualDisk, vmID, d.Get("connected").(bool), vm.PowerState)
+		if resErr != nil {
+			return diag.FromErr(resErr)
+		}
+		diskData["connected"] = connected
+	}
 
 	// Définir les données dans le state
 	for k, v := range diskData {
@@ -211,6 +356,15 @@ func openIaasVirtualDiskUpdate(ctx context.Context, d *schema.ResourceData, meta
 	disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
 	if err != nil {
 		return diag.Errorf("failed to read virtual disk state before update: %s", err)
+	}
+	if disk == nil {
+		// A nil read (since #384 a definitive 404; a genuine 403 surfaces as an
+		// access-denied error above) means we cannot enumerate the disk's
+		// attachments to compute the update cycle safely: refuse to mutate blindly
+		// rather than dereferencing disk.VirtualMachines and panicking (#325). The
+		// next refresh's Read resolves the drop-or-drift decision under strict
+		// evidence.
+		return diag.Errorf("virtual disk %s could not be read before update (it may have been deleted out-of-band or access is restricted): refusing to apply changes — refresh or re-import, then retry", d.Id())
 	}
 
 	// Handle connection state changes
@@ -357,6 +511,28 @@ func openIaasVirtualDiskDelete(ctx context.Context, d *schema.ResourceData, meta
 	disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, d.Id())
 	if err != nil {
 		return diag.Errorf("failed to read virtual disk state before delete: %s", err)
+	}
+	if disk == nil {
+		// Since #384 a nil read is a definitive 404 (a genuine 403 surfaces as an
+		// access-denied error above). Treating the destroy as already satisfied is
+		// correct ONLY when the deletion is positively confirmed; a disk that still
+		// exists must never be silently dropped from the state (never-orphan
+		// doctrine, SYMMETRIC with Read — #325). Without this guard the loop below would
+		// dereference disk.VirtualMachines and panic.
+		vmID := d.Get("virtual_machine_id").(string)
+		verdict, confirmDiags := confirmOpenIaaSVirtualDiskDeleted(ctx, c, d.Id(), vmID)
+		if confirmDiags != nil {
+			return confirmDiags
+		}
+		switch verdict {
+		case deviceStillInScope:
+			return diag.Errorf("virtual disk %s could not be read but is still listed on virtual machine %s: refusing to assume it was deleted (possible access restriction)", d.Id(), vmID)
+		case deviceExistsOutOfScope:
+			return diag.Errorf("virtual disk %s could not be read and is no longer attached to virtual machine %s but still exists platform-side (detached or moved): refusing to treat this drift as a deletion — fix the attachment then destroy, or remove it from state", d.Id(), vmID)
+		}
+		// Deletion confirmed by independent strict reads: nothing to disconnect
+		// or delete, the destroy is already satisfied.
+		return nil
 	}
 	for _, vm := range disk.VirtualMachines {
 		if vm.Connected {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -174,10 +175,20 @@ func New(version string) func() *schema.Provider {
 				// Marketplace
 				"cloudtemple_marketplace_item":  documentDatasource(dataSourceMarketplaceItem(), ""),
 				"cloudtemple_marketplace_items": documentDatasource(dataSourceMarketplaceItems(), ""),
+
+				// VPC
+				"cloudtemple_vpc_vpc":              documentDatasource(dataSourceVPCVPC(), "vpc_read"),
+				"cloudtemple_vpc_vpcs":             documentDatasource(dataSourceVPCVPCs(), "vpc_read"),
+				"cloudtemple_vpc_private_network":  documentDatasource(dataSourceVPCPrivateNetwork(), "vpc_read"),
+				"cloudtemple_vpc_private_networks": documentDatasource(dataSourceVPCPrivateNetworks(), "vpc_read"),
+				"cloudtemple_vpc_static_ip":        documentDatasource(dataSourceVPCStaticIP(), "vpc_read"),
+				"cloudtemple_vpc_static_ips":       documentDatasource(dataSourceVPCStaticIPs(), "vpc_read"),
+				"cloudtemple_vpc_floating_ip":      documentDatasource(dataSourceVPCFloatingIP(), "vpc_read"),
+				"cloudtemple_vpc_floating_ips":     documentDatasource(dataSourceVPCFloatingIPs(), "vpc_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				// Compute - IaaS VMWare
-				"cloudtemple_compute_network_adapter":    documentResource(resourceNetworkAdapter(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
+				"cloudtemple_compute_network_adapter":    documentResource(resourceNetworkAdapter(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read", "vpc_read"),
 				"cloudtemple_compute_virtual_controller": documentResource(resourceVirtualController(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
 				"cloudtemple_compute_virtual_disk":       documentResource(resourceVirtualDisk(), "compute_iaas_vmware_management", "compute_iaas_vmware_read", "activity_read"),
 				"cloudtemple_compute_virtual_machine":    documentResource(resourceVirtualMachine(), "compute_iaas_vmware_infrastructure_read", "compute_iaas_vmware_infrastructure_write", "compute_iaas_vmware_management", "compute_iaas_vmware_read", "compute_iaas_vmware_virtual_machine_power", "backup_iaas_spp_read", "backup_iaas_spp_write", "activity_read", "tag_read", "tag_write"),
@@ -186,7 +197,7 @@ func New(version string) func() *schema.Provider {
 				// Compute - Open IaaS
 				"cloudtemple_compute_iaas_opensource_virtual_machine":    documentResource(resourceOpenIaasVirtualMachine(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "compute_iaas_opensource_virtual_machine_power", "backup_iaas_opensource_read", "backup_iaas_opensource_write", "activity_read", "tag_read", "tag_write"),
 				"cloudtemple_compute_iaas_opensource_virtual_disk":       documentResource(resourceOpenIaasVirtualDisk(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
-				"cloudtemple_compute_iaas_opensource_network_adapter":    documentResource(resourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
+				"cloudtemple_compute_iaas_opensource_network_adapter":    documentResource(resourceOpenIaasNetworkAdapter(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read", "vpc_read"),
 				"cloudtemple_compute_iaas_opensource_replication_policy": documentResource(resourceOpenIaasReplicationPolicy(), "compute_iaas_opensource_management", "compute_iaas_opensource_read", "activity_read"),
 
 				// Object Storage
@@ -194,6 +205,11 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_object_storage_storage_account":   documentResource(resourceStorageAccount(), "object-storage_iam_management"),
 				"cloudtemple_object_storage_acl_entry":         documentResource(resourceACLEntry(), "object-storage_iam_management"),
 				"cloudtemple_object_storage_global_access_key": documentResource(resourceGlobalAccessKey(), "object-storage_iam_management"),
+
+				// VPC
+				"cloudtemple_vpc_static_ip":           documentResource(resourceVPCStaticIP(), "vpc_write", "vpc_read", "activity_read"),
+				"cloudtemple_vpc_floating_ip":         documentResource(resourceVPCFloatingIP(), "vpc_write", "vpc_read", "activity_read"),
+				"cloudtemple_vpc_floating_ip_binding": documentResource(resourceVPCFloatingIPBinding(), "vpc_write", "vpc_read", "activity_read"),
 			},
 		}
 
@@ -207,6 +223,19 @@ type loggingHttpTransport struct {
 	transport http.RoundTripper
 }
 
+// sensitiveBodyValueRegex redacts the VALUE of secret-bearing JSON keys wherever
+// they appear in a logged HTTP body (tf_http_req_body / tf_http_res_body), so a
+// `TF_LOG=DEBUG` run never prints a credential. Whole-body masking is only
+// applied to the auth endpoint; other endpoints (e.g. object storage, which
+// returns `secretAccessKey`, or VM customization, which sends `password`) log
+// their body, so the secret values must be redacted by key. The closing quote in
+// the alternation anchors each key exactly, so "secret" never partially matches
+// "secretAccessKey". The value matcher `"(?:[^"\\]|\\.)*"` is JSON-string aware:
+// it consumes escaped characters (including an escaped quote `\"`), so a value
+// containing a quote is masked in full — a plain `[^"]*` would stop at the
+// escaped quote and leak the suffix.
+var sensitiveBodyValueRegex = regexp.MustCompile(`(?i)"(secretAccessKey|accessSecretKey|secretKey|secret|password|domainAdminPassword)"\s*:\s*"(?:[^"\\]|\\.)*"`)
+
 func (t *loggingHttpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 	if strings.Contains(req.URL.Path, "personal_access_token") {
@@ -214,6 +243,10 @@ func (t *loggingHttpTransport) RoundTrip(req *http.Request) (*http.Response, err
 		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "tf_http_res_body")
 	}
 	ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "Authorization")
+	// Redact secret JSON values in any logged body, regardless of endpoint, so a
+	// credential (object-storage secretAccessKey, VM password, …) cannot leak into
+	// TF_LOG=DEBUG output even when the whole body is not masked.
+	ctx = tflog.MaskAllFieldValuesRegexes(ctx, sensitiveBodyValueRegex)
 	req = req.WithContext(ctx)
 	return t.transport.RoundTrip(req)
 }
@@ -253,20 +286,6 @@ func configure(version string, p *schema.Provider) func(context.Context, *schema
 
 func getClient(meta any) *client.Client {
 	return meta.(*client.Client)
-}
-
-func getUserID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, error) {
-	userID, ok := d.Get("user_id").(string)
-	if ok && userID != "" {
-		return userID, nil
-	}
-
-	l, err := client.Token(ctx)
-	if err != nil {
-		return "", fmt.Errorf("failed to get token: %s", err)
-	}
-
-	return l.UserID(), nil
 }
 
 func getTenantID(ctx context.Context, client *client.Client, d *schema.ResourceData) (string, error) {
@@ -546,7 +565,9 @@ func setIdFromActivityConcernedItems(d *schema.ResourceData, activity *client.Ac
 	}
 
 	i := slices.IndexFunc(activity.ConcernedItems, func(concernedItem client.ActivityConcernedItem) bool { return concernedItem.Type == expectedType })
-	if i > -1 {
+	if i > -1 && activity.ConcernedItems[i].ID != "" {
+		// Symmetric with setIdFromActivityState: never adopt an empty id, which
+		// would clobber a previously-set id and make the resource untrackable.
 		d.SetId(activity.ConcernedItems[i].ID)
 	}
 }

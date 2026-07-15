@@ -111,8 +111,17 @@ func objectStorageStorageAccountRead(ctx context.Context, d *schema.ResourceData
 		return diag.Errorf("failed to read storage account: %s", err)
 	}
 	if storageAccount == nil {
-		d.SetId("")
-		return nil
+		// A nil read is NOT a deletion: the client maps HTTP 403 to nil. The
+		// storage account listing is unscoped and not provably complete, so we
+		// never auto-remove the resource; we fail closed (#281).
+		return confirmObjectStorageOrKeep(ctx, d.Id(), "object storage storage account",
+			func(ctx context.Context) ([]string, error) {
+				accounts, err := c.ObjectStorage().StorageAccount().ListStrict(ctx)
+				if err != nil {
+					return nil, err
+				}
+				return storageAccountNames(accounts), nil
+			})
 	}
 
 	// Use helper to flatten the storage account data

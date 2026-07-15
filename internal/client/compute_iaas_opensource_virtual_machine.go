@@ -41,10 +41,14 @@ type OpenIaaSVirtualMachine struct {
 	ManagementAgent struct {
 		Detected bool
 	}
-	Addresses struct {
-		IPv6 string
-		IPv4 string
-	}
+	// Addresses is an OBJECT with COMPOSITE keys of the form
+	// "<device>/<family>/<index>" (e.g. "0/ipv4/0", "0/ipv6/0"), per the
+	// compute API contract (swagger.comput.yml openIaasVirtualMachine). The
+	// previous flat {IPv4, IPv6} struct bound NO key, so addresses were always
+	// empty in state. Decoding into a map captures every composite key without
+	// loss; the device-0 primary IPv4/IPv6 are projected back to the existing
+	// {ipv4, ipv6} state block by FlattenOpenIaaSVirtualMachine (#238).
+	Addresses      map[string]string `json:"addresses"`
 	MachineManager BaseObject
 	Host           BaseObject
 	Pool           BaseObject
@@ -74,7 +78,7 @@ type CreateOpenIaasVirtualMachineRequest struct {
 	TemplateID      string             `json:"templateId"`
 	CPU             int                `json:"cpu"`
 	Memory          int                `json:"memory"`
-	CloudInit       CloudInit          `json:"cloudInit,omitempty"`
+	CloudInit       *CloudInit         `json:"cloudInit,omitempty"`
 	NetworkAdapters []OSNetworkAdapter `json:"networkAdapters,omitempty"`
 }
 
@@ -82,6 +86,30 @@ func (c *OpenIaaSVirtualMachineClient) Create(ctx context.Context, req *CreateOp
 	r := c.c.newRequest("POST", "/compute/v1/open_iaas/virtual_machines")
 	r.obj = req
 	return c.c.doRequestAndReturnActivity(ctx, r)
+}
+
+// ListStrict behaves like List but requires a complete 200 answer: callers
+// using the listing as EVIDENCE for state-shrinking decisions must fail
+// closed on access-denied or partial answers (#275 doctrine, FF-5).
+func (v *OpenIaaSVirtualMachineClient) ListStrict(ctx context.Context, filter *OpenIaaSVirtualMachineFilter) ([]*OpenIaaSVirtualMachine, error) {
+	r := v.c.newRequest("GET", "/compute/v1/open_iaas/virtual_machines")
+	r.addFilter(filter)
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	// Strictly 200: a 206 partial listing cannot prove an absence.
+	if err := requireHttpCodes(resp, 200); err != nil {
+		return nil, err
+	}
+
+	var out []*OpenIaaSVirtualMachine
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 func (v *OpenIaaSVirtualMachineClient) List(
@@ -114,7 +142,7 @@ func (v *OpenIaaSVirtualMachineClient) Read(ctx context.Context, id string) (*Op
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -128,13 +156,17 @@ func (v *OpenIaaSVirtualMachineClient) Read(ctx context.Context, id string) (*Op
 }
 
 type UpdateOpenIaasVirtualMachineRequest struct {
+	// All fields are optional (PATCH semantics): callers only set the
+	// fields that actually diverge from the live state. The booleans are
+	// pointers so an absent value is omitted from the payload while an
+	// explicit false stays expressible (#267).
 	Name              string `json:"name,omitempty"`
 	CPU               int    `json:"cpu,omitempty"`
 	NumCoresPerSocket int    `json:"numCoresPerSocket,omitempty"`
 	Memory            int    `json:"memory,omitempty"`
-	SecureBoot        bool   `json:"secureBoot"`
+	SecureBoot        *bool  `json:"secureBoot,omitempty"`
 	BootFirmware      string `json:"bootFirmware,omitempty"`
-	AutoPowerOn       bool   `json:"autoPowerOn"`
+	AutoPowerOn       *bool  `json:"autoPowerOn,omitempty"`
 	HighAvailability  string `json:"highAvailability,omitempty"`
 }
 
@@ -164,6 +196,21 @@ func (v *OpenIaaSVirtualMachineClient) Power(ctx context.Context, id string, req
 	return v.c.doRequestAndReturnActivity(ctx, r)
 }
 
+// RelocateOpenIaasVirtualMachineRequest relocates (migrates) a virtual machine
+// to another host. For an intra-pool (same-cluster) live migration of a running
+// VM, only HostId is required (the API documents this case explicitly). The
+// optional storageRepositoryId / networkData fields of the endpoint are out of
+// scope here (host-only migration, #355) and tracked separately if needed.
+type RelocateOpenIaasVirtualMachineRequest struct {
+	HostId string `json:"hostId,omitempty"`
+}
+
+func (v *OpenIaaSVirtualMachineClient) Relocate(ctx context.Context, id string, req *RelocateOpenIaasVirtualMachineRequest) (string, error) {
+	r := v.c.newRequest("POST", "/compute/v1/open_iaas/virtual_machines/%s/relocate", id)
+	r.obj = req
+	return v.c.doRequestAndReturnActivity(ctx, r)
+}
+
 func (v *OpenIaaSVirtualMachineClient) MountISO(ctx context.Context, id string, virtualDiskId string) (string, error) {
 	r := v.c.newRequest("POST", "/compute/v1/open_iaas/virtual_machines/%s/mount", id)
 	r.obj = map[string]string{"virtualDiskId": virtualDiskId}
@@ -187,20 +234,58 @@ func (c *OpenIaaSVirtualMachineClient) WaitForDrivers(
 	timeout time.Duration,
 	options *WaiterOptions,
 ) (*OpenIaaSVirtualMachine, error) {
+	return waitForDrivers(ctx, id, timeout,
+		func(d time.Duration) (<-chan time.Time, func()) {
+			t := time.NewTicker(d)
+			return t.C, t.Stop
+		},
+		func(ctx context.Context) (*OpenIaaSVirtualMachine, error) {
+			return c.Read(ctx, id)
+		},
+		options,
+	)
+}
+
+// driverReadFunc abstracts the VM read; newTickerFunc abstracts the poll ticker
+// (it returns the tick channel and a stop func). Both are injected so
+// waitForDrivers is unit tested without HTTP calls or a real 5s tick (a
+// test-controlled channel drives the ticks). A channel seam is used rather than a
+// fake *time.Ticker to avoid depending on time.Ticker internals.
+type driverReadFunc func(ctx context.Context) (*OpenIaaSVirtualMachine, error)
+type newTickerFunc func(d time.Duration) (<-chan time.Time, func())
+
+// waitForDrivers is the polling loop behind WaitForDrivers, with the ticker and
+// read injected. Behavior is preserved EXACTLY:
+//   - timeout == 0: ONE read with the PARENT ctx, no ticker, return it (best-effort skip);
+//   - timeout > 0: a timeout ctx is created BEFORE the ticker (factory called with 5s);
+//     reads use the TIMEOUT ctx, not the parent;
+//   - the timeout firing (before any tick, or via the guard on a late tick) returns
+//     (lastVM, nil) — best-effort, NEVER an error;
+//   - a read error returns (nil, fmt.Errorf("[WAITER] failed to read ...: %s", id, err)) —
+//     note %s, NOT %w (the original error is not wrapped);
+//   - a nil VM returns (nil, fmt.Errorf("[WAITER] the virtual machine %q could not be found", id)).
+func waitForDrivers(
+	ctx context.Context,
+	id string,
+	timeout time.Duration,
+	newTicker newTickerFunc,
+	read driverReadFunc,
+	options *WaiterOptions,
+) (*OpenIaaSVirtualMachine, error) {
 
 	if timeout == 0 {
 		options.log(fmt.Sprintf(
 			"[WAITER] skipping wait for drivers for virtual machine %q (timeout = 0)",
 			id,
 		))
-		return c.Read(ctx, id)
+		return read(ctx)
 	}
 
 	timeoutCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	ticker := time.NewTicker(5 * time.Second)
-	defer ticker.Stop()
+	tickC, stop := newTicker(5 * time.Second)
+	defer stop()
 
 	var lastVM *OpenIaaSVirtualMachine
 
@@ -214,14 +299,14 @@ func (c *OpenIaaSVirtualMachineClient) WaitForDrivers(
 			))
 			return lastVM, nil
 
-		case <-ticker.C:
+		case <-tickC:
 
 			if timeoutCtx.Err() != nil {
 				options.log("[WAITER] timeout reached while waiting, continuing without PV drivers")
 				return lastVM, nil
 			}
 
-			vm, err := c.Read(timeoutCtx, id)
+			vm, err := read(timeoutCtx)
 			if err != nil {
 				return nil, fmt.Errorf(
 					"[WAITER] failed to read virtual machine %q while waiting for drivers: %s",

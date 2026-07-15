@@ -79,6 +79,41 @@ func dataSourceOpenIaasNetworkAdapter() *schema.Resource {
 				Computed:    true,
 				Description: "Whether the network adapter is attached to a virtual machine.",
 			},
+			"ipv4_address": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The IPv4 address of the network adapter.",
+			},
+			"ipv6_address": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The IPv6 address of the network adapter.",
+			},
+			"vpc_id": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The ID of the VPC the network adapter is associated with, or an empty string when the adapter is not on a VPC network.",
+			},
+			"vpc_name": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the VPC the network adapter is associated with, or an empty string when the adapter is not on a VPC network.",
+			},
+			"private_network_id": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The ID of the VPC private network the network adapter is associated with, or an empty string when the adapter is not on a VPC network.",
+			},
+			"private_network_name": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The name of the VPC private network the network adapter is associated with, or an empty string when the adapter is not on a VPC network.",
+			},
+			"static_ip_address": {
+				Type:        schema.TypeString,
+				Computed:    true,
+				Description: "The static IP address assigned to the network adapter on its VPC, or an empty string when the adapter is not on a VPC network.",
+			},
 		},
 	}
 }

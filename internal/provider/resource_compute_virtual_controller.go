@@ -133,8 +133,26 @@ func computeVirtualControllerRead(ctx context.Context, d *schema.ResourceData, m
 		return diag.FromErr(err)
 	}
 	if virtualController == nil {
-		d.SetId("") // L'adaptateur n'existe plus, marquer la ressource comme supprimée
-		return nil
+		// A nil read is NOT auto-treated as a deletion: since #384 it is a
+		// definitive 404 (a genuine 403 surfaces as an access-denied error
+		// above). We never auto-remove the resource; we confirm liveness against
+		// a strict VM-scoped listing (without the type filter) and otherwise fail
+		// closed (#281).
+		vmID := d.Get("virtual_machine_id").(string)
+		return confirmVMwareDeviceOrKeep(ctx, d.Id(), "virtual controller", "virtual machine", vmID,
+			func(ctx context.Context) ([]string, error) {
+				controllers, err := c.Compute().VirtualController().ListStrict(ctx, &client.VirtualControllerFilter{VirtualMachineId: vmID})
+				if err != nil {
+					return nil, err
+				}
+				ids := make([]string, 0, len(controllers))
+				for _, ctrl := range controllers {
+					if ctrl != nil {
+						ids = append(ids, ctrl.ID)
+					}
+				}
+				return ids, nil
+			})
 	}
 
 	// Mapper les données en utilisant la fonction helper

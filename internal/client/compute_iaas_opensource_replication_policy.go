@@ -63,7 +63,7 @@ func (v *ComputeOpenIaaSReplicationPolicyClient) Read(ctx context.Context, id st
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -74,6 +74,29 @@ func (v *ComputeOpenIaaSReplicationPolicyClient) Read(ctx context.Context, id st
 	}
 
 	return &out, nil
+}
+
+// ListStrict behaves like List but requires a complete 200 answer: callers
+// using the listing as EVIDENCE for state-shrinking decisions must fail
+// closed on access-denied or partial answers (#275 doctrine, FF-5).
+func (v *ComputeOpenIaaSReplicationPolicyClient) ListStrict(ctx context.Context) ([]*OpenIaaSReplicationPolicy, error) {
+	r := v.c.newRequest("GET", "/compute/v1/open_iaas/replication/configurations")
+	resp, err := v.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	// Strictly 200: a 206 partial listing cannot prove an absence.
+	if err := requireHttpCodes(resp, 200); err != nil {
+		return nil, err
+	}
+
+	var out []*OpenIaaSReplicationPolicy
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 func (v *ComputeOpenIaaSReplicationPolicyClient) List(ctx context.Context) ([]*OpenIaaSReplicationPolicy, error) {

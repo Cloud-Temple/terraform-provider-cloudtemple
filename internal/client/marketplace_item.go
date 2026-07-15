@@ -123,7 +123,7 @@ func (v *MarketplaceItemClient) Read(ctx context.Context, id string) (*Marketpla
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, err
 	}
@@ -143,7 +143,7 @@ func (v *MarketplaceItemClient) ReadInfo(ctx context.Context, id string, target 
 		return nil, nil, err
 	}
 	defer closeResponseBody(resp)
-	found, err := requireNotFoundOrOK(resp, 403)
+	found, err := requireNotFoundOrOK(resp, 404)
 	if err != nil || !found {
 		return nil, nil, err
 	}
@@ -185,7 +185,12 @@ func (v *MarketplaceItemClient) List(ctx context.Context) ([]*MarketplaceItem, e
 }
 
 type NetworkDataMapping struct {
-	SourceNetworkName    string `json:"sourceNetworkName"`
+	// Deprecated by the marketplace API in favor of NetworkAdapterName, kept
+	// for backward compatibility with older backends.
+	SourceNetworkName string `json:"sourceNetworkName,omitempty"`
+	// Adapter name mapping (e.g. "VIF #0"). Takes priority over
+	// SourceNetworkName server-side.
+	NetworkAdapterName   string `json:"networkAdapterName,omitempty"`
 	DestinationNetworkId string `json:"destinationNetworkId"`
 }
 
@@ -194,7 +199,7 @@ type MarketplaceOpenIaasDeployementRequest struct {
 	Name                string               `json:"name"`
 	StorageRepositoryID string               `json:"storageRepositoryId"`
 	NetworkData         []NetworkDataMapping `json:"networkData,omitempty"`
-	CloudInit           CloudInit            `json:"cloudInit,omitempty"`
+	CloudInit           *CloudInit           `json:"cloudInit,omitempty"`
 }
 
 func (c *MarketplaceItemClient) DeployOpenIaasItem(ctx context.Context, req *MarketplaceOpenIaasDeployementRequest) (string, error) {

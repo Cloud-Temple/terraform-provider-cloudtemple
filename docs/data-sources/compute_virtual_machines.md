@@ -54,7 +54,7 @@ Read-Only:
 - `datastore_name` (String)
 - `distributed_virtual_port_group_ids` (List of String)
 - `expose_hardware_virtualization` (Boolean)
-- `extra_config` (List of Object) (see [below for nested schema](#nestedobjatt--virtual_machines--extra_config))
+- `extra_config` (Map of String)
 - `guest_operating_system_moref` (String)
 - `hardware_version` (String)
 - `host_cluster_id` (String)
@@ -89,15 +89,6 @@ Read-Only:
 - `efi_secure_boot_enabled` (Boolean)
 - `enter_bios_setup` (Boolean)
 - `firmware` (String)
-
-
-<a id="nestedobjatt--virtual_machines--extra_config"></a>
-### Nested Schema for `virtual_machines.extra_config`
-
-Read-Only:
-
-- `key` (String)
-- `value` (String)
 
 
 <a id="nestedobjatt--virtual_machines--replication_config"></a>

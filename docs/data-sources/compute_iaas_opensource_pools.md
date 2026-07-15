@@ -59,7 +59,10 @@ Read-Only:
 - `hosts` (List of String)
 - `id` (String)
 - `internal_id` (String)
+- `label` (String)
 - `machine_manager_id` (String)
+- `master` (String)
+- `memory` (List of Object) (see [below for nested schema](#nestedobjatt--pools--memory))
 - `name` (String)
 - `type` (List of Object) (see [below for nested schema](#nestedobjatt--pools--type))
 
@@ -70,6 +73,15 @@ Read-Only:
 
 - `cores` (Number)
 - `sockets` (Number)
+
+
+<a id="nestedobjatt--pools--memory"></a>
+### Nested Schema for `pools.memory`
+
+Read-Only:
+
+- `size` (Number)
+- `usage` (Number)
 
 
 <a id="nestedobjatt--pools--type"></a>

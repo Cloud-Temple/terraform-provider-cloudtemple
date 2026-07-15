@@ -1,0 +1,105 @@
+package provider
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"testing"
+)
+
+// These unit tests pin the #386 fix: a VM CRUD operation that reads the virtual
+// machine before acting must not panic and must fail closed when the client read
+// does not return a usable VM. Since #384 VirtualMachine().Read maps an HTTP 404
+// (absent) to (nil,nil) — caught by the shared readVirtualMachineForOp nil-guard
+// ("could not be read") — while a genuine 403 (forbidden) surfaces as an
+// access-denied error from the client. Both routes are exercised: neither panics,
+// both produce an actionable diagnostic.
+//
+// Mutation proof: removing the `if vm == nil` line in readVirtualMachineForOp
+// makes the 404 cases return no diagnostic (RED) and makes
+// TestComputeVirtualMachineDeleteNilReadDoesNotPanic panic at vm.PowerState on the
+// 404 case (RED). Reverting VirtualMachine().Read to notFoundCode=403 makes the
+// 403 cases (which now assert an access-denied error) RED.
+
+// TestReadVirtualMachineForOp covers the shared guard used by the three VM
+// operation sites (update-customize, update-power, delete). The customize and
+// power branches are gated (d.HasChange / the updatePower parameter) behind the
+// full VM-update pipeline, so the guard logic is proven here directly rather than
+// by driving those branches end-to-end.
+func TestReadVirtualMachineForOp(t *testing.T) {
+	t.Run("404 -> diagnostic, nil vm", func(t *testing.T) {
+		c := newAssignTestClient(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusNotFound) })
+		vm, diags := readVirtualMachineForOp(context.Background(), c, "vm-1", "delete")
+		if vm != nil {
+			t.Fatalf("expected nil vm on a 404 read, got %+v", vm)
+		}
+		if !diags.HasError() {
+			t.Fatal("expected an error diagnostic on a 404 read, got none")
+		}
+		diagsContain(t, diags, "could not be read")
+	})
+	t.Run("403 -> access-denied diagnostic, nil vm", func(t *testing.T) {
+		c := newAssignTestClient(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusForbidden) })
+		vm, diags := readVirtualMachineForOp(context.Background(), c, "vm-1", "update")
+		if vm != nil {
+			t.Fatalf("expected nil vm on a 403 read, got %+v", vm)
+		}
+		if !diags.HasError() {
+			t.Fatal("expected an error diagnostic on a 403 read, got none")
+		}
+		// Since #384 a genuine 403 surfaces from the client as an access-denied
+		// error (before the nil-guard), not the "could not be read" guard text.
+		diagsContain(t, diags, "access denied")
+	})
+	t.Run("500 -> diagnostic (read error)", func(t *testing.T) {
+		c := newAssignTestClient(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusInternalServerError) })
+		vm, diags := readVirtualMachineForOp(context.Background(), c, "vm-1", "power")
+		if vm != nil {
+			t.Fatalf("expected nil vm on a 500 read, got %+v", vm)
+		}
+		if !diags.HasError() {
+			t.Fatal("expected an error diagnostic on a 500 read, got none")
+		}
+	})
+	t.Run("200 -> vm, no diagnostic", func(t *testing.T) {
+		c := newAssignTestClient(t, func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{"id":"vm-1"}`))
+		})
+		vm, diags := readVirtualMachineForOp(context.Background(), c, "vm-1", "update")
+		if diags.HasError() {
+			t.Fatalf("a valid 200 read must not error, got: %v", diags)
+		}
+		if vm == nil || vm.ID != "vm-1" {
+			t.Fatalf("expected a non-nil vm with id %q, got %+v", "vm-1", vm)
+		}
+	})
+}
+
+// TestComputeVirtualMachineDeleteNilReadDoesNotPanic: destroy reads the VM first
+// (unconditionally) to power it off before deleting. A read that does not return a
+// usable VM must fail closed with a diagnostic, never panic at vm.PowerState.
+// Since #384 a nil read is a definitive 404 (absent) caught by the nil-guard, and
+// a genuine 403 surfaces as an access-denied error; the destroy fails closed on
+// both rather than concluding "already deleted" on an ambiguous signal.
+func TestComputeVirtualMachineDeleteNilReadDoesNotPanic(t *testing.T) {
+	for _, tc := range []struct {
+		code int
+		want string
+	}{
+		{http.StatusNotFound, "could not be read"},
+		{http.StatusForbidden, "access denied"},
+	} {
+		t.Run(fmt.Sprintf("HTTP_%d", tc.code), func(t *testing.T) {
+			c := newAssignTestClient(t, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(tc.code) })
+			d := resourceVirtualMachine().TestResourceData()
+			d.SetId("vm-1")
+
+			diags := computeVirtualMachineDelete(context.Background(), d, c)
+			if !diags.HasError() {
+				t.Fatalf("a %d read on delete must return a diagnostic, got none", tc.code)
+			}
+			diagsContain(t, diags, tc.want)
+		})
+	}
+}
