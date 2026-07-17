@@ -185,6 +185,31 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_vpc_static_ips":       documentDatasource(dataSourceVPCStaticIPs(), "vpc_read"),
 				"cloudtemple_vpc_floating_ip":      documentDatasource(dataSourceVPCFloatingIP(), "vpc_read"),
 				"cloudtemple_vpc_floating_ips":     documentDatasource(dataSourceVPCFloatingIPs(), "vpc_read"),
+
+				// Public Cloud VM Instances
+				"cloudtemple_public_cloud_vm_region":             documentDatasource(dataSourcePublicCloudVMRegion(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_regions":            documentDatasource(dataSourcePublicCloudVMRegions(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_availability_zone":  documentDatasource(dataSourcePublicCloudVMAvailabilityZone(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_availability_zones": documentDatasource(dataSourcePublicCloudVMAvailabilityZones(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_flavor":             documentDatasource(dataSourcePublicCloudVMFlavor(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_flavors":            documentDatasource(dataSourcePublicCloudVMFlavors(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_instance_family":    documentDatasource(dataSourcePublicCloudVMInstanceFamily(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_instance_families":  documentDatasource(dataSourcePublicCloudVMInstanceFamilies(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_storage_type":       documentDatasource(dataSourcePublicCloudVMStorageType(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_storage_types":      documentDatasource(dataSourcePublicCloudVMStorageTypes(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_template":           documentDatasource(dataSourcePublicCloudVMTemplate(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_templates":          documentDatasource(dataSourcePublicCloudVMTemplates(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_backup_policy":      documentDatasource(dataSourcePublicCloudVMBackupPolicy(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_backup_policies":    documentDatasource(dataSourcePublicCloudVMBackupPolicies(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_quota":              documentDatasource(dataSourcePublicCloudVMQuota(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_task":               documentDatasource(dataSourcePublicCloudVMTask(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_tasks":              documentDatasource(dataSourcePublicCloudVMTasks(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_network":            documentDatasource(dataSourcePublicCloudVMNetwork(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_networks":           documentDatasource(dataSourcePublicCloudVMNetworks(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_instance":           documentDatasource(dataSourcePublicCloudVMInstance(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_instances":          documentDatasource(dataSourcePublicCloudVMInstances(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_disks":              documentDatasource(dataSourcePublicCloudVMDisks(), "public_cloud_vm_instances_read"),
+				"cloudtemple_public_cloud_vm_snapshots":          documentDatasource(dataSourcePublicCloudVMSnapshots(), "public_cloud_vm_instances_read"),
 			},
 			ResourcesMap: map[string]*schema.Resource{
 				// Compute - IaaS VMWare
@@ -210,6 +235,12 @@ func New(version string) func() *schema.Provider {
 				"cloudtemple_vpc_static_ip":           documentResource(resourceVPCStaticIP(), "vpc_write", "vpc_read", "activity_read"),
 				"cloudtemple_vpc_floating_ip":         documentResource(resourceVPCFloatingIP(), "vpc_write", "vpc_read", "activity_read"),
 				"cloudtemple_vpc_floating_ip_binding": documentResource(resourceVPCFloatingIPBinding(), "vpc_write", "vpc_read", "activity_read"),
+
+				// Public Cloud VM Instances
+				"cloudtemple_public_cloud_vm_instance":        documentResource(resourcePublicCloudVMInstance(), "public_cloud_vm_instances_management", "public_cloud_vm_instances_read", "activity_read"),
+				"cloudtemple_public_cloud_vm_disk":            documentResource(resourcePublicCloudVMDisk(), "public_cloud_vm_instances_management", "public_cloud_vm_instances_read", "activity_read"),
+				"cloudtemple_public_cloud_vm_snapshot":        documentResource(resourcePublicCloudVMSnapshot(), "public_cloud_vm_instances_management", "public_cloud_vm_instances_read", "activity_read"),
+				"cloudtemple_public_cloud_vm_network_adapter": documentResource(resourcePublicCloudVMNetworkAdapter(), "public_cloud_vm_instances_management", "public_cloud_vm_instances_read", "activity_read"),
 			},
 		}
 

@@ -352,6 +352,33 @@ var datasourceCoverage = map[string]dsCoverage{
 	"cloudtemple_vpc_static_ips":       {"static_ips", flat(helpers.FlattenStaticIP)},
 	"cloudtemple_vpc_floating_ip":      {"", flat(helpers.FlattenFloatingIP)},
 	"cloudtemple_vpc_floating_ips":     {"floating_ips", flat(helpers.FlattenFloatingIP)},
+
+	// --- Public Cloud VM Instances ----------------------------------------
+	// FlattenPublicCloudVMRegion emits "id" itself and the plural Read does not
+	// inject it afterwards; mirror that with flat, not flatID.
+	"cloudtemple_public_cloud_vm_region":             {"", flat(helpers.FlattenPublicCloudVMRegion)},
+	"cloudtemple_public_cloud_vm_regions":            {"regions", flat(helpers.FlattenPublicCloudVMRegion)},
+	"cloudtemple_public_cloud_vm_availability_zone":  {"", flat(helpers.FlattenPublicCloudVMAvailabilityZone)},
+	"cloudtemple_public_cloud_vm_availability_zones": {"availability_zones", flat(helpers.FlattenPublicCloudVMAvailabilityZone)},
+	"cloudtemple_public_cloud_vm_flavor":             {"", flat(helpers.FlattenPublicCloudVMFlavor)},
+	"cloudtemple_public_cloud_vm_flavors":            {"flavors", flat(helpers.FlattenPublicCloudVMFlavor)},
+	"cloudtemple_public_cloud_vm_instance_family":    {"", flat(helpers.FlattenPublicCloudVMInstanceFamily)},
+	"cloudtemple_public_cloud_vm_instance_families":  {"instance_families", flat(helpers.FlattenPublicCloudVMInstanceFamily)},
+	"cloudtemple_public_cloud_vm_storage_type":       {"", flat(helpers.FlattenPublicCloudVMStorageType)},
+	"cloudtemple_public_cloud_vm_storage_types":      {"storage_types", flat(helpers.FlattenPublicCloudVMStorageType)},
+	"cloudtemple_public_cloud_vm_template":           {"", flat(helpers.FlattenPublicCloudVMTemplate)},
+	"cloudtemple_public_cloud_vm_templates":          {"templates", flat(helpers.FlattenPublicCloudVMTemplate)},
+	"cloudtemple_public_cloud_vm_backup_policy":      {"", flat(helpers.FlattenPublicCloudVMBackupPolicy)},
+	"cloudtemple_public_cloud_vm_backup_policies":    {"backup_policies", flat(helpers.FlattenPublicCloudVMBackupPolicy)},
+	"cloudtemple_public_cloud_vm_quota":              {"", flat(helpers.FlattenPublicCloudVMQuota)},
+	"cloudtemple_public_cloud_vm_task":               {"", flat(helpers.FlattenPublicCloudVMTask)},
+	"cloudtemple_public_cloud_vm_tasks":              {"tasks", flat(helpers.FlattenPublicCloudVMTask)},
+	"cloudtemple_public_cloud_vm_instance":           {"", flat(helpers.FlattenPublicCloudVMInstance)},
+	"cloudtemple_public_cloud_vm_instances":          {"instances", flat(helpers.FlattenPublicCloudVMInstance)},
+	"cloudtemple_public_cloud_vm_disks":              {"disks", flat(helpers.FlattenPublicCloudVMDisk)},
+	"cloudtemple_public_cloud_vm_snapshots":          {"snapshots", flat(helpers.FlattenPublicCloudVMSnapshot)},
+	"cloudtemple_public_cloud_vm_network":            {"", flat(helpers.FlattenPublicCloudVMNetwork)},
+	"cloudtemple_public_cloud_vm_networks":           {"networks", flat(helpers.FlattenPublicCloudVMNetwork)},
 }
 
 // datasourceKnownGaps lists datasources deliberately NOT covered by the walker

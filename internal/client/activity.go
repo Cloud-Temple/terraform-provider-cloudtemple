@@ -236,17 +236,23 @@ type activityReadFunc func(ctx context.Context) (*Activity, error)
 //   - permanent read errors (4xx, decode, context cancellation) fail
 //     immediately;
 //   - a terminal "failed" activity is never retried;
-//   - an initial not-found is tolerated once (eventual consistency),
-//     a repeated not-found is permanent.
+//   - initial not-founds are tolerated up to a bounded budget
+//     (WaiterOptions.NotFoundRetries, default 1) for eventual consistency,
+//     a not-found beyond the budget is permanent;
+//   - an activity that was seen and then vanishes is always permanent,
+//     regardless of the not-found budget.
 func waitForActivityCompletion(ctx context.Context, id string, read activityReadFunc, b retry.Backoff, options *WaiterOptions) (*Activity, error) {
 	var res *Activity
 	var consecutiveReadFailures int
-	// The one-time not-found tolerance (eventual consistency right after
-	// the activity is started) is tracked independently from the transient
-	// read budget: a 429/5xx/transport blip before the first successful
-	// read must not consume it (FF-3). The disappearance of an activity
-	// that was already seen stays permanent.
-	var notFoundTolerated bool
+	// The initial not-found tolerance (eventual consistency right after the
+	// activity is started) is tracked independently from the transient read
+	// budget: a 429/5xx/transport blip before the first successful read must
+	// not consume it (FF-3). Its size is WaiterOptions.NotFoundRetries (default
+	// 1) so a slow-to-index activity does not fail a write that keeps running
+	// platform-side (#415). The disappearance of an activity that was already
+	// seen stays permanent.
+	var notFoundReads int
+	notFoundBudget := options.notFoundBudget()
 	var activitySeen bool
 
 	err := retry.Do(ctx, b, func(ctx context.Context) error {
@@ -270,11 +276,12 @@ func waitForActivityCompletion(ctx context.Context, id string, read activityRead
 				message: fmt.Sprintf("the activity %q could not be found", id),
 			}
 			if activitySeen {
-				// An activity that was visible and vanished is permanent.
+				// An activity that was visible and vanished is permanent,
+				// regardless of the not-found budget.
 				return options.error(err)
 			}
-			if !notFoundTolerated {
-				notFoundTolerated = true
+			if notFoundReads < notFoundBudget {
+				notFoundReads++
 				return options.retryableError(err)
 			}
 			return options.error(err)
