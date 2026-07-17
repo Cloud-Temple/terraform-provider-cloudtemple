@@ -1,7 +1,39 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.9.0 (July 8th, 2026)
+# 1.10.0 (July 17th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+NEW FEATURES :
+
+  * Added resource `cloudtemple_public_cloud_vm_instance` to manage a Public Cloud VM instance: create, start/stop (`power_state`), rename, change the backup policy, resize `cpu`/`memory` and grow the OS disk (`os_disk.size_gb`) — resize and OS disk growth require the VM to be stopped.
+  * Added resource `cloudtemple_public_cloud_vm_disk` to manage a data disk attached to a Public Cloud VM instance: create, grow-only extend and delete (extend requires the VM to be stopped; delete stops a running VM automatically). Import with `<virtual_machine_id>/<disk_id>`.
+  * Added resource `cloudtemple_public_cloud_vm_snapshot` to manage a snapshot of a Public Cloud VM instance (`name` is immutable). Import with `<virtual_machine_id>/<snapshot_id>`.
+  * Added resource `cloudtemple_public_cloud_vm_network_adapter` to manage a network adapter attached to a Public Cloud VM instance. Changing `network_id` requires the VM to be stopped (deleting stops a running VM automatically); `ip_address` is only honoured on VPC networks; `device_index` is immutable. Import with `<virtual_machine_id>/<network_adapter_id>`.
+  * Added datasource `cloudtemple_public_cloud_vm_instance` to retrieve a VM instance by `id`.
+  * Added datasource `cloudtemple_public_cloud_vm_instances` to list the tenant's VM instances (filterable by name, status, availability zone or instance family).
+  * Added datasource `cloudtemple_public_cloud_vm_disks` to list the disks of a VM instance.
+  * Added datasource `cloudtemple_public_cloud_vm_snapshots` to list the snapshots of a VM instance.
+  * Added datasource `cloudtemple_public_cloud_vm_network` to retrieve a network by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_networks` to list the network catalogue of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_region` to retrieve a region by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_regions` to list the regions of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_availability_zone` to retrieve an availability zone by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_availability_zones` to list the availability zones of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_flavor` to retrieve a flavor (vCPU/RAM sizing pair) by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_flavors` to list the flavors of the tenant (filterable by instance family).
+  * Added datasource `cloudtemple_public_cloud_vm_instance_family` to retrieve an instance family by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_instance_families` to list the instance families of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_storage_type` to retrieve a storage type by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_storage_types` to list the storage types of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_template` to retrieve a template (OS image) by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_templates` to list the templates of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_backup_policy` to retrieve a backup policy by `id` or by `name`.
+  * Added datasource `cloudtemple_public_cloud_vm_backup_policies` to list the backup policies of the tenant.
+  * Added datasource `cloudtemple_public_cloud_vm_quota` to retrieve the tenant's quota (limits and current usage).
+  * Added datasource `cloudtemple_public_cloud_vm_task` to retrieve a diagnostic task by `id`.
+  * Added datasource `cloudtemple_public_cloud_vm_tasks` to list diagnostic tasks (optionally scoped to a VM).
+
+# 1.9.0 (July 8th, 2026)
 
 UPGRADE NOTES :
 

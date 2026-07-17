@@ -146,6 +146,21 @@ func genericFlattenCases() []zeroFlattenCase {
 
 		// --- Marketplace --------------------------------------------------
 		{"FlattenMarketplaceItem", zeroOf(FlattenMarketplaceItem)},
+
+		// --- Public Cloud VM Instances ------------------------------------
+		{"FlattenPublicCloudVMRegion", zeroOf(FlattenPublicCloudVMRegion)},
+		{"FlattenPublicCloudVMAvailabilityZone", zeroOf(FlattenPublicCloudVMAvailabilityZone)},
+		{"FlattenPublicCloudVMFlavor", zeroOf(FlattenPublicCloudVMFlavor)},
+		{"FlattenPublicCloudVMInstanceFamily", zeroOf(FlattenPublicCloudVMInstanceFamily)},
+		{"FlattenPublicCloudVMStorageType", zeroOf(FlattenPublicCloudVMStorageType)},
+		{"FlattenPublicCloudVMTemplate", zeroOf(FlattenPublicCloudVMTemplate)},
+		{"FlattenPublicCloudVMBackupPolicy", zeroOf(FlattenPublicCloudVMBackupPolicy)},
+		{"FlattenPublicCloudVMQuota", zeroOf(FlattenPublicCloudVMQuota)},
+		{"FlattenPublicCloudVMTask", zeroOf(FlattenPublicCloudVMTask)},
+		{"FlattenPublicCloudVMInstance", zeroOf(FlattenPublicCloudVMInstance)},
+		{"FlattenPublicCloudVMDisk", zeroOf(FlattenPublicCloudVMDisk)},
+		{"FlattenPublicCloudVMSnapshot", zeroOf(FlattenPublicCloudVMSnapshot)},
+		{"FlattenPublicCloudVMNetwork", zeroOf(FlattenPublicCloudVMNetwork)},
 	}
 }
 

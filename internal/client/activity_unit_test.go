@@ -325,3 +325,73 @@ func TestActivityWaitDisappearedActivityIsPermanent(t *testing.T) {
 		t.Fatalf("calls=%d, want 2 (no retry after disappearance)", calls)
 	}
 }
+
+// TestActivityWaitNotFoundBudgetIsConfigurableAndBounded pins the E0-7
+// anti-orphan extension (#415): WaiterOptions.NotFoundRetries widens the
+// initial not-found tolerance from a single read to a bounded budget, so a
+// slow-to-index activity does not fail a write that is still running
+// platform-side. The default (unset) budget stays at one, and the extension
+// never relaxes the disappearance rule.
+func TestActivityWaitNotFoundBudgetIsConfigurableAndBounded(t *testing.T) {
+	t.Run("a generous budget tolerates several initial not-founds then completes", func(t *testing.T) {
+		calls := 0
+		read := scriptedReads(&calls,
+			readOutcome{}, // three initial not-founds (eventual consistency)
+			readOutcome{},
+			readOutcome{},
+			readOutcome{activity: completedActivity()},
+		)
+		opts := &WaiterOptions{NotFoundRetries: 5}
+		activity, err := waitForActivityCompletion(context.Background(), "act-1", read, immediateBackoff(20), opts)
+		if err != nil || activity == nil {
+			t.Fatalf("a budget of 5 must tolerate 3 initial not-founds, got err=%v", err)
+		}
+		if calls != 4 {
+			t.Fatalf("calls=%d, want 4", calls)
+		}
+	})
+
+	t.Run("the budget is bounded: a not-found beyond it is permanent", func(t *testing.T) {
+		calls := 0
+		read := scriptedReads(&calls, readOutcome{}) // endless not-found
+		opts := &WaiterOptions{NotFoundRetries: 3}
+		_, err := waitForActivityCompletion(context.Background(), "act-1", read, immediateBackoff(50), opts)
+		if err == nil {
+			t.Fatal("an endless not-found must fail once the budget is exhausted")
+		}
+		// 3 tolerated retries + 1 final permanent attempt; kills the
+		// unbounded-tolerance and off-by-one mutants.
+		if calls != 4 {
+			t.Fatalf("calls=%d, want 4 (3 tolerated + 1 permanent)", calls)
+		}
+	})
+
+	t.Run("a generous budget still treats a seen-then-vanished activity as permanent", func(t *testing.T) {
+		calls := 0
+		read := scriptedReads(&calls,
+			readOutcome{activity: pendingActivity()}, // seen
+			readOutcome{},                            // vanished
+		)
+		opts := &WaiterOptions{NotFoundRetries: 10}
+		_, err := waitForActivityCompletion(context.Background(), "act-1", read, immediateBackoff(20), opts)
+		if err == nil {
+			t.Fatal("disappearance after being seen is permanent regardless of the not-found budget")
+		}
+		if calls != 2 {
+			t.Fatalf("calls=%d, want 2 (disappearance is not covered by the not-found budget)", calls)
+		}
+	})
+
+	t.Run("the default (unset) budget still tolerates exactly one initial not-found", func(t *testing.T) {
+		calls := 0
+		read := scriptedReads(&calls, readOutcome{}, readOutcome{})
+		opts := &WaiterOptions{} // NotFoundRetries unset -> historical single tolerance
+		_, err := waitForActivityCompletion(context.Background(), "act-1", read, immediateBackoff(20), opts)
+		if err == nil {
+			t.Fatal("the default budget tolerates only one initial not-found")
+		}
+		if calls != 2 {
+			t.Fatalf("calls=%d, want 2 (default budget unchanged)", calls)
+		}
+	})
+}

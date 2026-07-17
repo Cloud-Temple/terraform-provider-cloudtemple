@@ -756,12 +756,34 @@ func encodeBody(obj any) (io.Reader, error) {
 
 type WaiterOptions struct {
 	Logger func(msg string)
+
+	// NotFoundRetries bounds how many not-found reads of the activity are
+	// tolerated BEFORE it is first seen — the eventual-consistency window that
+	// opens right after a write returns its Location header and before
+	// GET /activity/v1/activities/{id} becomes readable (#415). It counts the
+	// TOTAL pre-seen not-found observations, and is deliberately NOT reset by an
+	// interleaved transient read error (that has its own independent budget,
+	// maxActivityReadRetries — FF-3). A value < 1 (the zero value / unset)
+	// preserves the historical behaviour of tolerating exactly one initial
+	// not-found. It NEVER relaxes the disappearance rule: an activity that was
+	// seen and then vanished stays permanently failed regardless of this budget.
+	NotFoundRetries int
 }
 
 func (w *WaiterOptions) log(msg string) {
 	if w != nil && w.Logger != nil {
 		w.Logger(msg)
 	}
+}
+
+// notFoundBudget returns how many consecutive initial not-found reads are
+// tolerated before the activity is first seen. Zero / unset (or a nil
+// WaiterOptions) preserves the historical single tolerance.
+func (w *WaiterOptions) notFoundBudget() int {
+	if w == nil || w.NotFoundRetries < 1 {
+		return 1
+	}
+	return w.NotFoundRetries
 }
 
 func (w *WaiterOptions) error(err error) error {
