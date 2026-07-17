@@ -1,6 +1,7 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.10.0 (Unreleased)
+# 1.10.0 (July 17th, 2026)
+<img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 NEW FEATURES :
 
@@ -32,7 +33,7 @@ NEW FEATURES :
   * Added datasource `cloudtemple_public_cloud_vm_task` to retrieve a diagnostic task by `id`.
   * Added datasource `cloudtemple_public_cloud_vm_tasks` to list diagnostic tasks (optionally scoped to a VM).
 
-# 1.9.0 (Unreleased)
+# 1.9.0 (July 8th, 2026)
 
 UPGRADE NOTES :
 
@@ -69,7 +70,7 @@ BUG FIXES :
   * Hardened the `cloudtemple_backup_iaas_opensource_policies` datasource against the platform endpoint (`GET /backup/v1/open_iaas/policies`) intermittently hanging for minutes: that read now carries a short, bounded per-request timeout (default 30s, overridable via `CLOUDTEMPLE_FAST_READ_TIMEOUT` in seconds, `0` disables it) and is retried when it fires, so a transient hang resolves on a fast retry and a persistent one fails quickly with an actionable error instead of stalling a `plan`/`apply` under the generic 10-minute request ceiling. Only this read opts in — every other call is unchanged — and a genuine context cancellation (a `terraform` interrupt) is never retried.
   * Hardened resource `cloudtemple_compute_iaas_opensource_virtual_machine` against a silently-skipped sizing update (doctrine "PATCH only diffs"): the provider now re-asserts an explicitly changed `memory`, `cpu` or `num_cores_per_socket` even when the live API already reports the desired value (a prior update may have been acknowledged by the platform without materialising), and it reads the virtual machine back after the update to fail closed when a patched value did not actually take effect — instead of trusting the activity acknowledgement and drifting silently. This is a defensive retry plus a materialisation check against the API-reported value; it does not fire on create (so it never reintroduces redundant updates), and a platform that reports the desired value while the guest still runs the old one cannot be detected here.
 
-# 1.8.0 (Unreleased)
+# 1.8.0 (June 26th, 2026)
 
 SECURITY :
 
@@ -117,8 +118,13 @@ MISCELLANEOUS :
   * Removed a broken CI workflow left over from the provider template.
   * Added a schema golden gate: a committed, deterministic snapshot of the full declared provider schema contract (every resource and datasource, recursively into nested blocks: types, `Required`/`Optional`/`Computed`/`ForceNew`/`Sensitive`, `MinItems`/`MaxItems`/`ConfigMode`, primitive `Default` values, the presence of state/normalization functions and validators, plan constraints, the explicit `Elem` kind, `SchemaVersion`, `StateUpgrader` versions and types, and `CustomizeDiff` presence) checked by a CI test that fails on any divergence. Any change to the contract that an existing client's Terraform state depends on must be seen and explicitly justified by a human before the golden is regenerated; the regenerate path is refused in CI. This freezes the declared contract; runtime behaviour and the live API shape stay covered by the other test layers.
 
+# 1.7.2 (June 15th, 2026)
+
+BUG FIXES :
+
+  * Fixed a remaining nil pointer crash during `terraform plan` when refreshing a `cloudtemple_compute_iaas_opensource_virtual_machine` whose OS disk was deleted or became forbidden out-of-band (the disk reads back as nil). Completes the partial 1.7.1 fix. (#320)
+
 # 1.7.1 (April 15th, 2026)
-<img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 BUG FIXES :
 
