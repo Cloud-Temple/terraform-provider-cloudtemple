@@ -24,10 +24,10 @@ jobs:
     steps:
 
     - name: Check out code into the Go module directory
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v7
       with:
         go-version-file: 'go.mod'
         cache: true
@@ -52,10 +52,10 @@ jobs:
     steps:
 
     - name: Check out code into the Go module directory
-      uses: actions/checkout@v3
+      uses: actions/checkout@v7
 
     - name: Set up Go
-      uses: actions/setup-go@v4
+      uses: actions/setup-go@v7
       with:
         go-version-file: 'go.mod'
         cache: true
@@ -102,12 +102,12 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - uses: hashicorp/setup-terraform@v2
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 'v1.5.7'
           terraform_wrapper: false
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
         with:
           go-version-file: 'go.mod'
           cache: true
@@ -138,16 +138,16 @@ jobs:
   #   steps:
 
   #   - name: Check out code into the Go module directory
-  #     uses: actions/checkout@v3
+  #     uses: actions/checkout@v7
 
   #   - name: Set up Go
-  #     uses: actions/setup-go@v4
+  #     uses: actions/setup-go@v7
   #     with:
   #       go-version-file: 'go.mod'
   #       cache: true
   #     id: go
 
-  #   - uses: hashicorp/setup-terraform@v2
+  #   - uses: hashicorp/setup-terraform@v4
   #     with:
   #       terraform_version: ${{ matrix.terraform }}
   #       terraform_wrapper: false
