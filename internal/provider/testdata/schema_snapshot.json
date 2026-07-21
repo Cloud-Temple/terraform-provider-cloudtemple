@@ -511,6 +511,7 @@
               "type": "TypeString",
               "optional": true,
               "computed": true,
+              "has_validate_func": true,
               "elem_kind": "nil"
             },
             "size": {

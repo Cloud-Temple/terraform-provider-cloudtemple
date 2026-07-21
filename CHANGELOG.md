@@ -1,5 +1,11 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.11.0 (Unreleased)
+
+BUG FIXES :
+
+  * `cloudtemple_compute_iaas_opensource_virtual_machine`: a VM deployed with `cloud_init` no longer captures the platform's cloud-init config drive ("XO CloudConfigDrive", attached read-write by the platform during the deploy) as a managed `os_disk`, which made every subsequent plan propose to remove that block (permanent drift). The create now excludes the drive (and fails closed if the listing is ambiguous), and a create from a source image that itself carries the reserved disk name is rejected upfront. States already polluted by earlier versions keep planning normally: the refresh emits a warning explaining that applying the removal diff only cleans the Terraform state — the provider never detaches, renames or resizes the drive on the platform. The name "XO CloudConfigDrive" is now rejected as a user-declared `os_disk.name` (reserved by the platform).
+
 # 1.10.0 (July 17th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
