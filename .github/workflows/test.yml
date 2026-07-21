@@ -102,7 +102,7 @@ jobs:
   generate:
     runs-on: ubuntu-latest
     steps:
-      - uses: hashicorp/setup-terraform@v2
+      - uses: hashicorp/setup-terraform@v4
         with:
           terraform_version: 'v1.5.7'
           terraform_wrapper: false
@@ -147,7 +147,7 @@ jobs:
   #       cache: true
   #     id: go
 
-  #   - uses: hashicorp/setup-terraform@v2
+  #   - uses: hashicorp/setup-terraform@v4
   #     with:
   #       terraform_version: ${{ matrix.terraform }}
   #       terraform_wrapper: false
