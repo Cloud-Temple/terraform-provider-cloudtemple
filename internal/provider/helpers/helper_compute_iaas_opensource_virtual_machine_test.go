@@ -100,14 +100,15 @@ func TestIsPlatformManagedDisk(t *testing.T) {
 	const vmID = "vm-1"
 
 	tests := []struct {
-		name string
-		disk *client.OpenIaaSVirtualDisk
-		want bool
+		name                 string
+		disk                 *client.OpenIaaSVirtualDisk
+		cloudInitProvisioned bool
+		want                 bool
 	}{
 		{
 			name: "read-only XO config drive on this VM is excluded",
 			disk: &client.OpenIaaSVirtualDisk{
-				Name: cloudConfigDriveName,
+				Name: CloudConfigDriveName,
 				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
 					{ID: vmID, ReadOnly: true},
 				},
@@ -115,9 +116,23 @@ func TestIsPlatformManagedDisk(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "writable user disk with the colliding name stays managed",
+			// #488: the platform attaches the config drive with a READ-WRITE
+			// VBD on the deploy path (live evidence, 2026-07-21) — the
+			// resource's own cloud-init provisioning is the second evidence.
+			name: "writable XO config drive on this VM is excluded when cloud-init is provisioned (#488)",
 			disk: &client.OpenIaaSVirtualDisk{
-				Name: cloudConfigDriveName,
+				Name: CloudConfigDriveName,
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: vmID, ReadOnly: false},
+				},
+			},
+			cloudInitProvisioned: true,
+			want:                 true,
+		},
+		{
+			name: "writable user disk with the colliding name stays managed without cloud-init",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: CloudConfigDriveName,
 				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
 					{ID: vmID, ReadOnly: false},
 				},
@@ -135,9 +150,20 @@ func TestIsPlatformManagedDisk(t *testing.T) {
 			want: false,
 		},
 		{
+			name: "disk with another name stays managed even with cloud-init provisioned",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: "data-disk",
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: vmID, ReadOnly: false},
+				},
+			},
+			cloudInitProvisioned: true,
+			want:                 false,
+		},
+		{
 			name: "XO-named disk read-only on another VM only stays managed",
 			disk: &client.OpenIaaSVirtualDisk{
-				Name: cloudConfigDriveName,
+				Name: CloudConfigDriveName,
 				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
 					{ID: "vm-other", ReadOnly: true},
 				},
@@ -145,25 +171,93 @@ func TestIsPlatformManagedDisk(t *testing.T) {
 			want: false,
 		},
 		{
-			name: "XO-named disk without any VBD stays managed (fail-safe)",
+			// #488 F2 guard: the cloud-init arm must NOT bypass the
+			// VBD-on-this-VM requirement (fail-safe keep).
+			name: "XO-named disk without a VBD on this VM stays managed even with cloud-init provisioned",
 			disk: &client.OpenIaaSVirtualDisk{
-				Name: cloudConfigDriveName,
+				Name: CloudConfigDriveName,
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: "vm-other", ReadOnly: false},
+				},
 			},
-			want: false,
+			cloudInitProvisioned: true,
+			want:                 false,
 		},
 		{
-			name: "a nil disk is not platform-managed and must not panic (#320)",
-			disk: nil,
-			want: false,
+			name: "XO-named disk without any VBD stays managed (fail-safe)",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: CloudConfigDriveName,
+			},
+			cloudInitProvisioned: true,
+			want:                 false,
+		},
+		{
+			name:                 "a nil disk is not platform-managed and must not panic (#320)",
+			disk:                 nil,
+			cloudInitProvisioned: true,
+			want:                 false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := IsPlatformManagedDisk(tt.disk, vmID); got != tt.want {
+			if got := IsPlatformManagedDisk(tt.disk, vmID, tt.cloudInitProvisioned); got != tt.want {
 				t.Errorf("IsPlatformManagedDisk() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestIsPlatformManagedDiskEmptyVMID pins the degenerate empty-id guard: the
+// zero-value VBD (ID "") must never accidentally match an empty resource id.
+func TestIsPlatformManagedDiskEmptyVMID(t *testing.T) {
+	disk := &client.OpenIaaSVirtualDisk{Name: CloudConfigDriveName}
+	if IsPlatformManagedDisk(disk, "", true) {
+		t.Fatal("an empty virtual machine id must never match the zero-value VBD")
+	}
+}
+
+// TestFlattenOpenIaaSOSDisksDataSkipsConfigDrive pins the #488 create-time
+// capture fix in both listing orders: with cloud-init provisioned, the
+// platform config drive (RW VBD) is skipped and the system disk survives as
+// the FIRST kept entry, whatever position the API listed the drive at.
+func TestFlattenOpenIaaSOSDisksDataSkipsConfigDrive(t *testing.T) {
+	const vmID = "vm-1"
+	system := &client.OpenIaaSVirtualDisk{
+		ID:   "disk-system",
+		Name: "ubuntu-24.04-disk-0",
+		VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+			{ID: vmID, ReadOnly: false},
+		},
+	}
+	drive := &client.OpenIaaSVirtualDisk{
+		ID:   "disk-drive",
+		Name: CloudConfigDriveName,
+		VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+			{ID: vmID, ReadOnly: false},
+		},
+	}
+
+	for name, order := range map[string][]*client.OpenIaaSVirtualDisk{
+		"system disk first":  {system, drive},
+		"config drive first": {drive, system},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := FlattenOpenIaaSOSDisksData(order, vmID, true)
+			if len(got) != 1 {
+				t.Fatalf("expected exactly the system disk to survive, got %d entries: %#v", len(got), got)
+			}
+			if id := got[0].(map[string]interface{})["id"]; id != "disk-system" {
+				t.Fatalf("expected the system disk at index 0, got id %v", id)
+			}
+		})
+	}
+
+	// Without cloud-init the RW drive is NOT skipped (pre-#488 behavior kept
+	// for non-cloud-init VMs: name alone is never enough).
+	got := FlattenOpenIaaSOSDisksData([]*client.OpenIaaSVirtualDisk{system, drive}, vmID, false)
+	if len(got) != 2 {
+		t.Fatalf("without cloud-init both disks must stay managed, got %d entries", len(got))
 	}
 }
 
@@ -188,7 +282,7 @@ func TestFlattenOpenIaaSOSDisksDataSkipsNil(t *testing.T) {
 		VirtualMachines:   []client.OpenIaaSVirtualDiskConnection{{ID: "vm-1", Connected: true}},
 	}
 
-	got := FlattenOpenIaaSOSDisksData([]*client.OpenIaaSVirtualDisk{nil, valid, nil}, "vm-1")
+	got := FlattenOpenIaaSOSDisksData([]*client.OpenIaaSVirtualDisk{nil, valid, nil}, "vm-1", false)
 	if len(got) != 1 {
 		t.Fatalf("expected exactly 1 disk (nils skipped), got %d: %#v", len(got), got)
 	}

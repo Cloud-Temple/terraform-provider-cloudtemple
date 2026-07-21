@@ -103,36 +103,51 @@ func FlattenOpenIaaSVirtualMachine(vm *client.OpenIaaSVirtualMachine) map[string
 	}
 }
 
-// cloudConfigDriveName is the name XO gives to the cloud-init config drive
-// it attaches at deploy time.
-const cloudConfigDriveName = "XO CloudConfigDrive"
+// CloudConfigDriveName is the name XO gives to the cloud-init config drive
+// it attaches at deploy time. Exported so the resource schema can reject it
+// as a user-declared os_disk name (#488) and the Read classification can
+// recognize a captured drive in the state.
+const CloudConfigDriveName = "XO CloudConfigDrive"
 
-// IsPlatformManagedDisk reports whether the disk is managed by the platform
-// (cloud-init config drive, attached read-only by XO at deploy time) and must
-// never be reconciled as an os_disk: capturing it — which is timing dependent
-// at create — produces a permanent removal drift in every subsequent plan.
-// Both discriminators are required: the exact XO naming alone could hide a
-// legitimate user disk carrying the same name, and a read-only criterion
-// alone could drop legitimate read-only disks without a formal API
-// invariant. Only a disk attached read-only to this VM under the exact XO
-// platform naming is excluded; when the VBD is absent Find returns a zero
-// value, so the default stays fail-safe (the disk remains managed).
-func IsPlatformManagedDisk(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string) bool {
+// IsPlatformManagedDisk reports whether the disk is the platform's cloud-init
+// config drive and must not be reconciled as an os_disk: capturing it produces
+// a permanent removal drift in every subsequent plan (#255, #488). The exact
+// XO naming alone could hide a legitimate user disk carrying the same name, so
+// a second, independent evidence is always required on top of the name and the
+// VBD of THIS vm:
+//   - a read-only VBD (the original #255 criterion), or
+//   - cloudInitProvisioned: the resource's own cloud_init actually provisions
+//     a config drive (#488 — live evidence shows XO attaches the drive with a
+//     read-write VBD on the deploy path, so the read-only arm never matches).
+//
+// Callers choose the evidence they can vouch for: the Read drop path passes
+// false (strict #255 behavior, a state entry is never dropped on the weaker
+// evidence), the Create flatten passes the resource's real cloud-init intent.
+// When the VBD is absent Find returns a zero value and the disk stays managed
+// (fail-safe).
+func IsPlatformManagedDisk(osDisk *client.OpenIaaSVirtualDisk, virtualMachineId string, cloudInitProvisioned bool) bool {
 	if osDisk == nil {
 		// A nil disk (the API maps a deleted/forbidden disk to nil) is not a
 		// platform-managed disk; never dereference it (#320).
 		return false
 	}
-	if osDisk.Name != cloudConfigDriveName {
+	if virtualMachineId == "" {
+		return false
+	}
+	if osDisk.Name != CloudConfigDriveName {
 		return false
 	}
 	vbd := Find(osDisk.VirtualMachines, func(virtualMachine client.OpenIaaSVirtualDiskConnection) bool {
 		return virtualMachine.ID == virtualMachineId
 	})
-	return vbd.ReadOnly
+	if vbd.ID != virtualMachineId {
+		// No VBD on this VM: fail-safe, the disk stays managed.
+		return false
+	}
+	return vbd.ReadOnly || cloudInitProvisioned
 }
 
-func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMachineId string) []interface{} {
+func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMachineId string, cloudInitProvisioned bool) []interface{} {
 	disks := make([]interface{}, 0, len(osDisks))
 
 	for _, osDisk := range osDisks {
@@ -142,7 +157,7 @@ func FlattenOpenIaaSOSDisksData(osDisks []*client.OpenIaaSVirtualDisk, virtualMa
 		if osDisk == nil {
 			continue
 		}
-		if IsPlatformManagedDisk(osDisk, virtualMachineId) {
+		if IsPlatformManagedDisk(osDisk, virtualMachineId, cloudInitProvisioned) {
 			continue
 		}
 		disks = append(disks, FlattenOpenIaaSOSDiskData(osDisk, virtualMachineId))
