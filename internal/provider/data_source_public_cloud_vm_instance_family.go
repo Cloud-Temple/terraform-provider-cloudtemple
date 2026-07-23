@@ -62,6 +62,49 @@ func dataSourcePublicCloudVMInstanceFamily() *schema.Resource {
 				Computed:    true,
 				Description: "The maximum amount of RAM (GB) allowed in this family.",
 			},
+			"skus": publicCloudVMSkusSchema(),
+		},
+	}
+}
+
+// publicCloudVMSkusSchema is the shared, read-only schema of the priced SKU
+// catalogue (vCPU and RAM) exposed by both the single and list instance-family
+// datasources. Defining it once keeps the two datasources from drifting apart
+// (#506). It returns a fresh *schema.Schema on each call so each datasource owns
+// its own instance.
+func publicCloudVMSkusSchema() *schema.Schema {
+	return &schema.Schema{
+		Type:        schema.TypeList,
+		Computed:    true,
+		Description: "The priced billing SKUs (vCPU and RAM) of the instance family.",
+		Elem: &schema.Resource{
+			Schema: map[string]*schema.Schema{
+				"name": {
+					Type:        schema.TypeString,
+					Computed:    true,
+					Description: "The SKU identifier (e.g. `csp:fr1:vminstance:gp:vcpu:v1`).",
+				},
+				"price": {
+					Type:        schema.TypeFloat,
+					Computed:    true,
+					Description: "The unit price of the SKU.",
+				},
+				"unit": {
+					Type:        schema.TypeString,
+					Computed:    true,
+					Description: "The billing unit of the SKU (e.g. `vcpu`, `gio`).",
+				},
+				"description": {
+					Type:        schema.TypeString,
+					Computed:    true,
+					Description: "The human-readable description of the SKU (French).",
+				},
+				"description_en": {
+					Type:        schema.TypeString,
+					Computed:    true,
+					Description: "The English description of the SKU.",
+				},
+			},
 		},
 	}
 }

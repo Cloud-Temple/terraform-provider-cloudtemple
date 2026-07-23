@@ -25,6 +25,11 @@ func TestAccDataSourcePublicCloudVMInstanceFamily(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance_family.foo", "id"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance_family.foo", "name"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance_family.foo", "vcpu_max"),
+					// #506: the priced SKU catalogue must be exposed and populated.
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance_family.foo", "skus.#"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance_family.foo", "skus.0.name"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance_family.foo", "skus.0.unit"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance_family.foo", "skus.0.price"),
 				),
 			},
 			{

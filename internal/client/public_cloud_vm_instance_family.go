@@ -22,6 +22,12 @@ type PublicCloudVMInstanceFamily struct {
 	VcpuMax     int
 	RamMinGb    int
 	RamMaxGb    int
+	// Skus is the priced billing catalogue (vCPU and RAM) of the family. The
+	// API returns it on both the list and the single-item endpoints (#506).
+	// PublicCloudVMSku is the shared SKU type (defined with the storage-type
+	// sibling in public_cloud_vm_storage_type.go, #507): the same priced-SKU
+	// shape the VM Instances API returns across catalogue resources.
+	Skus []PublicCloudVMSku `json:"skus"`
 }
 
 // List returns the instance families of the tenant (bare JSON array, no filter).

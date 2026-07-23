@@ -5,6 +5,7 @@
 ENHANCEMENTS :
 
   * The `cloudtemple_public_cloud_vm_storage_type` and `cloudtemple_public_cloud_vm_storage_types` data sources now expose the priced `sku` object the VM Instances API returns on each storage type: `sku.name`, `sku.price`, `sku.unit`, `sku.description` and `sku.description_en` (all read-only). The `sku` block is empty when the API returns no SKU for a given storage type. This requires a VM Instances API version that returns `StorageType.sku`; against an older API the block is simply empty (#507).
+  * `cloudtemple_public_cloud_vm_instance_family` and `cloudtemple_public_cloud_vm_instance_families`: the data sources now expose the priced billing SKUs of each instance family through a new read-only `skus` attribute — a list of objects with `name`, `price`, `unit`, `description` and `description_en` — covering the on-demand per-vCPU and per-GiB-of-RAM pricing returned by the VM Instances API (#506). The SKUs are sorted by `name` so the list order is stable across reads.
 
 BUG FIXES :
 
