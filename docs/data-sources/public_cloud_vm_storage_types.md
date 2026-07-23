@@ -47,5 +47,17 @@ Read-Only:
 - `max_size_gb` (Number)
 - `min_size_gb` (Number)
 - `name` (String)
+- `sku` (List of Object) (see [below for nested schema](#nestedobjatt--storage_types--sku))
+
+<a id="nestedobjatt--storage_types--sku"></a>
+### Nested Schema for `storage_types.sku`
+
+Read-Only:
+
+- `description` (String)
+- `description_en` (String)
+- `name` (String)
+- `price` (Number)
+- `unit` (String)
 
 

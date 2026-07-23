@@ -46,5 +46,17 @@ output "storage_type" {
 - `is_available` (Boolean) Whether the storage type is currently available.
 - `max_size_gb` (Number) The maximum disk size (GB) allowed for this storage type.
 - `min_size_gb` (Number) The minimum disk size (GB) allowed for this storage type.
+- `sku` (List of Object) The priced SKU of the storage resource. Empty when the API returns no SKU for this storage type. (see [below for nested schema](#nestedatt--sku))
+
+<a id="nestedatt--sku"></a>
+### Nested Schema for `sku`
+
+Read-Only:
+
+- `description` (String)
+- `description_en` (String)
+- `name` (String)
+- `price` (Number)
+- `unit` (String)
 
 

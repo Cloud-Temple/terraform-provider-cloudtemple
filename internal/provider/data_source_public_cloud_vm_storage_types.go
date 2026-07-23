@@ -57,6 +57,7 @@ func dataSourcePublicCloudVMStorageTypes() *schema.Resource {
 							Computed:    true,
 							Description: "Whether the storage type is currently available.",
 						},
+						"sku": publicCloudVMStorageTypeSkuSchema(),
 					},
 				},
 			},
