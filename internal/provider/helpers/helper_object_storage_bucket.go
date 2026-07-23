@@ -10,6 +10,7 @@ func FlattenBucket(bucket *client.Bucket) map[string]interface{} {
 		"id":                    bucket.ID,
 		"name":                  bucket.Name,
 		"namespace":             bucket.Namespace,
+		"access_type":           bucket.AccessType,
 		"retention_period":      bucket.RetentionPeriod,
 		"versioning":            bucket.Versioning,
 		"endpoint":              bucket.Endpoint,
