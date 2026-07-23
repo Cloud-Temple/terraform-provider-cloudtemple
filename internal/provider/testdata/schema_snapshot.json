@@ -11452,6 +11452,38 @@
               "computed": true,
               "elem_kind": "nil"
             },
+            "skus": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "resource",
+              "elem_resource": {
+                "description": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "description_en": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "name": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "price": {
+                  "type": "TypeFloat",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "unit": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                }
+              }
+            },
             "vcpu_max": {
               "type": "TypeInt",
               "computed": true,
@@ -11507,6 +11539,38 @@
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
+        },
+        "skus": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "description": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "description_en": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "price": {
+              "type": "TypeFloat",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "unit": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
         },
         "vcpu_max": {
           "type": "TypeInt",
