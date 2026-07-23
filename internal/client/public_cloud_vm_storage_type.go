@@ -22,6 +22,23 @@ type PublicCloudVMStorageType struct {
 	MinSizeGb   int
 	MaxSizeGb   int
 	IsAvailable bool
+	// Sku is the priced SKU of the storage resource. It is a pointer because
+	// the API may omit it (or send null) for a given storage type; a nil Sku
+	// then flattens to an empty list rather than a phantom zero-priced object.
+	Sku *PublicCloudVMSku
+}
+
+// PublicCloudVMSku is the priced SKU the VM Instances API carries on each
+// storage type. Unlike its sibling fields, this struct pins EXPLICIT json tags:
+// they lock the exact API spelling of these billing fields (notably the
+// French/English description pair) instead of relying on case-insensitive
+// matching.
+type PublicCloudVMSku struct {
+	Name          string  `json:"name"`
+	Price         float64 `json:"price"`
+	Unit          string  `json:"unit"`
+	Description   string  `json:"description"`
+	DescriptionEn string  `json:"descriptionEn"`
 }
 
 type publicCloudVMStorageTypeListResponse struct {

@@ -2,6 +2,10 @@
 
 # 1.11.0 (Unreleased)
 
+ENHANCEMENTS :
+
+  * The `cloudtemple_public_cloud_vm_storage_type` and `cloudtemple_public_cloud_vm_storage_types` data sources now expose the priced `sku` object the VM Instances API returns on each storage type: `sku.name`, `sku.price`, `sku.unit`, `sku.description` and `sku.description_en` (all read-only). The `sku` block is empty when the API returns no SKU for a given storage type. This requires a VM Instances API version that returns `StorageType.sku`; against an older API the block is simply empty (#507).
+
 BUG FIXES :
 
   * `cloudtemple_object_storage_bucket`: the resource now refreshes `access_type` from the API, so a change made out-of-band in the Cloud Temple console (for example `custom` -> `private`) is detected as drift instead of staying invisible to `terraform plan` (#490). Previously the read path never wrote `access_type` back to the state, so console-side changes were silently ignored. Existing states whose console value has already diverged will show a one-time reconciling diff on the next plan — the expected behaviour, letting `terraform apply` realign the intended value. The `cloudtemple_object_storage_bucket` and `cloudtemple_object_storage_buckets` data sources now also expose `access_type`.
