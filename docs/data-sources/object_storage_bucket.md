@@ -34,6 +34,7 @@ output "bucket_id" {
 
 ### Read-Only
 
+- `access_type` (String) The access type of the bucket. Possible values are: `public`, `private`, `custom`.
 - `endpoint` (String) The endpoint URL of the bucket.
 - `id` (String) The ID of the bucket.
 - `namespace` (String) The namespace of the bucket.

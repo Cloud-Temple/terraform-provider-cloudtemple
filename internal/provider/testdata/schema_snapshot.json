@@ -10524,6 +10524,11 @@
     },
     "cloudtemple_object_storage_bucket": {
       "schema": {
+        "access_type": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
         "endpoint": {
           "type": "TypeString",
           "computed": true,
@@ -10691,6 +10696,11 @@
           "computed": true,
           "elem_kind": "resource",
           "elem_resource": {
+            "access_type": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
             "endpoint": {
               "type": "TypeString",
               "computed": true,

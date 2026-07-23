@@ -11,9 +11,14 @@ func (c *ObjectStorage) Bucket() *BucketClient {
 }
 
 type Bucket struct {
-	ID              string
-	Name            string
-	Namespace       string
+	ID        string
+	Name      string
+	Namespace string
+	// AccessType is refreshed from the API so an out-of-band change made in the
+	// console (e.g. custom -> private) surfaces as Terraform drift (#490). The
+	// explicit json tag is deliberate: this field is state-critical, so it must
+	// not rely on encoding/json implicit case-insensitive matching.
+	AccessType      string `json:"accessType"`
 	RetentionPeriod int64
 	Versioning      string
 	Endpoint        string
