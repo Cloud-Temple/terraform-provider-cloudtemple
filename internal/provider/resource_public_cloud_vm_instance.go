@@ -33,7 +33,7 @@ const (
 
 func resourcePublicCloudVMInstance() *schema.Resource {
 	return &schema.Resource{
-		Description: "Manages a Public Cloud VM instance. Creation, resize, power transitions and deletion are asynchronous (tracked through the Shiva Activities service). The system disk is provided by the template and is not created here; data disks and additional network adapters are managed by their own resources.",
+		Description: "Manages a Public Cloud VM instance. Creation, resize, power transitions and deletion are asynchronous (tracked through the Shiva Activities service). The system disk is provided by the image and is not created here; data disks and additional network adapters are managed by their own resources.",
 
 		CreateContext: resourcePublicCloudVMInstanceCreate,
 		ReadContext:   resourcePublicCloudVMInstanceRead,
@@ -42,6 +42,20 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 		Importer: &schema.ResourceImporter{
 			StateContext: schema.ImportStatePassthroughContext,
 		},
+
+		// v0 -> v1: the `template_id`/`template_name` attributes were renamed to
+		// `image_id`/`image_name` (the "template" catalogue object was renamed to
+		// "image"). The underlying value (a catalogue UUID / name) is unchanged, so
+		// the upgrader is a pure state-key rename and never forces a replacement.
+		SchemaVersion: 1,
+		StateUpgraders: []schema.StateUpgrader{
+			{
+				Type:    resourcePublicCloudVMInstanceResourceV0().CoreConfigSchema().ImpliedType(),
+				Upgrade: migratePublicCloudVMInstanceStateV0toV1,
+				Version: 0,
+			},
+		},
+
 		CustomizeDiff: customizeVMInstanceDiff,
 
 		// Generous timeouts: every write is async and a created VM must never be
@@ -95,12 +109,12 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				ValidateFunc: validation.IsUUID,
 				Description:  "The ID of the availability zone where the VM is placed. Immutable.",
 			},
-			"template_id": {
+			"image_id": {
 				Type:         schema.TypeString,
 				Required:     true,
 				ForceNew:     true,
 				ValidateFunc: validation.IsUUID,
-				Description:  "The ID of the OS template the VM is created from. Immutable.",
+				Description:  "The ID of the OS image the VM is created from. Immutable.",
 			},
 			"instance_family_id": {
 				Type:         schema.TypeString,
@@ -175,10 +189,10 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				Computed:    true,
 				Description: "The name of the availability zone.",
 			},
-			"template_name": {
+			"image_name": {
 				Type:        schema.TypeString,
 				Computed:    true,
-				Description: "The name of the OS template.",
+				Description: "The name of the OS image.",
 			},
 			"instance_family_name": {
 				Type:        schema.TypeString,
@@ -205,7 +219,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				Optional:    true,
 				Computed:    true,
 				MaxItems:    1,
-				Description: "The system (primary) disk of the VM, provided by the template. Declare the block with `size_gb` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the template's size is used. Data disks are managed by the separate disk resource.",
+				Description: "The system (primary) disk of the VM, provided by the image. Declare the block with `size_gb` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the image's size is used. Data disks are managed by the separate disk resource.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {Type: schema.TypeString, Computed: true, Description: "The unique identifier of the system disk."},
@@ -233,13 +247,13 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 func customizeVMInstanceDiff(ctx context.Context, d *schema.ResourceDiff, meta any) error {
 	exists := d.Id() != ""
 	// os_disk.size_gb cannot be set at CREATE: the VM is created with the
-	// template's system disk size, and create never extends it — so a configured
-	// value that differs from the template would produce an inconsistent result.
+	// image's system disk size, and create never extends it — so a configured
+	// value that differs from the image would produce an inconsistent result.
 	// Detected on the RAW config (never the diff/state: the attribute is
 	// Optional+Computed, so d.Get would report a computed value as "set").
 	if !exists {
 		if osDiskSizeSetInRawConfig(d.GetRawConfig()) {
-			return fmt.Errorf("os_disk.size_gb cannot be set when creating the VM: the template's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
+			return fmt.Errorf("os_disk.size_gb cannot be set when creating the VM: the image's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
 		}
 	} else if d.HasChange("os_disk.0.size_gb") {
 		// Grow-only + requires-off, validated on the LEAF only: a refresh of a
@@ -544,7 +558,7 @@ func setVMInstanceOSDisk(ctx context.Context, d *schema.ResourceData, funcs vmIn
 		}
 	}
 	if primary == nil {
-		// No primary disk reported (e.g. a never-booted template edge case): clear
+		// No primary disk reported (e.g. a never-booted image edge case): clear
 		// any stale os_disk block rather than keep a previously-read primary.
 		sw := newStateWriter(d)
 		sw.set("os_disk", []map[string]interface{}{})
@@ -563,7 +577,7 @@ func setVMInstanceOSDisk(ctx context.Context, d *schema.ResourceData, funcs vmIn
 }
 
 // setVMInstanceState writes the API view of the VM into the resource state. The
-// immutable ids (az/template/family) are reconciled to their API values to catch
+// immutable ids (az/image/family) are reconciled to their API values to catch
 // an out-of-band replacement; os_network_adapter and cloud_init are not returned
 // by the API and are ForceNew, so they are left untouched (kept from config).
 func setVMInstanceState(d *schema.ResourceData, vm *client.PublicCloudVMInstance, mode vmInstanceReadMode) diag.Diagnostics {
@@ -583,8 +597,8 @@ func setVMInstanceState(d *schema.ResourceData, vm *client.PublicCloudVMInstance
 	sw.set("guest_tools_installed", vm.GuestToolsInstalled)
 	sw.set("availability_zone_id", vm.AZ.ID)
 	sw.set("availability_zone_name", vm.AZ.Name)
-	sw.set("template_id", vm.Template.ID)
-	sw.set("template_name", vm.Template.Name)
+	sw.set("image_id", vm.Image.ID)
+	sw.set("image_name", vm.Image.Name)
 	sw.set("instance_family_id", vm.InstanceFamily.ID)
 	sw.set("instance_family_name", vm.InstanceFamily.Name)
 	if vm.BackupPolicy != nil {
@@ -763,12 +777,12 @@ func runVMInstanceActivity(ctx context.Context, wait func(ctx context.Context, a
 
 // buildCreateVMInstanceRequest maps the resource config into the create body. It
 // deliberately never sets disks[]: the resource does not create disks (the
-// template provides the system disk).
+// image provides the system disk).
 func buildCreateVMInstanceRequest(d *schema.ResourceData) (*client.CreateVMInstanceRequest, error) {
 	req := &client.CreateVMInstanceRequest{
 		Name:               d.Get("name").(string),
 		AvailabilityZoneID: d.Get("availability_zone_id").(string),
-		TemplateID:         d.Get("template_id").(string),
+		ImageID:            d.Get("image_id").(string),
 		InstanceFamilyID:   d.Get("instance_family_id").(string),
 		CPU:                d.Get("cpu").(int),
 		Memory:             d.Get("memory").(int),
@@ -813,4 +827,59 @@ func expandVMInstanceCloudInit(raw map[string]interface{}) *client.CreateVMInsta
 		ci.NetworkConfig = base64.StdEncoding.EncodeToString([]byte(v))
 	}
 	return ci
+}
+
+// resourcePublicCloudVMInstanceResourceV0 returns the V0 schema, used only to
+// migrate state written before the `template` -> `image` rename. It declares
+// just the two attributes whose keys changed; every other attribute is carried
+// through unchanged by migratePublicCloudVMInstanceStateV0toV1.
+//
+// The minimal-V0 pattern (declare only the changed keys, not a frozen copy of
+// the full schema) is safe here and matches the repository idiom
+// (migrateVirtualMachineStateV0toV1): this is an SDKv2 provider, so it only
+// runs under Terraform >= 0.12, whose state is JSON. On the JSON upgrade path
+// the SDK hands the upgrade function the FULL raw state map regardless of this
+// Type, so unrelated attributes are preserved (proven by
+// TestMigratePublicCloudVMInstanceStateV0toV1). The legacy flatmap path — the
+// only case where an undeclared attribute could be dropped through this Type —
+// cannot apply: flatmap state exists only under Terraform <= 0.11, which cannot
+// run an SDKv2 provider, and this resource is new in the 1.10.0 cycle so all of
+// its state is recent v0 JSON.
+func resourcePublicCloudVMInstanceResourceV0() *schema.Resource {
+	return &schema.Resource{
+		Schema: map[string]*schema.Schema{
+			"template_id": {
+				Type:     schema.TypeString,
+				Required: true,
+				ForceNew: true,
+			},
+			"template_name": {
+				Type:     schema.TypeString,
+				Computed: true,
+			},
+		},
+	}
+}
+
+// migratePublicCloudVMInstanceStateV0toV1 renames the state keys after the
+// `template` -> `image` catalogue rename: `template_id` -> `image_id` and
+// `template_name` -> `image_name`. The stored value (a catalogue UUID / name) is
+// identical for the renamed object, so this is a pure key rename: an existing
+// VM keeps its identity and is NOT forced to be recreated. Users must still
+// rename the argument in their HCL (`template_id` -> `image_id`); the state
+// migration only prevents the ForceNew replacement that the rename would
+// otherwise trigger.
+func migratePublicCloudVMInstanceStateV0toV1(ctx context.Context, rawState map[string]interface{}, meta interface{}) (map[string]interface{}, error) {
+	if rawState == nil {
+		return rawState, nil
+	}
+	if v, ok := rawState["template_id"]; ok {
+		rawState["image_id"] = v
+		delete(rawState, "template_id")
+	}
+	if v, ok := rawState["template_name"]; ok {
+		rawState["image_name"] = v
+		delete(rawState, "template_name")
+	}
+	return rawState, nil
 }

@@ -57,11 +57,11 @@ Read-Only:
 - `disks_size_gb` (Number)
 - `guest_tools_installed` (Boolean)
 - `id` (String)
+- `image` (List of Object) (see [below for nested schema](#nestedobjatt--instances--image))
 - `instance_family` (List of Object) (see [below for nested schema](#nestedobjatt--instances--instance_family))
 - `name` (String)
 - `ram_gb` (Number)
 - `status` (String)
-- `template` (List of Object) (see [below for nested schema](#nestedobjatt--instances--template))
 - `updated_at` (String)
 - `vcpu` (Number)
 
@@ -83,8 +83,8 @@ Read-Only:
 - `name` (String)
 
 
-<a id="nestedobjatt--instances--instance_family"></a>
-### Nested Schema for `instances.instance_family`
+<a id="nestedobjatt--instances--image"></a>
+### Nested Schema for `instances.image`
 
 Read-Only:
 
@@ -92,8 +92,8 @@ Read-Only:
 - `name` (String)
 
 
-<a id="nestedobjatt--instances--template"></a>
-### Nested Schema for `instances.template`
+<a id="nestedobjatt--instances--instance_family"></a>
+### Nested Schema for `instances.instance_family`
 
 Read-Only:
 

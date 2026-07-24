@@ -193,7 +193,7 @@ func createRD(t *testing.T) *schema.ResourceData {
 	return newVMInstanceRD(t, map[string]interface{}{
 		"name":                 "web",
 		"availability_zone_id": "11111111-1111-1111-1111-111111111111",
-		"template_id":          "22222222-2222-2222-2222-222222222222",
+		"image_id":             "22222222-2222-2222-2222-222222222222",
 		"instance_family_id":   "33333333-3333-3333-3333-333333333333",
 		"cpu":                  2,
 		"memory":               4,
@@ -549,11 +549,73 @@ func TestBuildCreateVMInstanceRequest(t *testing.T) {
 	if req.Name != "web" || req.CPU != 2 || req.Memory != 4 || req.PowerState != "on" {
 		t.Fatalf("scalar mapping wrong: %+v", req)
 	}
+	// The renamed attribute image_id must map to the create body's ImageID
+	// (json:"imageId"). This pins the resource-config -> request wiring so a
+	// revert to template_id would leave ImageID empty and turn this RED.
+	if req.ImageID != "22222222-2222-2222-2222-222222222222" {
+		t.Fatalf("image_id must map to CreateVMInstanceRequest.ImageID, got %q", req.ImageID)
+	}
 	if len(req.NetworkInterfaces) != 1 || req.NetworkInterfaces[0].NetworkID != "55555555-5555-5555-5555-555555555555" {
 		t.Fatalf("nic mapping wrong: %+v", req.NetworkInterfaces)
 	}
 	if req.CloudInit != nil {
 		t.Fatalf("cloud_init must be nil when unset, got %+v", req.CloudInit)
+	}
+}
+
+// TestMigratePublicCloudVMInstanceStateV0toV1 proves the v0->v1 state upgrader
+// renames template_id/template_name to image_id/image_name AND carries every
+// other state attribute through unchanged. The "carry-through" assertion is the
+// non-complacent part: it pins that the minimal-V0 upgrader never drops
+// unrelated state on the JSON upgrade path (the only path an SDKv2 provider
+// takes). Reverting the rename, or accidentally rebuilding the map instead of
+// mutating it, turns this RED.
+func TestMigratePublicCloudVMInstanceStateV0toV1(t *testing.T) {
+	v0 := map[string]interface{}{
+		"id":                 "vm-1",
+		"name":               "web",
+		"template_id":        "22222222-2222-2222-2222-222222222222",
+		"template_name":      "Rocky Linux 9",
+		"cpu":                2,
+		"instance_family_id": "33333333-3333-3333-3333-333333333333",
+		"os_disk":            []interface{}{map[string]interface{}{"size_gb": 40}},
+	}
+	out, err := migratePublicCloudVMInstanceStateV0toV1(context.Background(), v0, nil)
+	if err != nil {
+		t.Fatalf("upgrade: %v", err)
+	}
+
+	// Renamed keys carry their value across; the old keys are gone.
+	if out["image_id"] != "22222222-2222-2222-2222-222222222222" {
+		t.Fatalf("image_id = %v, want the old template_id value", out["image_id"])
+	}
+	if out["image_name"] != "Rocky Linux 9" {
+		t.Fatalf("image_name = %v, want the old template_name value", out["image_name"])
+	}
+	if _, ok := out["template_id"]; ok {
+		t.Fatalf("template_id must be removed after upgrade")
+	}
+	if _, ok := out["template_name"]; ok {
+		t.Fatalf("template_name must be removed after upgrade")
+	}
+
+	// Every unrelated attribute is preserved verbatim (the minimal-V0 upgrader
+	// must never drop state it does not touch).
+	if out["id"] != "vm-1" || out["name"] != "web" || out["cpu"] != 2 || out["instance_family_id"] != "33333333-3333-3333-3333-333333333333" {
+		t.Fatalf("unrelated attributes must be preserved: %#v", out)
+	}
+	if _, ok := out["os_disk"]; !ok {
+		t.Fatalf("os_disk must be preserved")
+	}
+
+	// A state without the old keys must not panic and must not fabricate the new
+	// ones (a partially-migrated or unexpected shape is left untouched).
+	partial, err := migratePublicCloudVMInstanceStateV0toV1(context.Background(), map[string]interface{}{"id": "vm-2"}, nil)
+	if err != nil {
+		t.Fatalf("upgrade partial: %v", err)
+	}
+	if _, ok := partial["image_id"]; ok {
+		t.Fatalf("image_id must not be fabricated when template_id was absent")
 	}
 }
 

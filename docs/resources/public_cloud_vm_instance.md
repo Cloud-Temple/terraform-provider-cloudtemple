@@ -3,7 +3,7 @@
 page_title: "cloudtemple_public_cloud_vm_instance Resource - terraform-provider-cloudtemple"
 subcategory: "Public Cloud VM Instances"
 description: |-
-  Manages a Public Cloud VM instance. Creation, resize, power transitions and deletion are asynchronous (tracked through the Shiva Activities service). The system disk is provided by the template and is not created here; data disks and additional network adapters are managed by their own resources.
+  Manages a Public Cloud VM instance. Creation, resize, power transitions and deletion are asynchronous (tracked through the Shiva Activities service). The system disk is provided by the image and is not created here; data disks and additional network adapters are managed by their own resources.
   To manage this resource you will need the following roles:
     - public_cloud_vm_instances_management
     - public_cloud_vm_instances_read
@@ -12,7 +12,7 @@ description: |-
 
 # cloudtemple_public_cloud_vm_instance (Resource)
 
-Manages a Public Cloud VM instance. Creation, resize, power transitions and deletion are asynchronous (tracked through the Shiva Activities service). The system disk is provided by the template and is not created here; data disks and additional network adapters are managed by their own resources.
+Manages a Public Cloud VM instance. Creation, resize, power transitions and deletion are asynchronous (tracked through the Shiva Activities service). The system disk is provided by the image and is not created here; data disks and additional network adapters are managed by their own resources.
 
 To manage this resource you will need the following roles:
   - `public_cloud_vm_instances_management`
@@ -31,7 +31,7 @@ data "cloudtemple_public_cloud_vm_instance_family" "family" {
   name = "Development"
 }
 
-data "cloudtemple_public_cloud_vm_template" "os" {
+data "cloudtemple_public_cloud_vm_image" "os" {
   name = "Debian 13"
 }
 
@@ -50,7 +50,7 @@ data "cloudtemple_public_cloud_vm_network" "lan" {
 resource "cloudtemple_public_cloud_vm_instance" "web" {
   name                 = "web-01"
   availability_zone_id = data.cloudtemple_public_cloud_vm_availability_zone.az.id
-  template_id          = data.cloudtemple_public_cloud_vm_template.os.id
+  image_id             = data.cloudtemple_public_cloud_vm_image.os.id
   instance_family_id   = data.cloudtemple_public_cloud_vm_instance_family.family.id
   cpu                  = 2
   memory               = 4
@@ -97,16 +97,16 @@ output "web_os_disk_size_gb" {
 - `availability_zone_id` (String) The ID of the availability zone where the VM is placed. Immutable.
 - `backup_policy_id` (String) The ID of the backup policy applied to the VM. Required, mutable (issues a metadata update).
 - `cpu` (Number) The number of vCPUs. Mutable via resize, which requires `power_state = "off"`.
+- `image_id` (String) The ID of the OS image the VM is created from. Immutable.
 - `instance_family_id` (String) The ID of the instance family. Immutable.
 - `memory` (Number) The amount of RAM in GB. Mutable via resize, which requires `power_state = "off"`.
 - `name` (String) The name of the virtual machine. Mutable (issues a metadata update).
 - `os_network_adapter` (Block List, Min: 1, Max: 8) The network interfaces attached at creation (Private Backbone networks only — attach VPC networks with the dedicated network adapter resource). Immutable here; additional adapters are managed by the dedicated network adapter resource. (see [below for nested schema](#nestedblock--os_network_adapter))
-- `template_id` (String) The ID of the OS template the VM is created from. Immutable.
 
 ### Optional
 
 - `cloud_init` (Map of String) The cloud-init configuration applied at creation (keys `cloud_config` and/or `network_config`), as plain YAML — the provider base64-encodes it for the API. Immutable and not readable back, so it is not reconciled on refresh.
-- `os_disk` (Block List, Max: 1) The system (primary) disk of the VM, provided by the template. Declare the block with `size_gb` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the template's size is used. Data disks are managed by the separate disk resource. (see [below for nested schema](#nestedblock--os_disk))
+- `os_disk` (Block List, Max: 1) The system (primary) disk of the VM, provided by the image. Declare the block with `size_gb` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the image's size is used. Data disks are managed by the separate disk resource. (see [below for nested schema](#nestedblock--os_disk))
 - `power_state` (String) The desired power state (`on` or `off`, default `off`). Honoured from the first apply (passed to the create call, so an `on` VM boots at creation). Changing it later issues a start (`off`->`on`) or stop (`on`->`off`).
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
@@ -118,9 +118,9 @@ output "web_os_disk_size_gb" {
 - `disks_size_gb` (Number) The total size of the VM's disks (system + data) in GB.
 - `guest_tools_installed` (Boolean) Whether the guest tools are installed.
 - `id` (String) The ID of this resource.
+- `image_name` (String) The name of the OS image.
 - `instance_family_name` (String) The name of the instance family.
 - `status` (String) The current status of the VM (e.g. `running`, `stopped`).
-- `template_name` (String) The name of the OS template.
 - `updated_at` (String) The last update date of the VM (RFC3339).
 
 <a id="nestedblock--os_network_adapter"></a>

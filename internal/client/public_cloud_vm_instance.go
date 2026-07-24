@@ -27,7 +27,7 @@ func (v *PublicCloudVMClient) Instance() *PublicCloudVMInstanceClient {
 const publicCloudVMInstanceListPageSize = 200
 
 // PublicCloudVMInstanceRef is the {id, name} shape used for the resolved
-// availability zone, template, instance family and backup policy references
+// availability zone, image, instance family and backup policy references
 // returned by the API.
 type PublicCloudVMInstanceRef struct {
 	ID   string
@@ -44,7 +44,7 @@ type PublicCloudVMInstance struct {
 	Name                string
 	Status              string
 	AZ                  PublicCloudVMInstanceRef
-	Template            PublicCloudVMInstanceRef
+	Image               PublicCloudVMInstanceRef
 	InstanceFamily      PublicCloudVMInstanceRef
 	VCPU                int
 	RAMGb               int
@@ -206,13 +206,13 @@ type CreateVMInstanceCloudInit struct {
 
 // CreateVMInstanceRequest is the body of POST /vm_instances/v1/virtual_machines.
 // disks[] is deliberately NOT modelled: the resource never creates disks (the
-// template provides the system disk); data disks are the standalone disk
+// image provides the system disk); data disks are the standalone disk
 // resource. PowerState is passed through so the VM boots (or stays off) from the
 // first apply; when empty the API leaves the VM stopped.
 type CreateVMInstanceRequest struct {
 	Name               string                     `json:"name"`
 	AvailabilityZoneID string                     `json:"availabilityZoneId"`
-	TemplateID         string                     `json:"templateId"`
+	ImageID            string                     `json:"imageId"`
 	InstanceFamilyID   string                     `json:"instanceFamilyId"`
 	CPU                int                        `json:"cpu"`
 	Memory             int                        `json:"memory"`
