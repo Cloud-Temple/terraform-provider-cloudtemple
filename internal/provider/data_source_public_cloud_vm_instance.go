@@ -11,7 +11,7 @@ import (
 )
 
 // publicCloudVMInstanceRefSchema returns the Computed {id, name} nested block used
-// for the resolved availability zone, template, instance family and backup policy.
+// for the resolved availability zone, image, instance family and backup policy.
 func publicCloudVMInstanceRefSchema(description string) *schema.Schema {
 	return &schema.Schema{
 		Type:        schema.TypeList,
@@ -35,7 +35,7 @@ func publicCloudVMInstanceComputedAttributes() map[string]*schema.Schema {
 		"name":                  {Type: schema.TypeString, Computed: true, Description: "The name of the virtual machine."},
 		"status":                {Type: schema.TypeString, Computed: true, Description: "The current status of the VM (e.g. `running`, `stopped`)."},
 		"availability_zone":     publicCloudVMInstanceRefSchema("The resolved availability zone."),
-		"template":              publicCloudVMInstanceRefSchema("The resolved OS template."),
+		"image":                 publicCloudVMInstanceRefSchema("The resolved OS image."),
 		"instance_family":       publicCloudVMInstanceRefSchema("The resolved instance family."),
 		"vcpu":                  {Type: schema.TypeInt, Computed: true, Description: "The number of vCPUs."},
 		"ram_gb":                {Type: schema.TypeInt, Computed: true, Description: "The amount of RAM in GB."},

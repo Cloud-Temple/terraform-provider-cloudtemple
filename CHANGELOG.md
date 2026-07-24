@@ -2,6 +2,15 @@
 
 # 1.11.0 (Unreleased)
 
+BREAKING CHANGES :
+
+  * The Public Cloud VM Instances OS-image catalogue is now exposed as `image` instead of `template`, matching the renamed VM Instances API endpoint (`GET /vm_instances/v1/images`). This is a breaking rename with no backward-compatible alias:
+    * the `cloudtemple_public_cloud_vm_template` and `cloudtemple_public_cloud_vm_templates` data sources are renamed to `cloudtemple_public_cloud_vm_image` and `cloudtemple_public_cloud_vm_images`; their `template_type` attribute becomes `image_type`, and the `templates` list attribute becomes `images`;
+    * on the `cloudtemple_public_cloud_vm_instance` resource, the `template_id` argument is renamed to `image_id` and the computed `template_name` attribute to `image_name`;
+    * on the `cloudtemple_public_cloud_vm_instance` and `cloudtemple_public_cloud_vm_instances` data sources, the computed `template` block is renamed to `image`.
+
+    Existing state is migrated automatically by a schema state upgrader (v0 → v1) that renames the stored `template_id`/`template_name` keys to `image_id`/`image_name`, so a VM already in state is NOT destroyed or recreated. You MUST still update your configuration: rename `template_id` → `image_id` in every `cloudtemple_public_cloud_vm_instance` block, and update any reference to the renamed data sources and attributes. Requires a VM Instances API version that serves `/vm_instances/v1/images` (#510).
+
 ENHANCEMENTS :
 
   * The `cloudtemple_public_cloud_vm_storage_type` and `cloudtemple_public_cloud_vm_storage_types` data sources now expose the priced `sku` object the VM Instances API returns on each storage type: `sku.name`, `sku.price`, `sku.unit`, `sku.description` and `sku.description_en` (all read-only). The `sku` block is empty when the API returns no SKU for a given storage type. This requires a VM Instances API version that returns `StorageType.sku`; against an older API the block is simply empty (#507).

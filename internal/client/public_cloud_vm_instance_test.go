@@ -14,7 +14,7 @@ import (
 // TestPublicCloudVMInstanceListDecode pins the decode of the wrapped
 // ({"vms":[...],"total":N}), camelCase GET /vm_instances/v1/virtual_machines
 // response: nested {id,name}
-// refs (az, template, instanceFamily), int fields (vcpu, ramGb, disksSizeGb),
+// refs (az, image, instanceFamily), int fields (vcpu, ramGb, disksSizeGb),
 // the bool guestToolsInstalled, and a nullable backupPolicy that decodes to nil.
 func TestPublicCloudVMInstanceListDecode(t *testing.T) {
 	ctx := context.Background()
@@ -26,7 +26,7 @@ func TestPublicCloudVMInstanceListDecode(t *testing.T) {
 		_, _ = w.Write([]byte(`{"total":2,"vms":[
 		  {"id":"vm-1","name":"web","status":"running",
 		   "az":{"id":"az-1","name":"fr1-az01"},
-		   "template":{"id":"tpl-1","name":"rocky-9"},
+		   "image":{"id":"img-1","name":"rocky-9"},
 		   "instanceFamily":{"id":"fam-1","name":"general"},
 		   "vcpu":2,"ramGb":4,"disksSizeGb":40,
 		   "backupPolicy":{"id":"bp-1","name":"daily"},
@@ -34,7 +34,7 @@ func TestPublicCloudVMInstanceListDecode(t *testing.T) {
 		   "createdAt":"2026-04-14T12:50:41.881814","updatedAt":"2026-04-14T12:50:41.881814"},
 		  {"id":"vm-2","name":"db","status":"stopped",
 		   "az":{"id":"az-1","name":"fr1-az01"},
-		   "template":{"id":"tpl-1","name":"rocky-9"},
+		   "image":{"id":"img-1","name":"rocky-9"},
 		   "instanceFamily":{"id":"fam-1","name":"general"},
 		   "vcpu":1,"ramGb":2,"disksSizeGb":20,
 		   "backupPolicy":null,
@@ -57,8 +57,8 @@ func TestPublicCloudVMInstanceListDecode(t *testing.T) {
 	if first.AZ.ID != "az-1" || first.AZ.Name != "fr1-az01" {
 		t.Fatalf("az ref not decoded: %+v", first.AZ)
 	}
-	if first.Template.ID != "tpl-1" || first.InstanceFamily.ID != "fam-1" {
-		t.Fatalf("template/family refs not decoded: %+v", first)
+	if first.Image.ID != "img-1" || first.InstanceFamily.ID != "fam-1" {
+		t.Fatalf("image/family refs not decoded: %+v", first)
 	}
 	if first.VCPU != 2 || first.RAMGb != 4 || first.DisksSizeGb != 40 {
 		t.Fatalf("int fields not decoded: vcpu=%d ramGb=%d disksSizeGb=%d", first.VCPU, first.RAMGb, first.DisksSizeGb)
@@ -325,7 +325,7 @@ func TestPublicCloudVMInstanceCreate(t *testing.T) {
 		activityID, err := c.PublicCloudVM().Instance().Create(ctx, &CreateVMInstanceRequest{
 			Name:               "web",
 			AvailabilityZoneID: "az-1",
-			TemplateID:         "tpl-1",
+			ImageID:            "img-1",
 			InstanceFamilyID:   "fam-1",
 			CPU:                2,
 			Memory:             4,
@@ -339,10 +339,14 @@ func TestPublicCloudVMInstanceCreate(t *testing.T) {
 		if activityID != "act-create-1" {
 			t.Fatalf("Create must return the Location activityId, got %q", activityID)
 		}
-		for _, k := range []string{"name", "availabilityZoneId", "templateId", "instanceFamilyId", "cpu", "memory", "backupPolicyId", "networkInterfaces", "powerState"} {
+		for _, k := range []string{"name", "availabilityZoneId", "imageId", "instanceFamilyId", "cpu", "memory", "backupPolicyId", "networkInterfaces", "powerState"} {
 			if _, ok := body[k]; !ok {
 				t.Fatalf("create body missing camelCase key %q (body: %v)", k, body)
 			}
+		}
+		// Negative assertion: the old key must be gone, so a revert to templateId turns this RED.
+		if _, ok := body["templateId"]; ok {
+			t.Fatalf("create body must NOT contain the old key templateId (body: %v)", body)
 		}
 		if _, ok := body["disks"]; ok {
 			t.Fatalf("create body must NOT contain disks[]: the resource never creates disks (body: %v)", body)
