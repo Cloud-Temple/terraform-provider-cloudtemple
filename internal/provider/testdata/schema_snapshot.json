@@ -12259,6 +12259,15 @@
     },
     "cloudtemple_public_cloud_vm_storage_type": {
       "schema": {
+        "availability_zone_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "required_with": [
+            "instance_family_id"
+          ],
+          "elem_kind": "nil"
+        },
         "description": {
           "type": "TypeString",
           "computed": true,
@@ -12274,6 +12283,15 @@
           "at_least_one_of": [
             "id",
             "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "instance_family_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "required_with": [
+            "availability_zone_id"
           ],
           "elem_kind": "nil"
         },
@@ -12345,6 +12363,24 @@
     },
     "cloudtemple_public_cloud_vm_storage_types": {
       "schema": {
+        "availability_zone_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "required_with": [
+            "instance_family_id"
+          ],
+          "elem_kind": "nil"
+        },
+        "instance_family_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "required_with": [
+            "availability_zone_id"
+          ],
+          "elem_kind": "nil"
+        },
         "storage_types": {
           "type": "TypeList",
           "computed": true,
