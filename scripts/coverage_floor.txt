@@ -24,6 +24,11 @@
 # stays 24.8 and internal/provider/helpers stays 70.0 (FlattenStaticIP was already
 # unit-covered at C2). Only the floor that C3's own tests improved is raised here;
 # the client slack remains deferred per the C2 note.
+# v1.11.0 #488: the platform-drive discriminator tests (flatten skip in both
+# orders, cloud-init arm, VBD fail-safe) raise internal/provider/helpers
+# 70.0 -> 70.9. Only the floor improved by #488's own tests is raised; the
+# client/provider slack accumulated by the v1.11.0 train is left for a
+# dedicated --update.
 internal/client 24.8
 internal/provider 14.3
-internal/provider/helpers 70.0
+internal/provider/helpers 70.9

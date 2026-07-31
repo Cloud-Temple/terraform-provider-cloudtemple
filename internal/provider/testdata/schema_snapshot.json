@@ -511,6 +511,7 @@
               "type": "TypeString",
               "optional": true,
               "computed": true,
+              "has_validate_func": true,
               "elem_kind": "nil"
             },
             "size": {
@@ -1975,7 +1976,14 @@
       }
     },
     "cloudtemple_public_cloud_vm_instance": {
+      "schema_version": 1,
       "has_customize_diff": true,
+      "state_upgraders": [
+        {
+          "version": 0,
+          "type": "cty.Object(map[string]cty.Type{\"id\":cty.String, \"template_id\":cty.String, \"template_name\":cty.String})"
+        }
+      ],
       "schema": {
         "availability_zone_id": {
           "type": "TypeString",
@@ -2025,6 +2033,18 @@
         },
         "guest_tools_installed": {
           "type": "TypeBool",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "image_id": {
+          "type": "TypeString",
+          "required": true,
+          "force_new": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "image_name": {
+          "type": "TypeString",
           "computed": true,
           "elem_kind": "nil"
         },
@@ -2127,18 +2147,6 @@
           "elem_kind": "nil"
         },
         "status": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        },
-        "template_id": {
-          "type": "TypeString",
-          "required": true,
-          "force_new": true,
-          "has_validate_func": true,
-          "elem_kind": "nil"
-        },
-        "template_name": {
           "type": "TypeString",
           "computed": true,
           "elem_kind": "nil"
@@ -10523,6 +10531,11 @@
     },
     "cloudtemple_object_storage_bucket": {
       "schema": {
+        "access_type": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
         "endpoint": {
           "type": "TypeString",
           "computed": true,
@@ -10690,6 +10703,11 @@
           "computed": true,
           "elem_kind": "resource",
           "elem_resource": {
+            "access_type": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
             "endpoint": {
               "type": "TypeString",
               "computed": true,
@@ -11291,6 +11309,200 @@
         }
       }
     },
+    "cloudtemple_public_cloud_vm_image": {
+      "schema": {
+        "availability_zone_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "categories": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "value_type:TypeString"
+        },
+        "compatible_families": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "value_type:TypeString"
+        },
+        "description_en": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "disk_sizes_gb": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "value_type:TypeInt"
+        },
+        "editor": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "family": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "icon": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "conflicts_with": [
+            "name"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "image_type": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "instance_family_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "name": {
+          "type": "TypeString",
+          "optional": true,
+          "conflicts_with": [
+            "id"
+          ],
+          "at_least_one_of": [
+            "id",
+            "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "os_family": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "os_name": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "os_version": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        },
+        "version": {
+          "type": "TypeString",
+          "computed": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
+    "cloudtemple_public_cloud_vm_images": {
+      "schema": {
+        "availability_zone_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        },
+        "images": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "categories": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "value_type:TypeString"
+            },
+            "compatible_families": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "value_type:TypeString"
+            },
+            "description_en": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "disk_sizes_gb": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "value_type:TypeInt"
+            },
+            "editor": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "family": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "icon": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "image_type": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "os_family": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "os_name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "os_version": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "version": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
+        "instance_family_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "elem_kind": "nil"
+        }
+      }
+    },
     "cloudtemple_public_cloud_vm_instance": {
       "schema": {
         "availability_zone": {
@@ -11348,6 +11560,23 @@
           "has_validate_func": true,
           "elem_kind": "nil"
         },
+        "image": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "id": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
+        },
         "instance_family": {
           "type": "TypeList",
           "computed": true,
@@ -11379,23 +11608,6 @@
           "type": "TypeString",
           "computed": true,
           "elem_kind": "nil"
-        },
-        "template": {
-          "type": "TypeList",
-          "computed": true,
-          "elem_kind": "resource",
-          "elem_resource": {
-            "id": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "name": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            }
-          }
         },
         "updated_at": {
           "type": "TypeString",
@@ -11440,6 +11652,38 @@
               "type": "TypeInt",
               "computed": true,
               "elem_kind": "nil"
+            },
+            "skus": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "resource",
+              "elem_resource": {
+                "description": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "description_en": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "name": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "price": {
+                  "type": "TypeFloat",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "unit": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                }
+              }
             },
             "vcpu_max": {
               "type": "TypeInt",
@@ -11496,6 +11740,38 @@
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
+        },
+        "skus": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "description": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "description_en": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "price": {
+              "type": "TypeFloat",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "unit": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
         },
         "vcpu_max": {
           "type": "TypeInt",
@@ -11582,6 +11858,23 @@
               "computed": true,
               "elem_kind": "nil"
             },
+            "image": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "resource",
+              "elem_resource": {
+                "id": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "name": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                }
+              }
+            },
             "instance_family": {
               "type": "TypeList",
               "computed": true,
@@ -11613,23 +11906,6 @@
               "type": "TypeString",
               "computed": true,
               "elem_kind": "nil"
-            },
-            "template": {
-              "type": "TypeList",
-              "computed": true,
-              "elem_kind": "resource",
-              "elem_resource": {
-                "id": {
-                  "type": "TypeString",
-                  "computed": true,
-                  "elem_kind": "nil"
-                },
-                "name": {
-                  "type": "TypeString",
-                  "computed": true,
-                  "elem_kind": "nil"
-                }
-              }
             },
             "updated_at": {
               "type": "TypeString",
@@ -11983,6 +12259,15 @@
     },
     "cloudtemple_public_cloud_vm_storage_type": {
       "schema": {
+        "availability_zone_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "required_with": [
+            "instance_family_id"
+          ],
+          "elem_kind": "nil"
+        },
         "description": {
           "type": "TypeString",
           "computed": true,
@@ -11998,6 +12283,15 @@
           "at_least_one_of": [
             "id",
             "name"
+          ],
+          "elem_kind": "nil"
+        },
+        "instance_family_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "required_with": [
+            "availability_zone_id"
           ],
           "elem_kind": "nil"
         },
@@ -12032,11 +12326,61 @@
             "name"
           ],
           "elem_kind": "nil"
+        },
+        "sku": {
+          "type": "TypeList",
+          "computed": true,
+          "elem_kind": "resource",
+          "elem_resource": {
+            "description": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "description_en": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "name": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "price": {
+              "type": "TypeFloat",
+              "computed": true,
+              "elem_kind": "nil"
+            },
+            "unit": {
+              "type": "TypeString",
+              "computed": true,
+              "elem_kind": "nil"
+            }
+          }
         }
       }
     },
     "cloudtemple_public_cloud_vm_storage_types": {
       "schema": {
+        "availability_zone_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "required_with": [
+            "instance_family_id"
+          ],
+          "elem_kind": "nil"
+        },
+        "instance_family_id": {
+          "type": "TypeString",
+          "optional": true,
+          "has_validate_func": true,
+          "required_with": [
+            "availability_zone_id"
+          ],
+          "elem_kind": "nil"
+        },
         "storage_types": {
           "type": "TypeList",
           "computed": true,
@@ -12076,6 +12420,38 @@
               "type": "TypeString",
               "computed": true,
               "elem_kind": "nil"
+            },
+            "sku": {
+              "type": "TypeList",
+              "computed": true,
+              "elem_kind": "resource",
+              "elem_resource": {
+                "description": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "description_en": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "name": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "price": {
+                  "type": "TypeFloat",
+                  "computed": true,
+                  "elem_kind": "nil"
+                },
+                "unit": {
+                  "type": "TypeString",
+                  "computed": true,
+                  "elem_kind": "nil"
+                }
+              }
             }
           }
         }
@@ -12205,200 +12581,6 @@
           "optional": true,
           "has_validate_func": true,
           "elem_kind": "nil"
-        }
-      }
-    },
-    "cloudtemple_public_cloud_vm_template": {
-      "schema": {
-        "availability_zone_id": {
-          "type": "TypeString",
-          "optional": true,
-          "has_validate_func": true,
-          "elem_kind": "nil"
-        },
-        "categories": {
-          "type": "TypeList",
-          "computed": true,
-          "elem_kind": "value_type:TypeString"
-        },
-        "compatible_families": {
-          "type": "TypeList",
-          "computed": true,
-          "elem_kind": "value_type:TypeString"
-        },
-        "description_en": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        },
-        "disk_sizes_gb": {
-          "type": "TypeList",
-          "computed": true,
-          "elem_kind": "value_type:TypeInt"
-        },
-        "editor": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        },
-        "family": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        },
-        "icon": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        },
-        "id": {
-          "type": "TypeString",
-          "optional": true,
-          "has_validate_func": true,
-          "conflicts_with": [
-            "name"
-          ],
-          "at_least_one_of": [
-            "id",
-            "name"
-          ],
-          "elem_kind": "nil"
-        },
-        "instance_family_id": {
-          "type": "TypeString",
-          "optional": true,
-          "has_validate_func": true,
-          "elem_kind": "nil"
-        },
-        "name": {
-          "type": "TypeString",
-          "optional": true,
-          "conflicts_with": [
-            "id"
-          ],
-          "at_least_one_of": [
-            "id",
-            "name"
-          ],
-          "elem_kind": "nil"
-        },
-        "os_family": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        },
-        "os_name": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        },
-        "os_version": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        },
-        "template_type": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        },
-        "version": {
-          "type": "TypeString",
-          "computed": true,
-          "elem_kind": "nil"
-        }
-      }
-    },
-    "cloudtemple_public_cloud_vm_templates": {
-      "schema": {
-        "availability_zone_id": {
-          "type": "TypeString",
-          "optional": true,
-          "has_validate_func": true,
-          "elem_kind": "nil"
-        },
-        "instance_family_id": {
-          "type": "TypeString",
-          "optional": true,
-          "has_validate_func": true,
-          "elem_kind": "nil"
-        },
-        "templates": {
-          "type": "TypeList",
-          "computed": true,
-          "elem_kind": "resource",
-          "elem_resource": {
-            "categories": {
-              "type": "TypeList",
-              "computed": true,
-              "elem_kind": "value_type:TypeString"
-            },
-            "compatible_families": {
-              "type": "TypeList",
-              "computed": true,
-              "elem_kind": "value_type:TypeString"
-            },
-            "description_en": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "disk_sizes_gb": {
-              "type": "TypeList",
-              "computed": true,
-              "elem_kind": "value_type:TypeInt"
-            },
-            "editor": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "family": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "icon": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "id": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "name": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "os_family": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "os_name": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "os_version": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "template_type": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            },
-            "version": {
-              "type": "TypeString",
-              "computed": true,
-              "elem_kind": "nil"
-            }
-          }
         }
       }
     },

@@ -216,7 +216,24 @@ Order of the elements in the list is the boot order.`,
 							Type:        schema.TypeString,
 							Optional:    true,
 							Computed:    true,
-							Description: "The name of the operating system disk. (Updating this property implies a disk disconnect-reconnect)",
+							Description: "The name of the operating system disk. (Updating this property implies a disk disconnect-reconnect) The name \"XO CloudConfigDrive\" is reserved by the platform for the cloud-init config drive and cannot be used.",
+							// #488: the platform names its cloud-init config drive
+							// exactly like this; a user disk declared under the
+							// reserved name would be indistinguishable from it.
+							// Config-only validation: captured drives living in the
+							// STATE (Computed values) are not validated, so polluted
+							// states keep planning and self-heal normally.
+							ValidateDiagFunc: func(v any, p cty.Path) diag.Diagnostics {
+								if v.(string) == helpers.CloudConfigDriveName {
+									return diag.Diagnostics{{
+										Severity:      diag.Error,
+										Summary:       "Reserved os_disk name",
+										Detail:        fmt.Sprintf("%q is the name the platform gives to the cloud-init config drive it attaches at deploy time; it cannot be used as an os_disk name.", helpers.CloudConfigDriveName),
+										AttributePath: p,
+									}}
+								}
+								return nil
+							},
 						},
 						"size": {
 							Type:        schema.TypeInt,
@@ -467,6 +484,39 @@ func buildOpenIaasCloudInit(raw map[string]interface{}) (*client.CloudInit, erro
 	return &client.CloudInit{CloudConfig: cloudConfig, NetworkConfig: networkConfig}, nil
 }
 
+// openIaasCloudInitProvisioned reports whether the resource's cloud_init
+// actually provisions a platform config drive, with the exact semantics of
+// what Create sends (buildOpenIaasCloudInit: non-empty cloud_config). An
+// empty map is omitted from the deploy and creates no drive; a
+// network_config-only map fails the Create itself, so on the Read path it
+// simply means no drive was ever provisioned (flag false). cloud_init is
+// ForceNew, so the answer cannot diverge on a live resource between the
+// Create that deployed it and any later Read (#488).
+func openIaasCloudInitProvisioned(d *schema.ResourceData) bool {
+	raw, _ := d.Get("cloud_init").(map[string]interface{})
+	cloudInit, err := buildOpenIaasCloudInit(raw)
+	return err == nil && cloudInit != nil
+}
+
+// openIaasReservedSourceDiskError fails a create BEFORE anything is deployed
+// when the source image (template or marketplace item) carries a disk named
+// like the platform's cloud-init config drive while cloud_init is provisioned:
+// after the deploy that disk would be indistinguishable from the platform
+// drive (#488). Evidence-only rejection: absent or empty source-disk metadata
+// passes (incomplete catalogs must not be blocked), the post-deploy ambiguity
+// guard remains the net.
+func openIaasReservedSourceDiskError(sourceDiskNames []string, cloudInitProvisioned bool) error {
+	if !cloudInitProvisioned {
+		return nil
+	}
+	for _, name := range sourceDiskNames {
+		if name == helpers.CloudConfigDriveName {
+			return fmt.Errorf("the source image carries a disk named %q, which is reserved for the platform's cloud-init config drive: with cloud_init set, that disk could not be told apart from the platform drive after the deploy. Rename the source image disk or remove cloud_init", helpers.CloudConfigDriveName)
+		}
+	}
+	return nil
+}
+
 func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
@@ -495,6 +545,16 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		}
 		if template == nil {
 			return diag.Errorf("Could not find template with id : %s", d.Get("template_id").(string))
+		}
+
+		// #488 preflight: fail before creating anything if a template disk
+		// carries the reserved cloud-init config drive name.
+		templateDiskNames := make([]string, 0, len(template.Disks))
+		for _, disk := range template.Disks {
+			templateDiskNames = append(templateDiskNames, disk.Name)
+		}
+		if err := openIaasReservedSourceDiskError(templateDiskNames, cloudInit != nil); err != nil {
+			return diag.FromErr(err)
 		}
 
 		if osNetworkAdapters != nil && len(osNetworkAdapters) != len(template.NetworkAdapters) {
@@ -535,6 +595,16 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		}
 		if openIaasItemInfo == nil {
 			return diag.Errorf("Could not find marketplace item info with id : %s", d.Get("marketplace_item_id").(string))
+		}
+
+		// #488 preflight: fail before deploying anything if a marketplace item
+		// disk carries the reserved cloud-init config drive name.
+		itemDiskNames := make([]string, 0, len(openIaasItemInfo.Disks))
+		for _, disk := range openIaasItemInfo.Disks {
+			itemDiskNames = append(itemDiskNames, disk.Name)
+		}
+		if err := openIaasReservedSourceDiskError(itemDiskNames, cloudInit != nil); err != nil {
+			return diag.FromErr(err)
 		}
 
 		if osNetworkAdapters != nil && len(osNetworkAdapters) != len(openIaasItemInfo.NetworkAdapters) {
@@ -581,7 +651,19 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		return diag.Errorf("could not list disks of virtual machine, %s", err)
 	}
 
-	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSDisksData(disks, d.Id()), "os_disk")
+	// #488: with cloud_init provisioned, the platform attached its config drive
+	// (read-write VBD, live-verified) before the deploy activity completed; the
+	// flatten below skips it so it is never captured as a managed os_disk.
+	// Exactly one disk may match the platform discriminator — the preflight
+	// rejected source images carrying the reserved name, so two or more matches
+	// mean the platform contract is broken: fail closed, never guess.
+	cloudInitProvisioned := cloudInit != nil
+	if cloudInitProvisioned {
+		if ambiguous := openIaasAmbiguousConfigDriveIDs(disks, d.Id()); len(ambiguous) > 1 {
+			return diag.Errorf("found %d disks matching the platform cloud-init config drive discriminator (%s): cannot tell the platform drive apart from a same-named disk; refusing to shape os_disk from an ambiguous listing", len(ambiguous), strings.Join(ambiguous, ", "))
+		}
+	}
+	osDisks := helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSDisksData(disks, d.Id(), cloudInitProvisioned), "os_disk")
 	if err := d.Set("os_disk", osDisks); err != nil {
 		return diag.FromErr(err)
 	}
@@ -710,6 +792,7 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 	}
 
 	// Get the OS disks
+	cloudInitProvisioned := openIaasCloudInitProvisioned(d)
 	osDisks := []interface{}{}
 	for _, osDisk := range d.Get("os_disk").([]interface{}) {
 		if osDisk == nil {
@@ -719,13 +802,29 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 		if osDiskId == "" {
 			continue
 		}
+		// The state entry's own name is provenance evidence for the
+		// guidance-only classification (#488): it distinguishes an entry
+		// CAPTURED as the config drive from a managed disk renamed to the
+		// reserved name out-of-band.
+		stateName, _ := osDisk.(map[string]interface{})["name"].(string)
 		disk, err := c.Compute().OpenIaaS().VirtualDisk().Read(ctx, osDiskId)
 		if err != nil {
 			return diag.Errorf("failed to read os disk: %s", err)
 		}
-		switch classifyOSDiskOnRead(disk, d.Id()) {
+		switch classifyOSDiskOnRead(disk, stateName, d.Id(), cloudInitProvisioned) {
 		case osDiskReadKeep:
 			osDisks = append(osDisks, helpers.FlattenOpenIaaSOSDiskData(disk, d.Id()))
+		case osDiskReadKeepWarnConfigDrive:
+			// KEPT like osDiskReadKeep — never auto-drop on this weaker
+			// evidence (#488) — plus a warning that walks the user through
+			// the state-only purge.
+			osDisks = append(osDisks, helpers.FlattenOpenIaaSOSDiskData(disk, d.Id()))
+			diags = append(diags, diag.Diagnostic{
+				Severity: diag.Warning,
+				Summary:  "Captured cloud-init config drive present in os_disk",
+				Detail: fmt.Sprintf("The disk %s (%q) matches the cloud-init config drive the platform attaches at deploy time; it was captured into the Terraform state as an os_disk by an earlier provider version. If you did not create this disk yourself, apply the plan that removes this os_disk block: the apply only cleans the Terraform state — the provider will not detach, rename, resize or otherwise modify the disk on the platform.",
+					osDiskId, disk.Name),
+			})
 		case osDiskReadDropGone:
 			gone, err := confirmDiskGone(osDiskId)
 			if err != nil {
@@ -1177,6 +1276,16 @@ type osDiskReadAction int
 const (
 	// osDiskReadKeep: the disk exists and is user-managed — keep it.
 	osDiskReadKeep osDiskReadAction = iota
+	// osDiskReadKeepWarnConfigDrive: the entry is almost certainly the
+	// platform cloud-init config drive captured by an earlier provider
+	// version (state AND live carry the reserved name, the VBD of this VM
+	// is read-write, and the resource provisions cloud-init) — but that
+	// evidence is weaker than the read-only VBD, so the entry is KEPT and
+	// a warning guides the user through the one-apply state purge (#488).
+	// A state entry is never auto-dropped on this weaker evidence: a
+	// pre-#488 state could equally hold a real source disk that carried
+	// the reserved name.
+	osDiskReadKeepWarnConfigDrive
 	// osDiskReadDropGone: the disk no longer exists platform-side — drop
 	// the stale entry instead of crashing on the nil API answer.
 	osDiskReadDropGone
@@ -1187,17 +1296,40 @@ const (
 )
 
 // classifyOSDiskOnRead decides what the refresh does with an os_disk entry
-// of the state, based exclusively on the live API answer. Ambiguity is
-// conservative: a disk that merely shares the XO config drive name (writable,
-// read-only on another VM, or without a VBD on this VM) stays managed.
-func classifyOSDiskOnRead(disk *client.OpenIaaSVirtualDisk, virtualMachineID string) osDiskReadAction {
+// of the state, based on the live API answer plus, for the guidance-only
+// outcome, the state entry's own name (provenance) and the resource's
+// cloud-init intent. Ambiguity is conservative: a disk that merely shares
+// the XO config drive name (writable, read-only on another VM, without a
+// VBD on this VM, or renamed out-of-band so the STATE name differs) stays
+// plainly managed. The only destructive outcome, osDiskReadDropPlatformManaged,
+// still requires the strict #255 evidence (exact name AND read-only VBD).
+func classifyOSDiskOnRead(disk *client.OpenIaaSVirtualDisk, stateName string, virtualMachineID string, cloudInitProvisioned bool) osDiskReadAction {
 	if disk == nil {
 		return osDiskReadDropGone
 	}
-	if helpers.IsPlatformManagedDisk(disk, virtualMachineID) {
+	if helpers.IsPlatformManagedDisk(disk, virtualMachineID, false) {
 		return osDiskReadDropPlatformManaged
 	}
+	if stateName == helpers.CloudConfigDriveName &&
+		helpers.IsPlatformManagedDisk(disk, virtualMachineID, cloudInitProvisioned) {
+		return osDiskReadKeepWarnConfigDrive
+	}
 	return osDiskReadKeep
+}
+
+// openIaasAmbiguousConfigDriveIDs lists the ids of the disks matching the
+// full platform config-drive discriminator under a provisioned cloud-init.
+// The Create fails closed when more than one matches (#488): the preflight
+// already rejected source images carrying the reserved name, so a multiple
+// match means the listing cannot be shaped safely.
+func openIaasAmbiguousConfigDriveIDs(disks []*client.OpenIaaSVirtualDisk, virtualMachineID string) []string {
+	ids := []string{}
+	for _, disk := range disks {
+		if helpers.IsPlatformManagedDisk(disk, virtualMachineID, true) {
+			ids = append(ids, disk.ID)
+		}
+	}
+	return ids
 }
 
 // powerOnBestEffort powers the VM back on after a failed operation that

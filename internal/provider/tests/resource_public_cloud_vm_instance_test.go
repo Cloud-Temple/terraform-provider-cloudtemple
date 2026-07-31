@@ -11,7 +11,7 @@ import (
 const (
 	// Catalogue ids of a DEV tenant, resolved out-of-band and injected via the
 	// environment (the acceptance suite runs live against a real tenant). The AZ,
-	// instance family and template ids reuse the constants already declared by the
+	// instance family and image ids reuse the constants already declared by the
 	// catalogue datasource tests.
 	PublicCloudVMInstanceBackupPolicyId = "PUBLIC_CLOUD_VM_BACKUP_POLICY_ID"
 	PublicCloudVMInstanceNetworkId      = "PUBLIC_CLOUD_VM_NETWORK_ID"
@@ -23,6 +23,7 @@ const (
 // returned by the API (and are ForceNew), and power_state is derived from the
 // status, so they are excluded from the import verification.
 func TestAccResourcePublicCloudVMInstance(t *testing.T) {
+	skipIfNoPublicCloudVMImageEnv(t)
 	resource.Test(t, resource.TestCase{
 		PreCheck:          func() { testAccPreCheck(t) },
 		ProviderFactories: providerFactories,
@@ -31,7 +32,7 @@ func TestAccResourcePublicCloudVMInstance(t *testing.T) {
 				Config: fmt.Sprintf(
 					testAccResourcePublicCloudVMInstanceConfig,
 					os.Getenv(PublicCloudVMAvailabilityZoneId),
-					os.Getenv(PublicCloudVMTemplateId),
+					os.Getenv(PublicCloudVMImageId),
 					os.Getenv(PublicCloudVMInstanceFamilyId),
 					os.Getenv(PublicCloudVMInstanceBackupPolicyId),
 					os.Getenv(PublicCloudVMInstanceNetworkId),
@@ -44,7 +45,7 @@ func TestAccResourcePublicCloudVMInstance(t *testing.T) {
 					resource.TestCheckResourceAttr("cloudtemple_public_cloud_vm_instance.test", "memory", "2"),
 					resource.TestCheckResourceAttrSet("cloudtemple_public_cloud_vm_instance.test", "disks_size_gb"),
 					resource.TestCheckResourceAttrSet("cloudtemple_public_cloud_vm_instance.test", "availability_zone_name"),
-					resource.TestCheckResourceAttrSet("cloudtemple_public_cloud_vm_instance.test", "template_name"),
+					resource.TestCheckResourceAttrSet("cloudtemple_public_cloud_vm_instance.test", "image_name"),
 				),
 			},
 			{
@@ -62,7 +63,7 @@ const testAccResourcePublicCloudVMInstanceConfig = `
 resource "cloudtemple_public_cloud_vm_instance" "test" {
   name                 = "tf-acc-vm-instance"
   availability_zone_id = "%s"
-  template_id          = "%s"
+  image_id             = "%s"
   instance_family_id   = "%s"
   cpu                  = 1
   memory               = 2

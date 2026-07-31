@@ -40,6 +40,7 @@ output "bucket_count" {
 
 Read-Only:
 
+- `access_type` (String)
 - `endpoint` (String)
 - `id` (String)
 - `name` (String)

@@ -1,7 +1,36 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.10.0 (July 17th, 2026)
+# 1.11.0 (July 31st, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+UPGRADE NOTES :
+
+  * ⚠️ **Public Cloud VM Instances — check which image endpoint your API serves before upgrading.** The VM Instances API has renamed its OS-image catalogue from `GET /vm_instances/v1/templates` to `GET /vm_instances/v1/images`, and this release follows that rename (see BREAKING CHANGES below). The two provider generations target different paths: releases up to 1.10.0 call `/templates`, and 1.11.0 calls `/images`. On the Cloud Temple production endpoint `shiva.cloud-temple.com`, a read-only probe run on July 31st, 2026 observed `/templates` answering HTTP 404 — the same answer as a path that does not exist — while `/images` answered HTTP 403, consistent with an entitlement answer on a path that is served. Against that endpoint the pre-1.11.0 image surface no longer resolves, and upgrading is the way forward. If you reach the API through a different endpoint, confirm which of the two paths it serves before upgrading. Either way your configuration must be updated (see BREAKING CHANGES below); a VM already in state is migrated automatically and is **not** recreated.
+  * The two new storage-type filters `availability_zone_id` and `instance_family_id` require a VM Instances API version that actually filters `GET /vm_instances/v1/storage_types`. The provider validates your inputs — both ids must exist, and the pair must be compatible when the availability zone advertises its compatible families — but it cannot prove the server applied the filters: an API version that does not implement them ignores the query parameters silently and returns the **full, unfiltered catalogue**. Verify against your target API before relying on these filters to narrow a catalogue (#513).
+  * The new `sku` and `skus` pricing attributes degrade cleanly: against a VM Instances API version that does not return them, the block is simply empty. No action required (#506, #507).
+  * `cloudtemple_object_storage_bucket` now refreshes `access_type` from the API. A bucket whose access type was changed out-of-band in the console will show a one-time reconciling diff on the first plan after the upgrade. This is expected — review it before applying (#490).
+
+BREAKING CHANGES :
+
+  * The Public Cloud VM Instances OS-image catalogue is now exposed as `image` instead of `template`, matching the renamed VM Instances API endpoint (`GET /vm_instances/v1/images`). This is a breaking rename with no backward-compatible alias:
+    * the `cloudtemple_public_cloud_vm_template` and `cloudtemple_public_cloud_vm_templates` data sources are renamed to `cloudtemple_public_cloud_vm_image` and `cloudtemple_public_cloud_vm_images`; their `template_type` attribute becomes `image_type`, and the `templates` list attribute becomes `images`;
+    * on the `cloudtemple_public_cloud_vm_instance` resource, the `template_id` argument is renamed to `image_id` and the computed `template_name` attribute to `image_name`;
+    * on the `cloudtemple_public_cloud_vm_instance` and `cloudtemple_public_cloud_vm_instances` data sources, the computed `template` block is renamed to `image`.
+
+    Existing state is migrated automatically by a schema state upgrader (v0 → v1) that renames the stored `template_id`/`template_name` keys to `image_id`/`image_name`, so a VM already in state is NOT destroyed or recreated. You MUST still update your configuration: rename `template_id` → `image_id` in every `cloudtemple_public_cloud_vm_instance` block, and update any reference to the renamed data sources and attributes. Requires a VM Instances API version that serves `/vm_instances/v1/images` (#510).
+
+ENHANCEMENTS :
+
+  * `cloudtemple_public_cloud_vm_storage_type` and `cloudtemple_public_cloud_vm_storage_types`: the data sources accept two new optional filters, `availability_zone_id` and `instance_family_id`, narrowing the storage-type catalogue to an availability-zone/instance-family pair (on the singular data source, they narrow the catalogue in which `id`/`name` is resolved). The API requires them as a pair: setting only one is rejected at plan time. The provider also verifies that both ids exist — and, when the zone advertises its compatible families, that the pair is compatible — failing with a clear error instead of silently returning an unfiltered catalogue (the API ignores unknown filter values). Requires a VM Instances API version that filters `/vm_instances/v1/storage_types` (#513).
+  * The `cloudtemple_public_cloud_vm_storage_type` and `cloudtemple_public_cloud_vm_storage_types` data sources now expose the priced `sku` object the VM Instances API returns on each storage type: `sku.name`, `sku.price`, `sku.unit`, `sku.description` and `sku.description_en` (all read-only). The `sku` block is empty when the API returns no SKU for a given storage type. This requires a VM Instances API version that returns `StorageType.sku`; against an older API the block is simply empty (#507).
+  * `cloudtemple_public_cloud_vm_instance_family` and `cloudtemple_public_cloud_vm_instance_families`: the data sources now expose the priced billing SKUs of each instance family through a new read-only `skus` attribute — a list of objects with `name`, `price`, `unit`, `description` and `description_en` — covering the on-demand per-vCPU and per-GiB-of-RAM pricing returned by the VM Instances API (#506). The SKUs are sorted by `name` so the list order is stable across reads.
+
+BUG FIXES :
+
+  * `cloudtemple_object_storage_bucket`: the resource now refreshes `access_type` from the API, so a change made out-of-band in the Cloud Temple console (for example `custom` -> `private`) is detected as drift instead of staying invisible to `terraform plan` (#490). Previously the read path never wrote `access_type` back to the state, so console-side changes were silently ignored. Existing states whose console value has already diverged will show a one-time reconciling diff on the next plan — the expected behaviour, letting `terraform apply` realign the intended value. The `cloudtemple_object_storage_bucket` and `cloudtemple_object_storage_buckets` data sources now also expose `access_type`.
+  * `cloudtemple_compute_iaas_opensource_virtual_machine`: a VM deployed with `cloud_init` no longer captures the platform's cloud-init config drive ("XO CloudConfigDrive", attached read-write by the platform during the deploy) as a managed `os_disk`, which made every subsequent plan propose to remove that block (permanent drift). The create now excludes the drive (and fails closed if the listing is ambiguous), and a create from a source image that itself carries the reserved disk name is rejected upfront. States already polluted by earlier versions keep planning normally: the refresh emits a warning explaining that applying the removal diff only cleans the Terraform state — the provider never detaches, renames or resizes the drive on the platform. The name "XO CloudConfigDrive" is now rejected as a user-declared `os_disk.name` (reserved by the platform) (#488).
+
+# 1.10.0 (July 17th, 2026)
 
 NEW FEATURES :
 

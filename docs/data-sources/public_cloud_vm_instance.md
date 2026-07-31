@@ -45,11 +45,11 @@ output "web" {
 - `created_at` (String) The creation date of the VM (RFC3339).
 - `disks_size_gb` (Number) The total size of the VM's disks (system + data) in GB.
 - `guest_tools_installed` (Boolean) Whether the guest tools are installed.
+- `image` (List of Object) The resolved OS image. (see [below for nested schema](#nestedatt--image))
 - `instance_family` (List of Object) The resolved instance family. (see [below for nested schema](#nestedatt--instance_family))
 - `name` (String) The name of the virtual machine.
 - `ram_gb` (Number) The amount of RAM in GB.
 - `status` (String) The current status of the VM (e.g. `running`, `stopped`).
-- `template` (List of Object) The resolved OS template. (see [below for nested schema](#nestedatt--template))
 - `updated_at` (String) The last update date of the VM (RFC3339).
 - `vcpu` (Number) The number of vCPUs.
 
@@ -71,8 +71,8 @@ Read-Only:
 - `name` (String)
 
 
-<a id="nestedatt--instance_family"></a>
-### Nested Schema for `instance_family`
+<a id="nestedatt--image"></a>
+### Nested Schema for `image`
 
 Read-Only:
 
@@ -80,8 +80,8 @@ Read-Only:
 - `name` (String)
 
 
-<a id="nestedatt--template"></a>
-### Nested Schema for `template`
+<a id="nestedatt--instance_family"></a>
+### Nested Schema for `instance_family`
 
 Read-Only:
 

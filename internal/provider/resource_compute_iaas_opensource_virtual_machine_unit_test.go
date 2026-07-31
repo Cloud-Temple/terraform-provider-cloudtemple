@@ -6,6 +6,7 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/go-cty/cty"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 )
 
 func boolPtr(b bool) *bool { return &b }
@@ -439,11 +440,14 @@ func TestBuildOpenIaasVIFPatch(t *testing.T) {
 
 func TestClassifyOSDiskOnRead(t *testing.T) {
 	const vmID = "vm-1"
+	const reserved = "XO CloudConfigDrive"
 
 	tests := []struct {
-		name string
-		disk *client.OpenIaaSVirtualDisk
-		want osDiskReadAction
+		name                 string
+		disk                 *client.OpenIaaSVirtualDisk
+		stateName            string
+		cloudInitProvisioned bool
+		want                 osDiskReadAction
 	}{
 		{
 			name: "deleted disk is dropped instead of crashing",
@@ -453,37 +457,85 @@ func TestClassifyOSDiskOnRead(t *testing.T) {
 		{
 			name: "read-only XO config drive on this VM is cleaned up",
 			disk: &client.OpenIaaSVirtualDisk{
-				Name: "XO CloudConfigDrive",
+				Name: reserved,
 				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
 					{ID: vmID, ReadOnly: true},
 				},
 			},
-			want: osDiskReadDropPlatformManaged,
+			stateName: reserved,
+			want:      osDiskReadDropPlatformManaged,
 		},
 		{
-			name: "writable user disk with the colliding name stays managed (ambiguous)",
+			// The strict drop needs no state provenance nor cloud-init: the
+			// read-only VBD is the #255 evidence and stays sufficient.
+			name: "read-only XO config drive is cleaned up whatever the state name says",
 			disk: &client.OpenIaaSVirtualDisk{
-				Name: "XO CloudConfigDrive",
+				Name: reserved,
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: vmID, ReadOnly: true},
+				},
+			},
+			stateName: "root",
+			want:      osDiskReadDropPlatformManaged,
+		},
+		{
+			// #488: the RW captured drive is NEVER auto-dropped — it is kept
+			// with a guidance warning (state purge is the user's one apply).
+			name: "captured RW config drive with cloud-init is kept with guidance (#488)",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: reserved,
 				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
 					{ID: vmID, ReadOnly: false},
 				},
 			},
-			want: osDiskReadKeep,
+			stateName:            reserved,
+			cloudInitProvisioned: true,
+			want:                 osDiskReadKeepWarnConfigDrive,
+		},
+		{
+			// #488 P2 guard: a managed disk RENAMED out-of-band to the
+			// reserved name has a different STATE name — plain keep, the
+			// rename-back diff surfaces naturally, no guidance warning.
+			name: "managed disk renamed out-of-band to the reserved name stays plainly managed",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: reserved,
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: vmID, ReadOnly: false},
+				},
+			},
+			stateName:            "root",
+			cloudInitProvisioned: true,
+			want:                 osDiskReadKeep,
+		},
+		{
+			name: "writable disk with the colliding name stays plainly managed without cloud-init",
+			disk: &client.OpenIaaSVirtualDisk{
+				Name: reserved,
+				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
+					{ID: vmID, ReadOnly: false},
+				},
+			},
+			stateName: reserved,
+			want:      osDiskReadKeep,
 		},
 		{
 			name: "XO-named disk read-only on another VM stays managed (ambiguous)",
 			disk: &client.OpenIaaSVirtualDisk{
-				Name: "XO CloudConfigDrive",
+				Name: reserved,
 				VirtualMachines: []client.OpenIaaSVirtualDiskConnection{
 					{ID: "vm-other", ReadOnly: true},
 				},
 			},
-			want: osDiskReadKeep,
+			stateName:            reserved,
+			cloudInitProvisioned: true,
+			want:                 osDiskReadKeep,
 		},
 		{
-			name: "XO-named disk without any VBD stays managed (ambiguous, fail-safe)",
-			disk: &client.OpenIaaSVirtualDisk{Name: "XO CloudConfigDrive"},
-			want: osDiskReadKeep,
+			name:                 "XO-named disk without any VBD stays managed (ambiguous, fail-safe)",
+			disk:                 &client.OpenIaaSVirtualDisk{Name: reserved},
+			stateName:            reserved,
+			cloudInitProvisioned: true,
+			want:                 osDiskReadKeep,
 		},
 		{
 			name: "ordinary user disk stays managed",
@@ -493,7 +545,9 @@ func TestClassifyOSDiskOnRead(t *testing.T) {
 					{ID: vmID, ReadOnly: false, Connected: true},
 				},
 			},
-			want: osDiskReadKeep,
+			stateName:            "data-disk",
+			cloudInitProvisioned: true,
+			want:                 osDiskReadKeep,
 		},
 		{
 			name: "legitimate read-only disk with another name stays managed",
@@ -503,16 +557,114 @@ func TestClassifyOSDiskOnRead(t *testing.T) {
 					{ID: vmID, ReadOnly: true},
 				},
 			},
-			want: osDiskReadKeep,
+			stateName: "shared-iso",
+			want:      osDiskReadKeep,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := classifyOSDiskOnRead(tt.disk, vmID); got != tt.want {
+			if got := classifyOSDiskOnRead(tt.disk, tt.stateName, vmID, tt.cloudInitProvisioned); got != tt.want {
 				t.Errorf("classifyOSDiskOnRead() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+// TestOpenIaasAmbiguousConfigDriveIDs pins the #488 create-time count guard
+// inputs: zero matches (valid deploy), one match (the platform drive), and
+// the >=2 ambiguity the Create refuses to shape state from.
+func TestOpenIaasAmbiguousConfigDriveIDs(t *testing.T) {
+	const vmID = "vm-1"
+	const reserved = "XO CloudConfigDrive"
+	system := &client.OpenIaaSVirtualDisk{
+		ID: "disk-system", Name: "root",
+		VirtualMachines: []client.OpenIaaSVirtualDiskConnection{{ID: vmID}},
+	}
+	drive := &client.OpenIaaSVirtualDisk{
+		ID: "disk-drive", Name: reserved,
+		VirtualMachines: []client.OpenIaaSVirtualDiskConnection{{ID: vmID}},
+	}
+	impostor := &client.OpenIaaSVirtualDisk{
+		ID: "disk-impostor", Name: reserved,
+		VirtualMachines: []client.OpenIaaSVirtualDiskConnection{{ID: vmID}},
+	}
+
+	if got := openIaasAmbiguousConfigDriveIDs([]*client.OpenIaaSVirtualDisk{system}, vmID); len(got) != 0 {
+		t.Fatalf("no reserved-name disk: expected zero matches, got %v", got)
+	}
+	if got := openIaasAmbiguousConfigDriveIDs([]*client.OpenIaaSVirtualDisk{system, drive}, vmID); len(got) != 1 || got[0] != "disk-drive" {
+		t.Fatalf("one platform drive: expected exactly [disk-drive], got %v", got)
+	}
+	got := openIaasAmbiguousConfigDriveIDs([]*client.OpenIaaSVirtualDisk{system, drive, impostor}, vmID)
+	if len(got) != 2 || got[0] != "disk-drive" || got[1] != "disk-impostor" {
+		t.Fatalf("two reserved-name disks: expected both ids reported for the fail-closed diagnostic, got %v", got)
+	}
+}
+
+// TestOpenIaasReservedSourceDiskError pins the #488 create preflight: reject
+// only on explicit evidence (a reserved-name source disk WITH cloud-init);
+// pass on missing/empty metadata and without cloud-init.
+func TestOpenIaasReservedSourceDiskError(t *testing.T) {
+	const reserved = "XO CloudConfigDrive"
+	if err := openIaasReservedSourceDiskError([]string{"root", reserved}, true); err == nil {
+		t.Fatal("a reserved-name source disk with cloud-init provisioned must fail the preflight")
+	}
+	if err := openIaasReservedSourceDiskError([]string{"root", reserved}, false); err != nil {
+		t.Fatalf("without cloud-init the reserved-name source disk is not a collision: %v", err)
+	}
+	if err := openIaasReservedSourceDiskError([]string{"root", "data"}, true); err != nil {
+		t.Fatalf("no reserved name in the source: %v", err)
+	}
+	if err := openIaasReservedSourceDiskError(nil, true); err != nil {
+		t.Fatalf("missing source metadata must pass (evidence-only rejection): %v", err)
+	}
+	if err := openIaasReservedSourceDiskError([]string{}, true); err != nil {
+		t.Fatalf("empty source metadata must pass (evidence-only rejection): %v", err)
+	}
+}
+
+// TestOpenIaasCloudInitProvisioned pins the flag's Create-payload semantics
+// (#488): true only when buildOpenIaasCloudInit would actually send a
+// cloud-init (non-empty cloud_config), through the real resource schema.
+func TestOpenIaasCloudInitProvisioned(t *testing.T) {
+	for name, tc := range map[string]struct {
+		raw  map[string]interface{}
+		want bool
+	}{
+		"absent":              {raw: nil, want: false},
+		"empty map":           {raw: map[string]interface{}{}, want: false},
+		"empty values":        {raw: map[string]interface{}{"cloud_config": ""}, want: false},
+		"network config only": {raw: map[string]interface{}{"network_config": "version: 2"}, want: false},
+		"cloud config set":    {raw: map[string]interface{}{"cloud_config": "#cloud-config\nhostname: x"}, want: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			values := map[string]interface{}{}
+			if tc.raw != nil {
+				values["cloud_init"] = tc.raw
+			}
+			d := schema.TestResourceDataRaw(t, resourceOpenIaasVirtualMachine().Schema, values)
+			if got := openIaasCloudInitProvisioned(d); got != tc.want {
+				t.Errorf("openIaasCloudInitProvisioned() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestOSDiskNameReservedValidation pins the #488 schema guard on the REAL
+// resource schema: declaring the platform drive name is rejected at plan
+// time, any other name passes.
+func TestOSDiskNameReservedValidation(t *testing.T) {
+	osDisk := resourceOpenIaasVirtualMachine().Schema["os_disk"].Elem.(*schema.Resource)
+	validate := osDisk.Schema["name"].ValidateDiagFunc
+	if validate == nil {
+		t.Fatal("os_disk.name must carry the reserved-name validation")
+	}
+	if diags := validate("XO CloudConfigDrive", cty.GetAttrPath("name")); !diags.HasError() {
+		t.Fatal("declaring the reserved platform drive name must be rejected")
+	}
+	if diags := validate("my-disk", cty.GetAttrPath("name")); diags.HasError() {
+		t.Fatalf("a regular disk name must pass: %v", diags)
 	}
 }
 

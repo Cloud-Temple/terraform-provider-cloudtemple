@@ -366,8 +366,8 @@ var datasourceCoverage = map[string]dsCoverage{
 	"cloudtemple_public_cloud_vm_instance_families":  {"instance_families", flat(helpers.FlattenPublicCloudVMInstanceFamily)},
 	"cloudtemple_public_cloud_vm_storage_type":       {"", flat(helpers.FlattenPublicCloudVMStorageType)},
 	"cloudtemple_public_cloud_vm_storage_types":      {"storage_types", flat(helpers.FlattenPublicCloudVMStorageType)},
-	"cloudtemple_public_cloud_vm_template":           {"", flat(helpers.FlattenPublicCloudVMTemplate)},
-	"cloudtemple_public_cloud_vm_templates":          {"templates", flat(helpers.FlattenPublicCloudVMTemplate)},
+	"cloudtemple_public_cloud_vm_image":              {"", flat(helpers.FlattenPublicCloudVMImage)},
+	"cloudtemple_public_cloud_vm_images":             {"images", flat(helpers.FlattenPublicCloudVMImage)},
 	"cloudtemple_public_cloud_vm_backup_policy":      {"", flat(helpers.FlattenPublicCloudVMBackupPolicy)},
 	"cloudtemple_public_cloud_vm_backup_policies":    {"backup_policies", flat(helpers.FlattenPublicCloudVMBackupPolicy)},
 	"cloudtemple_public_cloud_vm_quota":              {"", flat(helpers.FlattenPublicCloudVMQuota)},
@@ -485,6 +485,58 @@ func TestIAMFeaturesFlattenIsDepthBounded(t *testing.T) {
 	level2 := level1["subfeatures"].([]map[string]interface{})[0]
 	if _, present := level2["subfeatures"]; present {
 		t.Errorf("level-2 node must not carry a 'subfeatures' key (it would break d.Set); got %#v", level2)
+	}
+}
+
+// TestPublicCloudVMImageFlattenSchemaKeysMatchExactly is the STRICT complement
+// to the generic walker. The walker (assertFlattenFitsSchema) only proves the
+// flatten output FITS the schema (flatten keys ⊆ schema keys); it would not
+// catch a schema attribute that the flatten never sets, nor a stale key left
+// over from the template->image rename. This test pins strict, bidirectional
+// key-set EQUALITY between FlattenPublicCloudVMImage and the `images` list-block
+// Elem schema (which is output-only, so the two sets must match exactly), and
+// asserts the renamed key is present while the old key is gone. Reverting the
+// helper or the schema to `template_type` (or dropping `image_type`) turns this
+// RED.
+func TestPublicCloudVMImageFlattenSchemaKeysMatchExactly(t *testing.T) {
+	flattenKeys := map[string]struct{}{}
+	for k := range helpers.FlattenPublicCloudVMImage(filled[client.PublicCloudVMImage]()) {
+		flattenKeys[k] = struct{}{}
+	}
+
+	images := dataSourcePublicCloudVMImages().Schema["images"]
+	elem, ok := images.Elem.(*schema.Resource)
+	if !ok {
+		t.Fatalf("images block Elem is not a *schema.Resource")
+	}
+	schemaKeys := map[string]struct{}{}
+	for k := range elem.Schema {
+		schemaKeys[k] = struct{}{}
+	}
+
+	for k := range flattenKeys {
+		if _, ok := schemaKeys[k]; !ok {
+			t.Errorf("flatten emits %q which the images block schema does not declare", k)
+		}
+	}
+	for k := range schemaKeys {
+		if _, ok := flattenKeys[k]; !ok {
+			t.Errorf("images block schema declares %q which the flatten never sets", k)
+		}
+	}
+
+	// Renamed key present, old key gone (both in the flatten and the schema).
+	if _, ok := flattenKeys["image_type"]; !ok {
+		t.Errorf("flatten must emit image_type")
+	}
+	if _, ok := flattenKeys["template_type"]; ok {
+		t.Errorf("flatten must NOT emit the old key template_type")
+	}
+	if _, ok := schemaKeys["image_type"]; !ok {
+		t.Errorf("images block schema must declare image_type")
+	}
+	if _, ok := schemaKeys["template_type"]; ok {
+		t.Errorf("images block schema must NOT declare the old key template_type")
 	}
 }
 

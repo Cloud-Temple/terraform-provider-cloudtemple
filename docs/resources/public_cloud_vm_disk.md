@@ -3,7 +3,7 @@
 page_title: "cloudtemple_public_cloud_vm_disk Resource - terraform-provider-cloudtemple"
 subcategory: "Public Cloud VM Instances"
 description: |-
-  Manages a DATA disk attached to a Public Cloud VM instance. The system disk is provided by the template and is not managed here. Create, extend (grow-only) and delete are asynchronous; extending requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete).
+  Manages a DATA disk attached to a Public Cloud VM instance. The system disk is provided by the image and is not managed here. Create, extend (grow-only) and delete are asynchronous; extending requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete).
   To manage this resource you will need the following roles:
     - public_cloud_vm_instances_management
     - public_cloud_vm_instances_read
@@ -12,7 +12,7 @@ description: |-
 
 # cloudtemple_public_cloud_vm_disk (Resource)
 
-Manages a DATA disk attached to a Public Cloud VM instance. The system disk is provided by the template and is not managed here. Create, extend (grow-only) and delete are asynchronous; extending requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete).
+Manages a DATA disk attached to a Public Cloud VM instance. The system disk is provided by the image and is not managed here. Create, extend (grow-only) and delete are asynchronous; extending requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete).
 
 To manage this resource you will need the following roles:
   - `public_cloud_vm_instances_management`

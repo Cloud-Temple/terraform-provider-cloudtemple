@@ -12,7 +12,7 @@ type PublicCloudVMDiskClient struct {
 // Disk returns the VM disk sub-client. Disks are VM-scoped
 // (/vm_instances/v1/virtual_machines/{vmID}/disks...); every write is
 // asynchronous (201 + Location:<activityId>). This resource layer manages DATA
-// disks only — the system/primary disk is provided by the template and cannot be
+// disks only — the system/primary disk is provided by the image and cannot be
 // created or deleted here.
 func (v *PublicCloudVMClient) Disk() *PublicCloudVMDiskClient {
 	return &PublicCloudVMDiskClient{v.c}

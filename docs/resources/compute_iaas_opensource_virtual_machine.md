@@ -222,7 +222,7 @@ Order of the elements in the list is the boot order.
 Optional:
 
 - `connected` (Boolean, Deprecated) Whether the disk is connected or not.
-- `name` (String) The name of the operating system disk. (Updating this property implies a disk disconnect-reconnect)
+- `name` (String) The name of the operating system disk. (Updating this property implies a disk disconnect-reconnect) The name "XO CloudConfigDrive" is reserved by the platform for the cloud-init config drive and cannot be used.
 - `size` (Number) The size of the operating system disk in bytes. (Updating this property implies a disk disconnect-reconnect)
 - `storage_repository_id` (String) The storage repository where the operating system disk is located.
 

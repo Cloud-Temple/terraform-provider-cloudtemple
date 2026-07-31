@@ -39,6 +39,11 @@ func dataSourceBuckets() *schema.Resource {
 							Type:        schema.TypeString,
 							Computed:    true,
 						},
+						"access_type": {
+							Description: "The access type of the bucket. Possible values are: `public`, `private`, `custom`.",
+							Type:        schema.TypeString,
+							Computed:    true,
+						},
 						"retention_period": {
 							Description: "The retention period of the bucket in days.",
 							Type:        schema.TypeInt,

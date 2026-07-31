@@ -31,7 +31,7 @@ const (
 
 func resourcePublicCloudVMDisk() *schema.Resource {
 	return &schema.Resource{
-		Description: "Manages a DATA disk attached to a Public Cloud VM instance. The system disk is provided by the template and is not managed here. Create, extend (grow-only) and delete are asynchronous; extending requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete).",
+		Description: "Manages a DATA disk attached to a Public Cloud VM instance. The system disk is provided by the image and is not managed here. Create, extend (grow-only) and delete are asynchronous; extending requires the VM to be stopped, and deleting stops a running VM automatically before detaching (the VM is not restarted by the delete).",
 
 		CreateContext: resourcePublicCloudVMDiskCreate,
 		ReadContext:   resourcePublicCloudVMDiskRead,

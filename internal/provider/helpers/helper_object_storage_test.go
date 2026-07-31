@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -86,6 +87,7 @@ func TestFlattenBucketContentAndShape(t *testing.T) {
 		ID:                  "bkt-1",
 		Name:                "data",
 		Namespace:           "ns-1",
+		AccessType:          "private",
 		RetentionPeriod:     int64(30),
 		Versioning:          "Enabled",
 		Endpoint:            "https://s3.example",
@@ -101,6 +103,7 @@ func TestFlattenBucketContentAndShape(t *testing.T) {
 	assertEq(t, "id", got["id"], "bkt-1")
 	assertEq(t, "name", got["name"], "data")
 	assertEq(t, "namespace", got["namespace"], "ns-1")
+	assertEq(t, "access_type", got["access_type"], "private")
 	assertEq(t, "endpoint", got["endpoint"], "https://s3.example")
 
 	// versioning is a string state value (e.g. "Enabled"/"Suspended"), it must
@@ -135,9 +138,9 @@ func TestFlattenBucketContentAndShape(t *testing.T) {
 func TestFlattenBucketKeySetIsExact(t *testing.T) {
 	got := FlattenBucket(&client.Bucket{ID: "x"})
 	want := map[string]bool{
-		"id": true, "name": true, "namespace": true, "retention_period": true,
-		"versioning": true, "endpoint": true, "total_size": true,
-		"total_size_unit": true, "total_objects": true,
+		"id": true, "name": true, "namespace": true, "access_type": true,
+		"retention_period": true, "versioning": true, "endpoint": true,
+		"total_size": true, "total_size_unit": true, "total_objects": true,
 		"total_objects_deleted": true, "total_size_deleted": true,
 	}
 	for k := range got {
@@ -149,5 +152,55 @@ func TestFlattenBucketKeySetIsExact(t *testing.T) {
 		if _, ok := got[k]; !ok {
 			t.Errorf("FlattenBucket is missing the expected key %q", k)
 		}
+	}
+}
+
+// TestFlattenBucketRefreshesAccessType is the regression test for issue #490:
+// a manual console change of a bucket's access_type must be detected as drift.
+//
+// It walks the exact read chain that terraform refresh uses — the API JSON is
+// decoded into client.Bucket (as client.BucketClient.Read does via decodeBody),
+// then FlattenBucket produces the state map the resource/datasource Read writes
+// back with d.Set. The scenario is the reporter's: the console changed the
+// access type to "private", so the API now reports accessType:"private".
+//
+// This test pins TWO layers that were both broken before the fix and would each,
+// alone, make the drift invisible:
+//   - client.Bucket must carry an AccessType field, or the JSON value is dropped
+//     at decode time (encoding/json ignores unknown keys);
+//   - FlattenBucket must emit "access_type", or d.Set never overwrites the stale
+//     value in state.
+//
+// A complacent test that only built a client.Bucket in memory would miss the
+// decode-layer gap, so this one starts from raw JSON on purpose.
+func TestFlattenBucketRefreshesAccessType(t *testing.T) {
+	// Realistic GET /storage/object/v1/buckets/{name} payload, AFTER the console
+	// changed the access type to "private".
+	apiResponse := []byte(`{
+		"id": "bkt-490",
+		"name": "terraform-test-bucket",
+		"namespace": "ns-1",
+		"accessType": "private",
+		"retentionPeriod": 0,
+		"versioning": "Disabled",
+		"endpoint": "https://s3.example"
+	}`)
+
+	var bucket client.Bucket
+	if err := json.Unmarshal(apiResponse, &bucket); err != nil {
+		t.Fatalf("decoding the API response failed: %s", err)
+	}
+	if bucket.AccessType != "private" {
+		t.Fatalf("client.Bucket did not capture accessType from the API JSON (got %q); the field or its json tag is missing (#490)", bucket.AccessType)
+	}
+
+	state := FlattenBucket(&bucket)
+
+	got, present := state["access_type"]
+	if !present {
+		t.Fatalf("FlattenBucket emits no \"access_type\" key; the console change custom->private stays invisible to terraform refresh/plan (#490)")
+	}
+	if got != "private" {
+		t.Fatalf("access_type = %v, want \"private\" (the value the API reports after the console change) (#490)", got)
 	}
 }

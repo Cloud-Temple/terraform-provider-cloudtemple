@@ -7,7 +7,7 @@ data "cloudtemple_public_cloud_vm_instance_family" "family" {
   name = "Development"
 }
 
-data "cloudtemple_public_cloud_vm_template" "os" {
+data "cloudtemple_public_cloud_vm_image" "os" {
   name = "Debian 13"
 }
 
@@ -26,7 +26,7 @@ data "cloudtemple_public_cloud_vm_network" "lan" {
 resource "cloudtemple_public_cloud_vm_instance" "web" {
   name                 = "web-01"
   availability_zone_id = data.cloudtemple_public_cloud_vm_availability_zone.az.id
-  template_id          = data.cloudtemple_public_cloud_vm_template.os.id
+  image_id             = data.cloudtemple_public_cloud_vm_image.os.id
   instance_family_id   = data.cloudtemple_public_cloud_vm_instance_family.family.id
   cpu                  = 2
   memory               = 4

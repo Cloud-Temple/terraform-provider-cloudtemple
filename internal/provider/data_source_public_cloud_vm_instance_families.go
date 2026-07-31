@@ -57,6 +57,7 @@ func dataSourcePublicCloudVMInstanceFamilies() *schema.Resource {
 							Computed:    true,
 							Description: "The maximum amount of RAM (GB) allowed in this family.",
 						},
+						"skus": publicCloudVMSkusSchema(),
 					},
 				},
 			},

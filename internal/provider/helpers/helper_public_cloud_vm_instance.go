@@ -23,7 +23,7 @@ func FlattenPublicCloudVMInstance(vm *client.PublicCloudVMInstance) map[string]i
 		"name":                  vm.Name,
 		"status":                vm.Status,
 		"availability_zone":     flattenPublicCloudVMInstanceRef(vm.AZ),
-		"template":              flattenPublicCloudVMInstanceRef(vm.Template),
+		"image":                 flattenPublicCloudVMInstanceRef(vm.Image),
 		"instance_family":       flattenPublicCloudVMInstanceRef(vm.InstanceFamily),
 		"vcpu":                  vm.VCPU,
 		"ram_gb":                vm.RAMGb,
