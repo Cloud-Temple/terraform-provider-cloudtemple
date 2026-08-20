@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -368,6 +369,41 @@ func TestPublicCloudVMInstanceCreate(t *testing.T) {
 		}
 		if _, ok := body["cloudInit"]; ok {
 			t.Fatalf("a nil cloudInit must be omitted, got %v", body["cloudInit"])
+		}
+	})
+
+	// The negative above only proves ipAddress is DROPPED when unset. This proves
+	// it is actually PUT ON THE WIRE when set — the field that lets an inline
+	// os_network_adapter pick its VPC static IP at VM creation (verified live:
+	// the platform registers exactly this address). A wrong or removed json tag
+	// would silently downgrade a chosen address to an auto-assigned one.
+	t.Run("a set ipAddress is sent as networkInterfaces[].ipAddress", func(t *testing.T) {
+		var body map[string]any
+		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/vm_instances/v1/virtual_machines") {
+				_ = json.NewDecoder(r.Body).Decode(&body)
+				w.Header().Set("Location", "/activity/v1/activities/act-9")
+				w.WriteHeader(http.StatusCreated)
+				return
+			}
+			w.WriteHeader(http.StatusNotFound)
+		})
+		if _, err := c.PublicCloudVM().Instance().Create(ctx, &CreateVMInstanceRequest{
+			Name:              "web",
+			NetworkInterfaces: []CreateVMInstanceNIC{{DeviceIndex: 1, NetworkID: "net-vpc", IPAddress: "10.0.6.240"}},
+		}); err != nil {
+			t.Fatalf("create: %v", err)
+		}
+		nics, ok := body["networkInterfaces"].([]any)
+		if !ok || len(nics) != 1 {
+			t.Fatalf("networkInterfaces not encoded as a 1-element array: %v", body["networkInterfaces"])
+		}
+		nic := nics[0].(map[string]any)
+		if nic["ipAddress"] != "10.0.6.240" {
+			t.Fatalf("nic ipAddress = %v, want 10.0.6.240", nic["ipAddress"])
+		}
+		if nic["networkId"] != "net-vpc" {
+			t.Fatalf("nic networkId = %v, want net-vpc", nic["networkId"])
 		}
 	})
 

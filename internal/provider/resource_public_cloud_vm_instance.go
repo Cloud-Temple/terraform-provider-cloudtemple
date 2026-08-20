@@ -129,7 +129,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				ForceNew:    true,
 				MinItems:    1,
 				MaxItems:    8,
-				Description: "The network interfaces attached at creation (Private Backbone networks only — attach VPC networks with the dedicated network adapter resource). Immutable here; additional adapters are managed by the dedicated network adapter resource.",
+				Description: "The network interfaces attached at creation. Both Private Backbone and VPC networks are supported, so a VPC-only VM can be declared here. Immutable (`ForceNew`): changing an interface's `network_id` or `ip_address` REPLACES the VM — relocate an existing adapter with a `cloudtemple_public_cloud_vm_network_adapter` resource instead. Additional adapters beyond creation are also managed by that resource.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"device_index": {
@@ -151,7 +151,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 							Optional:     true,
 							ForceNew:     true,
 							ValidateFunc: validation.IsIPv4Address,
-							Description:  "The fixed IPv4 address to assign. When omitted, the platform assigns one.",
+							Description:  "The fixed IPv4 address to assign, registered as a static IP on the VPC private network. Requires `network_id` to reference a VPC network: the platform silently ignores it on a Private Backbone network, so setting it there is rejected at apply. When omitted on a VPC network, the platform auto-assigns an address. Write-only: it is never read back (the registration is addressable only by MAC on the VPC plane).",
 						},
 					},
 				},
@@ -429,11 +429,22 @@ func createVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 		return diag.FromErr(err)
 	}
 
-	// VPC phase 1: the inline os_network_adapter block only supports Private
-	// Backbone networks — VPC attachments go through the standalone
-	// cloudtemple_public_cloud_vm_network_adapter resource. Each declared network
-	// is resolved BEFORE the create POST; a network that cannot be read fails
-	// closed (never create a VM against an unverifiable network).
+	// Network preflight. Each declared network is resolved BEFORE the create POST;
+	// a network that cannot be read fails closed (never create a VM against an
+	// unverifiable network).
+	//
+	// VPC networks ARE supported here. The former phase-1 refusal was a provider
+	// scoping decision, not an API limitation, and it has been retired against live
+	// evidence (DEV 2026-08-20): the create endpoint accepts a VPC networkId, the
+	// resulting adapter comes up `type="vpc"`, and networkInterfaces[].ipAddress is
+	// honoured — see internal/client/vpc_vm_create_live_probe_test.go.
+	//
+	// What the preflight now enforces instead is the ip_address precondition. The
+	// same live probe measured that ipAddress on a Private Backbone network is
+	// SILENTLY IGNORED: no static IP is registered and no error is returned. Left
+	// unchecked, a user's chosen address would be dead config they believe took
+	// effect, so it is rejected up front — the same polarity as the two Compute
+	// standalone adapter resources (see validateIPAddressTargetsVPC).
 	for _, nic := range req.NetworkInterfaces {
 		network, nerr := funcs.networkRead(ctx, nic.NetworkID)
 		if nerr != nil {
@@ -442,8 +453,8 @@ func createVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 		if network == nil {
 			return diag.Errorf("network %s of os_network_adapter (device_index %d) could not be found before creating VM %q; refusing to create against an unverifiable network.", nic.NetworkID, nic.DeviceIndex, req.Name)
 		}
-		if network.VPC != nil {
-			return diag.Errorf("network %s (%q) of os_network_adapter (device_index %d) is a VPC network: the inline os_network_adapter block only supports Private Backbone networks. Create the VM on a Private Backbone network and attach the VPC network with a cloudtemple_public_cloud_vm_network_adapter resource.", nic.NetworkID, network.Name, nic.DeviceIndex)
+		if nic.IPAddress != "" && network.VPC == nil {
+			return diag.Errorf("ip_address %q is set on os_network_adapter (device_index %d) but network %s (%q) is not a VPC network: a fixed IPv4 address is only honoured on a VPC network (the platform silently ignores it elsewhere) — remove ip_address, or target a VPC network.", nic.IPAddress, nic.DeviceIndex, nic.NetworkID, network.Name)
 		}
 	}
 
@@ -454,8 +465,15 @@ func createVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 
 	activity, err := funcs.waitActivity(ctx, activityID)
 	if err != nil {
+		// Two planes can be left behind by a create that fails after starting.
+		// The compute plane is the VM itself. The IPAM plane is a VPC static-IP
+		// registration: a successful delete reclaims it (verified live), but a
+		// create that registered the address and then failed leaves it behind, and
+		// the provider cannot safely reclaim it — it has no positive evidence of
+		// ownership for an address it may never have chosen (auto-assignment). So
+		// the diagnostic names both planes instead of silently leaving one out.
 		return diag.Errorf(
-			"VM instance %q create activity %q did not complete: %s. If a VM was created it is now ORPHANED outside the state — audit the VM instances for a recently-created %q and import it (terraform import) or delete it before re-applying.",
+			"VM instance %q create activity %q did not complete: %s. If a VM was created it is now ORPHANED outside the state — audit the VM instances for a recently-created %q and import it (terraform import) or delete it before re-applying. If any os_network_adapter targeted a VPC network, also audit that VPC private network's static IPs for a registration left behind by this failed create.",
 			req.Name, activityID, err, req.Name,
 		)
 	}
