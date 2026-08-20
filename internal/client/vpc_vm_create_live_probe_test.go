@@ -1045,3 +1045,76 @@ func sweepProbeStaticIPs(ctx context.Context, t *testing.T, c *Client, base stat
 		}
 	}
 }
+
+// TestVPCVMwareAdapterLiveProbe is READ-ONLY and covers the one contract the
+// VMware inline path newly depends on and that no other probe here establishes:
+// that a vCenter network ADAPTER sitting on a VPC-backed network really does expose
+// the `vpc` object, and that its registered static IP resolves by MAC.
+//
+// Why read-only here rather than a create/delete cycle: the full VMware
+// create-with-a-chosen-address cycle IS proven live, by
+// TestAccResourceVirtualMachineVPCInline in internal/provider/tests — it clones a VM
+// onto a VPC network with a chosen static IP and asserts the LIVE registration by
+// MAC. This probe covers the complementary INVENTORY question cheaply, over EXISTING
+// machines: do vCenter adapters on VPC networks really expose `vpc`, and does their
+// address resolve by MAC? Answering that needs no creation at all.
+func TestVPCVMwareAdapterLiveProbe(t *testing.T) {
+	c, cfg := requireVPCCreateProbeClient(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Minute)
+	defer cancel()
+	if _, err := c.Token(ctx); err != nil {
+		t.Fatalf("auth failed: %v", err)
+	}
+	t.Logf("AUTH ok on %s — READ-ONLY VMware adapter probe", cfg.Address)
+
+	vms, err := c.Compute().VirtualMachine().List(ctx, &VirtualMachineFilter{})
+	if err != nil {
+		t.Fatalf("VirtualMachine().List failed: %v", err)
+	}
+	t.Logf("vCenter VMs visible: %d", len(vms))
+
+	inspected, onVPC := 0, 0
+	for _, vm := range vms {
+		if vm == nil {
+			continue
+		}
+		adapters, aerr := c.Compute().NetworkAdapter().List(ctx, &NetworkAdapterFilter{VirtualMachineID: vm.ID})
+		if aerr != nil {
+			continue
+		}
+		for _, a := range adapters {
+			if a == nil {
+				continue
+			}
+			inspected++
+			if a.VPC == nil {
+				continue
+			}
+			onVPC++
+			registered := "<none>"
+			if a.MacAddress != "" {
+				sip, serr := c.VPC().StaticIP().ReadByMAC(ctx, a.MacAddress)
+				switch {
+				case serr != nil:
+					registered = "ERR:" + serr.Error()
+				case sip != nil:
+					registered = sip.IPAddress + " (source=" + sip.Source + ")"
+				}
+			}
+			t.Logf("VW adapter on VPC: vm=%q nic=%s net=%s(%q) mac=%s autoConnect=%t connected=%t vpc={id:%s privateNetwork:%s} staticIP=%s",
+				vm.Name, a.ID, a.Network.ID, a.Network.Name, a.MacAddress, a.AutoConnect, a.Connected,
+				a.VPC.ID, a.VPC.PrivateNetwork.ID, registered)
+			if onVPC >= 5 {
+				break
+			}
+		}
+		if onVPC >= 5 {
+			break
+		}
+	}
+	t.Logf("adapters inspected=%d, on a VPC=%d", inspected, onVPC)
+	if onVPC == 0 {
+		t.Skip("no vCenter adapter currently sits on a VPC-backed network; the read contract cannot be observed on this tenant right now")
+	}
+}

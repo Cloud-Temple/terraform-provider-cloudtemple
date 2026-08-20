@@ -475,3 +475,167 @@ func TestWithPriorInlineAdapterIPs(t *testing.T) {
 		}
 	})
 }
+
+// TestRejectInlineAdapterIPWithoutAdapterID pins the refusal that closes a SILENT
+// non-convergence: on an update, a block with no adapter id behind it is skipped by
+// every write branch and then dropped by the read, so the apply SUCCEEDS having done
+// nothing and the plan never converges — with no diagnostic at all. That is the worst
+// possible outcome for the user, hence the hard refusal.
+func TestRejectInlineAdapterIPWithoutAdapterID(t *testing.T) {
+	withID := map[string]interface{}{"id": "nic-1", "network_id": "net-vpc"}
+	withoutID := map[string]interface{}{"network_id": "net-vpc"}
+
+	t.Run("a block with an adapter id passes", func(t *testing.T) {
+		if diags := rejectInlineAdapterIPWithoutAdapterID(map[int]string{0: "10.0.0.5"}, []interface{}{withID}); diags != nil {
+			t.Fatalf("want no diagnostics: %v", diags)
+		}
+	})
+
+	t.Run("a block WITHOUT an adapter id is refused", func(t *testing.T) {
+		diags := rejectInlineAdapterIPWithoutAdapterID(map[int]string{0: "10.0.0.5"}, []interface{}{withoutID})
+		if diags == nil {
+			t.Fatal("an address with no adapter behind it must be refused, not silently ignored")
+		}
+		if !strings.Contains(diags[0].Summary, "silently dropped") {
+			t.Fatalf("the diagnostic must explain WHY the apply would look successful: %q", diags[0].Summary)
+		}
+	})
+
+	t.Run("a block without ip_address is none of this check's business", func(t *testing.T) {
+		if diags := rejectInlineAdapterIPWithoutAdapterID(map[int]string{}, []interface{}{withoutID}); diags != nil {
+			t.Fatalf("blocks without an address keep their existing behaviour: %v", diags)
+		}
+	})
+
+	t.Run("an out-of-range index is left to the live-adapter check", func(t *testing.T) {
+		if diags := rejectInlineAdapterIPWithoutAdapterID(map[int]string{3: "10.0.0.5"}, []interface{}{withID}); diags != nil {
+			t.Fatalf("out of range is rejectInlineAdapterIPWithoutLiveAdapter's job: %v", diags)
+		}
+	})
+
+	t.Run("the LOWEST offending index is reported", func(t *testing.T) {
+		for i := 0; i < 30; i++ {
+			diags := rejectInlineAdapterIPWithoutAdapterID(
+				map[int]string{0: "10.0.0.1", 1: "10.0.0.2"},
+				[]interface{}{withoutID, withoutID},
+			)
+			if diags == nil || !strings.Contains(diags[0].Summary, "10.0.0.1") {
+				t.Fatalf("run %d: want the lowest offending block, got %v", i, diags)
+			}
+		}
+	})
+}
+
+// TestRejectInlineAdapterIPOnAdapterlessMode pins the refusal that spares a needless
+// creation: on a deployment mode that produces NO adapter, an address could never
+// take effect, and that is knowable from the configuration alone — so the refusal
+// must precede the create rather than follow it.
+func TestRejectInlineAdapterIPOnAdapterlessMode(t *testing.T) {
+	t.Run("an adapterless mode with a configured address is refused", func(t *testing.T) {
+		diags := rejectInlineAdapterIPOnAdapterlessMode(map[int]string{0: "10.0.0.5"}, true, "from scratch")
+		if diags == nil {
+			t.Fatal("the address can never apply on an adapterless mode; refusing before the create is the point")
+		}
+		if !strings.Contains(diags[0].Summary, "from scratch") {
+			t.Fatalf("the diagnostic must name the mode so the user knows what to change: %q", diags[0].Summary)
+		}
+		if !strings.Contains(diags[0].Summary, "clone, content library or marketplace") {
+			t.Fatalf("the diagnostic must say what WOULD work: %q", diags[0].Summary)
+		}
+	})
+
+	t.Run("an adapterless mode with no configured address is fine", func(t *testing.T) {
+		if diags := rejectInlineAdapterIPOnAdapterlessMode(map[int]string{}, true, "from scratch"); diags != nil {
+			t.Fatalf("nothing to refuse: %v", diags)
+		}
+	})
+
+	t.Run("an adapter-producing mode is never refused by this check", func(t *testing.T) {
+		if diags := rejectInlineAdapterIPOnAdapterlessMode(map[int]string{0: "10.0.0.5"}, false, "from a clone"); diags != nil {
+			t.Fatalf("a clone provides adapters; this check must stay out of the way: %v", diags)
+		}
+	})
+
+	t.Run("the LOWEST offending index is reported", func(t *testing.T) {
+		for i := 0; i < 30; i++ {
+			diags := rejectInlineAdapterIPOnAdapterlessMode(map[int]string{2: "10.0.0.2", 0: "10.0.0.1"}, true, "from scratch")
+			if diags == nil || !strings.Contains(diags[0].Summary, "10.0.0.1") {
+				t.Fatalf("run %d: want the lowest offending block, got %v", i, diags)
+			}
+		}
+	})
+}
+
+// TestRollbackInlineAdapterIPsOnAnyError pins the behaviour of the deferred guard,
+// observed through its EFFECT ON THE STATE rather than through the diagnostics it
+// returns — an earlier version of this test only inspected the diagnostics and
+// therefore could not tell whether the rollback had fired at all.
+//
+// Inert on success matters as much as acting on failure: a guard that fired on an
+// apply that merely emitted a warning would erase the address that apply had just
+// recorded.
+func TestRollbackInlineAdapterIPsOnAnyError(t *testing.T) {
+	// A ResourceData built from raw config has no prior state, so "the prior value"
+	// of ip_address is empty. That is exactly what makes the rollback observable
+	// here: if it fires, the address is cleared; if it stays inert, the address
+	// survives.
+	newRD := func(t *testing.T) *schema.ResourceData {
+		t.Helper()
+		return schema.TestResourceDataRaw(t, resourceOpenIaasVirtualMachine().Schema, map[string]interface{}{
+			"name": "vm",
+			"os_network_adapter": []interface{}{
+				map[string]interface{}{"id": "vif-1", "network_id": "net-vpc", "ip_address": "10.0.0.5"},
+			},
+		})
+	}
+	addressOf := func(t *testing.T, d *schema.ResourceData) string {
+		t.Helper()
+		list, _ := d.Get("os_network_adapter").([]interface{})
+		if len(list) != 1 {
+			t.Fatalf("expected one adapter block, got %v", list)
+		}
+		block, _ := list[0].(map[string]interface{})
+		ip, _ := block["ip_address"].(string)
+		return ip
+	}
+
+	t.Run("nil diagnostics leave the address alone", func(t *testing.T) {
+		d := newRD(t)
+		var diags diag.Diagnostics
+		rollbackInlineAdapterIPsOnAnyError(d, &diags)
+		if diags != nil {
+			t.Fatalf("must not invent diagnostics, got %v", diags)
+		}
+		if got := addressOf(t, d); got != "10.0.0.5" {
+			t.Fatalf("ip_address = %q on success, want it untouched", got)
+		}
+	})
+
+	t.Run("a WARNING-only apply leaves the address alone", func(t *testing.T) {
+		d := newRD(t)
+		diags := diag.Diagnostics{{Severity: diag.Warning, Summary: "just a warning"}}
+		rollbackInlineAdapterIPsOnAnyError(d, &diags)
+		if got := addressOf(t, d); got != "10.0.0.5" {
+			t.Fatalf("ip_address = %q, want it untouched: an apply that SUCCEEDED with a warning has applied the address, and erasing it would undo real work", got)
+		}
+	})
+
+	t.Run("an ERROR rolls the address back and keeps the diagnostics", func(t *testing.T) {
+		d := newRD(t)
+		diags := diag.Errorf("something failed")
+		rollbackInlineAdapterIPsOnAnyError(d, &diags)
+		if !diags.HasError() {
+			t.Fatal("the original error must survive the rollback")
+		}
+		if diags[0].Summary != "something failed" {
+			t.Fatalf("the original diagnostic must come first, got %q", diags[0].Summary)
+		}
+		if got := addressOf(t, d); got != "" {
+			t.Fatalf("ip_address = %q after a failed apply, want the prior value (empty here): the state must not claim an address that was never applied", got)
+		}
+	})
+
+	t.Run("a nil pointer is tolerated", func(t *testing.T) {
+		rollbackInlineAdapterIPsOnAnyError(newRD(t), nil)
+	})
+}

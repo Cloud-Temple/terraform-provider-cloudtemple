@@ -231,19 +231,19 @@ func TestOsNetworkAdapterUpdateSkipsUnconfiguredTx(t *testing.T) {
 
 	// txWant=nil: the merged-map tx divergence must not produce any PATCH.
 	// The nil client guarantees a loud failure if a request were attempted.
-	if diags := osNetworkAdapterUpdate(context.Background(), nil, nil, adapter, actual, nil, ""); diags != nil {
+	if diags := osNetworkAdapterUpdate(context.Background(), nil, adapter, actual, nil, ""); diags != nil {
 		t.Fatalf("osNetworkAdapterUpdate() returned diagnostics for a fully converged adapter: %v", diags)
 	}
 
 	// txWant equal to the live value: no divergence, no PATCH either.
-	if diags := osNetworkAdapterUpdate(context.Background(), nil, nil, adapter, actual, boolPtr(true), ""); diags != nil {
+	if diags := osNetworkAdapterUpdate(context.Background(), nil, adapter, actual, boolPtr(true), ""); diags != nil {
 		t.Fatalf("osNetworkAdapterUpdate() returned diagnostics for an equal explicit value: %v", diags)
 	}
 
 	// An unconfigured ip_address must not reach the VPC plane either: with a nil
 	// client any /vpc/v1 read would panic, so this pins that the relocation step is
 	// skipped outright rather than merely finding nothing to do.
-	if diags := osNetworkAdapterUpdate(context.Background(), nil, nil, adapter, actual, nil, ""); diags != nil {
+	if diags := osNetworkAdapterUpdate(context.Background(), nil, adapter, actual, nil, ""); diags != nil {
 		t.Fatalf("an unconfigured ip_address must not trigger the VPC reconciliation: %v", diags)
 	}
 }

@@ -193,11 +193,15 @@ func preserveInlineAdapterIP(prevEntry interface{}, flat interface{}) interface{
 // inlineAdapterIPDescription is the shared user-facing wording of the nested
 // ip_address argument. Kept in one place so the two surfaces cannot drift apart
 // in what they promise.
-const inlineAdapterIPDescription = "The VPC static IP to assign to this adapter at creation. " +
+const inlineAdapterIPDescription = "The VPC static IP to assign to this adapter. It is applied when the virtual machine is created, " +
+	"and changing it later relocates the address in place (no replacement). " +
 	"Requires `network_id` to reference a VPC-backed network: the platform silently ignores the value on a plain network, " +
-	"so setting it there is rejected before anything is created. It is also rejected when another `os_network_adapter` block " +
+	"so setting it there is rejected before anything is created or changed. It is also rejected when another `os_network_adapter` block " +
 	"targets the same network, because the platform assigns an explicit address per (virtual machine, network) pair and cannot " +
 	"give one address to several adapters. When omitted on a VPC network, the platform auto-assigns an address. " +
+	"Not supported on deployment modes that provide no network adapter for it to apply to — a VMware from-scratch create " +
+	"(`guest_operating_system_moref`), or an OpenIaaS marketplace-item deploy, whose deploy call cannot carry an address; " +
+	"both are rejected with an explicit error rather than silently ignored. " +
 	"Write-only: it is never read back from the platform (the registration is addressable only by MAC on the VPC plane), " +
 	"so the value recorded in the state is the last one applied, and an out-of-band change is not detected as drift."
 
@@ -229,13 +233,41 @@ func sortedIndexes(m map[int]string) []int {
 // validated the same blocks before its POST and then tail-calls Update.
 func validateInlineAdapterIPPreconditions(ctx context.Context, d *schema.ResourceData, status networkVPCStatusFunc) diag.Diagnostics {
 	if d.IsNewResource() {
+		// Create validated the same blocks before its own calls and then tail-calls
+		// Update; re-reading the networks here would buy nothing.
 		return nil
 	}
+	// On an UPDATE the adapters already exist, so a configured address whose block
+	// carries no adapter id has nothing to be applied to. Left unchecked the apply
+	// SUCCEEDS while doing nothing and the read then drops the block, so the plan
+	// never converges and the user is never told why.
+	if diags := rejectInlineAdapterIPWithoutAdapterID(osAdapterIPConfigured(d.GetRawConfig()), plannedInlineAdapters(d)); diags != nil {
+		return refuseBeforeAnyMutation(d, diags)
+	}
+	return validateInlineAdapterIPPreconditionsCore(ctx, d, status)
+}
+
+// validateInlineAdapterIPPreconditionsOnCreate is the CREATE-side entry point.
+// d.IsNewResource() is precisely the case to validate here, so there is no skip; and
+// it additionally rejects an address on a deployment mode that produces NO adapter
+// at all, before anything is created.
+func validateInlineAdapterIPPreconditionsOnCreate(ctx context.Context, d *schema.ResourceData, status networkVPCStatusFunc, adapterlessMode bool, modeName string) diag.Diagnostics {
+	if diags := rejectInlineAdapterIPOnAdapterlessMode(osAdapterIPConfigured(d.GetRawConfig()), adapterlessMode, modeName); diags != nil {
+		return refuseBeforeAnyMutation(d, diags)
+	}
+	return validateInlineAdapterIPPreconditionsCore(ctx, d, status)
+}
+
+// validateInlineAdapterIPPreconditionsCore holds the checks both entry points share.
+//
+// refuseBeforeAnyMutation is applied to the verdict, so a refusal never records the
+// planned values: every call site is placed before any platform call.
+func validateInlineAdapterIPPreconditionsCore(ctx context.Context, d *schema.ResourceData, status networkVPCStatusFunc) diag.Diagnostics {
 	configuredIPs := osAdapterIPConfigured(d.GetRawConfig())
 	if len(configuredIPs) == 0 {
 		return nil
 	}
-	planned, _ := d.Get("os_network_adapter").([]interface{})
+	planned := plannedInlineAdapters(d)
 	networkIDAt := func(index int) string {
 		if index >= len(planned) {
 			return ""
@@ -401,4 +433,95 @@ func refuseBeforeAnyMutation(d *schema.ResourceData, diags diag.Diagnostics) dia
 	}
 	d.Partial(true)
 	return diags
+}
+
+// rollbackInlineAdapterIPsOnAnyError is installed with `defer` at the top of a
+// create or update function, against its NAMED return value:
+//
+//	func fooUpdate(...) (diags diag.Diagnostics) {
+//	    defer rollbackInlineAdapterIPsOnAnyError(d, &diags)
+//
+// It exists to make a state-safety property STRUCTURAL instead of a discipline that
+// has to be remembered at every error return.
+//
+// The hazard, once more, because it is the whole reason this exists: `ip_address` is
+// write-only, so the read path preserves whatever the state holds; and
+// terraform-plugin-sdk/v2 persists the PLANNED values when a create or update
+// returns an error. A single error return that does not roll the addresses back is
+// therefore enough to record an address that was never applied — after which state
+// equals config, Terraform sees no diff, the function is never called again, and the
+// address is never applied. Permanent, and invisible in the plan.
+//
+// Wrapping each return individually was tried and does not hold: adversarial review
+// found five separate forgotten spots, each one narrower than the last. A deferred
+// guard inverts the burden — every present AND FUTURE error return is covered, and
+// there is nothing left to forget.
+//
+// Rolling back on ANY error, including one raised after the address was successfully
+// applied, is deliberate and safe. The reconciliation compares the configuration
+// against the LIVE platform, never against the state, so an over-reverted address
+// costs exactly one no-op apply to converge. Under-reverting costs correctness,
+// permanently. Given that asymmetry, the unconditional rule is the right one, and it
+// needs no flag tracking how far the function got.
+func rollbackInlineAdapterIPsOnAnyError(d *schema.ResourceData, diags *diag.Diagnostics) {
+	if diags == nil || !diags.HasError() {
+		return
+	}
+	*diags = restoreInlineAdapterIPsOnFailure(d, *diags)
+}
+
+// plannedInlineAdapters is the planned os_network_adapter list, tolerating a nil or
+// wrongly-typed value.
+func plannedInlineAdapters(d *schema.ResourceData) []interface{} {
+	planned, _ := d.Get("os_network_adapter").([]interface{})
+	return planned
+}
+
+// rejectInlineAdapterIPWithoutAdapterID fails when a block that sets `ip_address`
+// carries no adapter id.
+//
+// On an UPDATE every managed adapter already has one, so an empty id means the block
+// has no adapter behind it. Both surfaces then skip it silently — VMware's update
+// branches are both keyed on a non-empty id, and the read rebuilds the list from the
+// live adapters — so the apply SUCCEEDS having done nothing, the block disappears
+// from the state, and the plan never converges. The user gets no diagnostic at all.
+// Refusing is the only outcome that tells them what is wrong.
+func rejectInlineAdapterIPWithoutAdapterID(configuredIPs map[int]string, planned []interface{}) diag.Diagnostics {
+	for _, index := range sortedIndexes(configuredIPs) {
+		if index >= len(planned) {
+			// Out of range is rejectInlineAdapterIPWithoutLiveAdapter's business.
+			continue
+		}
+		block, ok := planned[index].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if id, _ := block["id"].(string); id == "" {
+			return diag.Errorf(
+				"os_network_adapter[%d] sets ip_address %q but has no network adapter behind it (no id in the state): the address cannot be applied to anything, and the block would be silently dropped on the next read. Remove ip_address, or manage the adapter with a dedicated network adapter resource.",
+				index, configuredIPs[index],
+			)
+		}
+	}
+	return nil
+}
+
+// rejectInlineAdapterIPOnAdapterlessMode fails when an address is configured while
+// the chosen deployment mode produces NO network adapter at all.
+//
+// On VMware a from-scratch create carries no network field whatsoever, so the address
+// could never take effect. Unlike the live-adapter-count check, this is knowable from
+// the configuration ALONE, before anything is created — so failing here spares the
+// operator a virtual machine created for nothing and left to clean up.
+func rejectInlineAdapterIPOnAdapterlessMode(configuredIPs map[int]string, adapterlessMode bool, modeName string) diag.Diagnostics {
+	if !adapterlessMode {
+		return nil
+	}
+	for _, index := range sortedIndexes(configuredIPs) {
+		return diag.Errorf(
+			"os_network_adapter[%d] sets ip_address %q, but a virtual machine created %s has no network adapter for it to apply to: the address could never take effect. Remove ip_address, or deploy from a source that provides adapters (clone, content library or marketplace item).",
+			index, configuredIPs[index], modeName,
+		)
+	}
+	return nil
 }

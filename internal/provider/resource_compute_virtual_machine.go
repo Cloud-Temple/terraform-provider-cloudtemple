@@ -514,6 +514,12 @@ Independent persistent: Changes are immediately and permanently written to the v
 							Computed:    true,
 							Description: "The ID of the network to which the virtual machine is connected.",
 						},
+						"ip_address": {
+							Type:         schema.TypeString,
+							Optional:     true,
+							ValidateFunc: validation.IsIPv4Address,
+							Description:  inlineAdapterIPDescription,
+						},
 						"mac_address": {
 							Type:        schema.TypeString,
 							Optional:    true,
@@ -1019,9 +1025,30 @@ func resolveVMwareUpdateSizing(dMemory, dCPU, dCores int, live *client.VirtualMa
 	return memory, cpu, cores, nil
 }
 
-func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) (diags diag.Diagnostics) {
 	c := getClient(meta)
+
+	// Same structural guarantee as the update: a create that fails after the virtual
+	// machine exists must not leave an unapplied address recorded either.
+	defer rollbackInlineAdapterIPsOnAnyError(d, &diags)
 	name := d.Get("name").(string)
+
+	// A configured ip_address is a VPC static IP, and it is only honoured on a
+	// VPC-backed network — the platform silently discards it elsewhere. Resolve and
+	// validate the target networks BEFORE anything is deployed, cloned or created.
+	// The platform also assigns an explicit address per (virtual machine, network)
+	// pair, so two blocks cannot share a network when one carries an address.
+	// A from-scratch create (guest_operating_system_moref, i.e. no clone, no content
+	// library item, no marketplace item) produces NO network adapter at all — the
+	// create request carries no network field. An inline block setting ip_address on
+	// that path could never take effect, and that is knowable BEFORE creating
+	// anything, so it is refused here rather than after a virtual machine exists.
+	fromScratch := d.Get("clone_virtual_machine_id").(string) == "" &&
+		d.Get("content_library_item_id").(string) == "" &&
+		d.Get("marketplace_item_id").(string) == ""
+	if diags := validateInlineAdapterIPPreconditionsOnCreate(ctx, d, vmwareNetworkVPCBacked(c), fromScratch, "from scratch (`guest_operating_system_moref`)"); diags != nil {
+		return diags
+	}
 
 	var activityId string
 	var err error
@@ -1188,6 +1215,14 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 	}
 
 	// Overwrite with the desired config
+	// UpdateNestedMapItems sizes the state it writes from the LIVE adapters, so a
+	// configured block beyond that count never reaches the state and no API call is
+	// ever made for it. Silently discarding a deliberately chosen static IP is not
+	// acceptable: surface it instead.
+	if diags := rejectInlineAdapterIPWithoutLiveAdapter(osAdapterIPConfigured(d.GetRawConfig()), len(networkAdapters), d.Id()); diags != nil {
+		return diags
+	}
+
 	osNetworkAdapters := helpers.UpdateNestedMapItems(d, helpers.FlattenOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
 
 	if err := d.Set("os_network_adapter", osNetworkAdapters); err != nil {
@@ -1259,6 +1294,39 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 	}
 
 	return updateVirtualMachine(ctx, d, meta, d.Get("power_state").(string) == "on", true)
+}
+
+// vmwareVPCRelocationPatch is the PURE decision of the VPC static-IP reconciliation
+// on the VMware surface: the payload to push, or nil when there is nothing to do.
+//
+// Split out of the update closure so the invariant that matters is unit testable
+// without an API client: NOTHING is pushed when the configured address already IS
+// the live one. That is not an optimisation. The create tail-calls the update, so
+// right after a create the configured address is already registered; re-sending it
+// would relocate the static IP onto itself. The payload also carries the adapter's
+// LIVE network and MAC rather than the planned ones, because the registration is
+// keyed by MAC and the network patch has already run by this point.
+//
+// A non-VPC adapter never yields a payload: a static IP has no meaning there, and
+// the preflight already rejected that configuration.
+func vmwareVPCRelocationPatch(configuredIP string, fresh *client.NetworkAdapter, liveIP string) *client.UpdateNetworkAdapterRequest {
+	if fresh == nil || fresh.VPC == nil {
+		return nil
+	}
+	ip := vpcStaticIPToPush(configuredIP != "", configuredIP, liveIP, true)
+	if ip == "" {
+		return nil
+	}
+	return &client.UpdateNetworkAdapterRequest{
+		ID:           fresh.ID,
+		NewNetworkId: fresh.Network.ID,
+		// The adapter's OWN live autoConnect, not `connected`: the request field is
+		// autoConnect and it has no omitempty, so sending the wrong one would flip an
+		// unrelated setting as a side effect of relocating an address.
+		AutoConnect: fresh.AutoConnect,
+		MacAddress:  fresh.MacAddress,
+		IPAddress:   ip,
+	}
 }
 
 func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
@@ -1355,7 +1423,12 @@ func computeVirtualMachineRead(ctx context.Context, d *schema.ResourceData, meta
 			if networkAdapter == nil {
 				return diag.Errorf("os network adapter not found: %s for virtual machine: %s", osNetworkAdapterId, id)
 			}
-			osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOSNetworkAdapterData(networkAdapter))
+			// ip_address is write-only (the platform never echoes the registered VPC
+			// static IP on the adapter object), so the flatten cannot re-derive it.
+			// Carry the previous state value across, or every refresh blanks the
+			// attribute and leaves a permanent diff.
+			osNetworkAdapters = append(osNetworkAdapters,
+				preserveInlineAdapterIP(osNetworkAdapter, helpers.FlattenOSNetworkAdapterData(networkAdapter)))
 		}
 	}
 	vmData["os_network_adapter"] = osNetworkAdapters
@@ -1714,11 +1787,27 @@ func computeVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, me
 	return updateVirtualMachine(ctx, d, meta, d.HasChange("power_state"), false)
 }
 
-func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any, updatePower bool, customizing bool) diag.Diagnostics {
+func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any, updatePower bool, customizing bool) (diags diag.Diagnostics) {
 	c := getClient(meta)
+
+	// Structural state-safety guarantee: ANY error from this function rolls the
+	// unapplied inline VPC static IPs back, so no error return can record an address
+	// that was never applied. See rollbackInlineAdapterIPsOnAnyError.
+	defer rollbackInlineAdapterIPsOnAnyError(d, &diags)
 
 	if d.Id() == "" {
 		return diag.Errorf("internal error: updateVirtualMachine called without a virtual machine id")
+	}
+
+	// The same ip_address preconditions the create enforces must hold on UPDATE, or
+	// they are trivially bypassed by adding the argument to an existing adapter. This
+	// runs before ANY mutation and, on refusal, leaves the previous state untouched —
+	// an apply that also changed something else must not be half-applied by a
+	// configuration that was always going to be rejected. Skipped while the resource
+	// is new, because Create validated the same blocks before its own calls and then
+	// tail-calls this function.
+	if diags := validateInlineAdapterIPPreconditions(ctx, d, vmwareNetworkVPCBacked(c)); diags != nil {
+		return diags
 	}
 
 	// Apply the sizing / hardware PATCH (ram/cpu/corePerSocket/reservation/hot
@@ -1940,13 +2029,67 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		}
 	}
 
-	if d.HasChange("os_network_adapter") {
+	// The blocks are walked when they changed OR whenever any of them configures an
+	// ip_address. A HasChange-only gate is not sufficient: ip_address is write-only,
+	// so the read preserves its stored value, and a failure that persisted the planned
+	// address would make state == config — killing the diff and leaving the address
+	// unapplied for good. See inlineAdaptersNeedCollection.
+	configuredInlineIPs := osAdapterIPConfigured(d.GetRawConfig())
+	if inlineAdaptersNeedCollection(d.HasChange("os_network_adapter"), configuredInlineIPs) {
 		for i, osNetworkAdapter := range d.Get("os_network_adapter").([]interface{}) {
 			if osNetworkAdapter == nil {
 				continue
 			}
 			networkAdapter := osNetworkAdapter.(map[string]interface{})
+
+			// VPC static IP reconciliation for this block, AFTER the network/mac patch
+			// below and against a FRESH read. Deferred to a closure so it runs whether
+			// or not the block itself changed: a configured address must converge even
+			// when nothing else about the adapter moved.
+			reconcileVPCIP := func(adapterID string) diag.Diagnostics {
+				configuredIP := configuredInlineIPs[i]
+				if configuredIP == "" || adapterID == "" {
+					return nil
+				}
+				fresh, err := c.Compute().NetworkAdapter().Read(ctx, adapterID)
+				if err != nil {
+					return diag.Errorf("failed to read network adapter %s before VPC IP reconciliation: %s", adapterID, err)
+				}
+				if fresh == nil {
+					return diag.Errorf("network adapter %s not found", adapterID)
+				}
+				// A non-VPC target was rejected by the preflight; a non-VPC `fresh`
+				// here is rare mid-apply drift, so skip rather than error after the
+				// network patch already ran.
+				if fresh.VPC == nil {
+					return nil
+				}
+				staticIP, err := c.VPC().StaticIP().ReadByMAC(ctx, fresh.MacAddress)
+				if err != nil {
+					return diag.Errorf("failed to read the current VPC static IP of network adapter %s: %s", adapterID, err)
+				}
+				req := vmwareVPCRelocationPatch(configuredIP, fresh, adapterVPCStaticIP(true, staticIP))
+				if req == nil {
+					return nil
+				}
+				relocateActivity, err := c.Compute().NetworkAdapter().Update(ctx, req)
+				if err != nil {
+					return diag.Errorf("the VPC static IP of network adapter %s could not be set: %s", adapterID, err)
+				}
+				if _, err := c.Activity().WaitForCompletion(ctx, relocateActivity, getWaiterOptions(ctx)); err != nil {
+					return diag.Errorf("the VPC static IP of network adapter %s could not be set: %s", adapterID, err)
+				}
+				return nil
+			}
+
 			// Check si le fichier tf a un macAddress ou pas
+			if networkAdapter["id"].(string) != "" && !d.HasChange(fmt.Sprintf("os_network_adapter.%d", i)) {
+				// Nothing about the adapter changed, but a configured address may
+				// still have to converge.
+				if diags := reconcileVPCIP(networkAdapter["id"].(string)); diags != nil {
+					return diags
+				}
+			}
 			if networkAdapter["id"].(string) != "" && d.HasChange(fmt.Sprintf("os_network_adapter.%d", i)) {
 				activityId, err := c.Compute().NetworkAdapter().Update(ctx, &client.UpdateNetworkAdapterRequest{
 					ID:           networkAdapter["id"].(string),
@@ -1989,6 +2132,13 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 					if err != nil {
 						return diag.Errorf("failed to %s network adapter, %s", msg, err)
 					}
+				}
+
+				// After the network/mac patch: a same-apply move onto a VPC-backed
+				// network only now shows the adapter on the VPC, so the address is
+				// reconciled here rather than before.
+				if diags := reconcileVPCIP(networkAdapter["id"].(string)); diags != nil {
+					return diags
 				}
 			}
 		}

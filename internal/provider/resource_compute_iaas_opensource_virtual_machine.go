@@ -523,7 +523,10 @@ func openIaasReservedSourceDiskError(sourceDiskNames []string, cloudInitProvisio
 	return nil
 }
 
-func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, meta any) (diags diag.Diagnostics) {
+	// Same structural guarantee as the update: a create that fails after the virtual
+	// machine exists must not leave an unapplied address recorded either.
+	defer rollbackInlineAdapterIPsOnAnyError(d, &diags)
 	c := getClient(meta)
 
 	// Fail fast, before creating anything, if an explicit host_id is requested
@@ -1004,8 +1007,13 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 	return diags
 }
 
-func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, meta any) (diags diag.Diagnostics) {
 	c := getClient(meta)
+
+	// Structural state-safety guarantee: ANY error from this function rolls the
+	// unapplied inline VPC static IPs back, so no error return can record an address
+	// that was never applied. See rollbackInlineAdapterIPsOnAnyError.
+	defer rollbackInlineAdapterIPsOnAnyError(d, &diags)
 
 	// Capture the host-placement intent once, before any mutation or read
 	// (#355): GetChange/GetRawConfig reflect the plan, not the live mutations
@@ -1869,7 +1877,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 			if !pendingAdapters[id] {
 				continue
 			}
-			if diags := osNetworkAdapterUpdate(ctx, c, d, networkAdapter, actualAdapters[id], txConfigured[id], ipConfigured[id]); diags != nil {
+			if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter, actualAdapters[id], txConfigured[id], ipConfigured[id]); diags != nil {
 				return diags
 			}
 		}
@@ -2021,7 +2029,7 @@ func openIaasVPCRelocationPatch(ipWant string, actual *client.OpenIaaSNetworkAda
 	}
 }
 
-func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool, ipWant string) diag.Diagnostics {
+func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool, ipWant string) diag.Diagnostics {
 	adapterID := networkAdapter["id"].(string)
 
 	if buildOpenIaasVIFPatch(networkAdapter, actual, txWant) != nil {
@@ -2053,10 +2061,10 @@ func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, d *schema.Res
 	// retryable failure.
 	fresh, err := c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, adapterID)
 	if err != nil {
-		return restoreInlineAdapterIPsOnFailure(d, diag.Errorf("failed to read network adapter %s before VPC IP reconciliation: %s", adapterID, err))
+		return diag.Errorf("failed to read network adapter %s before VPC IP reconciliation: %s", adapterID, err)
 	}
 	if fresh == nil {
-		return restoreInlineAdapterIPsOnFailure(d, diag.Errorf("network adapter %s not found", adapterID))
+		return diag.Errorf("network adapter %s not found", adapterID)
 	}
 	if fresh.VPC == nil {
 		// The preflight rejected a non-VPC target up front, so this is a rare
@@ -2077,11 +2085,11 @@ func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, d *schema.Res
 	}
 	if relocatePatch(fresh) != nil {
 		if err := runVIFUpdateWithRetry(ctx, adapterID, clientVIFUpdateFuncs(c, adapterID, getWaiterOptions(ctx)), relocatePatch); err != nil {
-			return restoreInlineAdapterIPsOnFailure(d, diag.Errorf("the VPC static IP of network adapter %s could not be set: %s", adapterID, err))
+			return diag.Errorf("the VPC static IP of network adapter %s could not be set: %s", adapterID, err)
 		}
 	}
 	if ipReadErr != nil {
-		return restoreInlineAdapterIPsOnFailure(d, diag.Errorf("failed to read the current VPC static IP of network adapter %s: %s", adapterID, ipReadErr))
+		return diag.Errorf("failed to read the current VPC static IP of network adapter %s: %s", adapterID, ipReadErr)
 	}
 	return nil
 }
