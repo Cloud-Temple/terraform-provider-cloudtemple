@@ -13,6 +13,7 @@ description: |-
     - activity_read
     - tag_read
     - tag_write
+    - vpc_read
 ---
 
 # cloudtemple_compute_iaas_opensource_virtual_machine (Resource)
@@ -28,6 +29,7 @@ To manage this resource you will need the following roles:
   - `activity_read`
   - `tag_read`
   - `tag_write`
+  - `vpc_read`
 
 ## Example Usage
 
@@ -53,6 +55,13 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
     network_id      = data.cloudtemple_compute_iaas_opensource_network.p-vlan-01.id
     mac_address     = "c2:db:4f:15:41:3e"
     tx_checksumming = true
+
+    # On a VPC-backed network, ip_address registers that address as the adapter's
+    # VPC static IP at creation. Omit it to let the platform assign one. It is
+    # only honoured on a VPC network: setting it on a plain network is rejected
+    # before anything is created, because the platform would silently ignore it.
+    #
+    # ip_address = "10.0.5.10"
   }
 
   # Define an os_disk block for each virtual disk in the template
@@ -238,6 +247,7 @@ Read-Only:
 Optional:
 
 - `attached` (Boolean, Deprecated) Whether the network adapter is attached.
+- `ip_address` (String) The VPC static IP to assign to this adapter at creation. Requires `network_id` to reference a VPC-backed network: the platform silently ignores the value on a plain network, so setting it there is rejected before anything is created. It is also rejected when another `os_network_adapter` block targets the same network, because the platform assigns an explicit address per (virtual machine, network) pair and cannot give one address to several adapters. When omitted on a VPC network, the platform auto-assigns an address. Write-only: it is never read back from the platform (the registration is addressable only by MAC on the VPC plane), so the value recorded in the state is the last one applied, and an out-of-band change is not detected as drift.
 - `mac_address` (String) The MAC address of the network adapter. If not provided, the MAC address will be sourced from the template used.
 - `network_id` (String) The identifier of the network to which the adapter is connected.  If not provided, the network will be sourced from the template used.
 - `tx_checksumming` (Boolean) Whether TX checksumming is enabled on the network adapter.

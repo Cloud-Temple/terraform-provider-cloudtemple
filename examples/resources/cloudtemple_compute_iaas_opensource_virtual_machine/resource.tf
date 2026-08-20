@@ -19,6 +19,13 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "pbt-openiaas-01"
     network_id      = data.cloudtemple_compute_iaas_opensource_network.p-vlan-01.id
     mac_address     = "c2:db:4f:15:41:3e"
     tx_checksumming = true
+
+    # On a VPC-backed network, ip_address registers that address as the adapter's
+    # VPC static IP at creation. Omit it to let the platform assign one. It is
+    # only honoured on a VPC network: setting it on a plain network is rejected
+    # before anything is created, because the platform would silently ignore it.
+    #
+    # ip_address = "10.0.5.10"
   }
 
   # Define an os_disk block for each virtual disk in the template

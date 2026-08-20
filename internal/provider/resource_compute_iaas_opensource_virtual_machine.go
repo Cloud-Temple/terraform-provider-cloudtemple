@@ -288,6 +288,12 @@ Order of the elements in the list is the boot order.`,
 							Computed:    true,
 							Description: "The identifier of the network to which the adapter is connected.  If not provided, the network will be sourced from the template used.",
 						},
+						"ip_address": {
+							Type:         schema.TypeString,
+							Optional:     true,
+							ValidateFunc: validation.IsIPv4Address,
+							Description:  inlineAdapterIPDescription,
+						},
 						"attached": {
 							Type:        schema.TypeBool,
 							Optional:    true,
@@ -561,12 +567,37 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 			return diag.Errorf("the number of os_network_adapter (%d) must match the number of network adapters in the template (%d)", len(osNetworkAdapters), len(template.NetworkAdapters))
 		}
 
+		// A configured ip_address is a VPC static IP: it is only honoured on a
+		// VPC-backed network (the platform silently discards it elsewhere), so the
+		// target network is resolved and validated BEFORE the create POST. Only
+		// blocks that explicitly set it are read, from the raw config — the merged
+		// map cannot tell an explicit value from a Computed one.
+		configuredIPs := osAdapterIPConfigured(d.GetRawConfig())
+		networkIDAt := func(index int) string {
+			if index >= len(osNetworkAdapters) {
+				return ""
+			}
+			block, ok := osNetworkAdapters[index].(map[string]interface{})
+			if !ok {
+				return ""
+			}
+			id, _ := block["network_id"].(string)
+			return id
+		}
+		if diags := rejectInlineAdapterIPSharedNetwork(configuredIPs, networkIDAt, len(osNetworkAdapters)); diags != nil {
+			return diags
+		}
+		if diags := validateInlineAdapterIPsTargetVPC(ctx, configuredIPs, networkIDAt, openIaasNetworkVPCBacked(c)); diags != nil {
+			return diags
+		}
+
 		templateNetworkAdapters := make([]client.OSNetworkAdapter, len(template.NetworkAdapters))
 		for i := range template.NetworkAdapters {
 			osNetworkAdapter := osNetworkAdapters[i].(map[string]interface{})
 			templateNetworkAdapters[i] = client.OSNetworkAdapter{
 				NetworkID: osNetworkAdapter["network_id"].(string),
 				MAC:       osNetworkAdapter["mac_address"].(string),
+				IPAddress: configuredIPs[i],
 			}
 		}
 
@@ -609,6 +640,24 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 
 		if osNetworkAdapters != nil && len(osNetworkAdapters) != len(openIaasItemInfo.NetworkAdapters) {
 			return diag.Errorf("the number of os_network_adapter (%d) must match the number of network adapters in the marketplace item (%d)", len(osNetworkAdapters), len(openIaasItemInfo.NetworkAdapters))
+		}
+
+		// The marketplace deploy maps networks through NetworkDataMapping, which
+		// carries no ipAddress field — and unlike the template path, this route has
+		// NOT been measured live. Refuse rather than accept a value that would be
+		// dropped without a trace; the standalone adapter resource can set it after
+		// the deploy.
+		if ips := osAdapterIPConfigured(d.GetRawConfig()); len(ips) > 0 {
+			// Report the LOWEST offending index: map iteration order is random in Go,
+			// so picking an arbitrary entry would make the diagnostic (and any test
+			// asserting on it) non-deterministic.
+			lowest := -1
+			for index := range ips {
+				if lowest == -1 || index < lowest {
+					lowest = index
+				}
+			}
+			return diag.Errorf("os_network_adapter[%d] sets ip_address %q, which is not supported when deploying from a marketplace item: the deploy call cannot carry a static IP. Deploy without it, then assign the address with a cloudtemple_compute_iaas_opensource_network_adapter resource.", lowest, ips[lowest])
 		}
 
 		networkData := []client.NetworkDataMapping{}
@@ -676,6 +725,14 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 	}
 	if networkAdapters == nil {
 		return diag.Errorf("could not list network adapters of virtual machine, %s", err)
+	}
+
+	// UpdateNestedMapItems sizes the state it writes from the LIVE adapters, so a
+	// configured block beyond that count never reaches the state and no API call is
+	// ever made for it. Silently discarding a deliberately chosen static IP is not
+	// acceptable: surface it instead.
+	if diags := rejectInlineAdapterIPWithoutLiveAdapter(osAdapterIPConfigured(d.GetRawConfig()), len(networkAdapters), d.Id()); diags != nil {
+		return diags
 	}
 
 	osNetworkAdapters = helpers.UpdateNestedMapItems(d, helpers.FlattenOpenIaaSOSNetworkAdaptersData(networkAdapters), "os_network_adapter")
@@ -891,7 +948,12 @@ func openIaasVirtualMachineRead(ctx context.Context, d *schema.ResourceData, met
 			// instead of crashing on the stale entry (#234 class).
 			continue
 		}
-		osNetworkAdapters = append(osNetworkAdapters, helpers.FlattenOpenIaaSOSNetworkAdapterData(networkAdapter))
+		// ip_address is write-only (the platform never echoes the registered VPC
+		// static IP on the adapter object), so the flatten cannot re-derive it.
+		// Carry the previous state value across, or every refresh blanks the
+		// attribute and leaves a permanent diff.
+		osNetworkAdapters = append(osNetworkAdapters,
+			preserveInlineAdapterIP(osNetworkAdapter, helpers.FlattenOpenIaaSOSNetworkAdapterData(networkAdapter)))
 	}
 	vmData["os_network_adapter"] = osNetworkAdapters
 
@@ -950,7 +1012,29 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 	// performed below. Fail fast if an explicit host_id change would leave the
 	// VM powered off.
 	placementInputs := openIaaSHostPlacementInputs(d)
+	// Wrapped like the inline-IP preflight below: this refusal also precedes every
+	// mutation, so none of the planned values must reach the state. It matters
+	// beyond tidiness — an apply that trips this check while ALSO setting a
+	// write-only os_network_adapter.ip_address would otherwise record that address
+	// permanently, since a refresh cannot correct a value the platform never echoes.
 	if diags := hostPlacementPreflightError(placementInputs); diags != nil {
+		return refuseBeforeAnyMutation(d, diags)
+	}
+
+	// The two ip_address preconditions the CREATE path enforces must hold on UPDATE
+	// too, or they are trivially bypassed: adding ip_address to an adapter that
+	// already sits on a non-VPC network would otherwise apply cleanly, push nothing
+	// (a non-VPC adapter is never marked pending), and then have the read preserve
+	// the planned value — recording dead configuration as if it had taken effect.
+	//
+	// This runs HERE, before ANY mutation, and not next to the adapter reconciliation
+	// further down: an apply that changes `name` as well would otherwise patch the
+	// name first and only then refuse, leaving the platform partially mutated by a
+	// configuration the provider was always going to reject.
+	//
+	// Skipped while the resource is new, because Create validated the very same
+	// blocks before its POST and tail-calls this function.
+	if diags := validateInlineAdapterIPPreconditions(ctx, d, openIaasNetworkVPCBacked(c)); diags != nil {
 		return diags
 	}
 
@@ -1153,7 +1237,7 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 		}
 	}
 
-	if d.HasChange("os_network_adapter") {
+	if inlineAdaptersNeedCollection(d.HasChange("os_network_adapter"), osAdapterIPConfigured(d.GetRawConfig())) {
 		for _, networkAdapter := range d.Get("os_network_adapter").([]interface{}) {
 			if networkAdapter == nil {
 				continue
@@ -1657,6 +1741,24 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 	// Indexes the raw configuration before the nil-filtered adapter slice is
 	// walked: the raw config list is aligned with the unfiltered d.Get list.
 	txConfigured := osAdapterTxConfigured(d.GetRawConfig(), d.Get("os_network_adapter").([]interface{}))
+	// ip_address is read from the raw config too, for the same reason as
+	// tx_checksumming: the merged map cannot be trusted for a value the state
+	// merge can reintroduce. The raw list is index-aligned with the unfiltered
+	// d.Get list, so the index is remapped to the adapter id the loops key on.
+	ipConfigured := map[string]string{}
+	for index, ip := range osAdapterIPConfigured(d.GetRawConfig()) {
+		adapters := d.Get("os_network_adapter").([]interface{})
+		if index >= len(adapters) {
+			continue
+		}
+		block, ok := adapters[index].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if id, _ := block["id"].(string); id != "" {
+			ipConfigured[id] = ip
+		}
+	}
 
 	pendingDisks := map[string]osDiskPendingChanges{}
 	for _, disk := range disks {
@@ -1688,7 +1790,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 		if !found {
 			return diag.Errorf("os_network_adapter %s is in the Terraform state but not returned by the API for virtual machine %s: refresh the state before updating", id, d.Id())
 		}
-		if adapterNeedsUpdate(networkAdapter, actual, txConfigured[id]) {
+		if adapterNeedsUpdate(networkAdapter, actual, txConfigured[id]) || adapterIPNeedsReconciliation(ipConfigured[id], actual) {
 			pendingAdapters[id] = true
 			mac, _ := networkAdapter["mac_address"].(string)
 			if mac != "" && !strings.EqualFold(mac, actual.MacAddress) && vm.PowerState == "Running" {
@@ -1767,7 +1869,7 @@ func handleUpdateOSDevices(ctx context.Context, c *client.Client, d *schema.Reso
 			if !pendingAdapters[id] {
 				continue
 			}
-			if diags := osNetworkAdapterUpdate(ctx, c, networkAdapter, actualAdapters[id], txConfigured[id]); diags != nil {
+			if diags := osNetworkAdapterUpdate(ctx, c, d, networkAdapter, actualAdapters[id], txConfigured[id], ipConfigured[id]); diags != nil {
 				return diags
 			}
 		}
@@ -1872,19 +1974,114 @@ func buildOpenIaasVIFPatch(networkAdapter map[string]interface{}, actual *client
 	return req
 }
 
-func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool) diag.Diagnostics {
-	if buildOpenIaasVIFPatch(networkAdapter, actual, txWant) == nil {
+// adapterIPNeedsReconciliation reports whether a configured VPC static IP may
+// still have to be pushed on this adapter. It is a CHEAP, over-approximating
+// trigger: the authoritative comparison needs the live address, which is only
+// readable by MAC on the /vpc/v1 plane, and doing that read here would put a VPC
+// call on every update of every adapter. Over-approximating is safe because the
+// actual push still goes through vpcStaticIPToPush, which sends nothing when the
+// address is already the configured one — so a false trigger costs one read, not
+// a redundant PATCH (the #246 self-conflict).
+//
+// A non-VPC adapter is never a candidate: a static IP has no meaning there, and
+// the create/update preflight already rejected that configuration.
+func adapterIPNeedsReconciliation(ipWant string, actual *client.OpenIaaSNetworkAdapter) bool {
+	return ipWant != "" && actual != nil && actual.VPC != nil
+}
+
+// openIaasVPCRelocationPatch is the PURE decision of the VPC static-IP
+// reconciliation: the payload to push, or nil when there is nothing to do.
+//
+// Split out of the retry closure so the two invariants that matter are unit
+// testable without an API client:
+//
+//  1. NOTHING is pushed when the configured address already IS the live one.
+//     This is not an optimisation. The create tail-calls the update with every
+//     HasChange true, so right after a create the configured address is the live
+//     one; re-sending it would relocate the static IP onto itself, which the
+//     platform rejects as a VPC Static-IP self-conflict (#246) — the failure mode
+//     that once turned a single platform hiccup into a full provisioning failure.
+//  2. When something IS pushed, networkId travels WITH ipAddress: the API
+//     requires it, and re-sending the same networkId alongside a REAL address
+//     change is accepted (verified live) — that is not the redundant patch of
+//     #246.
+//
+// A non-VPC adapter never yields a payload: a static IP has no meaning there.
+func openIaasVPCRelocationPatch(ipWant string, actual *client.OpenIaaSNetworkAdapter, liveIP string) *client.UpdateOpenIaasNetworkAdapterRequest {
+	if actual == nil || actual.VPC == nil {
 		return nil
 	}
+	ip := vpcStaticIPToPush(ipWant != "", ipWant, liveIP, true)
+	if ip == "" {
+		return nil
+	}
+	return &client.UpdateOpenIaasNetworkAdapterRequest{
+		NetworkID: actual.Network.ID,
+		IPAddress: ip,
+	}
+}
+
+func osNetworkAdapterUpdate(ctx context.Context, c *client.Client, d *schema.ResourceData, networkAdapter map[string]interface{}, actual *client.OpenIaaSNetworkAdapter, txWant *bool, ipWant string) diag.Diagnostics {
 	adapterID := networkAdapter["id"].(string)
-	// Bounded retry on transient platform failures, rebuilding the payload
-	// against a freshly read live adapter before every attempt (#251).
-	err := runVIFUpdateWithRetry(ctx, adapterID, clientVIFUpdateFuncs(c, adapterID, getWaiterOptions(ctx)), func(actual *client.OpenIaaSNetworkAdapter) *client.UpdateOpenIaasNetworkAdapterRequest {
-		return buildOpenIaasVIFPatch(networkAdapter, actual, txWant)
-	})
-	if err != nil {
-		return diag.Errorf("failed to update os network adapter: %s", err)
+
+	if buildOpenIaasVIFPatch(networkAdapter, actual, txWant) != nil {
+		// Bounded retry on transient platform failures, rebuilding the payload
+		// against a freshly read live adapter before every attempt (#251).
+		err := runVIFUpdateWithRetry(ctx, adapterID, clientVIFUpdateFuncs(c, adapterID, getWaiterOptions(ctx)), func(actual *client.OpenIaaSNetworkAdapter) *client.UpdateOpenIaasNetworkAdapterRequest {
+			return buildOpenIaasVIFPatch(networkAdapter, actual, txWant)
+		})
+		if err != nil {
+			return diag.Errorf("failed to update os network adapter: %s", err)
+		}
 	}
 
+	// VPC static-IP reconciliation, as a SECOND patch and AFTER the network/mac
+	// one, against a FRESH read: a same-apply move onto a VPC-backed network only
+	// then shows the adapter on the VPC. Mirrors the standalone adapter resource
+	// (resource_compute_iaas_opensource_network_adapter.go) rather than forking the
+	// decision: the live address is resolved by MAC INSIDE the builder, so
+	// runVIFUpdateWithRetry re-reads it per attempt and a relocation that already
+	// landed server-side is recognised as converged (nil payload) instead of being
+	// relocated onto itself.
+	if ipWant == "" {
+		return nil
+	}
+	// Every failure below leaves the requested address UNAPPLIED, so each one must
+	// take the prior value back into the state: the SDK would otherwise persist the
+	// planned address, the read would preserve it (write-only), and Terraform would
+	// see no diff left to bring Update back — a permanent divergence rather than a
+	// retryable failure.
+	fresh, err := c.Compute().OpenIaaS().NetworkAdapter().Read(ctx, adapterID)
+	if err != nil {
+		return restoreInlineAdapterIPsOnFailure(d, diag.Errorf("failed to read network adapter %s before VPC IP reconciliation: %s", adapterID, err))
+	}
+	if fresh == nil {
+		return restoreInlineAdapterIPsOnFailure(d, diag.Errorf("network adapter %s not found", adapterID))
+	}
+	if fresh.VPC == nil {
+		// The preflight rejected a non-VPC target up front, so this is a rare
+		// mid-apply drift: skip rather than error after the network patch already ran.
+		return nil
+	}
+	var ipReadErr error
+	relocatePatch := func(actual *client.OpenIaaSNetworkAdapter) *client.UpdateOpenIaasNetworkAdapterRequest {
+		if actual.VPC == nil {
+			return nil
+		}
+		staticIP, rerr := c.VPC().StaticIP().ReadByMAC(ctx, actual.MacAddress)
+		if rerr != nil {
+			ipReadErr = rerr
+			return nil
+		}
+		return openIaasVPCRelocationPatch(ipWant, actual, adapterVPCStaticIP(true, staticIP))
+	}
+	if relocatePatch(fresh) != nil {
+		if err := runVIFUpdateWithRetry(ctx, adapterID, clientVIFUpdateFuncs(c, adapterID, getWaiterOptions(ctx)), relocatePatch); err != nil {
+			return restoreInlineAdapterIPsOnFailure(d, diag.Errorf("the VPC static IP of network adapter %s could not be set: %s", adapterID, err))
+		}
+	}
+	if ipReadErr != nil {
+		return restoreInlineAdapterIPsOnFailure(d, diag.Errorf("failed to read the current VPC static IP of network adapter %s: %s", adapterID, ipReadErr))
+	}
 	return nil
 }
