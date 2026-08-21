@@ -445,6 +445,11 @@ Order of the elements in the list is the boot order.`,
 			},
 		},
 		CustomizeDiff: customdiff.All(
+			// Plan-time IPAM collision check. Advisory: it skips unresolved
+			// network ids, and the create/update preconditions remain the gate.
+			func(ctx context.Context, diff *schema.ResourceDiff, meta any) error {
+				return inlineAdapterIPCollisionDiff(inlineIPConflictOrNil(meta, openIaasInlineIPConflict))(ctx, diff, meta)
+			},
 			customdiff.ValidateChange("os_disk", func(ctx context.Context, old, new, meta any) error {
 				o := len(old.([]interface{}))
 				n := len(new.([]interface{}))
@@ -593,6 +598,10 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		if diags := validateInlineAdapterIPsTargetVPC(ctx, configuredIPs, networkIDAt, openIaasNetworkVPCBacked(c)); diags != nil {
 			return diags
 		}
+		// Nothing is ours yet on a create, so any existing registration conflicts.
+		if diags := rejectInlineAdapterIPAlreadyRegistered(ctx, configuredIPs, networkIDAt, openIaasInlineIPConflict(c), ""); diags != nil {
+			return diags
+		}
 
 		templateNetworkAdapters := make([]client.OSNetworkAdapter, len(template.NetworkAdapters))
 		for i := range template.NetworkAdapters {
@@ -645,22 +654,35 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 			return diag.Errorf("the number of os_network_adapter (%d) must match the number of network adapters in the marketplace item (%d)", len(osNetworkAdapters), len(openIaasItemInfo.NetworkAdapters))
 		}
 
-		// The marketplace deploy maps networks through NetworkDataMapping, which
-		// carries no ipAddress field — and unlike the template path, this route has
-		// NOT been measured live. Refuse rather than accept a value that would be
-		// dropped without a trace; the standalone adapter resource can set it after
-		// the deploy.
-		if ips := osAdapterIPConfigured(d.GetRawConfig()); len(ips) > 0 {
-			// Report the LOWEST offending index: map iteration order is random in Go,
-			// so picking an arbitrary entry would make the diagnostic (and any test
-			// asserting on it) non-deterministic.
-			lowest := -1
-			for index := range ips {
-				if lowest == -1 || index < lowest {
-					lowest = index
-				}
+		// A configured ip_address is a VPC static IP. The marketplace deploy DOES
+		// carry it (networkData[].ipAddress) even though the published swagger omits
+		// the field — same discrepancy as the VM-create route in #376. It is only
+		// honoured on a VPC-backed network, so the same two preconditions as the
+		// template path run BEFORE the deploy POST: the platform silently discards
+		// the value on a plain network, and it assigns one explicit address per
+		// (virtual machine, network) pair, so two blocks on the same network cannot
+		// both carry one. Only blocks that explicitly set it are read, from the raw
+		// config — the merged map cannot tell an explicit value from a Computed one.
+		marketplaceConfiguredIPs := osAdapterIPConfigured(d.GetRawConfig())
+		marketplaceNetworkIDAt := func(index int) string {
+			if index >= len(osNetworkAdapters) {
+				return ""
 			}
-			return diag.Errorf("os_network_adapter[%d] sets ip_address %q, which is not supported when deploying from a marketplace item: the deploy call cannot carry a static IP. Deploy without it, then assign the address with a cloudtemple_compute_iaas_opensource_network_adapter resource.", lowest, ips[lowest])
+			block, ok := osNetworkAdapters[index].(map[string]interface{})
+			if !ok {
+				return ""
+			}
+			id, _ := block["network_id"].(string)
+			return id
+		}
+		if diags := rejectInlineAdapterIPSharedNetwork(marketplaceConfiguredIPs, marketplaceNetworkIDAt, len(osNetworkAdapters)); diags != nil {
+			return diags
+		}
+		if diags := validateInlineAdapterIPsTargetVPC(ctx, marketplaceConfiguredIPs, marketplaceNetworkIDAt, openIaasNetworkVPCBacked(c)); diags != nil {
+			return diags
+		}
+		if diags := rejectInlineAdapterIPAlreadyRegistered(ctx, marketplaceConfiguredIPs, marketplaceNetworkIDAt, openIaasInlineIPConflict(c), ""); diags != nil {
+			return diags
 		}
 
 		networkData := []client.NetworkDataMapping{}
@@ -673,6 +695,7 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 				NetworkAdapterName:   networkAdapter.Name,
 				SourceNetworkName:    networkAdapter.NetworkName,
 				DestinationNetworkId: osNetworkAdapter["network_id"].(string),
+				IPAddress:            marketplaceConfiguredIPs[i],
 			})
 		}
 
@@ -1042,7 +1065,7 @@ func openIaasVirtualMachineUpdate(ctx context.Context, d *schema.ResourceData, m
 	//
 	// Skipped while the resource is new, because Create validated the very same
 	// blocks before its POST and tail-calls this function.
-	if diags := validateInlineAdapterIPPreconditions(ctx, d, openIaasNetworkVPCBacked(c)); diags != nil {
+	if diags := validateInlineAdapterIPPreconditions(ctx, d, openIaasNetworkVPCBacked(c), openIaasInlineIPConflict(c)); diags != nil {
 		return diags
 	}
 

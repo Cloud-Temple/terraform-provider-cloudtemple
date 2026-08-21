@@ -160,7 +160,7 @@ Required:
 
 Optional:
 
-- `ip_address` (String) The fixed IPv4 address to assign, registered as a static IP on the VPC private network. Requires `network_id` to reference a VPC network: the platform silently ignores it on a Private Backbone network, so setting it there is rejected at apply. When omitted on a VPC network, the platform auto-assigns an address. Write-only: it is never read back (the registration is addressable only by MAC on the VPC plane).
+- `ip_address` (String) The fixed IPv4 address to assign, registered as a static IP on the VPC private network. Requires `network_id` to reference a VPC network: the platform silently ignores it on a Private Backbone network, so setting it there is rejected at apply. It is also rejected when the address is ALREADY registered on the target VPC private network: the platform does not refuse that case — it creates the VM, reports success and silently registers nothing — so the collision is checked at plan and again before the create. When omitted on a VPC network, the platform auto-assigns an address. Write-only: it is never read back (the registration is addressable only by MAC on the VPC plane).
 
 
 <a id="nestedblock--os_disk"></a>

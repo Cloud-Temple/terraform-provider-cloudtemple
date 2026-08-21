@@ -151,7 +151,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 							Optional:     true,
 							ForceNew:     true,
 							ValidateFunc: validation.IsIPv4Address,
-							Description:  "The fixed IPv4 address to assign, registered as a static IP on the VPC private network. Requires `network_id` to reference a VPC network: the platform silently ignores it on a Private Backbone network, so setting it there is rejected at apply. When omitted on a VPC network, the platform auto-assigns an address. Write-only: it is never read back (the registration is addressable only by MAC on the VPC plane).",
+							Description:  "The fixed IPv4 address to assign, registered as a static IP on the VPC private network. Requires `network_id` to reference a VPC network: the platform silently ignores it on a Private Backbone network, so setting it there is rejected at apply. It is also rejected when the address is ALREADY registered on the target VPC private network: the platform does not refuse that case — it creates the VM, reports success and silently registers nothing — so the collision is checked at plan and again before the create. When omitted on a VPC network, the platform auto-assigns an address. Write-only: it is never read back (the registration is addressable only by MAC on the VPC plane).",
 						},
 					},
 				},
@@ -245,6 +245,11 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 // on an existing resource — on create, cpu/memory necessarily "change" from their
 // zero value and an `on` power_state is the legitimate boot-at-create case.
 func customizeVMInstanceDiff(ctx context.Context, d *schema.ResourceDiff, meta any) error {
+	// Plan-time IPAM collision check; see inlineAdapterIPCollisionDiff. Advisory:
+	// the create preflight remains the authoritative gate.
+	if err := inlineAdapterIPCollisionDiff(inlineIPConflictOrNil(meta, publicCloudInlineIPConflict))(ctx, d, meta); err != nil {
+		return err
+	}
 	exists := d.Id() != ""
 	// os_disk.size_gb cannot be set at CREATE: the VM is created with the
 	// image's system disk size, and create never extends it — so a configured
@@ -364,12 +369,36 @@ type vmInstanceCRUDFuncs struct {
 	extendSystem func(ctx context.Context, id string, size int) (string, error)
 	networkRead  func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error)
 	waitActivity func(ctx context.Context, activityID string) (*client.Activity, error)
+	// listStaticIPs reads every static IP registered on a VPC private network, so
+	// the create can refuse an address that is already taken. STRICT on purpose: a
+	// truncated body must surface as an error, never read as an empty network — see
+	// rejectInlineAdapterIPAlreadyRegistered.
+	listStaticIPs func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error)
 }
 
 func vmInstanceWaiterOptions(ctx context.Context) *client.WaiterOptions {
 	o := getWaiterOptions(ctx)
 	o.NotFoundRetries = vmInstanceActivityNotFoundRetries
 	return o
+}
+
+// publicCloudInlineIPConflict builds the IPAM-collision checker for VM Instances.
+func publicCloudInlineIPConflict(c *client.Client) inlineIPConflictFunc {
+	return staticIPConflictChecker(
+		func(ctx context.Context, networkID string) (string, error) {
+			network, err := c.PublicCloudVM().Network().Read(ctx, networkID)
+			if err != nil {
+				return "", err
+			}
+			if network == nil || network.VPC == nil {
+				return "", nil
+			}
+			return network.VPC.PrivateNetwork.ID, nil
+		},
+		func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+			return c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
+		},
+	)
 }
 
 func vmInstanceClientFuncs(c *client.Client) vmInstanceCRUDFuncs {
@@ -390,6 +419,9 @@ func vmInstanceClientFuncs(c *client.Client) vmInstanceCRUDFuncs {
 		networkRead:  c.PublicCloudVM().Network().Read,
 		waitActivity: func(ctx context.Context, activityID string) (*client.Activity, error) {
 			return c.Activity().WaitForCompletion(ctx, activityID, vmInstanceWaiterOptions(ctx))
+		},
+		listStaticIPs: func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+			return c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
 		},
 	}
 }
@@ -455,6 +487,29 @@ func createVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 		}
 		if nic.IPAddress != "" && network.VPC == nil {
 			return diag.Errorf("ip_address %q is set on os_network_adapter (device_index %d) but network %s (%q) is not a VPC network: a fixed IPv4 address is only honoured on a VPC network (the platform silently ignores it elsewhere) — remove ip_address, or target a VPC network.", nic.IPAddress, nic.DeviceIndex, nic.NetworkID, network.Name)
+		}
+		// IPAM collision, checked before the create for the reason documented on
+		// rejectInlineAdapterIPAlreadyRegistered: an address already registered to
+		// someone else is NOT refused by the platform — the VM is created, success is
+		// reported, and the address is silently not registered, while the state records
+		// it. Nothing detects that afterwards, because ip_address is write-only.
+		//
+		// Fail closed on a read error: an unreadable listing must not be read as "free".
+		if nic.IPAddress != "" && network.VPC != nil && funcs.listStaticIPs != nil {
+			pnID := network.VPC.PrivateNetwork.ID
+			if pnID == "" {
+				return diag.Errorf("network %s (%q) is VPC-backed but exposes no private-network id, so the ip_address %q of os_network_adapter (device_index %d) cannot be checked for a collision; refusing rather than requesting an address the platform may silently decline to register.", nic.NetworkID, network.Name, nic.IPAddress, nic.DeviceIndex)
+			}
+			registered, err := funcs.listStaticIPs(ctx, pnID)
+			if err != nil {
+				return diag.Errorf("failed to verify whether ip_address %q is already registered on the VPC private network %s of network %s (os_network_adapter device_index %d): %s", nic.IPAddress, pnID, nic.NetworkID, nic.DeviceIndex, err)
+			}
+			for _, existing := range registered {
+				if existing == nil || existing.IPAddress != nic.IPAddress {
+					continue
+				}
+				return diag.Errorf("os_network_adapter (device_index %d) requests ip_address %q, which is ALREADY registered on the VPC private network of network %s%s. The platform does not refuse this: it would create the VM, report success, and silently leave the adapter with no static IP while Terraform recorded %q. Choose a free address.", nic.DeviceIndex, nic.IPAddress, nic.NetworkID, describeStaticIPHolder(existing), nic.IPAddress)
+			}
 		}
 	}
 

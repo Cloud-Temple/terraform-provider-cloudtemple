@@ -2,8 +2,10 @@ package provider
 
 import (
 	"context"
+	"fmt"
 	"sort"
 
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
@@ -96,6 +98,197 @@ func validateInlineAdapterIPsTargetVPC(
 		}
 	}
 	return nil
+}
+
+// inlineIPConflictFunc reports the static IP registration that ALREADY holds `ip`
+// on the VPC private network behind `networkID`, or nil when the address is free.
+// It is injected because each surface reaches the network through its own client.
+//
+// An error must mean "could not establish the truth", never "free": see
+// rejectInlineAdapterIPAlreadyRegistered for why that distinction is load-bearing.
+type inlineIPConflictFunc func(ctx context.Context, networkID, ip string) (holder *client.StaticIP, err error)
+
+// rejectInlineAdapterIPAlreadyRegistered fails when a configured `ip_address` is
+// already registered to somebody else on the target VPC private network.
+//
+// MEASURED on the live API (OpenIaaS marketplace deploy, DEV 2026-08-21, 25
+// concurrent creates): a VM asked for 10.0.5.103, an address already registered to
+// another tenant resource. The platform did NOT refuse. It created the VM, answered
+// success, and simply DID NOT register the address — leaving the adapter with no
+// VPC static IP at all while Terraform recorded 10.0.5.103 in the state.
+//
+// That is the worst shape a defect can take here, and the reason this check exists:
+//   - nothing fails, so no diagnostic ever reaches the user;
+//   - `ip_address` is write-only, so no refresh compares it to the platform;
+//   - state == config, so no future plan re-enters the reconciliation.
+//
+// The divergence is therefore PERMANENT and INVISIBLE. Only a pre-flight can catch
+// it, because after the create there is no signal left to detect.
+//
+// FAIL CLOSED on a read error, deliberately, matching the sibling VPC precondition.
+// Treating an unreadable listing as "address free" would reintroduce exactly the
+// silent divergence above, and the failure is transient and retryable — which a
+// permanently wrong state is not.
+//
+// ownerVMID excuses the resource's OWN registration: on an update the address is
+// legitimately already registered to this very VM, and refusing that would make
+// every no-op apply fail. It is empty on a create, where nothing can be ours yet.
+func rejectInlineAdapterIPAlreadyRegistered(
+	ctx context.Context,
+	configuredIPs map[int]string,
+	networkIDAt func(index int) string,
+	conflictOf inlineIPConflictFunc,
+	ownerVMID string,
+) diag.Diagnostics {
+	if conflictOf == nil {
+		return nil
+	}
+	for _, index := range sortedIndexes(configuredIPs) {
+		ip := configuredIPs[index]
+		networkID := networkIDAt(index)
+		if networkID == "" {
+			// validateInlineAdapterIPsTargetVPC already refuses this case with a
+			// better diagnostic; nothing to add here.
+			continue
+		}
+		holder, err := conflictOf(ctx, networkID, ip)
+		if err != nil {
+			return diag.Errorf("failed to verify whether ip_address %q is already registered on the VPC private network of network %s (os_network_adapter[%d]): %s. Refusing rather than risk requesting an address the platform would silently decline to register.", ip, networkID, index, err)
+		}
+		if holder == nil {
+			continue
+		}
+		if ownerVMID != "" && holder.VirtualMachine != nil && holder.VirtualMachine.ID == ownerVMID {
+			// Already ours: this is the steady state of an update, not a conflict.
+			continue
+		}
+		return diag.Errorf("os_network_adapter[%d] requests ip_address %q, which is ALREADY registered on that VPC private network%s. The platform does not refuse this: it would create the resource, report success, and silently leave the adapter with no static IP while Terraform recorded %q — a divergence no later refresh can detect, because ip_address is write-only. Choose a free address.", index, ip, describeStaticIPHolder(holder), ip)
+	}
+	return nil
+}
+
+// describeStaticIPHolder renders who holds an address, without dumping the whole
+// record: enough for the user to find it, nothing more.
+func describeStaticIPHolder(holder *client.StaticIP) string {
+	if holder == nil {
+		return ""
+	}
+	out := ""
+	if holder.Source != "" {
+		out += fmt.Sprintf(", registered by %s", holder.Source)
+	}
+	if holder.VirtualMachine != nil && holder.VirtualMachine.ID != "" {
+		out += fmt.Sprintf(" for virtual machine %s", holder.VirtualMachine.ID)
+	}
+	if holder.MacAddress != "" {
+		out += fmt.Sprintf(" on MAC %s", holder.MacAddress)
+	}
+	if holder.FloatingIP != nil {
+		out += " (a floating IP is bound to it)"
+	}
+	return out
+}
+
+// staticIPConflictChecker builds an inlineIPConflictFunc from a resolver of the VPC
+// private network behind a Compute network and a STRICT listing of that network's
+// static IPs.
+//
+// The listing must be strict (client ListStrict): a partial or unprovable answer
+// has to surface as an error. A lenient listing that returns an empty slice for a
+// truncated body would read as "address free" and defeat the whole check.
+//
+// Listings are memoised per private network for the duration of one validation
+// pass: several blocks may resolve to the same private network, and re-reading it
+// would multiply calls against an API this very test proved fragile under load.
+func staticIPConflictChecker(
+	privateNetworkOf func(ctx context.Context, networkID string) (string, error),
+	listStrict func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error),
+) inlineIPConflictFunc {
+	cache := map[string][]*client.StaticIP{}
+	return func(ctx context.Context, networkID, ip string) (*client.StaticIP, error) {
+		pnID, err := privateNetworkOf(ctx, networkID)
+		if err != nil {
+			return nil, err
+		}
+		if pnID == "" {
+			// Not VPC-backed, or the platform does not expose the link. The VPC
+			// precondition owns that verdict; there is no IPAM plane to check.
+			return nil, nil
+		}
+		rows, cached := cache[pnID]
+		if !cached {
+			rows, err = listStrict(ctx, pnID)
+			if err != nil {
+				return nil, err
+			}
+			cache[pnID] = rows
+		}
+		for _, row := range rows {
+			if row != nil && row.IPAddress == ip {
+				return row, nil
+			}
+		}
+		return nil, nil
+	}
+}
+
+// inlineAdapterIPCollisionDiff is the PLAN-TIME half of the IPAM collision check.
+//
+// The create/update preconditions already refuse a taken address before any
+// platform call, which is what protects the state. But they run during APPLY, so a
+// `terraform plan` looks clean and the user only learns at apply time. Catching it
+// in CustomizeDiff turns it into a plan error, which is where a mistake costs the
+// least.
+//
+// It is DELIBERATELY tolerant of unknowns and never authoritative:
+//   - a network_id still unknown at plan time (computed, or sourced from the
+//     template rather than the config) is skipped — a plan must not fail because a
+//     value has not been resolved yet;
+//   - the apply-time check remains the real gate, because the IPAM plane can change
+//     between plan and apply and only the pre-create check is ordered against the
+//     platform call.
+//
+// So this can produce a false PASS, never a false FAIL.
+func inlineAdapterIPCollisionDiff(conflictOf inlineIPConflictFunc) func(ctx context.Context, diff *schema.ResourceDiff, meta any) error {
+	return func(ctx context.Context, diff *schema.ResourceDiff, meta any) error {
+		if conflictOf == nil {
+			// No client to read the IPAM plane with (unit tests drive Resource.Diff
+			// with a nil meta). Skip rather than panic: this hook is advisory and the
+			// create/update precondition is the real gate.
+			return nil
+		}
+		configuredIPs := osAdapterIPConfigured(diff.GetRawConfig())
+		if len(configuredIPs) == 0 {
+			return nil
+		}
+		blocks, _ := diff.Get("os_network_adapter").([]interface{})
+		networkIDAt := func(index int) string {
+			if index >= len(blocks) {
+				return ""
+			}
+			block, ok := blocks[index].(map[string]interface{})
+			if !ok {
+				return ""
+			}
+			id, _ := block["network_id"].(string)
+			return id
+		}
+		diags := rejectInlineAdapterIPAlreadyRegistered(ctx, configuredIPs, networkIDAt, conflictOf, diff.Id())
+		if diags.HasError() {
+			return fmt.Errorf("%s", diags[0].Summary)
+		}
+		return nil
+	}
+}
+
+// inlineIPConflictOrNil returns nil when meta carries no client, so the plan-time
+// hook degrades to a no-op instead of panicking. Production always has one.
+func inlineIPConflictOrNil(meta any, build func(*client.Client) inlineIPConflictFunc) inlineIPConflictFunc {
+	c, ok := meta.(*client.Client)
+	if !ok || c == nil {
+		return nil
+	}
+	return build(c)
 }
 
 // rejectInlineAdapterIPSharedNetwork fails when a block sets `ip_address` while
@@ -198,10 +391,12 @@ const inlineAdapterIPDescription = "The VPC static IP to assign to this adapter.
 	"Requires `network_id` to reference a VPC-backed network: the platform silently ignores the value on a plain network, " +
 	"so setting it there is rejected before anything is created or changed. It is also rejected when another `os_network_adapter` block " +
 	"targets the same network, because the platform assigns an explicit address per (virtual machine, network) pair and cannot " +
-	"give one address to several adapters. When omitted on a VPC network, the platform auto-assigns an address. " +
-	"Not supported on deployment modes that provide no network adapter for it to apply to — a VMware from-scratch create " +
-	"(`guest_operating_system_moref`), or an OpenIaaS marketplace-item deploy, whose deploy call cannot carry an address; " +
-	"both are rejected with an explicit error rather than silently ignored. " +
+	"give one address to several adapters. It is also rejected when the address is ALREADY registered on the target VPC " +
+	"private network: the platform does not refuse that case — it creates the resource, reports success and silently " +
+	"registers nothing — so the collision is checked before anything is created. " +
+	"When omitted on a VPC network, the platform auto-assigns an address. " +
+	"Not supported on a deployment mode that provides no network adapter for it to apply to — a VMware from-scratch create " +
+	"(`guest_operating_system_moref`) — which is rejected with an explicit error rather than silently ignored. " +
 	"Write-only: it is never read back from the platform (the registration is addressable only by MAC on the VPC plane), " +
 	"so the value recorded in the state is the last one applied, and an out-of-band change is not detected as drift."
 
@@ -231,7 +426,7 @@ func sortedIndexes(m map[int]string) []int {
 // network_id may legitimately come from the template rather than the
 // configuration. It is a no-op while the resource is new, because Create already
 // validated the same blocks before its POST and then tail-calls Update.
-func validateInlineAdapterIPPreconditions(ctx context.Context, d *schema.ResourceData, status networkVPCStatusFunc) diag.Diagnostics {
+func validateInlineAdapterIPPreconditions(ctx context.Context, d *schema.ResourceData, status networkVPCStatusFunc, conflictOf inlineIPConflictFunc) diag.Diagnostics {
 	if d.IsNewResource() {
 		// Create validated the same blocks before its own calls and then tail-calls
 		// Update; re-reading the networks here would buy nothing.
@@ -244,25 +439,27 @@ func validateInlineAdapterIPPreconditions(ctx context.Context, d *schema.Resourc
 	if diags := rejectInlineAdapterIPWithoutAdapterID(osAdapterIPConfigured(d.GetRawConfig()), plannedInlineAdapters(d)); diags != nil {
 		return refuseBeforeAnyMutation(d, diags)
 	}
-	return validateInlineAdapterIPPreconditionsCore(ctx, d, status)
+	return validateInlineAdapterIPPreconditionsCore(ctx, d, status, conflictOf, d.Id())
 }
 
 // validateInlineAdapterIPPreconditionsOnCreate is the CREATE-side entry point.
 // d.IsNewResource() is precisely the case to validate here, so there is no skip; and
 // it additionally rejects an address on a deployment mode that produces NO adapter
 // at all, before anything is created.
-func validateInlineAdapterIPPreconditionsOnCreate(ctx context.Context, d *schema.ResourceData, status networkVPCStatusFunc, adapterlessMode bool, modeName string) diag.Diagnostics {
+func validateInlineAdapterIPPreconditionsOnCreate(ctx context.Context, d *schema.ResourceData, status networkVPCStatusFunc, conflictOf inlineIPConflictFunc, adapterlessMode bool, modeName string) diag.Diagnostics {
 	if diags := rejectInlineAdapterIPOnAdapterlessMode(osAdapterIPConfigured(d.GetRawConfig()), adapterlessMode, modeName); diags != nil {
 		return refuseBeforeAnyMutation(d, diags)
 	}
-	return validateInlineAdapterIPPreconditionsCore(ctx, d, status)
+	// Empty owner: on a create nothing on the IPAM plane can be ours yet, so ANY
+	// existing registration of the requested address is a conflict.
+	return validateInlineAdapterIPPreconditionsCore(ctx, d, status, conflictOf, "")
 }
 
 // validateInlineAdapterIPPreconditionsCore holds the checks both entry points share.
 //
 // refuseBeforeAnyMutation is applied to the verdict, so a refusal never records the
 // planned values: every call site is placed before any platform call.
-func validateInlineAdapterIPPreconditionsCore(ctx context.Context, d *schema.ResourceData, status networkVPCStatusFunc) diag.Diagnostics {
+func validateInlineAdapterIPPreconditionsCore(ctx context.Context, d *schema.ResourceData, status networkVPCStatusFunc, conflictOf inlineIPConflictFunc, ownerVMID string) diag.Diagnostics {
 	configuredIPs := osAdapterIPConfigured(d.GetRawConfig())
 	if len(configuredIPs) == 0 {
 		return nil
@@ -282,7 +479,12 @@ func validateInlineAdapterIPPreconditionsCore(ctx context.Context, d *schema.Res
 	if diags := rejectInlineAdapterIPSharedNetwork(configuredIPs, networkIDAt, len(planned)); diags != nil {
 		return refuseBeforeAnyMutation(d, diags)
 	}
-	return refuseBeforeAnyMutation(d, validateInlineAdapterIPsTargetVPC(ctx, configuredIPs, networkIDAt, status))
+	if diags := validateInlineAdapterIPsTargetVPC(ctx, configuredIPs, networkIDAt, status); diags != nil {
+		return refuseBeforeAnyMutation(d, diags)
+	}
+	// Ordered last on purpose: it costs a listing per targeted private network, so
+	// it only runs once the cheaper structural checks have passed.
+	return refuseBeforeAnyMutation(d, rejectInlineAdapterIPAlreadyRegistered(ctx, configuredIPs, networkIDAt, conflictOf, ownerVMID))
 }
 
 // inlineAdaptersNeedCollection decides whether the update must walk the inline

@@ -309,3 +309,22 @@ func vmwareNetworkVPCBacked(c *client.Client) networkVPCStatusFunc {
 		return network.VPC != nil, true, nil
 	}
 }
+
+// vmwareInlineIPConflict is the VMware counterpart of openIaasInlineIPConflict.
+func vmwareInlineIPConflict(c *client.Client) inlineIPConflictFunc {
+	return staticIPConflictChecker(
+		func(ctx context.Context, networkID string) (string, error) {
+			network, err := c.Compute().Network().Read(ctx, networkID)
+			if err != nil {
+				return "", err
+			}
+			if network == nil || network.VPC == nil {
+				return "", nil
+			}
+			return network.VPC.PrivateNetwork.ID, nil
+		},
+		func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+			return c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
+		},
+	)
+}

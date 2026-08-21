@@ -839,6 +839,11 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 			},
 		},
 		CustomizeDiff: customdiff.All(
+			// Plan-time IPAM collision check. Advisory: it skips unresolved
+			// network ids, and the create/update preconditions remain the gate.
+			func(ctx context.Context, diff *schema.ResourceDiff, meta any) error {
+				return inlineAdapterIPCollisionDiff(inlineIPConflictOrNil(meta, vmwareInlineIPConflict))(ctx, diff, meta)
+			},
 			customdiff.ValidateChange("os_disk", func(ctx context.Context, old, new, meta any) error {
 				o := len(old.([]interface{}))
 				n := len(new.([]interface{}))
@@ -1046,7 +1051,7 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 	fromScratch := d.Get("clone_virtual_machine_id").(string) == "" &&
 		d.Get("content_library_item_id").(string) == "" &&
 		d.Get("marketplace_item_id").(string) == ""
-	if diags := validateInlineAdapterIPPreconditionsOnCreate(ctx, d, vmwareNetworkVPCBacked(c), fromScratch, "from scratch (`guest_operating_system_moref`)"); diags != nil {
+	if diags := validateInlineAdapterIPPreconditionsOnCreate(ctx, d, vmwareNetworkVPCBacked(c), vmwareInlineIPConflict(c), fromScratch, "from scratch (`guest_operating_system_moref`)"); diags != nil {
 		return diags
 	}
 
@@ -1806,7 +1811,7 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 	// configuration that was always going to be rejected. Skipped while the resource
 	// is new, because Create validated the same blocks before its own calls and then
 	// tail-calls this function.
-	if diags := validateInlineAdapterIPPreconditions(ctx, d, vmwareNetworkVPCBacked(c)); diags != nil {
+	if diags := validateInlineAdapterIPPreconditions(ctx, d, vmwareNetworkVPCBacked(c), vmwareInlineIPConflict(c)); diags != nil {
 		return diags
 	}
 
