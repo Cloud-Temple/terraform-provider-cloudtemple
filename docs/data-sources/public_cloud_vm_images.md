@@ -53,7 +53,7 @@ Read-Only:
 - `categories` (List of String)
 - `compatible_families` (List of String)
 - `description_en` (String)
-- `disk_sizes_gb` (List of Number)
+- `disk_sizes_gib` (List of Number)
 - `editor` (String)
 - `family` (String)
 - `icon` (String)

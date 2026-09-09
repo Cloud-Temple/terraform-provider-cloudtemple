@@ -1,5 +1,35 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.13.0 (Unreleased)
+
+UPGRADE NOTES :
+
+  * ⚠️ **Public Cloud VM Instances — the capacity attributes are renamed to their binary unit (`*_gib` / `*_mib`), and configurations referencing them must be updated.** The VM Instances API renamed every capacity field from the `*Gb`/`*Mb` spelling to `*Gib`/`*Mib`, to match the binary units it has always used, and will stop serving the old names on **December 9th, 2026**. This is a **pure rename: no value changes** — `min_size_gb` and `min_size_gib` carry the exact same number, so updating a configuration is a rename, never a recalculation. See BREAKING CHANGES below for the list. No resource is destroyed or recreated, and no Terraform state is lost: the renamed attributes are all read-only, and a computed attribute is simply rewritten on the next refresh. What breaks is any expression that *references* an old name (for example `data.cloudtemple_public_cloud_vm_storage_type.fast.min_size_gb`), which fails at plan time with a clear error before anything is applied.
+  * The provider reads **both** spellings from the API — requiring them to agree when both are present — so this release works against a VM Instances API that has done the rename and against one that has not. No API version requirement is introduced.
+  * ⚠️ **A capacity the API reports under neither spelling is now an error instead of a silent `0`.** The Public Cloud VM client used to rely on case-insensitive JSON matching, so a renamed or missing capacity field decoded to `0` and was written as such into the Terraform state. Such a read now fails with a diagnostic naming both spellings and the affected object. This is the change that makes the December 9th removal safe rather than silent — but it does mean a previously invisible API inconsistency now surfaces as a loud read error. The two quota usage counters (`ram_used_mib`, `storage_used_gib`) are exempt: the API contract gives them a default of `0`, so their absence legitimately means zero.
+  * On the `cloudtemple_public_cloud_vm_instance` resource, `os_disk.size_gb` is the only **user-settable** attribute affected, so it is NOT renamed in this release. It is deprecated and keeps working alongside the new `os_disk.size_gib`; declaring both at once is rejected at plan time. Migrate at your convenience — the removal will come in a future major version (#525).
+
+BREAKING CHANGES :
+
+  * The read-only capacity attributes of the Public Cloud VM Instances data sources and resources are renamed to their binary-unit spelling, with no backward-compatible alias. The values are unchanged:
+    * `cloudtemple_public_cloud_vm_storage_type` / `..._storage_types`: `min_size_gb` -> `min_size_gib`, `max_size_gb` -> `max_size_gib`;
+    * `cloudtemple_public_cloud_vm_instance_family` / `..._instance_families`: `ram_min_gb` -> `ram_min_gib`, `ram_max_gb` -> `ram_max_gib`;
+    * `cloudtemple_public_cloud_vm_flavor` / `..._flavors`: `ram_gb` -> `ram_gib`;
+    * `cloudtemple_public_cloud_vm_image` / `..._images`: `disk_sizes_gb` -> `disk_sizes_gib`;
+    * `cloudtemple_public_cloud_vm_quota`: `ram_limit_mb` -> `ram_limit_mib`, `storage_limit_gb` -> `storage_limit_gib`, `ram_used_mb` -> `ram_used_mib`, `storage_used_gb` -> `storage_used_gib`;
+    * `cloudtemple_public_cloud_vm_disks`: `size_gb` -> `size_gib`;
+    * `cloudtemple_public_cloud_vm_instance` / `..._instances` (data sources): `ram_gb` -> `ram_gib`, `disks_size_gb` -> `disks_size_gib`;
+    * `cloudtemple_public_cloud_vm_instance` (resource): `disks_size_gb` -> `disks_size_gib`.
+
+    Rename these references in your configuration; the values they carry are identical (#524).
+
+ENHANCEMENTS :
+
+  * `cloudtemple_public_cloud_vm_instance`: the `os_disk` block accepts the new `size_gib` argument alongside the now-deprecated `size_gb`. Both carry the same value and both drive the same grow-only, VM-must-be-stopped rules; setting both at once is rejected at plan time with an explicit error. `size_gb` will be removed in a future major version (#524, #525).
+  * `cloudtemple_public_cloud_vm_instances`: the `order_by` argument accepts the new `ramGib` sort field. The deprecated `ramGb` is still accepted — it is the only spelling an API version predating the rename understands, and it remains mapped by newer ones — but it stops working once the API removes it. The provider cannot detect which API version it is talking to, and the endpoint does not report an unusable sort field, so the choice is documented rather than validated (#524).
+  * The Public Cloud VM read path now accepts both the current and the deprecated capacity spellings, and rejects a payload where the two disagree: the deprecated name is contractually an exact alias, so a divergence means a value was rewritten in transit (a unit conversion applied by a proxy being the dangerous case). Rather than pick one, the read fails with a diagnostic reporting both values (#524).
+  * Capacity descriptions across the Public Cloud VM surface now say GiB/MiB instead of GB/MB, which is what the API actually returns.
+
 # 1.12.1 (September 18th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 

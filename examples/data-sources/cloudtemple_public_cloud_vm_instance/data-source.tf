@@ -5,9 +5,9 @@ data "cloudtemple_public_cloud_vm_instance" "web" {
 
 output "web" {
   value = {
-    name   = data.cloudtemple_public_cloud_vm_instance.web.name
-    status = data.cloudtemple_public_cloud_vm_instance.web.status
-    vcpu   = data.cloudtemple_public_cloud_vm_instance.web.vcpu
-    ram_gb = data.cloudtemple_public_cloud_vm_instance.web.ram_gb
+    name    = data.cloudtemple_public_cloud_vm_instance.web.name
+    status  = data.cloudtemple_public_cloud_vm_instance.web.status
+    vcpu    = data.cloudtemple_public_cloud_vm_instance.web.vcpu
+    ram_gib = data.cloudtemple_public_cloud_vm_instance.web.ram_gib
   }
 }

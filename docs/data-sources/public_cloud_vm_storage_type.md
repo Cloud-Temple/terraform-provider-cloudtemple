@@ -24,9 +24,9 @@ data "cloudtemple_public_cloud_vm_storage_type" "fast" {
 # The storage type id is consumed by the data-disk resource.
 output "storage_type" {
   value = {
-    id          = data.cloudtemple_public_cloud_vm_storage_type.fast.id
-    iops_hint   = data.cloudtemple_public_cloud_vm_storage_type.fast.iops_hint
-    max_size_gb = data.cloudtemple_public_cloud_vm_storage_type.fast.max_size_gb
+    id           = data.cloudtemple_public_cloud_vm_storage_type.fast.id
+    iops_hint    = data.cloudtemple_public_cloud_vm_storage_type.fast.iops_hint
+    max_size_gib = data.cloudtemple_public_cloud_vm_storage_type.fast.max_size_gib
   }
 }
 
@@ -57,8 +57,8 @@ data "cloudtemple_public_cloud_vm_storage_type" "fast_in_az" {
 - `description` (String) The human-readable description of the storage type.
 - `iops_hint` (String) An indicative IOPS hint for the storage type (e.g. `~1500 IOPS/TB`).
 - `is_available` (Boolean) Whether the storage type is currently available.
-- `max_size_gb` (Number) The maximum disk size (GB) allowed for this storage type.
-- `min_size_gb` (Number) The minimum disk size (GB) allowed for this storage type.
+- `max_size_gib` (Number) The maximum disk size (GiB) allowed for this storage type.
+- `min_size_gib` (Number) The minimum disk size (GiB) allowed for this storage type.
 - `sku` (List of Object) The priced SKU of the storage resource. Empty when the API returns no SKU for this storage type. (see [below for nested schema](#nestedatt--sku))
 
 <a id="nestedatt--sku"></a>

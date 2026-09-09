@@ -24,10 +24,10 @@ data "cloudtemple_public_cloud_vm_instance_family" "family" {
 # The family id is required to create a VM, and bounds its cpu/memory sizing.
 output "family_sizing_bounds" {
   value = {
-    vcpu_min   = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_min
-    vcpu_max   = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_max
-    ram_min_gb = data.cloudtemple_public_cloud_vm_instance_family.family.ram_min_gb
-    ram_max_gb = data.cloudtemple_public_cloud_vm_instance_family.family.ram_max_gb
+    vcpu_min    = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_min
+    vcpu_max    = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_max
+    ram_min_gib = data.cloudtemple_public_cloud_vm_instance_family.family.ram_min_gib
+    ram_max_gib = data.cloudtemple_public_cloud_vm_instance_family.family.ram_max_gib
   }
 }
 
@@ -51,8 +51,8 @@ output "family_pricing" {
 ### Read-Only
 
 - `description` (String) The human-readable description of the instance family.
-- `ram_max_gb` (Number) The maximum amount of RAM (GB) allowed in this family.
-- `ram_min_gb` (Number) The minimum amount of RAM (GB) allowed in this family.
+- `ram_max_gib` (Number) The maximum amount of RAM (GiB) allowed in this family.
+- `ram_min_gib` (Number) The minimum amount of RAM (GiB) allowed in this family.
 - `skus` (List of Object) The priced billing SKUs (vCPU and RAM) of the instance family. (see [below for nested schema](#nestedatt--skus))
 - `vcpu_max` (Number) The maximum number of vCPUs allowed in this family.
 - `vcpu_min` (Number) The minimum number of vCPUs allowed in this family.

@@ -23,10 +23,10 @@ data "cloudtemple_public_cloud_vm_instance" "web" {
 
 output "web" {
   value = {
-    name   = data.cloudtemple_public_cloud_vm_instance.web.name
-    status = data.cloudtemple_public_cloud_vm_instance.web.status
-    vcpu   = data.cloudtemple_public_cloud_vm_instance.web.vcpu
-    ram_gb = data.cloudtemple_public_cloud_vm_instance.web.ram_gb
+    name    = data.cloudtemple_public_cloud_vm_instance.web.name
+    status  = data.cloudtemple_public_cloud_vm_instance.web.status
+    vcpu    = data.cloudtemple_public_cloud_vm_instance.web.vcpu
+    ram_gib = data.cloudtemple_public_cloud_vm_instance.web.ram_gib
   }
 }
 ```
@@ -43,12 +43,12 @@ output "web" {
 - `availability_zone` (List of Object) The resolved availability zone. (see [below for nested schema](#nestedatt--availability_zone))
 - `backup_policy` (List of Object) The applied backup policy (empty when none). (see [below for nested schema](#nestedatt--backup_policy))
 - `created_at` (String) The creation date of the VM (RFC3339).
-- `disks_size_gb` (Number) The total size of the VM's disks (system + data) in GB.
+- `disks_size_gib` (Number) The total size of the VM's disks (system + data) in GiB.
 - `guest_tools_installed` (Boolean) Whether the guest tools are installed.
 - `image` (List of Object) The resolved OS image. (see [below for nested schema](#nestedatt--image))
 - `instance_family` (List of Object) The resolved instance family. (see [below for nested schema](#nestedatt--instance_family))
 - `name` (String) The name of the virtual machine.
-- `ram_gb` (Number) The amount of RAM in GB.
+- `ram_gib` (Number) The amount of RAM in GiB.
 - `status` (String) The current status of the VM (e.g. `running`, `stopped`).
 - `updated_at` (String) The last update date of the VM (RFC3339).
 - `vcpu` (Number) The number of vCPUs.

@@ -59,8 +59,8 @@ Read-Only:
 - `id` (String)
 - `iops_hint` (String)
 - `is_available` (Boolean)
-- `max_size_gb` (Number)
-- `min_size_gb` (Number)
+- `max_size_gib` (Number)
+- `min_size_gib` (Number)
 - `name` (String)
 - `sku` (List of Object) (see [below for nested schema](#nestedobjatt--storage_types--sku))
 

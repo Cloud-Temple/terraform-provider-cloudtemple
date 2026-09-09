@@ -23,8 +23,8 @@ data "cloudtemple_public_cloud_vm_flavor" "medium" {
 
 output "flavor_sizing" {
   value = {
-    vcpu   = data.cloudtemple_public_cloud_vm_flavor.medium.vcpu
-    ram_gb = data.cloudtemple_public_cloud_vm_flavor.medium.ram_gb
+    vcpu    = data.cloudtemple_public_cloud_vm_flavor.medium.vcpu
+    ram_gib = data.cloudtemple_public_cloud_vm_flavor.medium.ram_gib
   }
 }
 ```
@@ -40,7 +40,7 @@ output "flavor_sizing" {
 
 ### Read-Only
 
-- `ram_gb` (Number) The amount of RAM of the flavor, in GB.
+- `ram_gib` (Number) The amount of RAM of the flavor, in GiB.
 - `vcpu` (Number) The number of vCPUs of the flavor.
 
 
