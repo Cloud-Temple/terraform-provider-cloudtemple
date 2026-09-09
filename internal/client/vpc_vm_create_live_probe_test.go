@@ -697,11 +697,11 @@ func resolveSchedulableVMISubstrate(ctx context.Context, t *testing.T, c *Client
 				if st == nil || !st.IsAvailable {
 					continue
 				}
-				if want < st.MinSizeGb || (st.MaxSizeGb > 0 && want > st.MaxSizeGb) {
+				if want < st.MinSizeGib || (st.MaxSizeGib > 0 && want > st.MaxSizeGib) {
 					continue
 				}
 				t.Logf("SUBSTRATE feasible: image %q (%s, 1 NIC, %dGB) on az=%s family=%s via storage type %q (%s, %d-%dGB)",
-					img.Name, img.ID, want, p.az, p.family, st.Name, st.ID, st.MinSizeGb, st.MaxSizeGb)
+					img.Name, img.ID, want, p.az, p.family, st.Name, st.ID, st.MinSizeGib, st.MaxSizeGib)
 				return img.ID, p.az, p.family, want
 			}
 		}

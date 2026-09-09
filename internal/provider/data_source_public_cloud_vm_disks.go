@@ -34,7 +34,7 @@ func dataSourcePublicCloudVMDisks() *schema.Resource {
 						"id":           {Type: schema.TypeString, Computed: true, Description: "The unique identifier of the disk."},
 						"position":     {Type: schema.TypeInt, Computed: true, Description: "The position of the disk (0 is the system disk; data disks are 1+)."},
 						"name":         {Type: schema.TypeString, Computed: true, Description: "The name (label) of the disk."},
-						"size_gb":      {Type: schema.TypeInt, Computed: true, Description: "The size of the disk in GB."},
+						"size_gib":     {Type: schema.TypeInt, Computed: true, Description: "The size of the disk in GiB."},
 						"storage_type": {Type: schema.TypeString, Computed: true, Description: "The ID of the storage type."},
 						"is_primary":   {Type: schema.TypeBool, Computed: true, Description: "Whether this is the primary (system) disk."},
 					},

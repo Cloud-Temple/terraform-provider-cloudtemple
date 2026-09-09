@@ -18,8 +18,8 @@ func TestFlattenPublicCloudVMStorageTypeSku(t *testing.T) {
 		Name:        "Standard",
 		Description: "Standard block storage",
 		IopsHint:    "~1500 IOPS/TB",
-		MinSizeGb:   1,
-		MaxSizeGb:   2048,
+		MinSizeGib:  1,
+		MaxSizeGib:  2048,
 		IsAvailable: true,
 		Sku: &client.PublicCloudVMSku{
 			Name:          "csp:fr1:iaas:storage:bloc:medium:v1",

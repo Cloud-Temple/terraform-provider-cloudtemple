@@ -23,7 +23,7 @@ func TestAccDataSourcePublicCloudVMInstance(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance.foo", "name"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance.foo", "status"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance.foo", "availability_zone.0.id"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance.foo", "disks_size_gb"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_instance.foo", "disks_size_gib"),
 				),
 			},
 			{

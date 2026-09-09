@@ -69,7 +69,7 @@ func storageTypeStubHandler(t *testing.T, k storageTypeStubKnobs) http.HandlerFu
 				return
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"` + stTestFamily + `","name":"Development"}`))
+			_, _ = w.Write([]byte(`{"id":"` + stTestFamily + `","name":"Development","ramMinGib":1,"ramMaxGib":64}`))
 		case r.URL.Path == "/vm_instances/v1/storage_types":
 			if k.catalogueMustNotBeHit {
 				t.Errorf("storage_types must not be queried when the filter pair fails validation (fail-closed ordering)")

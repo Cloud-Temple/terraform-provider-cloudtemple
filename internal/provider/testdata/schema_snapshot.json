@@ -2038,7 +2038,7 @@
           "computed": true,
           "elem_kind": "nil"
         },
-        "disks_size_gb": {
+        "disks_size_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
@@ -2107,6 +2107,13 @@
               "elem_kind": "nil"
             },
             "size_gb": {
+              "type": "TypeInt",
+              "optional": true,
+              "computed": true,
+              "has_validate_func": true,
+              "elem_kind": "nil"
+            },
+            "size_gib": {
               "type": "TypeInt",
               "optional": true,
               "computed": true,
@@ -11214,7 +11221,7 @@
               "computed": true,
               "elem_kind": "nil"
             },
-            "size_gb": {
+            "size_gib": {
               "type": "TypeInt",
               "computed": true,
               "elem_kind": "nil"
@@ -11267,7 +11274,7 @@
           ],
           "elem_kind": "nil"
         },
-        "ram_gb": {
+        "ram_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
@@ -11301,7 +11308,7 @@
               "computed": true,
               "elem_kind": "nil"
             },
-            "ram_gb": {
+            "ram_gib": {
               "type": "TypeInt",
               "computed": true,
               "elem_kind": "nil"
@@ -11344,7 +11351,7 @@
           "computed": true,
           "elem_kind": "nil"
         },
-        "disk_sizes_gb": {
+        "disk_sizes_gib": {
           "type": "TypeList",
           "computed": true,
           "elem_kind": "value_type:TypeInt"
@@ -11450,7 +11457,7 @@
               "computed": true,
               "elem_kind": "nil"
             },
-            "disk_sizes_gb": {
+            "disk_sizes_gib": {
               "type": "TypeList",
               "computed": true,
               "elem_kind": "value_type:TypeInt"
@@ -11556,7 +11563,7 @@
           "computed": true,
           "elem_kind": "nil"
         },
-        "disks_size_gb": {
+        "disks_size_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
@@ -11611,7 +11618,7 @@
           "computed": true,
           "elem_kind": "nil"
         },
-        "ram_gb": {
+        "ram_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
@@ -11655,12 +11662,12 @@
               "computed": true,
               "elem_kind": "nil"
             },
-            "ram_max_gb": {
+            "ram_max_gib": {
               "type": "TypeInt",
               "computed": true,
               "elem_kind": "nil"
             },
-            "ram_min_gb": {
+            "ram_min_gib": {
               "type": "TypeInt",
               "computed": true,
               "elem_kind": "nil"
@@ -11743,12 +11750,12 @@
           ],
           "elem_kind": "nil"
         },
-        "ram_max_gb": {
+        "ram_max_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
         },
-        "ram_min_gb": {
+        "ram_min_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
@@ -11855,7 +11862,7 @@
               "computed": true,
               "elem_kind": "nil"
             },
-            "disks_size_gb": {
+            "disks_size_gib": {
               "type": "TypeInt",
               "computed": true,
               "elem_kind": "nil"
@@ -11909,7 +11916,7 @@
               "computed": true,
               "elem_kind": "nil"
             },
-            "ram_gb": {
+            "ram_gib": {
               "type": "TypeInt",
               "computed": true,
               "elem_kind": "nil"
@@ -12075,22 +12082,22 @@
     },
     "cloudtemple_public_cloud_vm_quota": {
       "schema": {
-        "ram_limit_mb": {
+        "ram_limit_mib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
         },
-        "ram_used_mb": {
+        "ram_used_mib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
         },
-        "storage_limit_gb": {
+        "storage_limit_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
         },
-        "storage_used_gb": {
+        "storage_used_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
@@ -12317,12 +12324,12 @@
           "computed": true,
           "elem_kind": "nil"
         },
-        "max_size_gb": {
+        "max_size_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
         },
-        "min_size_gb": {
+        "min_size_gib": {
           "type": "TypeInt",
           "computed": true,
           "elem_kind": "nil"
@@ -12418,12 +12425,12 @@
               "computed": true,
               "elem_kind": "nil"
             },
-            "max_size_gb": {
+            "max_size_gib": {
               "type": "TypeInt",
               "computed": true,
               "elem_kind": "nil"
             },
-            "min_size_gb": {
+            "min_size_gib": {
               "type": "TypeInt",
               "computed": true,
               "elem_kind": "nil"

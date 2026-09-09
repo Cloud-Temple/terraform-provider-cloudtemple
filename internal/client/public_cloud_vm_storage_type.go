@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
@@ -22,13 +23,44 @@ type PublicCloudVMStorageType struct {
 	Name        string
 	Description string
 	IopsHint    string
-	MinSizeGb   int
-	MaxSizeGb   int
+	MinSizeGib  int
+	MaxSizeGib  int
 	IsAvailable bool
 	// Sku is the priced SKU of the storage resource. It is a pointer because
 	// the API may omit it (or send null) for a given storage type; a nil Sku
 	// then flattens to an empty list rather than a phantom zero-priced object.
 	Sku *PublicCloudVMSku
+}
+
+// UnmarshalJSON accepts both the current `minSizeGib`/`maxSizeGib` spellings and
+// the deprecated `minSizeGb`/`maxSizeGb` ones (see public_cloud_vm_capacity.go,
+// issue #524).
+func (s *PublicCloudVMStorageType) UnmarshalJSON(data []byte) error {
+	type plain PublicCloudVMStorageType
+	var v struct {
+		plain
+		MinSizeGib *int
+		MinSizeGb  *int
+		MaxSizeGib *int
+		MaxSizeGb  *int
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*s = PublicCloudVMStorageType(v.plain)
+
+	subject := "storage type " + quotedOrUnidentified(v.plain.ID)
+	minSize, err := resolveRenamedCapacity(v.MinSizeGib, v.MinSizeGb, "minSizeGib", "minSizeGb", subject)
+	if err != nil {
+		return err
+	}
+	maxSize, err := resolveRenamedCapacity(v.MaxSizeGib, v.MaxSizeGb, "maxSizeGib", "maxSizeGb", subject)
+	if err != nil {
+		return err
+	}
+	s.MinSizeGib = minSize
+	s.MaxSizeGib = maxSize
+	return nil
 }
 
 // PublicCloudVMSku is the priced SKU the VM Instances API carries on each

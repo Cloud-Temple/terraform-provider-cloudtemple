@@ -15,8 +15,8 @@ func FlattenPublicCloudVMInstanceFamily(family *client.PublicCloudVMInstanceFami
 		"description": family.Description,
 		"vcpu_min":    family.VcpuMin,
 		"vcpu_max":    family.VcpuMax,
-		"ram_min_gb":  family.RamMinGb,
-		"ram_max_gb":  family.RamMaxGb,
+		"ram_min_gib": family.RamMinGib,
+		"ram_max_gib": family.RamMaxGib,
 		"skus":        flattenPublicCloudVMSkus(family.Skus),
 	}
 }

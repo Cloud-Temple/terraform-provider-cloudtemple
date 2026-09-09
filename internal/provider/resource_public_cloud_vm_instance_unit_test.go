@@ -29,7 +29,7 @@ func vmiCompletedActivity(concernedID, result string) *client.Activity {
 // okListPrimaryDisk is the listDisks seam for the found read path (which now
 // enriches os_disk from the primary disk).
 func okListPrimaryDisk(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error) {
-	return []*client.PublicCloudVMDisk{{ID: "osdisk-1", Position: 0, SizeGb: 38, StorageType: "st-1", IsPrimary: true}}, nil
+	return []*client.PublicCloudVMDisk{{ID: "osdisk-1", Position: 0, SizeGib: 38, StorageType: "st-1", IsPrimary: true}}, nil
 }
 
 // okNetworkReadPB is the networkRead seam for the create preflight: a plain
@@ -208,7 +208,7 @@ func createRD(t *testing.T) *schema.ResourceData {
 
 func TestCreateVMInstanceWith(t *testing.T) {
 	okRead := func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
-		return &client.PublicCloudVMInstance{ID: id, Name: "web", Status: "running", VCPU: 2, RAMGb: 4}, nil
+		return &client.PublicCloudVMInstance{ID: id, Name: "web", Status: "running", VCPU: 2, RAMGib: 4}, nil
 	}
 
 	t.Run("id comes from the activity concernedItems (vmi)", func(t *testing.T) {
@@ -333,7 +333,7 @@ func TestCreateVMInstanceNetworkPreflight(t *testing.T) {
 				return vmiCompletedActivity("vm-1", "vm-1"), nil
 			},
 			read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
-				return &client.PublicCloudVMInstance{ID: id, Name: "web", Status: "running", VCPU: 2, RAMGb: 4}, nil
+				return &client.PublicCloudVMInstance{ID: id, Name: "web", Status: "running", VCPU: 2, RAMGib: 4}, nil
 			},
 			listDisks: okListPrimaryDisk,
 		}, &created, &seen
@@ -486,7 +486,7 @@ func TestCreateVMInstanceNetworkPreflight(t *testing.T) {
 // --- read state-safety (E0-9) ---
 
 func TestReadVMInstanceInto(t *testing.T) {
-	vm := &client.PublicCloudVMInstance{ID: "vm-1", Name: "web", Status: "stopped", VCPU: 1, RAMGb: 2, DisksSizeGb: 38}
+	vm := &client.PublicCloudVMInstance{ID: "vm-1", Name: "web", Status: "stopped", VCPU: 1, RAMGib: 2, DisksSizeGib: 38}
 
 	t.Run("found populates state and maps power_state from status", func(t *testing.T) {
 		d := createRD(t)
@@ -501,8 +501,8 @@ func TestReadVMInstanceInto(t *testing.T) {
 		if d.Get("power_state").(string) != "off" {
 			t.Fatalf("stopped status must map to power_state off, got %q", d.Get("power_state"))
 		}
-		if d.Get("disks_size_gb").(int) != 38 {
-			t.Fatalf("disks_size_gb not set: %d", d.Get("disks_size_gb"))
+		if d.Get("disks_size_gib").(int) != 38 {
+			t.Fatalf("disks_size_gib not set: %d", d.Get("disks_size_gib"))
 		}
 	})
 
@@ -622,7 +622,7 @@ func TestReadVMInstanceInto(t *testing.T) {
 		// declared "on" (refresh mode is what reconciles power_state from status).
 		funcs := vmInstanceCRUDFuncs{
 			read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
-				return &client.PublicCloudVMInstance{ID: "vm-1", Status: "stopped", VCPU: 1, RAMGb: 2}, nil
+				return &client.PublicCloudVMInstance{ID: "vm-1", Status: "stopped", VCPU: 1, RAMGib: 2}, nil
 			},
 			listDisks: okListPrimaryDisk,
 		}
@@ -803,8 +803,8 @@ func TestSetVMInstanceOSDisk(t *testing.T) {
 		funcs := vmInstanceCRUDFuncs{
 			listDisks: func(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error) {
 				return []*client.PublicCloudVMDisk{
-					{ID: "data-1", Position: 1, SizeGb: 10, IsPrimary: false},
-					{ID: "sys", Position: 0, SizeGb: 38, StorageType: "st-1", IsPrimary: true},
+					{ID: "data-1", Position: 1, SizeGib: 10, IsPrimary: false},
+					{ID: "sys", Position: 0, SizeGib: 38, StorageType: "st-1", IsPrimary: true},
 				}, nil
 			},
 		}
@@ -816,22 +816,33 @@ func TestSetVMInstanceOSDisk(t *testing.T) {
 			t.Fatalf("os_disk must have exactly the primary disk, got %d", len(osd))
 		}
 		m := osd[0].(map[string]interface{})
-		if m["id"] != "sys" || m["is_primary"] != true || m["size_gb"].(int) != 38 || m["storage_type"] != "st-1" {
+		if m["id"] != "sys" || m["is_primary"] != true || m["storage_type"] != "st-1" {
 			t.Fatalf("os_disk primary not mapped: %v", m)
+		}
+		// BOTH spellings must be written, with the same value: while the
+		// deprecation window is open (issue #524) the deprecated leaf must never
+		// be left holding a stale size in the state.
+		if m["size_gib"].(int) != 38 {
+			t.Fatalf("size_gib not written from the API view: %v", m)
+		}
+		if m["size_gb"].(int) != 38 {
+			t.Fatalf("the deprecated size_gb must be kept in sync with size_gib, got %v", m)
 		}
 	})
 
 	t.Run("a partially declared block is overwritten by the full API view (no sibling wipe)", func(t *testing.T) {
 		d := createRD(t)
 		d.SetId("vm-1")
-		// Simulate the state after a config that only declares size_gb: the
-		// Computed siblings must be (re)filled from the API, never left empty.
+		// Simulate the state after a config that only declares the deprecated
+		// size_gb: the Computed siblings must be (re)filled from the API, never
+		// left empty — and size_gib must be populated even though the config
+		// never mentioned it.
 		if err := d.Set("os_disk", []map[string]interface{}{{"size_gb": 45}}); err != nil {
 			t.Fatalf("seed: %v", err)
 		}
 		funcs := vmInstanceCRUDFuncs{
 			listDisks: func(ctx context.Context, id string) ([]*client.PublicCloudVMDisk, error) {
-				return []*client.PublicCloudVMDisk{{ID: "sys", Position: 0, SizeGb: 45, StorageType: "st-1", IsPrimary: true}}, nil
+				return []*client.PublicCloudVMDisk{{ID: "sys", Position: 0, SizeGib: 45, StorageType: "st-1", IsPrimary: true}}, nil
 			},
 		}
 		if diags := setVMInstanceOSDisk(context.Background(), d, funcs, "vm-1"); diags.HasError() {
@@ -840,6 +851,9 @@ func TestSetVMInstanceOSDisk(t *testing.T) {
 		m := d.Get("os_disk").([]interface{})[0].(map[string]interface{})
 		if m["id"] != "sys" || m["storage_type"] != "st-1" || m["size_gb"].(int) != 45 || m["is_primary"] != true {
 			t.Fatalf("computed siblings must be refilled from the API view: %v", m)
+		}
+		if m["size_gib"].(int) != 45 {
+			t.Fatalf("a config declaring only the deprecated spelling must still get size_gib populated: %v", m)
 		}
 	})
 
@@ -877,41 +891,63 @@ func TestSetVMInstanceOSDisk(t *testing.T) {
 	})
 }
 
-// TestOSDiskSizeSetInRawConfig pins the create-time rejection detector: it must
-// read the RAW config (Optional+Computed cannot be told apart in the diff),
-// never panic on absent/null/unknown shapes, and treat an unknown size_gb as
-// set (create cannot honour it either).
-func TestOSDiskSizeSetInRawConfig(t *testing.T) {
-	block := func(sizeGb cty.Value) cty.Value {
+// TestOSDiskSizeDeclaredInRawConfig pins the create-time rejection detector: it
+// must read the RAW config (Optional+Computed cannot be told apart in the diff),
+// never panic on absent/null/unknown shapes, treat an unknown size as declared
+// (create cannot honour it either), and report EACH spelling separately so the
+// contradictory "both declared" case can be rejected (issue #524).
+func TestOSDiskSizeDeclaredInRawConfig(t *testing.T) {
+	// blockType carries both spellings, as the real schema does.
+	blockType := cty.Object(map[string]cty.Type{"size_gib": cty.Number, "size_gb": cty.Number})
+	block := func(sizeGib, sizeGb cty.Value) cty.Value {
 		return cty.ObjectVal(map[string]cty.Value{
 			"os_disk": cty.ListVal([]cty.Value{
-				cty.ObjectVal(map[string]cty.Value{"size_gb": sizeGb}),
+				cty.ObjectVal(map[string]cty.Value{"size_gib": sizeGib, "size_gb": sizeGb}),
 			}),
 		})
 	}
+	null := cty.NullVal(cty.Number)
 	cases := []struct {
-		name string
-		raw  cty.Value
-		want bool
+		name           string
+		raw            cty.Value
+		wantGib        bool
+		wantDeprecated bool
+		wantUnknown    bool
 	}{
-		{"null raw config", cty.NullVal(cty.Object(map[string]cty.Type{"os_disk": cty.List(cty.Object(map[string]cty.Type{"size_gb": cty.Number}))})), false},
-		{"no os_disk attribute", cty.ObjectVal(map[string]cty.Value{"name": cty.StringVal("x")}), false},
-		{"null os_disk", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.NullVal(cty.List(cty.Object(map[string]cty.Type{"size_gb": cty.Number})))}), false},
-		{"empty os_disk list", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.ListValEmpty(cty.Object(map[string]cty.Type{"size_gb": cty.Number}))}), false},
-		{"block without size_gb (null)", block(cty.NullVal(cty.Number)), false},
-		{"block with size_gb set", block(cty.NumberIntVal(80)), true},
-		{"block with size_gb unknown counts as set", block(cty.UnknownVal(cty.Number)), true},
+		{name: "null raw config", raw: cty.NullVal(cty.Object(map[string]cty.Type{"os_disk": cty.List(blockType)}))},
+		{name: "no os_disk attribute", raw: cty.ObjectVal(map[string]cty.Value{"name": cty.StringVal("x")})},
+		{name: "null os_disk", raw: cty.ObjectVal(map[string]cty.Value{"os_disk": cty.NullVal(cty.List(blockType))})},
+		{name: "empty os_disk list", raw: cty.ObjectVal(map[string]cty.Value{"os_disk": cty.ListValEmpty(blockType)})},
+		{name: "block with neither size set", raw: block(null, null)},
+		{name: "block with size_gib set", raw: block(cty.NumberIntVal(80), null), wantGib: true},
+		{name: "block with deprecated size_gb set", raw: block(null, cty.NumberIntVal(80)), wantDeprecated: true},
+		{name: "block with BOTH set", raw: block(cty.NumberIntVal(80), cty.NumberIntVal(80)), wantGib: true, wantDeprecated: true},
+		{name: "unknown size_gib counts as declared", raw: block(cty.UnknownVal(cty.Number), null), wantGib: true},
+		{name: "unknown deprecated size_gb counts as declared", raw: block(null, cty.UnknownVal(cty.Number)), wantDeprecated: true},
 		// A declared-but-unknown os_disk cannot be inspected; create cannot honour
-		// a size that only resolves later -> conservative reject.
-		{"unknown os_disk list counts as set", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.UnknownVal(cty.List(cty.Object(map[string]cty.Type{"size_gb": cty.Number})))}), true},
+		// a size that only resolves later -> conservative reject, but NOT reported
+		// as a both-spellings conflict (nothing was read).
+		{name: "unknown os_disk list is unknown, not a conflict", raw: cty.ObjectVal(map[string]cty.Value{"os_disk": cty.UnknownVal(cty.List(blockType))}), wantUnknown: true},
 		// Raw config can surface blocks as a tuple; the iterator must handle it.
-		{"tuple-shaped os_disk with size_gb set", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.TupleVal([]cty.Value{cty.ObjectVal(map[string]cty.Value{"size_gb": cty.NumberIntVal(80)})})}), true},
-		{"tuple-shaped os_disk without size_gb", cty.ObjectVal(map[string]cty.Value{"os_disk": cty.TupleVal([]cty.Value{cty.ObjectVal(map[string]cty.Value{"size_gb": cty.NullVal(cty.Number)})})}), false},
+		{name: "tuple-shaped os_disk with size_gib set", raw: cty.ObjectVal(map[string]cty.Value{"os_disk": cty.TupleVal([]cty.Value{cty.ObjectVal(map[string]cty.Value{"size_gib": cty.NumberIntVal(80)})})}), wantGib: true},
+		{name: "tuple-shaped os_disk with only the deprecated attribute present", raw: cty.ObjectVal(map[string]cty.Value{"os_disk": cty.TupleVal([]cty.Value{cty.ObjectVal(map[string]cty.Value{"size_gb": cty.NumberIntVal(80)})})}), wantDeprecated: true},
+		{name: "tuple-shaped os_disk without any size", raw: cty.ObjectVal(map[string]cty.Value{"os_disk": cty.TupleVal([]cty.Value{cty.ObjectVal(map[string]cty.Value{"size_gib": null})})})},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := osDiskSizeSetInRawConfig(tc.raw); got != tc.want {
-				t.Fatalf("osDiskSizeSetInRawConfig = %v, want %v", got, tc.want)
+			got := osDiskSizeDeclaredInRawConfig(tc.raw)
+			if got.Gib != tc.wantGib || got.Deprecated != tc.wantDeprecated || got.Unknown != tc.wantUnknown {
+				t.Fatalf("osDiskSizeDeclaredInRawConfig = %+v, want {Gib:%v Deprecated:%v Unknown:%v}",
+					got, tc.wantGib, tc.wantDeprecated, tc.wantUnknown)
+			}
+			// any() must cover the unknown case too: create cannot honour it.
+			if wantAny := tc.wantGib || tc.wantDeprecated || tc.wantUnknown; got.any() != wantAny {
+				t.Fatalf("any() = %v, want %v (%+v)", got.any(), wantAny, got)
+			}
+			// both() must be true ONLY for a genuine two-spelling declaration; an
+			// unknown block must never be mistaken for a conflict.
+			if wantBoth := tc.wantGib && tc.wantDeprecated; got.both() != wantBoth {
+				t.Fatalf("both() = %v, want %v (%+v)", got.both(), wantBoth, got)
 			}
 		})
 	}
@@ -996,7 +1032,7 @@ func TestCreateVMInstanceIPAMCollisionGate(t *testing.T) {
 				return vmiCompletedActivity("vm-new", "vm-new"), nil
 			},
 			read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
-				return &client.PublicCloudVMInstance{ID: id, Name: "control-01", Status: "stopped", VCPU: 2, RAMGb: 4}, nil
+				return &client.PublicCloudVMInstance{ID: id, Name: "control-01", Status: "stopped", VCPU: 2, RAMGib: 4}, nil
 			},
 			listDisks: okListPrimaryDisk,
 		}, &created, &listed

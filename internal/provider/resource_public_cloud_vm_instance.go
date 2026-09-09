@@ -85,7 +85,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				Type:         schema.TypeInt,
 				Required:     true,
 				ValidateFunc: validation.IntAtLeast(1),
-				Description:  "The amount of RAM in GB. Mutable via resize, which requires `power_state = \"off\"`.",
+				Description:  "The amount of RAM in GiB. Mutable via resize, which requires `power_state = \"off\"`.",
 			},
 			"backup_policy_id": {
 				Type:         schema.TypeString,
@@ -174,10 +174,10 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				Computed:    true,
 				Description: "The current status of the VM (e.g. `running`, `stopped`).",
 			},
-			"disks_size_gb": {
+			"disks_size_gib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The total size of the VM's disks (system + data) in GB.",
+				Description: "The total size of the VM's disks (system + data) in GiB.",
 			},
 			"guest_tools_installed": {
 				Type:        schema.TypeBool,
@@ -219,16 +219,28 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				Optional:    true,
 				Computed:    true,
 				MaxItems:    1,
-				Description: "The system (primary) disk of the VM, provided by the image. Declare the block with `size_gb` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the image's size is used. Data disks are managed by the separate disk resource.",
+				Description: "The system (primary) disk of the VM, provided by the image. Declare the block with `size_gib` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the image's size is used. Data disks are managed by the separate disk resource.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"id": {Type: schema.TypeString, Computed: true, Description: "The unique identifier of the system disk."},
+						"size_gib": {
+							Type:         schema.TypeInt,
+							Optional:     true,
+							Computed:     true,
+							ValidateFunc: validation.IntAtLeast(1),
+							Description:  "The size of the system disk in GiB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the current size is kept.",
+						},
+						// Deprecated spelling of size_gib, kept for the API compatibility
+						// window (issue #524). It is NOT a different unit: the VM Instances
+						// API renamed the field without changing the value, so the two carry
+						// the same number. Removal is tracked by issue #525.
 						"size_gb": {
 							Type:         schema.TypeInt,
 							Optional:     true,
 							Computed:     true,
 							ValidateFunc: validation.IntAtLeast(1),
-							Description:  "The size of the system disk in GB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the current size is kept.",
+							Deprecated:   "Use size_gib instead. The value is identical — the VM Instances API renamed the field to match the binary unit it always used. This attribute will be removed in a future major version.",
+							Description:  "Deprecated: use `size_gib`, which carries the same value. The size of the system disk in GiB.",
 						},
 						"storage_type": {Type: schema.TypeString, Computed: true, Description: "The ID of the storage type."},
 						"position":     {Type: schema.TypeInt, Computed: true, Description: "The position of the disk (0 for the system disk)."},
@@ -263,19 +275,25 @@ func customizeVMInstanceDiffWith(conflictOf inlineIPConflictFunc) schema.Customi
 			return err
 		}
 		exists := d.Id() != ""
-		// os_disk.size_gb cannot be set at CREATE: the VM is created with the
+		// The os_disk size cannot be set at CREATE: the VM is created with the
 		// image's system disk size, and create never extends it — so a configured
 		// value that differs from the image would produce an inconsistent result.
 		// Detected on the RAW config (never the diff/state: the attribute is
 		// Optional+Computed, so d.Get would report a computed value as "set").
+		declared := osDiskSizeDeclaredInRawConfig(d.GetRawConfig())
+		// The two spellings carry the same value, so declaring both can only express
+		// a contradiction (or hide one). Rejected at plan time, before any write.
+		if declared.both() {
+			return fmt.Errorf("os_disk: set either size_gib or the deprecated size_gb, not both — they are the same value under two names. Keep size_gib")
+		}
 		if !exists {
-			if osDiskSizeSetInRawConfig(d.GetRawConfig()) {
-				return fmt.Errorf("os_disk.size_gb cannot be set when creating the VM: the image's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
+			if declared.any() {
+				return fmt.Errorf("os_disk.size_gib cannot be set when creating the VM: the image's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
 			}
-		} else if d.HasChange("os_disk.0.size_gb") {
+		} else if attr, changed := osDiskChangedSizeAttr(d); changed {
 			// Grow-only + requires-off, validated on the LEAF only: a refresh of a
 			// Computed sibling (id, storage_type, ...) must never look like an extend.
-			o, n := d.GetChange("os_disk.0.size_gb")
+			o, n := d.GetChange(attr)
 			oldSize, okOld := o.(int)
 			newSize, okNew := n.(int)
 			if okOld && okNew {
@@ -288,40 +306,86 @@ func customizeVMInstanceDiffWith(conflictOf inlineIPConflictFunc) schema.Customi
 	}
 }
 
-// osDiskSizeSetInRawConfig reports whether the raw config declares an os_disk
-// block with an explicitly set size_gb (null-, absent- and unknown-safe: an
-// unknown value counts as set, since create cannot honour it either). It reads
-// the RAW config because os_disk.size_gb is Optional+Computed — the diff/state
-// view cannot tell an explicit value from a computed one.
-func osDiskSizeSetInRawConfig(raw cty.Value) bool {
+// osDiskSizeDeclaration reports which of the two os_disk size spellings the raw
+// config declares. Both carry the same value (issue #524), so which one the user
+// wrote decides which leaf the plan-time rules read.
+type osDiskSizeDeclaration struct {
+	Gib        bool // size_gib explicitly set
+	Deprecated bool // size_gb explicitly set
+	Unknown    bool // the os_disk block itself is unknown at plan time
+}
+
+// any reports whether a size is declared at all — including the unknown case,
+// which create cannot honour either.
+func (o osDiskSizeDeclaration) any() bool { return o.Gib || o.Deprecated || o.Unknown }
+
+// both reports the contradictory case: the same size declared under two names.
+// An unknown block is NOT "both": nothing can be read from it, so it must not
+// trigger the conflict error.
+func (o osDiskSizeDeclaration) both() bool { return o.Gib && o.Deprecated }
+
+// osDiskSizeDeclaredInRawConfig inspects the raw config for an os_disk block
+// declaring a size under either spelling (null-, absent- and unknown-safe). It
+// reads the RAW config because both size attributes are Optional+Computed — the
+// diff/state view cannot tell an explicit value from a computed one.
+func osDiskSizeDeclaredInRawConfig(raw cty.Value) osDiskSizeDeclaration {
+	var out osDiskSizeDeclaration
 	if raw.IsNull() || !raw.Type().IsObjectType() || !raw.Type().HasAttribute("os_disk") {
-		return false
+		return out
 	}
 	osd := raw.GetAttr("os_disk")
 	if osd.IsNull() {
-		return false
+		return out
 	}
 	// A declared-but-unknown os_disk cannot be inspected — and create cannot
 	// honour a size that only resolves later. Reject conservatively.
 	if !osd.IsKnown() {
-		return true
+		out.Unknown = true
+		return out
 	}
 	if !osd.CanIterateElements() {
-		return false
+		return out
 	}
 	for it := osd.ElementIterator(); it.Next(); {
 		_, el := it.Element()
-		if el.IsNull() || !el.Type().IsObjectType() || !el.Type().HasAttribute("size_gb") {
+		if el.IsNull() || !el.Type().IsObjectType() {
 			continue
 		}
-		if sg := el.GetAttr("size_gb"); !sg.IsNull() {
-			return true
+		if el.Type().HasAttribute("size_gib") {
+			if sg := el.GetAttr("size_gib"); !sg.IsNull() {
+				out.Gib = true
+			}
+		}
+		if el.Type().HasAttribute("size_gb") {
+			if sg := el.GetAttr("size_gb"); !sg.IsNull() {
+				out.Deprecated = true
+			}
 		}
 	}
-	return false
+	return out
 }
 
-// vmInstanceOSDiskChangeCheck is the pure os_disk.size_gb change rule on an
+// osDiskChangedSizeAttr returns the os_disk size leaf that actually changed, so
+// that the grow-only rules and the update path read the spelling the user
+// drives. The current spelling wins when both report a change (a state written
+// before the rename can make the deprecated leaf move on its own).
+func osDiskChangedSizeAttr(d *schema.ResourceDiff) (string, bool) {
+	if d.HasChange(osDiskSizeGibAttr) {
+		return osDiskSizeGibAttr, true
+	}
+	if d.HasChange(osDiskSizeGbAttr) {
+		return osDiskSizeGbAttr, true
+	}
+	return "", false
+}
+
+// The two os_disk size leaves, as addressed in the diff/state.
+const (
+	osDiskSizeGibAttr = "os_disk.0.size_gib"
+	osDiskSizeGbAttr  = "os_disk.0.size_gb"
+)
+
+// vmInstanceOSDiskChangeCheck is the pure os_disk size change rule on an
 // EXISTING VM. A zero new size (block removed, value resolved by Computed) is
 // not a change to validate. A zero OLD size (no readable primary in state)
 // cannot prove a shrink — the grow-only check is skipped — but the update will
@@ -336,7 +400,7 @@ func vmInstanceOSDiskChangeCheck(oldSize, newSize int, powerState string) error 
 		}
 	}
 	if powerState != "off" {
-		return fmt.Errorf("os_disk.size_gb can only be changed while power_state = \"off\" (extending the system disk requires a stopped VM); set power_state = \"off\" in the same change, then power the VM back on in a subsequent apply")
+		return fmt.Errorf("os_disk.size_gib can only be changed while power_state = \"off\" (extending the system disk requires a stopped VM); set power_state = \"off\" in the same change, then power the VM back on in a subsequent apply")
 	}
 	return nil
 }
@@ -627,7 +691,17 @@ func readVMInstanceInto(ctx context.Context, d *schema.ResourceData, funcs vmIns
 
 // setVMInstanceOSDisk enriches the state with the VM's system (primary) disk —
 // the FULL os_disk block is always written from the API view, so a partially
-// declared config block (only size_gb) can never wipe the Computed siblings.
+// declared config block (only a size) can never wipe the Computed siblings.
+// Both size spellings are written with the SAME value: the deprecated one must
+// never be left holding a stale number while the window is open (issue #524).
+// Consequence, deliberately accepted: growing the disk through size_gib leaves
+// the deprecated leaf showing its previous value in that one plan, since an
+// Optional+Computed attribute absent from the config keeps its state value in
+// the diff. The apply reconciles both, so the state is never wrong — only that
+// intermediate plan is incomplete. Neither SetNew nor SetNewComputed can fix it
+// (both reject a nested path: helper/schema checkKey looks the key up in the
+// root schema map), and rebuilding the whole os_disk block in CustomizeDiff
+// would risk wiping the very Computed siblings this function protects.
 // The disk list is fetched fresh; a failure fails closed (the VM itself is
 // kept, but the read errors — a forbidden/broken disk listing is surfaced, not
 // silently ignored).
@@ -654,7 +728,8 @@ func setVMInstanceOSDisk(ctx context.Context, d *schema.ResourceData, funcs vmIn
 	sw := newStateWriter(d)
 	sw.set("os_disk", []map[string]interface{}{{
 		"id":           primary.ID,
-		"size_gb":      primary.SizeGb,
+		"size_gib":     primary.SizeGib,
+		"size_gb":      primary.SizeGib,
 		"storage_type": primary.StorageType,
 		"position":     primary.Position,
 		"is_primary":   primary.IsPrimary,
@@ -670,7 +745,7 @@ func setVMInstanceState(d *schema.ResourceData, vm *client.PublicCloudVMInstance
 	sw := newStateWriter(d)
 	sw.set("name", vm.Name)
 	sw.set("cpu", vm.VCPU)
-	sw.set("memory", vm.RAMGb)
+	sw.set("memory", vm.RAMGib)
 	sw.set("status", vm.Status)
 	// Reconcile power_state from the live status ONLY on a refresh, to surface an
 	// out-of-band power change. Right after a write the status can lag the
@@ -679,7 +754,7 @@ func setVMInstanceState(d *schema.ResourceData, vm *client.PublicCloudVMInstance
 	if mode == vmInstanceReadForRefresh {
 		sw.set("power_state", powerStateFromStatus(vm.Status))
 	}
-	sw.set("disks_size_gb", vm.DisksSizeGb)
+	sw.set("disks_size_gib", vm.DisksSizeGib)
 	sw.set("guest_tools_installed", vm.GuestToolsInstalled)
 	sw.set("availability_zone_id", vm.AZ.ID)
 	sw.set("availability_zone_name", vm.AZ.Name)
@@ -826,9 +901,14 @@ func updateVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 
 	// LEAF-only detection: HasChange("os_disk") would also fire on a refresh of a
 	// Computed sibling (id, storage_type, ...) and trigger an extend the user
-	// never asked for.
-	osDiskExtending := d.HasChange("os_disk.0.size_gb")
-	osDiskSize := d.Get("os_disk.0.size_gb").(int)
+	// never asked for. Either spelling drives the extend, the current one first.
+	osDiskSizeAttr := osDiskSizeGibAttr
+	osDiskExtending := d.HasChange(osDiskSizeGibAttr)
+	if !osDiskExtending && d.HasChange(osDiskSizeGbAttr) {
+		osDiskSizeAttr = osDiskSizeGbAttr
+		osDiskExtending = true
+	}
+	osDiskSize := d.Get(osDiskSizeAttr).(int)
 	if osDiskExtending && osDiskSize == 0 {
 		// Block removed / no concrete target size: nothing to extend to.
 		osDiskExtending = false

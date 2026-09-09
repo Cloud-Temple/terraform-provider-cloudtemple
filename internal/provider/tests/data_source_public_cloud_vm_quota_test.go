@@ -15,8 +15,8 @@ func TestAccDataSourcePublicCloudVMQuota(t *testing.T) {
 				Config: testAccDataSourcePublicCloudVMQuota,
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_quota.current", "vcpu_limit"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_quota.current", "ram_limit_mb"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_quota.current", "storage_limit_gb"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_quota.current", "ram_limit_mib"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_quota.current", "storage_limit_gib"),
 				),
 			},
 		},

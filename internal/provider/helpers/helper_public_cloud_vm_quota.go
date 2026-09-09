@@ -8,11 +8,11 @@ import (
 // snake_case map consumed by the quota datasource.
 func FlattenPublicCloudVMQuota(quota *client.PublicCloudVMQuota) map[string]interface{} {
 	return map[string]interface{}{
-		"vcpu_limit":       quota.VcpuLimit,
-		"ram_limit_mb":     quota.RamLimitMb,
-		"storage_limit_gb": quota.StorageLimitGb,
-		"vcpu_used":        quota.VcpuUsed,
-		"ram_used_mb":      quota.RamUsedMb,
-		"storage_used_gb":  quota.StorageUsedGb,
+		"vcpu_limit":        quota.VcpuLimit,
+		"ram_limit_mib":     quota.RamLimitMib,
+		"storage_limit_gib": quota.StorageLimitGib,
+		"vcpu_used":         quota.VcpuUsed,
+		"ram_used_mib":      quota.RamUsedMib,
+		"storage_used_gib":  quota.StorageUsedGib,
 	}
 }
