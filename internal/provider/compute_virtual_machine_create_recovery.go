@@ -27,9 +27,27 @@ import (
 // soon as it is materialised, WHILE THE ACTIVITY IS STILL RUNNING. Measured
 // against the API on a marketplace VMware deployment: the `virtual_machine`
 // concerned item appears about 8 seconds after the POST, roughly a minute
-// before `state.completed.result` carries that same id. That is the
-// authoritative correlation used here — never a lookup by name, which could
-// match a homonym the provider did not create.
+// before `state.completed.result` carries that same id.
+//
+// That signal is not merely the most convenient one, it is the ONLY SOUND one.
+// It is scoped to THIS activity, whose id came from the Location header of
+// THIS resource's own POST, so concurrent creates cannot contaminate each
+// other. Every alternative is a GLOBAL lookup, and no global lookup can be
+// made safe, because nothing on a virtual machine records which activity
+// created it:
+//
+//   - matching by name adopts a homonym the provider never created;
+//   - a differential (census the name before the POST, adopt what is new
+//     afterwards) fails under concurrency, which is exactly when this bug
+//     shows up. Five instances created in parallel under one name: instance A
+//     censuses zero, instance B's machine materialises, A fails and finds
+//     exactly ONE machine that is new since its census — B's. A adopts it,
+//     taints it, and the next apply destroys a machine B also owns. An
+//     "exactly one candidate" rule does not help: the race produces exactly
+//     one candidate, just not the right one.
+//
+// So when the activity names no virtual machine, this code adopts NOTHING and
+// says what to audit. That is a deliberate refusal, not a missing feature.
 //
 // Adopting an id is a STATE-CRITICAL decision: the adopted resource is
 // persisted as TAINTED, so the next apply DESTROYS whatever it points at. The
