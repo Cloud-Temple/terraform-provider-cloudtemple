@@ -35,6 +35,17 @@ import (
 // persisted as TAINTED, so the next apply DESTROYS whatever it points at. The
 // evidence required is therefore strict, and every ambiguous case fails closed
 // with a diagnostic that tells the operator exactly what to audit.
+//
+// Why TAINTED and not "recorded as healthy": a create that returns an error
+// leaves SDKv2 exactly two outcomes — no id (the object is orphaned) or an id
+// (the object is tainted). There is no third option, and the provider cannot
+// know at failure time whether an object whose activity never completed will
+// end up complete. Tainted is the safe default AND the reversible one: when the
+// operator verifies the virtual machine is actually complete, `terraform
+// untaint` keeps it and a re-apply converges the configuration instead of
+// recreating it. The diagnostics say so, because "the deployment merely stalled
+// and the machine is fine" is a plausible reading of the failure the operator
+// must be able to act on.
 
 // vmReadFunc abstracts the per-id virtual machine read so the recovery is unit
 // tested without HTTP calls. It follows the client contract: (nil, nil) is a
@@ -129,7 +140,7 @@ func recoverVMCreateFailure(
 ) diag.Diagnostics {
 	if d.Id() != "" {
 		return diag.Errorf(
-			"%s: %s. The virtual machine %s IS recorded in the Terraform state (tainted): run `terraform destroy` to remove it, or `terraform apply` to replace it — no manual cleanup is needed.",
+			"%s: %s. The virtual machine %s IS recorded in the Terraform state (tainted): run `terraform destroy` to remove it, or `terraform apply` to replace it — no manual cleanup is needed. If you verify the virtual machine is actually complete, `terraform untaint` it and re-apply to finish the configuration instead of recreating it.",
 			action, cause, d.Id(),
 		)
 	}
@@ -157,7 +168,7 @@ func recoverVMCreateFailure(
 		// machine that probably exists.
 		d.SetId(candidate)
 		return diag.Errorf(
-			"%s: %s. Activity %s created virtual machine %s, whose read-back was inconclusive (%s). It was recorded in the Terraform state (tainted) so it is NOT orphaned: run `terraform destroy` to remove it, or `terraform apply` to replace it.",
+			"%s: %s. Activity %s created virtual machine %s, whose read-back was inconclusive (%s). It was recorded in the Terraform state (tainted) so it is NOT orphaned: run `terraform destroy` to remove it, or `terraform apply` to replace it. If you verify the virtual machine is actually complete, `terraform untaint` it and re-apply to finish the configuration instead of recreating it.",
 			action, cause, activityID, candidate, readErr,
 		)
 
@@ -191,7 +202,7 @@ func recoverVMCreateFailure(
 			setErr = d.Set("machine_manager_id", vm.MachineManager.ID)
 		}
 		msg := fmt.Sprintf(
-			"%s: %s. Virtual machine %s was created and HAS been recorded in the Terraform state (tainted), so it is not orphaned: run `terraform destroy` to remove it, or `terraform apply` to replace it.",
+			"%s: %s. Virtual machine %s was created and HAS been recorded in the Terraform state (tainted), so it is not orphaned: run `terraform destroy` to remove it, or `terraform apply` to replace it. If you verify the virtual machine is actually complete, `terraform untaint` it and re-apply to finish the configuration instead of recreating it.",
 			action, cause, candidate,
 		)
 		if setErr != nil {
