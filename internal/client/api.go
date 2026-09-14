@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -608,10 +609,45 @@ func retryableTransportError(err error) bool {
 		return false
 	}
 	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
-		// A configured per-request timeout / deadline reports Timeout() == true and
-		// must not be retried; any other transport failure is transient.
-		return !urlErr.Timeout()
+	if !errors.As(err, &urlErr) {
+		return false
+	}
+	if !urlErr.Timeout() {
+		// Any non-timeout transport failure (connection reset, broken pipe,
+		// unexpected EOF…) is transient.
+		return true
+	}
+	// A timeout is transient ONLY when it comes from the network stack itself.
+	// The CONFIGURED deadline (http.Client.Timeout) must stay permanent: net/http
+	// replaces the underlying error with its own *httpError when that deadline
+	// fires, so it never carries a *net.OpError / *net.DNSError and is correctly
+	// excluded by networkStackTimeout.
+	return networkStackTimeout(err)
+}
+
+// networkStackTimeout reports whether err carries a timeout raised by the
+// NETWORK STACK — DNS resolution, or a connection-level operation (dial, read,
+// write) — as opposed to the client's own configured request deadline.
+//
+// Both are ordinary transient conditions: a DNS resolver that does not answer
+// in time, or a SYN that goes unacknowledged, says nothing about the operation
+// the server is running. Classifying them as permanent made a sub-second blip
+// abort a long activity poll outright, bypassing the bounded retry budget that
+// exists for exactly this class of failure — and treated a DNS hiccup more
+// harshly than a connection reset, which was already retried (#527).
+//
+// The TLS handshake timeout is deliberately NOT matched: net/http reports it
+// through an unexported type that carries neither *net.OpError nor
+// *net.DNSError, so it cannot be distinguished from the configured deadline by
+// type. Leaving it permanent keeps this classifier fail-closed.
+func networkStackTimeout(err error) bool {
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return dnsErr.IsTimeout
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return opErr.Timeout()
 	}
 	return false
 }

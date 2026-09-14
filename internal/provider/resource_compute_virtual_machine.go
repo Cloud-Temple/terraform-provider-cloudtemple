@@ -1059,13 +1059,17 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			DatastoreId:       d.Get("datastore_id").(string),
 		})
 		if err != nil {
-			return diag.Errorf("failed to clone virtual machine: %s", err)
+			return diag.Errorf("failed to clone virtual machine: %s. If the clone was started platform-side the virtual machine may exist outside the Terraform state — audit the one named %q before re-applying.", err, name)
 		}
 
 		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		setIdFromActivityState(d, activity)
 		if err != nil {
-			return diag.Errorf("failed to clone virtual machine, %s", err)
+			// The clone source is a virtual machine too: exclude it so it can
+			// never be adopted as the resource id (adopting it would taint, and
+			// then destroy, the source).
+			return recoverVMCreateFailure(ctx, d, c.Compute().VirtualMachine().Read, activity, activityId, name,
+				"failed to clone virtual machine", err, cloneVirtualMachineId)
 		}
 
 	} else if contentLibraryItemId != "" {
@@ -1086,13 +1090,14 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			DeployOptions:         deployOptions,
 		})
 		if err != nil {
-			return diag.Errorf("failed to deploy content library item: %s", err)
+			return diag.Errorf("failed to deploy content library item: %s. If the deployment was started platform-side the virtual machine may exist outside the Terraform state — audit the one named %q before re-applying.", err, name)
 		}
 
 		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		setIdFromActivityState(d, activity)
 		if err != nil {
-			return diag.Errorf("failed to deploy content library item: %s", err)
+			return recoverVMCreateFailure(ctx, d, c.Compute().VirtualMachine().Read, activity, activityId, name,
+				"failed to deploy content library item", err)
 		}
 
 	} else if marketplaceItemId != "" {
@@ -1129,13 +1134,14 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			DeployOptions: deployOptions,
 		})
 		if err != nil {
-			return diag.Errorf("failed to deploy marketplace item: %s", err)
+			return diag.Errorf("failed to deploy marketplace item: %s. If the deployment was started platform-side the virtual machine may exist outside the Terraform state — audit the one named %q before re-applying.", err, name)
 		}
 
 		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		setIdFromActivityState(d, activity)
 		if err != nil {
-			return diag.Errorf("failed to deploy marketplace item: %s", err)
+			return recoverVMCreateFailure(ctx, d, c.Compute().VirtualMachine().Read, activity, activityId, name,
+				"failed to deploy marketplace item", err)
 		}
 	} else {
 		// #395 runtime backstop: the from-scratch create sends memory and cpu
@@ -1156,13 +1162,14 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 			GuestOperatingSystemMoref: d.Get("guest_operating_system_moref").(string),
 		})
 		if err != nil {
-			return diag.Errorf("failed to create virtual machine, %s", err)
+			return diag.Errorf("failed to create virtual machine: %s. If the creation was started platform-side the virtual machine may exist outside the Terraform state — audit the one named %q before re-applying.", err, name)
 		}
 
 		activity, err := c.Activity().WaitForCompletion(ctx, activityId, getWaiterOptions(ctx))
 		setIdFromActivityConcernedItems(d, activity, "virtual_machine")
 		if err != nil {
-			return diag.Errorf("failed to create virtual machine: %s", err)
+			return recoverVMCreateFailure(ctx, d, c.Compute().VirtualMachine().Read, activity, activityId, name,
+				"failed to create virtual machine", err)
 		}
 	}
 
