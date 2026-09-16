@@ -1,6 +1,7 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.12.0 (Unreleased)
+# 1.12.0 (September 16th, 2026)
+<img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 UPGRADE NOTES :
 
@@ -16,7 +17,6 @@ ENHANCEMENTS :
   * `cloudtemple_public_cloud_vm_instance`: the inline `os_network_adapter` block now accepts **VPC networks**, so a virtual machine can be created directly on a VPC private network — including a VPC-only machine — in a single `terraform apply`. Previously the create refused a VPC network and required a two-step path: create the VM on a Private Backbone network, then attach the VPC network with a `cloudtemple_public_cloud_vm_network_adapter` resource. The block's `ip_address` argument becomes meaningful at the same time: on a VPC network it registers that address as the adapter's static IP, and omitting it lets the platform assign one. The former restriction was a provider-side decision, not an API limitation; it was retired against live evidence gathered from the VM Instances API (#376).
 
 # 1.11.0 (July 31st, 2026)
-<img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 UPGRADE NOTES :
 
