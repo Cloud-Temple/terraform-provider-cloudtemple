@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -604,14 +605,78 @@ func retryableTransportError(err error) bool {
 	if err == nil {
 		return false
 	}
+	// ORDER MATTERS, and the reason is subtle enough to be worth spelling out.
+	//
+	// A timeout raised by the NETWORK STACK is classified FIRST, before the generic
+	// context guards below. Since Go 1.23 a DNS or connect timeout produced by the
+	// dialer's own deadline is wrapped as
+	//
+	//	*url.Error -> *net.OpError{Op:"dial"} -> *net.DNSError{UnwrapErr: net.errTimeout}
+	//
+	// and `net.errTimeout.Is(context.DeadlineExceeded)` returns TRUE (net/net.go
+	// timeoutError.Is). Evaluating the context guard first therefore classified the
+	// field error of #527 — `dial tcp: lookup <host>: i/o timeout`, the production
+	// dialer being cleanhttp's with Timeout: 30s — as PERMANENT, and this whole
+	// function never reached networkStackTimeout. The retry it was written to
+	// provide did not happen.
+	//
+	// Putting it first is safe, and the reason is structural rather than incidental.
+	// http.Transport DETACHES the dial from the request context —
+	// `context.WithoutCancel` in transport.go's dialConnFor — and getConn returns the
+	// request's own ctx error when that context ends. So a parent-context deadline or
+	// cancellation NEVER surfaces as a *net.OpError / *net.DNSError in the first
+	// place; measured through the real stack, it surfaces as a bare
+	// "context deadline exceeded" / "context canceled", which networkStackTimeout
+	// rejects and the guards below classify permanent. Only the dialer's OWN deadline
+	// produces the network-stack shape, and that is exactly the one worth retrying.
+	//
+	// (Callers stopping on ctx.Done() — waitBeforeRetry, retry.Do — is a second line
+	// of defence, not the reason this ordering is correct.)
+	//
+	// The CONFIGURED per-request deadline (http.Client.Timeout) is likewise excluded:
+	// net/http replaces the underlying error with its own timeout error, which
+	// carries neither type.
+	if networkStackTimeout(err) {
+		return true
+	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
 	var urlErr *url.Error
-	if errors.As(err, &urlErr) {
-		// A configured per-request timeout / deadline reports Timeout() == true and
-		// must not be retried; any other transport failure is transient.
-		return !urlErr.Timeout()
+	if !errors.As(err, &urlErr) {
+		return false
+	}
+	// Any non-timeout transport failure (connection reset, broken pipe, unexpected
+	// EOF…) is transient. A timeout reaching this point is NOT from the network
+	// stack — networkStackTimeout already claimed those above — so it is the
+	// configured per-request deadline, which must stay permanent: retrying it would
+	// multiply the anti-hang bound into a multi-minute stall.
+	return !urlErr.Timeout()
+}
+
+// networkStackTimeout reports whether err carries a timeout raised by the
+// NETWORK STACK — DNS resolution, or a connection-level operation (dial, read,
+// write) — as opposed to the client's own configured request deadline.
+//
+// Both are ordinary transient conditions: a DNS resolver that does not answer
+// in time, or a SYN that goes unacknowledged, says nothing about the operation
+// the server is running. Classifying them as permanent made a sub-second blip
+// abort a long activity poll outright, bypassing the bounded retry budget that
+// exists for exactly this class of failure — and treated a DNS hiccup more
+// harshly than a connection reset, which was already retried (#527).
+//
+// The TLS handshake timeout is deliberately NOT matched: net/http reports it
+// through an unexported type that carries neither *net.OpError nor
+// *net.DNSError, so it cannot be distinguished from the configured deadline by
+// type. Leaving it permanent keeps this classifier fail-closed.
+func networkStackTimeout(err error) bool {
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return dnsErr.IsTimeout
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return opErr.Timeout()
 	}
 	return false
 }
