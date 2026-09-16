@@ -1,6 +1,7 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.12.0 (Unreleased)
+# 1.12.0 (September 16th, 2026)
+<img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 UPGRADE NOTES :
 
@@ -20,7 +21,6 @@ BUG FIXES :
   * The client no longer aborts a long-running operation on a transient network timeout. A DNS resolution timeout or a connection-level (dial, read, write) timeout is now retried within the existing bounded budget, instead of being treated as a permanent failure. This is classified before the generic context checks, because since Go 1.23 such a timeout raised by the dialer's own deadline unwraps to an error that `errors.Is` matches against `context.DeadlineExceeded` — checking the context first classified the very error this fixes as permanent — previously a sub-second DNS hiccup while polling an activity failed the whole operation, even though the platform kept working, and a DNS blip was treated more harshly than a connection reset, which was already retried. The configured per-request deadline stays permanent and is still never retried (#527).
 
 # 1.11.0 (July 31st, 2026)
-<img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
 UPGRADE NOTES :
 
