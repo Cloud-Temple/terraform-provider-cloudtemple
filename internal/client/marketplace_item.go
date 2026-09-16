@@ -192,6 +192,14 @@ type NetworkDataMapping struct {
 	// SourceNetworkName server-side.
 	NetworkAdapterName   string `json:"networkAdapterName,omitempty"`
 	DestinationNetworkId string `json:"destinationNetworkId"`
+	// IPAddress registers this adapter's VPC static IP at deploy time, exactly as
+	// networkAdapters[].ipAddress does on the VM-create route. The published
+	// marketplace swagger omits the field; the marketplace module maintainer
+	// confirmed it exists on the deploy endpoint, and the provider only sends it
+	// when the target network is VPC-backed (a plain network would discard it).
+	// omitempty matters: an empty string on a plain network would hand the
+	// platform a value it has no meaning for.
+	IPAddress string `json:"ipAddress,omitempty"`
 }
 
 type MarketplaceOpenIaasDeployementRequest struct {

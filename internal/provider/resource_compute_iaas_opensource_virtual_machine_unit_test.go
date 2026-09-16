@@ -231,13 +231,143 @@ func TestOsNetworkAdapterUpdateSkipsUnconfiguredTx(t *testing.T) {
 
 	// txWant=nil: the merged-map tx divergence must not produce any PATCH.
 	// The nil client guarantees a loud failure if a request were attempted.
-	if diags := osNetworkAdapterUpdate(context.Background(), nil, adapter, actual, nil); diags != nil {
+	if diags := osNetworkAdapterUpdate(context.Background(), nil, adapter, actual, nil, ""); diags != nil {
 		t.Fatalf("osNetworkAdapterUpdate() returned diagnostics for a fully converged adapter: %v", diags)
 	}
 
 	// txWant equal to the live value: no divergence, no PATCH either.
-	if diags := osNetworkAdapterUpdate(context.Background(), nil, adapter, actual, boolPtr(true)); diags != nil {
+	if diags := osNetworkAdapterUpdate(context.Background(), nil, adapter, actual, boolPtr(true), ""); diags != nil {
 		t.Fatalf("osNetworkAdapterUpdate() returned diagnostics for an equal explicit value: %v", diags)
+	}
+
+	// An unconfigured ip_address must not reach the VPC plane either: with a nil
+	// client any /vpc/v1 read would panic, so this pins that the relocation step is
+	// skipped outright rather than merely finding nothing to do.
+	if diags := osNetworkAdapterUpdate(context.Background(), nil, adapter, actual, nil, ""); diags != nil {
+		t.Fatalf("an unconfigured ip_address must not trigger the VPC reconciliation: %v", diags)
+	}
+}
+
+// TestOpenIaasVPCRelocationPatch is the anti-#246 test. The create tail-calls the
+// update with every HasChange true, so immediately after a create the configured
+// address IS the live one; a payload emitted there would relocate the static IP
+// onto itself and be rejected platform-side as a VPC Static-IP self-conflict.
+// Case (a) is what forbids that. Case (b) pins that a real change carries
+// networkId alongside ipAddress, which the API requires.
+func TestOpenIaasVPCRelocationPatch(t *testing.T) {
+	vpcAdapter := &client.OpenIaaSNetworkAdapter{
+		MacAddress: "aa:bb:cc:dd:ee:ff",
+		Network:    client.BaseObject{ID: "net-vpc"},
+		VPC:        &client.OpenIaaSNetworkAdapterVPC{ID: "vpc-1"},
+	}
+
+	t.Run("(a) configured == live emits NOTHING (the create-time self-conflict)", func(t *testing.T) {
+		if got := openIaasVPCRelocationPatch("10.0.6.240", vpcAdapter, "10.0.6.240"); got != nil {
+			t.Fatalf("an already-applied address must emit no patch, got %+v", got)
+		}
+	})
+
+	t.Run("(b) a real divergence carries BOTH networkId and ipAddress", func(t *testing.T) {
+		got := openIaasVPCRelocationPatch("10.0.6.241", vpcAdapter, "10.0.6.240")
+		if got == nil {
+			t.Fatal("a genuine divergence must emit a patch")
+		}
+		if got.IPAddress != "10.0.6.241" {
+			t.Fatalf("ipAddress = %q, want the configured address", got.IPAddress)
+		}
+		if got.NetworkID != "net-vpc" {
+			t.Fatalf("networkId = %q, want the adapter's live network: the API rejects ipAddress sent alone", got.NetworkID)
+		}
+		if got.MAC != "" || got.TxChecksumming != nil {
+			t.Fatalf("the relocation patch must be minimal, got %+v", got)
+		}
+	})
+
+	t.Run("(c) a non-VPC adapter never yields a payload", func(t *testing.T) {
+		plain := &client.OpenIaaSNetworkAdapter{MacAddress: "aa:bb:cc:dd:ee:ff", Network: client.BaseObject{ID: "net-pb"}}
+		if got := openIaasVPCRelocationPatch("10.0.6.241", plain, ""); got != nil {
+			t.Fatalf("a static IP has no meaning on a plain network, got %+v", got)
+		}
+	})
+
+	t.Run("(d) an unconfigured address emits nothing even when the live one exists", func(t *testing.T) {
+		if got := openIaasVPCRelocationPatch("", vpcAdapter, "10.0.6.240"); got != nil {
+			t.Fatalf("the provider must never clear or move an address the config does not ask for, got %+v", got)
+		}
+	})
+
+	t.Run("(e) a nil adapter is tolerated", func(t *testing.T) {
+		if got := openIaasVPCRelocationPatch("10.0.6.241", nil, ""); got != nil {
+			t.Fatalf("want nil, got %+v", got)
+		}
+	})
+}
+
+// TestInlineAdapterIPReconciliationIsStateIndependent pins the property that makes
+// the ip_address contract SELF-HEALING, and it is the reason a transiently
+// optimistic state cannot become a permanent divergence.
+//
+// The reconciliation trigger and the push decision both ignore the Terraform state
+// entirely: the desired address comes from the RAW CONFIG (osAdapterIPConfigured)
+// and the current one from the LIVE platform (resolved by MAC). So even when the
+// state already claims an address — which can happen when an apply is refused
+// after the state was seeded with planned values, e.g. a sizing change refused
+// because allow_vm_restart is false — the NEXT apply still evaluates config against
+// live and still pushes. Nothing suppresses the push on the grounds that the state
+// already agrees.
+//
+// If either input were ever taken from the state, this test fails, and the
+// attribute would silently stop converging.
+func TestInlineAdapterIPReconciliationIsStateIndependent(t *testing.T) {
+	vpcAdapter := &client.OpenIaaSNetworkAdapter{
+		MacAddress: "aa:bb:cc:dd:ee:ff",
+		Network:    client.BaseObject{ID: "net-vpc"},
+		VPC:        &client.OpenIaaSNetworkAdapterVPC{ID: "vpc-1"},
+	}
+
+	// The state is irrelevant to the trigger: only the configured value and the
+	// live adapter matter.
+	if !adapterIPNeedsReconciliation("10.0.0.238", vpcAdapter) {
+		t.Fatal("a configured address on a VPC adapter must always be a candidate, whatever the state says")
+	}
+
+	// LIVE has nothing registered while the (hypothetical) state already claims the
+	// address: the patch must still be emitted, because live is the only authority.
+	got := openIaasVPCRelocationPatch("10.0.0.238", vpcAdapter, "")
+	if got == nil {
+		t.Fatal("with nothing registered live, the configured address MUST still be pushed — otherwise a state that optimistically recorded it would suppress the push forever")
+	}
+	if got.IPAddress != "10.0.0.238" || got.NetworkID != "net-vpc" {
+		t.Fatalf("unexpected patch: %+v", got)
+	}
+
+	// And once live agrees, it stops. Convergence, not oscillation.
+	if openIaasVPCRelocationPatch("10.0.0.238", vpcAdapter, "10.0.0.238") != nil {
+		t.Fatal("once live matches the configured address, nothing more must be pushed")
+	}
+}
+
+// TestAdapterIPNeedsReconciliation pins the cheap over-approximating trigger that
+// makes the relocation reachable at all. Without it the relocation code exists but
+// is never entered, because nothing marks the adapter pending.
+func TestAdapterIPNeedsReconciliation(t *testing.T) {
+	vpcAdapter := &client.OpenIaaSNetworkAdapter{
+		MacAddress: "aa:bb:cc:dd:ee:ff",
+		VPC:        &client.OpenIaaSNetworkAdapterVPC{ID: "vpc-1"},
+	}
+	plainAdapter := &client.OpenIaaSNetworkAdapter{MacAddress: "aa:bb:cc:dd:ee:ff"}
+
+	if adapterIPNeedsReconciliation("", vpcAdapter) {
+		t.Fatal("an unconfigured ip_address must never trigger a reconciliation")
+	}
+	if adapterIPNeedsReconciliation("10.0.0.5", plainAdapter) {
+		t.Fatal("a non-VPC adapter must never trigger a static-IP reconciliation")
+	}
+	if adapterIPNeedsReconciliation("10.0.0.5", nil) {
+		t.Fatal("a nil adapter must never trigger a reconciliation")
+	}
+	if !adapterIPNeedsReconciliation("10.0.0.5", vpcAdapter) {
+		t.Fatal("a configured ip_address on a VPC adapter MUST mark the adapter pending, or the relocation is unreachable")
 	}
 }
 
