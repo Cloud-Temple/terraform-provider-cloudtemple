@@ -219,6 +219,9 @@ func TestRecoverVMCreateFailure(t *testing.T) {
 	})
 
 	t.Run("a definitive 404 records nothing rather than poisoning the state", func(t *testing.T) {
+		// The absence is now confirmed by repeated read-backs (see confirmVMAbsence);
+		// drive them without sleeping.
+		withFastAbsenceBackoff(t)
 		d := newVMCreateData(t)
 		read := func(ctx context.Context, id string) (*client.VirtualMachine, error) {
 			return nil, nil // client contract: (nil, nil) is a definitive absence

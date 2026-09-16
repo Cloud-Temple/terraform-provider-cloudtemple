@@ -605,6 +605,30 @@ func retryableTransportError(err error) bool {
 	if err == nil {
 		return false
 	}
+	// ORDER MATTERS, and the reason is subtle enough to be worth spelling out.
+	//
+	// A timeout raised by the NETWORK STACK is classified FIRST, before the generic
+	// context guards below. Since Go 1.23 a DNS or connect timeout produced by the
+	// dialer's own deadline is wrapped as
+	//
+	//	*url.Error -> *net.OpError{Op:"dial"} -> *net.DNSError{UnwrapErr: net.errTimeout}
+	//
+	// and `net.errTimeout.Is(context.DeadlineExceeded)` returns TRUE (net/net.go
+	// timeoutError.Is). Evaluating the context guard first therefore classified the
+	// field error of #527 — `dial tcp: lookup <host>: i/o timeout`, the production
+	// dialer being cleanhttp's with Timeout: 30s — as PERMANENT, and this whole
+	// function never reached networkStackTimeout. The retry it was written to
+	// provide did not happen.
+	//
+	// Putting it first is safe. A genuine parent-context deadline or cancellation
+	// carries no *net.OpError / *net.DNSError, so it falls through to the guards
+	// below; and the callers stop on ctx.Done() anyway (waitBeforeRetry, retry.Do).
+	// The CONFIGURED per-request deadline (http.Client.Timeout) is likewise excluded:
+	// net/http replaces the underlying error with its own *httpError, which carries
+	// neither type.
+	if networkStackTimeout(err) {
+		return true
+	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return false
 	}
@@ -612,17 +636,12 @@ func retryableTransportError(err error) bool {
 	if !errors.As(err, &urlErr) {
 		return false
 	}
-	if !urlErr.Timeout() {
-		// Any non-timeout transport failure (connection reset, broken pipe,
-		// unexpected EOF…) is transient.
-		return true
-	}
-	// A timeout is transient ONLY when it comes from the network stack itself.
-	// The CONFIGURED deadline (http.Client.Timeout) must stay permanent: net/http
-	// replaces the underlying error with its own *httpError when that deadline
-	// fires, so it never carries a *net.OpError / *net.DNSError and is correctly
-	// excluded by networkStackTimeout.
-	return networkStackTimeout(err)
+	// Any non-timeout transport failure (connection reset, broken pipe, unexpected
+	// EOF…) is transient. A timeout reaching this point is NOT from the network
+	// stack — networkStackTimeout already claimed those above — so it is the
+	// configured per-request deadline, which must stay permanent: retrying it would
+	// multiply the anti-hang bound into a multi-minute stall.
+	return !urlErr.Timeout()
 }
 
 // networkStackTimeout reports whether err carries a timeout raised by the

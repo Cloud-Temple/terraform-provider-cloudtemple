@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
@@ -145,6 +146,57 @@ func vmCandidateFromActivity(activity *client.Activity, exclude ...string) strin
 //     longer resolves would be worse than recording nothing: the read fails
 //     closed and never auto-removes, so every later refresh would error until
 //     the operator ran `terraform state rm`.
+//
+// vmAbsenceAttempts is the number of ADDITIONAL read-backs used before concluding
+// that a candidate virtual machine really does not exist, and vmAbsenceBackoff the
+// pause between them.
+//
+// A single 404 is not proof of absence on this platform. The virtual machine item is
+// published on the activity as soon as the object is materialised — roughly eight
+// seconds after the POST, measured — while `GET /compute/v1/vcenters/virtual_machines/{id}`
+// has documented eventual-consistency windows right after a write (#415). Read-back
+// and indexing can therefore cross: the object exists and the id still answers 404.
+//
+// Concluding absence from that single answer is the expensive mistake. The two
+// outcomes are not symmetric:
+//   - wrongly concluding absence records nothing, and the operator is sent away while
+//     a billable virtual machine materialises unattended — the #527 damage itself;
+//   - wrongly concluding presence adopts an id, which the case-4 reasoning explains is
+//     also bad (the read fails closed and never auto-removes).
+//
+// So neither answer is safe on ONE read, and the cheapest way out is simply to look
+// again. Two extra reads cost a few seconds on a path that has already failed, and
+// they are by id — no listing, no wide call.
+const vmAbsenceAttempts = 2
+
+// vmAbsenceBackoff is a var, not a const, solely so tests can drive the absence path
+// without sleeping. Production never reassigns it.
+var vmAbsenceBackoff = 3 * time.Second
+
+// confirmVMAbsence re-reads a candidate that answered "not found" once.
+//
+// It returns as soon as anything contradicts the absence: a virtual machine (it
+// exists after all — adopt it) or an error (inconclusive — the caller adopts rather
+// than orphan). Only a run of definitive not-founds returns (nil, nil), which is the
+// answer the caller is allowed to treat as proof.
+func confirmVMAbsence(ctx context.Context, read vmReadFunc, candidate string) (*client.VirtualMachine, error) {
+	for attempt := 0; attempt < vmAbsenceAttempts; attempt++ {
+		select {
+		case <-ctx.Done():
+			// A cancelled context proves nothing about the platform. Report it as an
+			// error so the caller takes the INCONCLUSIVE branch and adopts, rather
+			// than orphaning on a read that never happened.
+			return nil, ctx.Err()
+		case <-time.After(vmAbsenceBackoff):
+		}
+		vm, err := read(ctx, candidate)
+		if err != nil || vm != nil {
+			return vm, err
+		}
+	}
+	return nil, nil
+}
+
 func recoverVMCreateFailure(
 	ctx context.Context,
 	d *schema.ResourceData,
@@ -172,13 +224,23 @@ func recoverVMCreateFailure(
 	}
 
 	vm, readErr := read(ctx, candidate)
+	if readErr == nil && vm == nil {
+		// One not-found is not proof; see confirmVMAbsence.
+		vm, readErr = confirmVMAbsence(ctx, read, candidate)
+	}
 	switch {
 	case readErr == nil && vm == nil:
-		// Definitive absence: the platform rolled the creation back. Nothing
-		// exists to track, and recording the id would poison every later refresh.
+		// Absence confirmed by repeated read-backs. Nothing exists to track, and
+		// recording the id would poison every later refresh (see case 4).
+		//
+		// The operator is still told to AUDIT before re-applying, like every other
+		// branch that records nothing. Telling them to re-apply outright would be
+		// the one instruction that can manufacture the incident this code exists to
+		// prevent: if the reads crossed an indexing window after all, the virtual
+		// machine materialises unattended and the re-apply creates a SECOND one.
 		return diag.Errorf(
-			"%s: %s. Activity %s referenced virtual machine %s, but it no longer exists — the platform rolled the creation back. Nothing was recorded in the Terraform state; re-run `terraform apply`.",
-			action, cause, activityID, candidate,
+			"%s: %s. Activity %s referenced virtual machine %s, but %d read-backs found no such virtual machine — the platform appears to have rolled the creation back, and NOTHING was recorded in the Terraform state. Confirm no virtual machine named %q exists before re-applying; if one does, it is ORPHANED — import it (`terraform import <resource address> <virtual machine id>`) or delete it first.",
+			action, cause, activityID, candidate, vmAbsenceAttempts+1, name,
 		)
 
 	case readErr != nil:
