@@ -94,6 +94,15 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 
   os_network_adapter {
     network_id = data.cloudtemple_compute_network.vlan.id
+
+    # On a VPC-backed network, ip_address registers that address as the adapter's
+    # VPC static IP. Omit it to let the platform assign one. It is only honoured on
+    # a VPC network: setting it on a plain network is rejected before anything is
+    # created, because the platform would silently ignore it. It is also rejected
+    # when another os_network_adapter block targets the same network — the platform
+    # assigns an explicit address per (virtual machine, network) pair.
+    #
+    # ip_address = "10.0.0.10"
   }
 
   tags = {

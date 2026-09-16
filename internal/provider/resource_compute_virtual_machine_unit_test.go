@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/go-cty/cty"
 )
 
@@ -204,4 +205,66 @@ func TestMigrateVirtualMachineStateV0toV1(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestVMwareVPCRelocationPatch is the anti-self-relocation test for the VMware
+// surface. The create tail-calls the update, so immediately after a create the
+// configured address is ALREADY registered; emitting a payload there would relocate
+// the static IP onto itself. Case (a) forbids that.
+//
+// It also pins that the payload carries the adapter's LIVE network, MAC and
+// autoConnect rather than planned or unrelated values: the registration is keyed by
+// MAC, the network patch has already run, and `autoConnect` has no omitempty — so
+// sending `connected` in its place would silently flip a setting that has nothing to
+// do with the address.
+func TestVMwareVPCRelocationPatch(t *testing.T) {
+	vpcAdapter := &client.NetworkAdapter{
+		ID:          "nic-1",
+		Network:     client.BaseObject{ID: "net-vpc"},
+		MacAddress:  "00:50:56:86:f3:76",
+		Connected:   true,
+		AutoConnect: false,
+		VPC:         &client.OpenIaaSNetworkAdapterVPC{ID: "vpc-1"},
+	}
+
+	t.Run("(a) configured == live emits NOTHING", func(t *testing.T) {
+		if got := vmwareVPCRelocationPatch("10.0.0.5", vpcAdapter, "10.0.0.5"); got != nil {
+			t.Fatalf("an already-applied address must emit no patch, got %+v", got)
+		}
+	})
+
+	t.Run("(b) a real divergence carries the LIVE network, mac and autoConnect", func(t *testing.T) {
+		got := vmwareVPCRelocationPatch("10.0.0.6", vpcAdapter, "10.0.0.5")
+		if got == nil {
+			t.Fatal("a genuine divergence must emit a patch")
+		}
+		if got.IPAddress != "10.0.0.6" {
+			t.Fatalf("ipAddress = %q, want the configured address", got.IPAddress)
+		}
+		if got.ID != "nic-1" || got.NewNetworkId != "net-vpc" || got.MacAddress != "00:50:56:86:f3:76" {
+			t.Fatalf("the patch must target the adapter by its LIVE identity, got %+v", got)
+		}
+		if got.AutoConnect != false {
+			t.Fatalf("autoConnect = %v, want the adapter's LIVE autoConnect (false), not its `connected` value (true): the field has no omitempty and would flip an unrelated setting", got.AutoConnect)
+		}
+	})
+
+	t.Run("(c) a non-VPC adapter never yields a payload", func(t *testing.T) {
+		plain := &client.NetworkAdapter{ID: "nic-2", Network: client.BaseObject{ID: "net-pb"}}
+		if got := vmwareVPCRelocationPatch("10.0.0.6", plain, ""); got != nil {
+			t.Fatalf("a static IP has no meaning on a plain network, got %+v", got)
+		}
+	})
+
+	t.Run("(d) an unconfigured address emits nothing even when a live one exists", func(t *testing.T) {
+		if got := vmwareVPCRelocationPatch("", vpcAdapter, "10.0.0.5"); got != nil {
+			t.Fatalf("the provider must never move an address the config does not ask for, got %+v", got)
+		}
+	})
+
+	t.Run("(e) a nil adapter is tolerated", func(t *testing.T) {
+		if got := vmwareVPCRelocationPatch("10.0.0.6", nil, ""); got != nil {
+			t.Fatalf("want nil, got %+v", got)
+		}
+	})
 }
