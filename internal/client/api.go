@@ -620,12 +620,22 @@ func retryableTransportError(err error) bool {
 	// function never reached networkStackTimeout. The retry it was written to
 	// provide did not happen.
 	//
-	// Putting it first is safe. A genuine parent-context deadline or cancellation
-	// carries no *net.OpError / *net.DNSError, so it falls through to the guards
-	// below; and the callers stop on ctx.Done() anyway (waitBeforeRetry, retry.Do).
+	// Putting it first is safe, and the reason is structural rather than incidental.
+	// http.Transport DETACHES the dial from the request context —
+	// `context.WithoutCancel` in transport.go's dialConnFor — and getConn returns the
+	// request's own ctx error when that context ends. So a parent-context deadline or
+	// cancellation NEVER surfaces as a *net.OpError / *net.DNSError in the first
+	// place; measured through the real stack, it surfaces as a bare
+	// "context deadline exceeded" / "context canceled", which networkStackTimeout
+	// rejects and the guards below classify permanent. Only the dialer's OWN deadline
+	// produces the network-stack shape, and that is exactly the one worth retrying.
+	//
+	// (Callers stopping on ctx.Done() — waitBeforeRetry, retry.Do — is a second line
+	// of defence, not the reason this ordering is correct.)
+	//
 	// The CONFIGURED per-request deadline (http.Client.Timeout) is likewise excluded:
-	// net/http replaces the underlying error with its own *httpError, which carries
-	// neither type.
+	// net/http replaces the underlying error with its own timeout error, which
+	// carries neither type.
 	if networkStackTimeout(err) {
 		return true
 	}
