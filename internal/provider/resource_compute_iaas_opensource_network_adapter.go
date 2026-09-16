@@ -483,6 +483,28 @@ func openIaasNetworkVPCBacked(c *client.Client) networkVPCStatusFunc {
 	}
 }
 
+// openIaasInlineIPConflict builds the IPAM-collision checker for OpenIaaS: it
+// resolves the VPC private network behind a Compute network, then reads that
+// network's static IPs with the STRICT listing (a truncated body must error, not
+// read as an empty network).
+func openIaasInlineIPConflict(c *client.Client) inlineIPConflictFunc {
+	return staticIPConflictChecker(
+		func(ctx context.Context, networkID string) (string, error) {
+			network, err := c.Compute().OpenIaaS().Network().Read(ctx, networkID)
+			if err != nil {
+				return "", err
+			}
+			if network == nil || network.VPC == nil {
+				return "", nil
+			}
+			return network.VPC.PrivateNetwork.ID, nil
+		},
+		func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+			return c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
+		},
+	)
+}
+
 // vifCleanupTargets partitions the adapter ids referenced by the failed
 // create activity: ids confirmed present on this VM by the strict listing
 // must be deleted; referenced ids ABSENT from the listing are UNCONFIRMED.

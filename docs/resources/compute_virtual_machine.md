@@ -17,6 +17,7 @@ description: |-
     - activity_read
     - tag_read
     - tag_write
+    - vpc_read
 ---
 
 # cloudtemple_compute_virtual_machine (Resource)
@@ -40,6 +41,7 @@ To manage this resource you will need the following roles:
   - `activity_read`
   - `tag_read`
   - `tag_write`
+  - `vpc_read`
 
 ## Example Usage
 
@@ -140,6 +142,15 @@ resource "cloudtemple_compute_virtual_machine" "content-library" {
 
   os_network_adapter {
     network_id = data.cloudtemple_compute_network.vlan.id
+
+    # On a VPC-backed network, ip_address registers that address as the adapter's
+    # VPC static IP. Omit it to let the platform assign one. It is only honoured on
+    # a VPC network: setting it on a plain network is rejected before anything is
+    # created, because the platform would silently ignore it. It is also rejected
+    # when another os_network_adapter block targets the same network — the platform
+    # assigns an explicit address per (virtual machine, network) pair.
+    #
+    # ip_address = "10.0.0.10"
   }
 
   tags = {
@@ -556,6 +567,7 @@ Optional:
 
 - `auto_connect` (Boolean) Whether the network adapter should be automatically connected when the virtual machine is powered on.
 - `connected` (Boolean) Whether the network adapter is connected to the network.
+- `ip_address` (String) The VPC static IP to assign to this adapter. It is applied when the virtual machine is created, and changing it later relocates the address in place (no replacement). Requires `network_id` to reference a VPC-backed network: the platform silently ignores the value on a plain network, so setting it there is rejected before anything is created or changed. It is also rejected when another `os_network_adapter` block targets the same network, because the platform assigns an explicit address per (virtual machine, network) pair and cannot give one address to several adapters. It is also rejected when the address is ALREADY registered on the target VPC private network: the platform does not refuse that case — it creates the resource, reports success and silently registers nothing — so the collision is checked before anything is created. When omitted on a VPC network, the platform auto-assigns an address. Not supported on a deployment mode that provides no network adapter for it to apply to — a VMware from-scratch create (`guest_operating_system_moref`) — which is rejected with an explicit error rather than silently ignored. Write-only: it is never read back from the platform (the registration is addressable only by MAC on the VPC plane), so the value recorded in the state is the last one applied, and an out-of-band change is not detected as drift.
 - `mac_address` (String) The MAC address of the network adapter. If not specified, a random MAC address will be generated.
 - `network_id` (String) The ID of the network to which the virtual machine is connected.
 

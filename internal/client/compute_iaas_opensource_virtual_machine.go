@@ -71,6 +71,16 @@ type CloudInit struct {
 type OSNetworkAdapter struct {
 	NetworkID string `json:"networkId"`
 	MAC       string `json:"mac,omitempty"`
+	// IPAddress is the VPC static IP to register for this adapter at VM creation.
+	//
+	// Issue #376 recorded this field as ABSENT from the VM-create schema, which is
+	// why the inline os_network_adapter block could not choose an address. That is
+	// no longer true: verified live on the DEV broker (2026-08-20), a create
+	// carrying networkAdapters[].ipAddress on a VPC-backed network registers
+	// exactly that address for the adapter's MAC (source="xoa"). Omitted, the
+	// platform auto-assigns one. Ignored on a non-VPC network — which is why the
+	// provider refuses it there rather than letting it be silently dropped.
+	IPAddress string `json:"ipAddress,omitempty"`
 }
 
 type CreateOpenIaasVirtualMachineRequest struct {

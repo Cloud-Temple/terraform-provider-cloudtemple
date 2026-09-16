@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -136,6 +138,93 @@ func TestRetryableTransportError(t *testing.T) {
 	require.False(t, retryableTransportError(context.Canceled))
 	require.False(t, retryableTransportError(context.DeadlineExceeded))
 	require.True(t, retryableTransportError(&url.Error{Err: errors.New("connection reset by peer")}))
+}
+
+// dnsTimeoutURLError is the error a DNS resolution timeout produces: a
+// *url.Error wrapping a dial *net.OpError wrapping a *net.DNSError whose
+// IsTimeout is set. Its message is the one observed in the field:
+//
+//	Post "https://<host>/api/iam/v2/auth/personal_access_token":
+//	dial tcp: lookup <host>: i/o timeout
+func dnsTimeoutURLError(host string) *url.Error {
+	return &url.Error{
+		Op:  "Post",
+		URL: "https://" + host + "/api/iam/v2/auth/personal_access_token",
+		Err: &net.OpError{
+			Op:  "dial",
+			Net: "tcp",
+			Err: &net.DNSError{Err: "i/o timeout", Name: host, IsTimeout: true},
+		},
+	}
+}
+
+// TestRetryableTransportErrorNetworkStackTimeouts pins the distinction between
+// a timeout raised by the NETWORK STACK and the client's own configured request
+// deadline.
+//
+// Classifying every Timeout() == true as permanent made a sub-second DNS blip
+// abort a long activity poll outright, bypassing maxActivityReadRetries — and
+// left an asynchronously-created object outside the Terraform state. It also
+// treated a DNS hiccup more harshly than a connection reset, which was already
+// retried.
+//
+// A mutant restoring `return !urlErr.Timeout()` reds on the DNS, dial and
+// read-deadline cases; a mutant that retried every timeout reds on the
+// configured-deadline case.
+func TestRetryableTransportErrorNetworkStackTimeouts(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "DNS resolution timeout is transient",
+			err:  dnsTimeoutURLError("shiva.example"),
+			want: true,
+		},
+		{
+			name: "bare DNS timeout, not wrapped in an OpError, is transient",
+			err:  &url.Error{Op: "Get", URL: "https://shiva.example", Err: &net.DNSError{Err: "i/o timeout", IsTimeout: true}},
+			want: true,
+		},
+		{
+			name: "dial timeout is transient",
+			err:  &url.Error{Op: "Get", URL: "https://shiva.example", Err: &net.OpError{Op: "dial", Net: "tcp", Err: timeoutErr{}}},
+			want: true,
+		},
+		{
+			name: "connection read deadline is transient",
+			err:  &url.Error{Op: "Get", URL: "https://shiva.example", Err: &net.OpError{Op: "read", Net: "tcp", Err: os.ErrDeadlineExceeded}},
+			want: true,
+		},
+		{
+			name: "configured request deadline stays permanent",
+			err:  &url.Error{Op: "Get", URL: "https://shiva.example", Err: timeoutErr{}},
+			want: false,
+		},
+		{
+			// Pre-existing behaviour, deliberately unchanged: a non-timeout
+			// transport failure has always been transient (a resolver that
+			// answers NXDOMAIN can be glitching, and the retry budget is
+			// bounded). Pinned here so the timeout refinement cannot silently
+			// alter the non-timeout branch.
+			name: "a DNS failure that is NOT a timeout keeps the non-timeout classification",
+			err:  &url.Error{Op: "Get", URL: "https://shiva.example", Err: &net.OpError{Op: "dial", Err: &net.DNSError{Err: "no such host", IsNotFound: true}}},
+			want: true,
+		},
+		{
+			name: "a parent context deadline stays permanent",
+			err:  &url.Error{Op: "Get", URL: "https://shiva.example", Err: context.DeadlineExceeded},
+			want: false,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, retryableTransportError(tc.err))
+			// isTransientAPIError is the predicate the activity waiter actually
+			// consults; it must agree on every transport shape.
+			require.Equal(t, tc.want, isTransientAPIError(tc.err))
+		})
+	}
 }
 
 func TestParseRetryAfter(t *testing.T) {
