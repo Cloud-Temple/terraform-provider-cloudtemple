@@ -151,7 +151,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 							Optional:     true,
 							ForceNew:     true,
 							ValidateFunc: validation.IsIPv4Address,
-							Description:  "The fixed IPv4 address to assign, registered as a static IP on the VPC private network. Requires `network_id` to reference a VPC network: the platform silently ignores it on a Private Backbone network, so setting it there is rejected at apply. It is also rejected when the address is ALREADY registered on the target VPC private network: the platform does not refuse that case — it creates the VM, reports success and silently registers nothing — so the collision is checked at plan and again before the create. When omitted on a VPC network, the platform auto-assigns an address. Write-only: it is never read back (the registration is addressable only by MAC on the VPC plane).",
+							Description:  "The fixed IPv4 address to assign, registered as a static IP on the VPC private network. Requires `network_id` to reference a VPC network: the platform silently ignores it on a Private Backbone network, so setting it there is rejected at apply. It is also rejected when the address is ALREADY registered on the target VPC private network: the platform does not refuse that case — it creates the VM, reports success and silently registers nothing — so the collision is refused before the create (the authoritative check) and reported earlier, at plan, when the plan carries the VM's identity (an in-place plan, or the first pass of a replacement plan). A fresh create and the create half of a replacement are planned without one and cannot tell the VM's own registration from another machine's, so they are left to the pre-create check. When omitted on a VPC network, the platform auto-assigns an address. Write-only: it is never read back (the registration is addressable only by MAC on the VPC plane).",
 						},
 					},
 				},
@@ -240,39 +240,52 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 	}
 }
 
-// customizeVMInstanceDiff enforces the resize precondition at PLAN time: cpu and
+// customizeVMInstanceDiff is the production CustomizeDiff: the IPAM view of the
+// plan-time collision check comes from the configured client (nil in unit tests
+// that drive Resource.Diff with a nil meta, where the hook degrades to a no-op).
+func customizeVMInstanceDiff(ctx context.Context, d *schema.ResourceDiff, meta any) error {
+	return customizeVMInstanceDiffWith(inlineIPConflictOrNil(meta, publicCloudInlineIPConflict))(ctx, d, meta)
+}
+
+// customizeVMInstanceDiffWith enforces the resize precondition at PLAN time: cpu and
 // memory can only change while the VM is declared stopped. This is checked ONLY
 // on an existing resource — on create, cpu/memory necessarily "change" from their
 // zero value and an `on` power_state is the legitimate boot-at-create case.
-func customizeVMInstanceDiff(ctx context.Context, d *schema.ResourceDiff, meta any) error {
-	// Plan-time IPAM collision check; see inlineAdapterIPCollisionDiff. Advisory:
-	// the create preflight remains the authoritative gate.
-	if err := inlineAdapterIPCollisionDiff(inlineIPConflictOrNil(meta, publicCloudInlineIPConflict))(ctx, d, meta); err != nil {
-		return err
-	}
-	exists := d.Id() != ""
-	// os_disk.size_gb cannot be set at CREATE: the VM is created with the
-	// image's system disk size, and create never extends it — so a configured
-	// value that differs from the image would produce an inconsistent result.
-	// Detected on the RAW config (never the diff/state: the attribute is
-	// Optional+Computed, so d.Get would report a computed value as "set").
-	if !exists {
-		if osDiskSizeSetInRawConfig(d.GetRawConfig()) {
-			return fmt.Errorf("os_disk.size_gb cannot be set when creating the VM: the image's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
+//
+// conflictOf is the IPAM view of the plan-time collision check. It is injected so a
+// test can drive the REAL resource through Resource.SimpleDiff — the exact entry point
+// the gRPC PlanResourceChange uses — with a recorded IPAM answer and no network.
+func customizeVMInstanceDiffWith(conflictOf inlineIPConflictFunc) schema.CustomizeDiffFunc {
+	return func(ctx context.Context, d *schema.ResourceDiff, meta any) error {
+		// Plan-time IPAM collision check; see inlineAdapterIPCollisionDiff. Advisory:
+		// the create preflight remains the authoritative gate.
+		if err := inlineAdapterIPCollisionDiff(conflictOf)(ctx, d, meta); err != nil {
+			return err
 		}
-	} else if d.HasChange("os_disk.0.size_gb") {
-		// Grow-only + requires-off, validated on the LEAF only: a refresh of a
-		// Computed sibling (id, storage_type, ...) must never look like an extend.
-		o, n := d.GetChange("os_disk.0.size_gb")
-		oldSize, okOld := o.(int)
-		newSize, okNew := n.(int)
-		if okOld && okNew {
-			if err := vmInstanceOSDiskChangeCheck(oldSize, newSize, d.Get("power_state").(string)); err != nil {
-				return err
+		exists := d.Id() != ""
+		// os_disk.size_gb cannot be set at CREATE: the VM is created with the
+		// image's system disk size, and create never extends it — so a configured
+		// value that differs from the image would produce an inconsistent result.
+		// Detected on the RAW config (never the diff/state: the attribute is
+		// Optional+Computed, so d.Get would report a computed value as "set").
+		if !exists {
+			if osDiskSizeSetInRawConfig(d.GetRawConfig()) {
+				return fmt.Errorf("os_disk.size_gb cannot be set when creating the VM: the image's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
+			}
+		} else if d.HasChange("os_disk.0.size_gb") {
+			// Grow-only + requires-off, validated on the LEAF only: a refresh of a
+			// Computed sibling (id, storage_type, ...) must never look like an extend.
+			o, n := d.GetChange("os_disk.0.size_gb")
+			oldSize, okOld := o.(int)
+			newSize, okNew := n.(int)
+			if okOld && okNew {
+				if err := vmInstanceOSDiskChangeCheck(oldSize, newSize, d.Get("power_state").(string)); err != nil {
+					return err
+				}
 			}
 		}
+		return vmInstanceResizeRequiresOff(exists, d.HasChange("cpu") || d.HasChange("memory"), d.Get("power_state").(string))
 	}
-	return vmInstanceResizeRequiresOff(exists, d.HasChange("cpu") || d.HasChange("memory"), d.Get("power_state").(string))
 }
 
 // osDiskSizeSetInRawConfig reports whether the raw config declares an os_disk
@@ -508,7 +521,7 @@ func createVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 				if existing == nil || existing.IPAddress != nic.IPAddress {
 					continue
 				}
-				return diag.Errorf("os_network_adapter (device_index %d) requests ip_address %q, which is ALREADY registered on the VPC private network of network %s%s. The platform does not refuse this: it would create the VM, report success, and silently leave the adapter with no static IP while Terraform recorded %q. Choose a free address.", nic.DeviceIndex, nic.IPAddress, nic.NetworkID, describeStaticIPHolder(existing), nic.IPAddress)
+				return diag.Errorf("os_network_adapter (device_index %d) requests ip_address %q, which is ALREADY registered on the VPC private network of network %s%s. The platform does not refuse this: it would create the VM, report success, and silently leave the adapter with no static IP while Terraform recorded %q. Choose a free address.%s", nic.DeviceIndex, nic.IPAddress, nic.NetworkID, describeStaticIPHolder(existing), nic.IPAddress, inlineAdapterIPReplacementHint)
 			}
 		}
 	}

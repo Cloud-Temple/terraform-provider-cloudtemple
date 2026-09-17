@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/go-cty/cty"
@@ -130,15 +131,38 @@ type inlineIPConflictFunc func(ctx context.Context, networkID, ip string) (holde
 // silent divergence above, and the failure is transient and retryable — which a
 // permanently wrong state is not.
 //
-// ownerVMID excuses the resource's OWN registration: on an update the address is
-// legitimately already registered to this very VM, and refusing that would make
-// every no-op apply fail. It is empty on a create, where nothing can be ours yet.
+// ownerVMID and ownerMACs excuse the resource's OWN registration: on an update the
+// address is legitimately already registered to this very VM, and refusing that
+// would make every no-op apply fail. Ownership is proven by EITHER piece of positive
+// evidence the registration can carry:
+//   - the registration's virtualMachine link names this VM (the shape measured on
+//     the VM Instances surface, where the platform links the machine);
+//   - the registration's MAC address is the MAC of one of this VM's own adapters
+//     (ownerMACs, read from the resource's planned adapter blocks). The VPC plane
+//     addresses a registration by MAC — GET /vpc/v1/static_ips/mac/{mac} — and the
+//     Compute surfaces register by MAC, where the machine link is not guaranteed
+//     (the client fixtures carry `virtualMachine: null` for xoa/vmware rows). A MAC
+//     is unique on a network. The planned mac_address is Optional+Computed, so it
+//     is normally the value read back from the live adapter; a user could type a
+//     foreign MAC there, but the same apply then pushes that duplicate MAC to the
+//     platform, which refuses it — that refusal, not this check, is the backstop.
+//
+// Both excuses are deliberately scoped to the VM, not to the adapter block that
+// configures the address: a registration on ANY of this VM's adapters is "ours".
+// This mirrors the machine-link excuse, which has never been per adapter either,
+// and stays on the safe side of the hook's contract (a stricter per-block match
+// could false-FAIL if the planned block order ever diverged from the live one).
+//
+// Both are empty on a create, where nothing can be ours yet — and where the refusal
+// therefore carries inlineAdapterIPReplacementHint, because a create is also how a
+// REPLACEMENT recreates the VM.
 func rejectInlineAdapterIPAlreadyRegistered(
 	ctx context.Context,
 	configuredIPs map[int]string,
 	networkIDAt func(index int) string,
 	conflictOf inlineIPConflictFunc,
 	ownerVMID string,
+	ownerMACs []string,
 ) diag.Diagnostics {
 	if conflictOf == nil {
 		return nil
@@ -158,14 +182,71 @@ func rejectInlineAdapterIPAlreadyRegistered(
 		if holder == nil {
 			continue
 		}
-		if ownerVMID != "" && holder.VirtualMachine != nil && holder.VirtualMachine.ID == ownerVMID {
+		if ownerVMID != "" && staticIPOwnedBy(holder, ownerVMID, ownerMACs) {
 			// Already ours: this is the steady state of an update, not a conflict.
 			continue
 		}
-		return diag.Errorf("os_network_adapter[%d] requests ip_address %q, which is ALREADY registered on that VPC private network%s. The platform does not refuse this: it would create the resource, report success, and silently leave the adapter with no static IP while Terraform recorded %q — a divergence no later refresh can detect, because ip_address is write-only. Choose a free address.", index, ip, describeStaticIPHolder(holder), ip)
+		hint := ""
+		if ownerVMID == "" {
+			hint = inlineAdapterIPReplacementHint
+		}
+		return diag.Errorf("os_network_adapter[%d] requests ip_address %q, which is ALREADY registered on that VPC private network%s. The platform does not refuse this: it would create the resource, report success, and silently leave the adapter with no static IP while Terraform recorded %q — a divergence no later refresh can detect, because ip_address is write-only. Choose a free address.%s", index, ip, describeStaticIPHolder(holder), ip, hint)
 	}
 	return nil
 }
+
+// staticIPOwnedBy reports whether a registration positively belongs to the VM
+// identified by vmID or by one of its adapters' MAC addresses. An empty MAC on
+// either side never matches: absence of evidence is not evidence.
+func staticIPOwnedBy(holder *client.StaticIP, vmID string, ownerMACs []string) bool {
+	if holder == nil {
+		return false
+	}
+	if holder.VirtualMachine != nil && holder.VirtualMachine.ID != "" && holder.VirtualMachine.ID == vmID {
+		return true
+	}
+	if holder.MacAddress == "" {
+		return false
+	}
+	for _, mac := range ownerMACs {
+		if mac != "" && strings.EqualFold(mac, holder.MacAddress) {
+			return true
+		}
+	}
+	return false
+}
+
+// inlineAdapterMACs collects the non-empty `mac_address` of the given
+// os_network_adapter blocks (planned or state view), as ONE per-VM set: which block
+// a MAC came from is deliberately not kept, because the ownership excuse it feeds is
+// per VM, not per adapter (see rejectInlineAdapterIPAlreadyRegistered). Surfaces
+// whose inline block has no mac_address attribute (VM Instances) yield nothing, and
+// ownership there rests on the virtualMachine link alone.
+func inlineAdapterMACs(blocks []interface{}) []string {
+	macs := make([]string, 0, len(blocks))
+	for _, entry := range blocks {
+		block, ok := entry.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if mac, _ := block["mac_address"].(string); mac != "" {
+			macs = append(macs, mac)
+		}
+	}
+	return macs
+}
+
+// inlineAdapterIPReplacementHint is appended to a CREATE-time collision refusal.
+//
+// A create is also how a REPLACEMENT recreates the VM, and at that point the address
+// may be held by the very machine being replaced: under the default
+// destroy-before-create ordering its registration is reclaimed by the platform after
+// the destroy — measured live, but not always instantly, so a single listing can
+// still see it for a moment — while under create_before_destroy the old machine
+// legitimately still holds it and the create can never proceed. The create path has
+// no way to know which situation it is in (it has no prior identity), so the refusal
+// says what to do in each instead of only "choose a free address".
+const inlineAdapterIPReplacementHint = " If this registration belongs to the virtual machine this resource is replacing, keep the default destroy-before-create ordering and retry once the registration has disappeared (the platform reclaims it after that machine is destroyed, not always immediately); create_before_destroy cannot reuse the same address."
 
 // describeStaticIPHolder renders who holds an address, without dumping the whole
 // record: enough for the user to find it, nothing more.
@@ -241,6 +322,22 @@ func staticIPConflictChecker(
 // least.
 //
 // It is DELIBERATELY tolerant of unknowns and never authoritative:
+//   - it runs ONLY when the plan carries the resource's identity (diff.Id() != ""):
+//     an in-place change, or the FIRST pass of a replacement plan. Terraform plans a
+//     REPLACEMENT in two PlanResourceChange calls, and the second one — the create
+//     half — is made against a NULL prior state, the old identity travelling only in
+//     the private data that terraform-plugin-sdk/v2 never exposes to CustomizeDiff
+//     (terraform: internal/terraform/node_resource_abstract_instance.go, plan(),
+//     `if action.IsReplace()`; OpenTofu is identical). To this hook that call is
+//     indistinguishable from a fresh create: no id, a null raw state, no private
+//     data. Without an identity it cannot excuse the resource's OWN registration, and
+//     it used to report it as a foreign conflict, failing the plan of every
+//     replacement of a VM that holds a static IP (#533). So it steps aside there and
+//     leaves the verdict to the pre-create check, which is correctly ordered: after
+//     the destroy under destroy-before-create (the platform reclaims the
+//     registration after the destroy, not always instantly — see
+//     inlineAdapterIPReplacementHint), before it under create_before_destroy (the
+//     old VM still holds the address, the create is refused and nothing is created);
 //   - a network_id still unknown at plan time (computed, or sourced from the
 //     template rather than the config) is skipped — a plan must not fail because a
 //     value has not been resolved yet;
@@ -248,13 +345,23 @@ func staticIPConflictChecker(
 //     between plan and apply and only the pre-create check is ordered against the
 //     platform call.
 //
-// So this can produce a false PASS, never a false FAIL.
+// So this can produce a false PASS, never a false FAIL. With an identity it still
+// refuses an address held by anyone else — including on the first pass of a
+// replacement plan, which stops a destroy-before-create replacement onto a FOREIGN
+// registration before the old VM would be destroyed.
 func inlineAdapterIPCollisionDiff(conflictOf inlineIPConflictFunc) func(ctx context.Context, diff *schema.ResourceDiff, meta any) error {
 	return func(ctx context.Context, diff *schema.ResourceDiff, meta any) error {
 		if conflictOf == nil {
 			// No client to read the IPAM plane with (unit tests drive Resource.Diff
 			// with a nil meta). Skip rather than panic: this hook is advisory and the
 			// create/update precondition is the real gate.
+			return nil
+		}
+		if diff.Id() == "" {
+			// No identity: a fresh create, or the create half of a replacement planned
+			// against a null prior state. The hook cannot tell them apart, and in the
+			// latter it cannot excuse the resource's own registration — so it must not
+			// adjudicate at all (see the doc comment). The pre-create check owns this.
 			return nil
 		}
 		configuredIPs := osAdapterIPConfigured(diff.GetRawConfig())
@@ -273,7 +380,7 @@ func inlineAdapterIPCollisionDiff(conflictOf inlineIPConflictFunc) func(ctx cont
 			id, _ := block["network_id"].(string)
 			return id
 		}
-		diags := rejectInlineAdapterIPAlreadyRegistered(ctx, configuredIPs, networkIDAt, conflictOf, diff.Id())
+		diags := rejectInlineAdapterIPAlreadyRegistered(ctx, configuredIPs, networkIDAt, conflictOf, diff.Id(), inlineAdapterMACs(blocks))
 		if diags.HasError() {
 			return fmt.Errorf("%s", diags[0].Summary)
 		}
@@ -484,7 +591,13 @@ func validateInlineAdapterIPPreconditionsCore(ctx context.Context, d *schema.Res
 	}
 	// Ordered last on purpose: it costs a listing per targeted private network, so
 	// it only runs once the cheaper structural checks have passed.
-	return refuseBeforeAnyMutation(d, rejectInlineAdapterIPAlreadyRegistered(ctx, configuredIPs, networkIDAt, conflictOf, ownerVMID))
+	var ownerMACs []string
+	if ownerVMID != "" {
+		// Only an existing VM can own a registration; on a create the owner is
+		// unknown and the planned MACs would be dead input.
+		ownerMACs = inlineAdapterMACs(planned)
+	}
+	return refuseBeforeAnyMutation(d, rejectInlineAdapterIPAlreadyRegistered(ctx, configuredIPs, networkIDAt, conflictOf, ownerVMID, ownerMACs))
 }
 
 // inlineAdaptersNeedCollection decides whether the update must walk the inline

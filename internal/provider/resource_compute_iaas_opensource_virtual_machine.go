@@ -599,7 +599,7 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 			return diags
 		}
 		// Nothing is ours yet on a create, so any existing registration conflicts.
-		if diags := rejectInlineAdapterIPAlreadyRegistered(ctx, configuredIPs, networkIDAt, openIaasInlineIPConflict(c), ""); diags != nil {
+		if diags := rejectInlineAdapterIPAlreadyRegistered(ctx, configuredIPs, networkIDAt, openIaasInlineIPConflict(c), "", nil); diags != nil {
 			return diags
 		}
 
@@ -681,7 +681,7 @@ func openIaasVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, m
 		if diags := validateInlineAdapterIPsTargetVPC(ctx, marketplaceConfiguredIPs, marketplaceNetworkIDAt, openIaasNetworkVPCBacked(c)); diags != nil {
 			return diags
 		}
-		if diags := rejectInlineAdapterIPAlreadyRegistered(ctx, marketplaceConfiguredIPs, marketplaceNetworkIDAt, openIaasInlineIPConflict(c), ""); diags != nil {
+		if diags := rejectInlineAdapterIPAlreadyRegistered(ctx, marketplaceConfiguredIPs, marketplaceNetworkIDAt, openIaasInlineIPConflict(c), "", nil); diags != nil {
 			return diags
 		}
 

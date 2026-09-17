@@ -946,3 +946,107 @@ func TestVMInstanceOSDiskChangeCheck(t *testing.T) {
 		})
 	}
 }
+
+// TestCreateVMInstanceIPAMCollisionGate pins the APPLY-time half of the collision
+// check on this surface — the authoritative gate the plan-time hook defers to since
+// #533. It is what makes a replacement safe in both lifecycle orderings: under the
+// default destroy-before-create the old VM is gone (and its registration reclaimed)
+// when the create runs; under create_before_destroy the old VM still holds the address
+// and the create must be refused before anything is created. The create has no prior
+// identity, so ANY holder is a conflict — including a VM that is about to be
+// destroyed — and the refusal must say what to do in each ordering.
+func TestCreateVMInstanceIPAMCollisionGate(t *testing.T) {
+	const network = "55555555-5555-5555-5555-555555555555"
+	vpcNetwork := func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
+		return &client.PublicCloudVMNetwork{
+			ID: id, Name: "fsn-pn-01",
+			VPC: &client.PublicCloudVMNetworkVPC{ID: "vpc-1", Name: "fsn-01", PrivateNetwork: &client.PublicCloudVMNetworkRef{ID: "pn-1", Name: "fsn-pn-01"}},
+		}, nil
+	}
+	newRD := func(t *testing.T) *schema.ResourceData {
+		return newVMInstanceRD(t, map[string]interface{}{
+			"name":                 "control-01",
+			"availability_zone_id": "11111111-1111-1111-1111-111111111111",
+			"image_id":             "22222222-2222-2222-2222-222222222222",
+			"instance_family_id":   "33333333-3333-3333-3333-333333333333",
+			"cpu":                  2,
+			"memory":               4,
+			"backup_policy_id":     "44444444-4444-4444-4444-444444444444",
+			"power_state":          "off",
+			"os_network_adapter": []interface{}{
+				map[string]interface{}{"device_index": 0, "network_id": network, "ip_address": "10.0.6.240"},
+			},
+			"cloud_init": map[string]interface{}{"cloud_config": "#cloud-config\nhostname: control-01\n"},
+		})
+	}
+	newFuncs := func(registered []*client.StaticIP) (vmInstanceCRUDFuncs, *bool, *[]string) {
+		created := false
+		var listed []string
+		return vmInstanceCRUDFuncs{
+			networkRead: vpcNetwork,
+			listStaticIPs: func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+				listed = append(listed, privateNetworkID)
+				return registered, nil
+			},
+			create: func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) {
+				created = true
+				return "act-1", nil
+			},
+			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
+				return vmiCompletedActivity("vm-new", "vm-new"), nil
+			},
+			read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
+				return &client.PublicCloudVMInstance{ID: id, Name: "control-01", Status: "stopped", VCPU: 2, RAMGb: 4}, nil
+			},
+			listDisks: okListPrimaryDisk,
+		}, &created, &listed
+	}
+
+	t.Run("the address held by the VM being replaced (create_before_destroy, or not yet reclaimed) refuses the create", func(t *testing.T) {
+		d := newRD(t)
+		funcs, created, listed := newFuncs([]*client.StaticIP{{
+			IPAddress: "10.0.6.240", Source: "vmi", MacAddress: "3a:ad:76:5d:e4:e9",
+			VirtualMachine: &client.BaseObject{ID: "vm-old"},
+		}})
+		diags := createVMInstanceWith(context.Background(), d, funcs)
+		if !diags.HasError() {
+			t.Fatal("an address still registered to another VM — even the one being replaced — must refuse the create: the platform would silently register nothing")
+		}
+		if *created {
+			t.Fatal("create must NOT be called: the refusal happens BEFORE any side effect")
+		}
+		if d.Id() != "" {
+			t.Fatalf("no id must be set on a refused create, got %q", d.Id())
+		}
+		if len(*listed) != 1 || (*listed)[0] != "pn-1" {
+			t.Fatalf("the gate must read the static IPs of the target private network exactly once, got %v", *listed)
+		}
+		got := diags[0].Summary
+		for _, want := range []string{"ALREADY registered", "vm-old", "10.0.6.240", "destroy-before-create", "retry once the registration has disappeared", "create_before_destroy"} {
+			if !strings.Contains(got, want) {
+				t.Fatalf("the refusal is missing %q, which the user needs to act on it.\ngot: %s", want, got)
+			}
+		}
+	})
+
+	// Anti-complacency: the gate really consults the listing and lets a free address
+	// through — it is not a blanket refusal of every addressed create.
+	t.Run("a free address passes the gate and the create proceeds", func(t *testing.T) {
+		d := newRD(t)
+		funcs, created, listed := newFuncs([]*client.StaticIP{{
+			IPAddress: "10.0.6.10", Source: "vmi", VirtualMachine: &client.BaseObject{ID: "vm-other"},
+		}})
+		if diags := createVMInstanceWith(context.Background(), d, funcs); diags.HasError() {
+			t.Fatalf("a free address must pass the gate: %v", diags)
+		}
+		if !*created {
+			t.Fatal("create must be called once the address is proven free")
+		}
+		if d.Id() != "vm-new" {
+			t.Fatalf("id = %q, want vm-new", d.Id())
+		}
+		if len(*listed) != 1 {
+			t.Fatalf("the gate must have consulted the listing exactly once, got %v", *listed)
+		}
+	})
+}

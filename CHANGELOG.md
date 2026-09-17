@@ -1,7 +1,14 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
-# 1.12.0 (September 16th, 2026)
+# 1.12.1 (September 18th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
+
+BUG FIXES :
+
+  * `cloudtemple_public_cloud_vm_instance`, `cloudtemple_compute_virtual_machine`, `cloudtemple_compute_iaas_opensource_virtual_machine`: planning the **replacement** of a virtual machine whose inline `os_network_adapter` carries a VPC static `ip_address` no longer fails with `ip_address ... is ALREADY registered ... for virtual machine <its own id>`. Terraform plans a replacement in two passes, and the second one — the create half — carries no prior state, so the plan-time IPAM collision check introduced in 1.12.0 could not recognise the virtual machine's own registration and reported it as a conflict. On `cloudtemple_public_cloud_vm_instance`, where `cloud_init` and the inline adapters are `ForceNew`, this blocked the plan of any such change. The plan-time check now runs only when the plan carries the resource's identity: an in-place change, or the first pass of a replacement plan — which still refuses an address held by another machine, before the current one would be destroyed. A fresh create and the create half of a replacement are deferred to the authoritative pre-create check, whose verdict is unchanged (its diagnostic now also says what to do when the holder is the machine being replaced): under the default destroy-before-create ordering it runs after the old machine is destroyed and re-reads the IPAM plane, and with `create_before_destroy` the old machine still holds the address, so the create is refused before anything is created. Because the platform reclaims the registration shortly after the destroy rather than instantly, a replacement `apply` may in rare cases be refused once, naming the destroyed machine as the holder; re-running `apply` converges, and the diagnostic now says so (#533).
+  * `cloudtemple_compute_virtual_machine`, `cloudtemple_compute_iaas_opensource_virtual_machine`: the IPAM collision check now also recognises the virtual machine's **own** static IP registration by the MAC address of one of its adapters, not only by the registration's machine link. The VPC plane addresses a registration by MAC and these two surfaces register by MAC, so a registration the platform does not link back to the machine was reported as a conflict on a plan or an update of the very machine that holds it (#533).
+
+# 1.12.0 (September 16th, 2026)
 
 UPGRADE NOTES :
 
