@@ -15,11 +15,14 @@ data "cloudtemple_public_cloud_vm_backup_policy" "policy" {
   name = "No Backup"
 }
 
-# The inline os_network_adapter block only accepts Private Backbone networks;
-# attach VPC networks with the cloudtemple_public_cloud_vm_network_adapter
-# resource.
+# The inline os_network_adapter block accepts both Private Backbone and VPC
+# networks. A VPC-backed network is the one whose `vpc` block is populated.
 data "cloudtemple_public_cloud_vm_network" "lan" {
   name = "LAN01"
+}
+
+data "cloudtemple_public_cloud_vm_network" "vpc" {
+  name = "fsn-pn-01"
 }
 
 # A small VM, booted at creation, bootstrapped with cloud-init.
@@ -55,6 +58,30 @@ resource "cloudtemple_public_cloud_vm_instance" "web" {
 #   os_disk {
 #     size_gb = 45
 #   }
+
+# A VPC-attached VM. `ip_address` registers a static IP on the VPC private
+# network; omit it to let the platform assign one. It is only honoured on a VPC
+# network — setting it on a Private Backbone network is rejected at apply.
+#
+# The block is ForceNew: changing network_id or ip_address REPLACES the VM. To
+# relocate an adapter (or its static IP) in place, manage it with a
+# cloudtemple_public_cloud_vm_network_adapter resource instead.
+resource "cloudtemple_public_cloud_vm_instance" "app" {
+  name                 = "app-01"
+  availability_zone_id = data.cloudtemple_public_cloud_vm_availability_zone.az.id
+  image_id             = data.cloudtemple_public_cloud_vm_image.os.id
+  instance_family_id   = data.cloudtemple_public_cloud_vm_instance_family.family.id
+  cpu                  = 2
+  memory               = 4
+  backup_policy_id     = data.cloudtemple_public_cloud_vm_backup_policy.policy.id
+  power_state          = "off"
+
+  os_network_adapter {
+    device_index = 0
+    network_id   = data.cloudtemple_public_cloud_vm_network.vpc.id
+    ip_address   = "10.0.0.50"
+  }
+}
 
 output "web_status" {
   value = cloudtemple_public_cloud_vm_instance.web.status

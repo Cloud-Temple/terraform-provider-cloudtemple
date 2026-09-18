@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
@@ -305,18 +306,27 @@ func TestCreateVMInstanceWith(t *testing.T) {
 	})
 }
 
-// TestCreateVMInstanceVPCGuard pins the phase-1 VPC rule: the inline
-// os_network_adapter block only supports Private Backbone networks. The
-// preflight resolves each declared network BEFORE the create POST — a VPC
-// network, an unreadable network or an absent network all refuse the create
-// without ever calling the API.
-func TestCreateVMInstanceVPCGuard(t *testing.T) {
-	newFuncs := func(networkRead func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error)) (vmInstanceCRUDFuncs, *bool) {
+// TestCreateVMInstanceNetworkPreflight pins what the create preflight enforces
+// about the inline os_network_adapter block:
+//
+//   - a VPC network is ACCEPTED and reaches the create POST. The former phase-1
+//     refusal (#473) was a provider decision, retired against live evidence;
+//     this subtest is what keeps it from creeping back.
+//   - an unreadable or absent network fails closed, WITHOUT calling the API.
+//   - ip_address on a non-VPC network is refused, because the platform silently
+//     ignores it there (measured live) and the value would be dead config.
+//
+// Every subtest asserts on the `created` flag as well as on the diagnostics, so
+// none of them can pass vacuously by short-circuiting somewhere earlier.
+func TestCreateVMInstanceNetworkPreflight(t *testing.T) {
+	newFuncs := func(networkRead func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error)) (vmInstanceCRUDFuncs, *bool, **client.CreateVMInstanceRequest) {
 		created := false
+		var seen *client.CreateVMInstanceRequest
 		return vmInstanceCRUDFuncs{
 			networkRead: networkRead,
 			create: func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) {
 				created = true
+				seen = r
 				return "act-1", nil
 			},
 			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
@@ -326,12 +336,21 @@ func TestCreateVMInstanceVPCGuard(t *testing.T) {
 				return &client.PublicCloudVMInstance{ID: id, Name: "web", Status: "running", VCPU: 2, RAMGb: 4}, nil
 			},
 			listDisks: okListPrimaryDisk,
-		}, &created
+		}, &created, &seen
+	}
+
+	// okNetworkReadVPC is the VPC counterpart of okNetworkReadPB: the `vpc` block
+	// is what tells a VPC-backed network apart from a Private Backbone one.
+	okNetworkReadVPC := func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
+		return &client.PublicCloudVMNetwork{
+			ID: id, Name: "fsn-pn-01",
+			VPC: &client.PublicCloudVMNetworkVPC{ID: "vpc-1", Name: "fsn-01"},
+		}, nil
 	}
 
 	t.Run("a Private Backbone network passes", func(t *testing.T) {
 		d := createRD(t)
-		funcs, created := newFuncs(okNetworkReadPB)
+		funcs, created, _ := newFuncs(okNetworkReadPB)
 		if diags := createVMInstanceWith(context.Background(), d, funcs); diags.HasError() {
 			t.Fatalf("a PB network must pass the preflight: %v", diags)
 		}
@@ -340,25 +359,106 @@ func TestCreateVMInstanceVPCGuard(t *testing.T) {
 		}
 	})
 
-	t.Run("a VPC network is refused BEFORE the create POST", func(t *testing.T) {
+	// This is the inversion of the retired #473 guard. It fails the moment anyone
+	// re-adds a `network.VPC != nil` refusal to the preflight.
+	t.Run("a VPC network REACHES the create POST", func(t *testing.T) {
 		d := createRD(t)
-		funcs, created := newFuncs(func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
-			return &client.PublicCloudVMNetwork{ID: id, Name: "fsn-pn-01", VPC: &client.PublicCloudVMNetworkVPC{ID: "vpc-1", Name: "fsn-01"}}, nil
+		funcs, created, seen := newFuncs(okNetworkReadVPC)
+		if diags := createVMInstanceWith(context.Background(), d, funcs); diags.HasError() {
+			t.Fatalf("a VPC network must be accepted by the preflight: %v", diags)
+		}
+		if !*created {
+			t.Fatal("create must be called when a NIC targets a VPC network")
+		}
+		if d.Id() != "vm-1" {
+			t.Fatalf("id = %q, want %q — the create must complete normally on a VPC network", d.Id(), "vm-1")
+		}
+		if *seen == nil || len((*seen).NetworkInterfaces) != 1 {
+			t.Fatalf("the create request must carry exactly one NIC, got %+v", *seen)
+		}
+		if got := (*seen).NetworkInterfaces[0].NetworkID; got != "55555555-5555-5555-5555-555555555555" {
+			t.Fatalf("NIC networkId = %q, want the declared VPC network id", got)
+		}
+	})
+
+	// The chosen static IP must survive the whole config -> request mapping, not
+	// merely be accepted: this asserts the value on the wire-bound struct.
+	t.Run("ip_address on a VPC network reaches the create request", func(t *testing.T) {
+		d := newVMInstanceRD(t, map[string]interface{}{
+			"name":                 "web",
+			"availability_zone_id": "11111111-1111-1111-1111-111111111111",
+			"image_id":             "22222222-2222-2222-2222-222222222222",
+			"instance_family_id":   "33333333-3333-3333-3333-333333333333",
+			"cpu":                  2,
+			"memory":               4,
+			"backup_policy_id":     "44444444-4444-4444-4444-444444444444",
+			"power_state":          "off",
+			"os_network_adapter": []interface{}{
+				map[string]interface{}{
+					"device_index": 0,
+					"network_id":   "55555555-5555-5555-5555-555555555555",
+					"ip_address":   "10.0.6.240",
+				},
+			},
 		})
-		if diags := createVMInstanceWith(context.Background(), d, funcs); !diags.HasError() {
-			t.Fatal("a VPC network must refuse the create")
+		funcs, created, seen := newFuncs(okNetworkReadVPC)
+		if diags := createVMInstanceWith(context.Background(), d, funcs); diags.HasError() {
+			t.Fatalf("ip_address on a VPC network must be accepted: %v", diags)
+		}
+		if !*created {
+			t.Fatal("create must be called")
+		}
+		if *seen == nil || len((*seen).NetworkInterfaces) != 1 {
+			t.Fatalf("the create request must carry exactly one NIC, got %+v", *seen)
+		}
+		nic := (*seen).NetworkInterfaces[0]
+		if nic.IPAddress != "10.0.6.240" {
+			t.Fatalf("NIC ipAddress = %q, want %q — the configured static IP was lost on the way to the API", nic.IPAddress, "10.0.6.240")
+		}
+		if nic.DeviceIndex != 0 {
+			t.Fatalf("NIC deviceIndex = %d, want 0", nic.DeviceIndex)
+		}
+	})
+
+	// The platform silently ignores ipAddress on a non-VPC network (measured live),
+	// so the provider must refuse it rather than let the user believe it applied.
+	t.Run("ip_address on a Private Backbone network is refused BEFORE the create POST", func(t *testing.T) {
+		d := newVMInstanceRD(t, map[string]interface{}{
+			"name":                 "web",
+			"availability_zone_id": "11111111-1111-1111-1111-111111111111",
+			"image_id":             "22222222-2222-2222-2222-222222222222",
+			"instance_family_id":   "33333333-3333-3333-3333-333333333333",
+			"cpu":                  2,
+			"memory":               4,
+			"backup_policy_id":     "44444444-4444-4444-4444-444444444444",
+			"power_state":          "off",
+			"os_network_adapter": []interface{}{
+				map[string]interface{}{
+					"device_index": 0,
+					"network_id":   "55555555-5555-5555-5555-555555555555",
+					"ip_address":   "10.0.6.240",
+				},
+			},
+		})
+		funcs, created, _ := newFuncs(okNetworkReadPB)
+		diags := createVMInstanceWith(context.Background(), d, funcs)
+		if !diags.HasError() {
+			t.Fatal("ip_address on a non-VPC network must refuse the create")
 		}
 		if *created {
-			t.Fatal("create must NOT be called when a NIC targets a VPC network")
+			t.Fatal("create must NOT be called: the refusal happens BEFORE any side effect")
 		}
 		if d.Id() != "" {
-			t.Fatal("no id must be set on a refused create")
+			t.Fatalf("no id must be set on a refused create, got %q", d.Id())
+		}
+		if !strings.Contains(diags[0].Summary, "ip_address") {
+			t.Fatalf("the diagnostic must name ip_address so the user can act on it, got %q", diags[0].Summary)
 		}
 	})
 
 	t.Run("an unreadable network fails closed (no create)", func(t *testing.T) {
 		d := createRD(t)
-		funcs, created := newFuncs(func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
+		funcs, created, _ := newFuncs(func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
 			return nil, errors.New("400")
 		})
 		if diags := createVMInstanceWith(context.Background(), d, funcs); !diags.HasError() {
@@ -371,7 +471,7 @@ func TestCreateVMInstanceVPCGuard(t *testing.T) {
 
 	t.Run("a nil network fails closed (no create)", func(t *testing.T) {
 		d := createRD(t)
-		funcs, created := newFuncs(func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
+		funcs, created, _ := newFuncs(func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
 			return nil, nil
 		})
 		if diags := createVMInstanceWith(context.Background(), d, funcs); !diags.HasError() {
@@ -555,8 +655,24 @@ func TestBuildCreateVMInstanceRequest(t *testing.T) {
 	if req.ImageID != "22222222-2222-2222-2222-222222222222" {
 		t.Fatalf("image_id must map to CreateVMInstanceRequest.ImageID, got %q", req.ImageID)
 	}
-	if len(req.NetworkInterfaces) != 1 || req.NetworkInterfaces[0].NetworkID != "55555555-5555-5555-5555-555555555555" {
+	// Every field of the NIC block is asserted, not just network_id: device_index
+	// orders the interfaces platform-side and ip_address carries the VPC static IP,
+	// so a mapping regression on either is silent damage rather than a build error.
+	if len(req.NetworkInterfaces) != 1 {
 		t.Fatalf("nic mapping wrong: %+v", req.NetworkInterfaces)
+	}
+	nic := req.NetworkInterfaces[0]
+	if nic.NetworkID != "55555555-5555-5555-5555-555555555555" {
+		t.Fatalf("nic networkId = %q, want the declared network id", nic.NetworkID)
+	}
+	if nic.DeviceIndex != 0 {
+		t.Fatalf("nic deviceIndex = %d, want 0", nic.DeviceIndex)
+	}
+	// createRD declares no ip_address: it must stay empty so `omitempty` drops it
+	// from the wire (an auto-assigned address on a VPC network, nothing at all on a
+	// Private Backbone one).
+	if nic.IPAddress != "" {
+		t.Fatalf("nic ipAddress = %q, want empty when the block does not set it", nic.IPAddress)
 	}
 	if req.CloudInit != nil {
 		t.Fatalf("cloud_init must be nil when unset, got %+v", req.CloudInit)
@@ -829,4 +945,108 @@ func TestVMInstanceOSDiskChangeCheck(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestCreateVMInstanceIPAMCollisionGate pins the APPLY-time half of the collision
+// check on this surface — the authoritative gate the plan-time hook defers to since
+// #533. It is what makes a replacement safe in both lifecycle orderings: under the
+// default destroy-before-create the old VM is gone (and its registration reclaimed)
+// when the create runs; under create_before_destroy the old VM still holds the address
+// and the create must be refused before anything is created. The create has no prior
+// identity, so ANY holder is a conflict — including a VM that is about to be
+// destroyed — and the refusal must say what to do in each ordering.
+func TestCreateVMInstanceIPAMCollisionGate(t *testing.T) {
+	const network = "55555555-5555-5555-5555-555555555555"
+	vpcNetwork := func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error) {
+		return &client.PublicCloudVMNetwork{
+			ID: id, Name: "fsn-pn-01",
+			VPC: &client.PublicCloudVMNetworkVPC{ID: "vpc-1", Name: "fsn-01", PrivateNetwork: &client.PublicCloudVMNetworkRef{ID: "pn-1", Name: "fsn-pn-01"}},
+		}, nil
+	}
+	newRD := func(t *testing.T) *schema.ResourceData {
+		return newVMInstanceRD(t, map[string]interface{}{
+			"name":                 "control-01",
+			"availability_zone_id": "11111111-1111-1111-1111-111111111111",
+			"image_id":             "22222222-2222-2222-2222-222222222222",
+			"instance_family_id":   "33333333-3333-3333-3333-333333333333",
+			"cpu":                  2,
+			"memory":               4,
+			"backup_policy_id":     "44444444-4444-4444-4444-444444444444",
+			"power_state":          "off",
+			"os_network_adapter": []interface{}{
+				map[string]interface{}{"device_index": 0, "network_id": network, "ip_address": "10.0.6.240"},
+			},
+			"cloud_init": map[string]interface{}{"cloud_config": "#cloud-config\nhostname: control-01\n"},
+		})
+	}
+	newFuncs := func(registered []*client.StaticIP) (vmInstanceCRUDFuncs, *bool, *[]string) {
+		created := false
+		var listed []string
+		return vmInstanceCRUDFuncs{
+			networkRead: vpcNetwork,
+			listStaticIPs: func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+				listed = append(listed, privateNetworkID)
+				return registered, nil
+			},
+			create: func(ctx context.Context, r *client.CreateVMInstanceRequest) (string, error) {
+				created = true
+				return "act-1", nil
+			},
+			waitActivity: func(ctx context.Context, a string) (*client.Activity, error) {
+				return vmiCompletedActivity("vm-new", "vm-new"), nil
+			},
+			read: func(ctx context.Context, id string) (*client.PublicCloudVMInstance, error) {
+				return &client.PublicCloudVMInstance{ID: id, Name: "control-01", Status: "stopped", VCPU: 2, RAMGb: 4}, nil
+			},
+			listDisks: okListPrimaryDisk,
+		}, &created, &listed
+	}
+
+	t.Run("the address held by the VM being replaced (create_before_destroy, or not yet reclaimed) refuses the create", func(t *testing.T) {
+		d := newRD(t)
+		funcs, created, listed := newFuncs([]*client.StaticIP{{
+			IPAddress: "10.0.6.240", Source: "vmi", MacAddress: "3a:ad:76:5d:e4:e9",
+			VirtualMachine: &client.BaseObject{ID: "vm-old"},
+		}})
+		diags := createVMInstanceWith(context.Background(), d, funcs)
+		if !diags.HasError() {
+			t.Fatal("an address still registered to another VM — even the one being replaced — must refuse the create: the platform would silently register nothing")
+		}
+		if *created {
+			t.Fatal("create must NOT be called: the refusal happens BEFORE any side effect")
+		}
+		if d.Id() != "" {
+			t.Fatalf("no id must be set on a refused create, got %q", d.Id())
+		}
+		if len(*listed) != 1 || (*listed)[0] != "pn-1" {
+			t.Fatalf("the gate must read the static IPs of the target private network exactly once, got %v", *listed)
+		}
+		got := diags[0].Summary
+		for _, want := range []string{"ALREADY registered", "vm-old", "10.0.6.240", "destroy-before-create", "retry once the registration has disappeared", "create_before_destroy"} {
+			if !strings.Contains(got, want) {
+				t.Fatalf("the refusal is missing %q, which the user needs to act on it.\ngot: %s", want, got)
+			}
+		}
+	})
+
+	// Anti-complacency: the gate really consults the listing and lets a free address
+	// through — it is not a blanket refusal of every addressed create.
+	t.Run("a free address passes the gate and the create proceeds", func(t *testing.T) {
+		d := newRD(t)
+		funcs, created, listed := newFuncs([]*client.StaticIP{{
+			IPAddress: "10.0.6.10", Source: "vmi", VirtualMachine: &client.BaseObject{ID: "vm-other"},
+		}})
+		if diags := createVMInstanceWith(context.Background(), d, funcs); diags.HasError() {
+			t.Fatalf("a free address must pass the gate: %v", diags)
+		}
+		if !*created {
+			t.Fatal("create must be called once the address is proven free")
+		}
+		if d.Id() != "vm-new" {
+			t.Fatalf("id = %q, want vm-new", d.Id())
+		}
+		if len(*listed) != 1 {
+			t.Fatalf("the gate must have consulted the listing exactly once, got %v", *listed)
+		}
+	})
 }

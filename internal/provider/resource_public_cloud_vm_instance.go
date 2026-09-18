@@ -129,7 +129,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 				ForceNew:    true,
 				MinItems:    1,
 				MaxItems:    8,
-				Description: "The network interfaces attached at creation (Private Backbone networks only — attach VPC networks with the dedicated network adapter resource). Immutable here; additional adapters are managed by the dedicated network adapter resource.",
+				Description: "The network interfaces attached at creation. Both Private Backbone and VPC networks are supported, so a VPC-only VM can be declared here. Immutable (`ForceNew`): changing an interface's `network_id` or `ip_address` REPLACES the VM — relocate an existing adapter with a `cloudtemple_public_cloud_vm_network_adapter` resource instead. Additional adapters beyond creation are also managed by that resource.",
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"device_index": {
@@ -151,7 +151,7 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 							Optional:     true,
 							ForceNew:     true,
 							ValidateFunc: validation.IsIPv4Address,
-							Description:  "The fixed IPv4 address to assign. When omitted, the platform assigns one.",
+							Description:  "The fixed IPv4 address to assign, registered as a static IP on the VPC private network. Requires `network_id` to reference a VPC network: the platform silently ignores it on a Private Backbone network, so setting it there is rejected at apply. It is also rejected when the address is ALREADY registered on the target VPC private network: the platform does not refuse that case — it creates the VM, reports success and silently registers nothing — so the collision is refused before the create (the authoritative check) and reported earlier, at plan, when the plan carries the VM's identity (an in-place plan, or the first pass of a replacement plan). A fresh create and the create half of a replacement are planned without one and cannot tell the VM's own registration from another machine's, so they are left to the pre-create check. When omitted on a VPC network, the platform auto-assigns an address. Write-only: it is never read back (the registration is addressable only by MAC on the VPC plane).",
 						},
 					},
 				},
@@ -240,34 +240,52 @@ func resourcePublicCloudVMInstance() *schema.Resource {
 	}
 }
 
-// customizeVMInstanceDiff enforces the resize precondition at PLAN time: cpu and
+// customizeVMInstanceDiff is the production CustomizeDiff: the IPAM view of the
+// plan-time collision check comes from the configured client (nil in unit tests
+// that drive Resource.Diff with a nil meta, where the hook degrades to a no-op).
+func customizeVMInstanceDiff(ctx context.Context, d *schema.ResourceDiff, meta any) error {
+	return customizeVMInstanceDiffWith(inlineIPConflictOrNil(meta, publicCloudInlineIPConflict))(ctx, d, meta)
+}
+
+// customizeVMInstanceDiffWith enforces the resize precondition at PLAN time: cpu and
 // memory can only change while the VM is declared stopped. This is checked ONLY
 // on an existing resource — on create, cpu/memory necessarily "change" from their
 // zero value and an `on` power_state is the legitimate boot-at-create case.
-func customizeVMInstanceDiff(ctx context.Context, d *schema.ResourceDiff, meta any) error {
-	exists := d.Id() != ""
-	// os_disk.size_gb cannot be set at CREATE: the VM is created with the
-	// image's system disk size, and create never extends it — so a configured
-	// value that differs from the image would produce an inconsistent result.
-	// Detected on the RAW config (never the diff/state: the attribute is
-	// Optional+Computed, so d.Get would report a computed value as "set").
-	if !exists {
-		if osDiskSizeSetInRawConfig(d.GetRawConfig()) {
-			return fmt.Errorf("os_disk.size_gb cannot be set when creating the VM: the image's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
+//
+// conflictOf is the IPAM view of the plan-time collision check. It is injected so a
+// test can drive the REAL resource through Resource.SimpleDiff — the exact entry point
+// the gRPC PlanResourceChange uses — with a recorded IPAM answer and no network.
+func customizeVMInstanceDiffWith(conflictOf inlineIPConflictFunc) schema.CustomizeDiffFunc {
+	return func(ctx context.Context, d *schema.ResourceDiff, meta any) error {
+		// Plan-time IPAM collision check; see inlineAdapterIPCollisionDiff. Advisory:
+		// the create preflight remains the authoritative gate.
+		if err := inlineAdapterIPCollisionDiff(conflictOf)(ctx, d, meta); err != nil {
+			return err
 		}
-	} else if d.HasChange("os_disk.0.size_gb") {
-		// Grow-only + requires-off, validated on the LEAF only: a refresh of a
-		// Computed sibling (id, storage_type, ...) must never look like an extend.
-		o, n := d.GetChange("os_disk.0.size_gb")
-		oldSize, okOld := o.(int)
-		newSize, okNew := n.(int)
-		if okOld && okNew {
-			if err := vmInstanceOSDiskChangeCheck(oldSize, newSize, d.Get("power_state").(string)); err != nil {
-				return err
+		exists := d.Id() != ""
+		// os_disk.size_gb cannot be set at CREATE: the VM is created with the
+		// image's system disk size, and create never extends it — so a configured
+		// value that differs from the image would produce an inconsistent result.
+		// Detected on the RAW config (never the diff/state: the attribute is
+		// Optional+Computed, so d.Get would report a computed value as "set").
+		if !exists {
+			if osDiskSizeSetInRawConfig(d.GetRawConfig()) {
+				return fmt.Errorf("os_disk.size_gb cannot be set when creating the VM: the image's system disk size is used at creation. Omit it, then set it in a later apply (with power_state = \"off\") to grow the system disk")
+			}
+		} else if d.HasChange("os_disk.0.size_gb") {
+			// Grow-only + requires-off, validated on the LEAF only: a refresh of a
+			// Computed sibling (id, storage_type, ...) must never look like an extend.
+			o, n := d.GetChange("os_disk.0.size_gb")
+			oldSize, okOld := o.(int)
+			newSize, okNew := n.(int)
+			if okOld && okNew {
+				if err := vmInstanceOSDiskChangeCheck(oldSize, newSize, d.Get("power_state").(string)); err != nil {
+					return err
+				}
 			}
 		}
+		return vmInstanceResizeRequiresOff(exists, d.HasChange("cpu") || d.HasChange("memory"), d.Get("power_state").(string))
 	}
-	return vmInstanceResizeRequiresOff(exists, d.HasChange("cpu") || d.HasChange("memory"), d.Get("power_state").(string))
 }
 
 // osDiskSizeSetInRawConfig reports whether the raw config declares an os_disk
@@ -364,12 +382,36 @@ type vmInstanceCRUDFuncs struct {
 	extendSystem func(ctx context.Context, id string, size int) (string, error)
 	networkRead  func(ctx context.Context, id string) (*client.PublicCloudVMNetwork, error)
 	waitActivity func(ctx context.Context, activityID string) (*client.Activity, error)
+	// listStaticIPs reads every static IP registered on a VPC private network, so
+	// the create can refuse an address that is already taken. STRICT on purpose: a
+	// truncated body must surface as an error, never read as an empty network — see
+	// rejectInlineAdapterIPAlreadyRegistered.
+	listStaticIPs func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error)
 }
 
 func vmInstanceWaiterOptions(ctx context.Context) *client.WaiterOptions {
 	o := getWaiterOptions(ctx)
 	o.NotFoundRetries = vmInstanceActivityNotFoundRetries
 	return o
+}
+
+// publicCloudInlineIPConflict builds the IPAM-collision checker for VM Instances.
+func publicCloudInlineIPConflict(c *client.Client) inlineIPConflictFunc {
+	return staticIPConflictChecker(
+		func(ctx context.Context, networkID string) (string, error) {
+			network, err := c.PublicCloudVM().Network().Read(ctx, networkID)
+			if err != nil {
+				return "", err
+			}
+			if network == nil || network.VPC == nil {
+				return "", nil
+			}
+			return network.VPC.PrivateNetwork.ID, nil
+		},
+		func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+			return c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
+		},
+	)
 }
 
 func vmInstanceClientFuncs(c *client.Client) vmInstanceCRUDFuncs {
@@ -390,6 +432,9 @@ func vmInstanceClientFuncs(c *client.Client) vmInstanceCRUDFuncs {
 		networkRead:  c.PublicCloudVM().Network().Read,
 		waitActivity: func(ctx context.Context, activityID string) (*client.Activity, error) {
 			return c.Activity().WaitForCompletion(ctx, activityID, vmInstanceWaiterOptions(ctx))
+		},
+		listStaticIPs: func(ctx context.Context, privateNetworkID string) ([]*client.StaticIP, error) {
+			return c.VPC().StaticIP().ListStrict(ctx, privateNetworkID)
 		},
 	}
 }
@@ -429,11 +474,22 @@ func createVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 		return diag.FromErr(err)
 	}
 
-	// VPC phase 1: the inline os_network_adapter block only supports Private
-	// Backbone networks — VPC attachments go through the standalone
-	// cloudtemple_public_cloud_vm_network_adapter resource. Each declared network
-	// is resolved BEFORE the create POST; a network that cannot be read fails
-	// closed (never create a VM against an unverifiable network).
+	// Network preflight. Each declared network is resolved BEFORE the create POST;
+	// a network that cannot be read fails closed (never create a VM against an
+	// unverifiable network).
+	//
+	// VPC networks ARE supported here. The former phase-1 refusal was a provider
+	// scoping decision, not an API limitation, and it has been retired against live
+	// evidence (DEV 2026-08-20): the create endpoint accepts a VPC networkId, the
+	// resulting adapter comes up `type="vpc"`, and networkInterfaces[].ipAddress is
+	// honoured — see internal/client/vpc_vm_create_live_probe_test.go.
+	//
+	// What the preflight now enforces instead is the ip_address precondition. The
+	// same live probe measured that ipAddress on a Private Backbone network is
+	// SILENTLY IGNORED: no static IP is registered and no error is returned. Left
+	// unchecked, a user's chosen address would be dead config they believe took
+	// effect, so it is rejected up front — the same polarity as the two Compute
+	// standalone adapter resources (see validateIPAddressTargetsVPC).
 	for _, nic := range req.NetworkInterfaces {
 		network, nerr := funcs.networkRead(ctx, nic.NetworkID)
 		if nerr != nil {
@@ -442,8 +498,31 @@ func createVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 		if network == nil {
 			return diag.Errorf("network %s of os_network_adapter (device_index %d) could not be found before creating VM %q; refusing to create against an unverifiable network.", nic.NetworkID, nic.DeviceIndex, req.Name)
 		}
-		if network.VPC != nil {
-			return diag.Errorf("network %s (%q) of os_network_adapter (device_index %d) is a VPC network: the inline os_network_adapter block only supports Private Backbone networks. Create the VM on a Private Backbone network and attach the VPC network with a cloudtemple_public_cloud_vm_network_adapter resource.", nic.NetworkID, network.Name, nic.DeviceIndex)
+		if nic.IPAddress != "" && network.VPC == nil {
+			return diag.Errorf("ip_address %q is set on os_network_adapter (device_index %d) but network %s (%q) is not a VPC network: a fixed IPv4 address is only honoured on a VPC network (the platform silently ignores it elsewhere) — remove ip_address, or target a VPC network.", nic.IPAddress, nic.DeviceIndex, nic.NetworkID, network.Name)
+		}
+		// IPAM collision, checked before the create for the reason documented on
+		// rejectInlineAdapterIPAlreadyRegistered: an address already registered to
+		// someone else is NOT refused by the platform — the VM is created, success is
+		// reported, and the address is silently not registered, while the state records
+		// it. Nothing detects that afterwards, because ip_address is write-only.
+		//
+		// Fail closed on a read error: an unreadable listing must not be read as "free".
+		if nic.IPAddress != "" && network.VPC != nil && funcs.listStaticIPs != nil {
+			pnID := network.VPC.PrivateNetwork.ID
+			if pnID == "" {
+				return diag.Errorf("network %s (%q) is VPC-backed but exposes no private-network id, so the ip_address %q of os_network_adapter (device_index %d) cannot be checked for a collision; refusing rather than requesting an address the platform may silently decline to register.", nic.NetworkID, network.Name, nic.IPAddress, nic.DeviceIndex)
+			}
+			registered, err := funcs.listStaticIPs(ctx, pnID)
+			if err != nil {
+				return diag.Errorf("failed to verify whether ip_address %q is already registered on the VPC private network %s of network %s (os_network_adapter device_index %d): %s", nic.IPAddress, pnID, nic.NetworkID, nic.DeviceIndex, err)
+			}
+			for _, existing := range registered {
+				if existing == nil || existing.IPAddress != nic.IPAddress {
+					continue
+				}
+				return diag.Errorf("os_network_adapter (device_index %d) requests ip_address %q, which is ALREADY registered on the VPC private network of network %s%s. The platform does not refuse this: it would create the VM, report success, and silently leave the adapter with no static IP while Terraform recorded %q. Choose a free address.%s", nic.DeviceIndex, nic.IPAddress, nic.NetworkID, describeStaticIPHolder(existing), nic.IPAddress, inlineAdapterIPReplacementHint)
+			}
 		}
 	}
 
@@ -454,8 +533,15 @@ func createVMInstanceWith(ctx context.Context, d *schema.ResourceData, funcs vmI
 
 	activity, err := funcs.waitActivity(ctx, activityID)
 	if err != nil {
+		// Two planes can be left behind by a create that fails after starting.
+		// The compute plane is the VM itself. The IPAM plane is a VPC static-IP
+		// registration: a successful delete reclaims it (verified live), but a
+		// create that registered the address and then failed leaves it behind, and
+		// the provider cannot safely reclaim it — it has no positive evidence of
+		// ownership for an address it may never have chosen (auto-assignment). So
+		// the diagnostic names both planes instead of silently leaving one out.
 		return diag.Errorf(
-			"VM instance %q create activity %q did not complete: %s. If a VM was created it is now ORPHANED outside the state — audit the VM instances for a recently-created %q and import it (terraform import) or delete it before re-applying.",
+			"VM instance %q create activity %q did not complete: %s. If a VM was created it is now ORPHANED outside the state — audit the VM instances for a recently-created %q and import it (terraform import) or delete it before re-applying. If any os_network_adapter targeted a VPC network, also audit that VPC private network's static IPs for a registration left behind by this failed create.",
 			req.Name, activityID, err, req.Name,
 		)
 	}
