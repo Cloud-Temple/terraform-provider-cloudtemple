@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 )
 
@@ -25,9 +26,37 @@ type PublicCloudVMDisk struct {
 	ID          string
 	Position    int
 	Label       string
-	SizeGb      int
+	SizeGib     int
 	StorageType string
 	IsPrimary   bool
+}
+
+// UnmarshalJSON accepts both the current `sizeGib` spelling and the deprecated
+// `sizeGb` one (see public_cloud_vm_capacity.go, issue #524). The embedded
+// `plain` alias both breaks the UnmarshalJSON recursion and keeps every other
+// field decoding by case-insensitive match, so adding a field to the struct
+// needs no change here; the pointer fields declared alongside it shadow the
+// capacity field at the shallower depth, which is where encoding/json resolves
+// the name.
+func (d *PublicCloudVMDisk) UnmarshalJSON(data []byte) error {
+	type plain PublicCloudVMDisk
+	var v struct {
+		plain
+		SizeGib *int
+		SizeGb  *int
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*d = PublicCloudVMDisk(v.plain)
+
+	subject := "disk " + quotedOrUnidentified(v.plain.ID)
+	size, err := resolveRenamedCapacity(v.SizeGib, v.SizeGb, "sizeGib", "sizeGb", subject)
+	if err != nil {
+		return err
+	}
+	d.SizeGib = size
+	return nil
 }
 
 // publicCloudVMDiskListResponse is the wrapped list shape (verified live):

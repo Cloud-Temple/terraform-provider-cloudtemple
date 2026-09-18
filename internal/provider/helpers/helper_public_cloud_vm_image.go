@@ -8,8 +8,8 @@ import (
 // snake_case map consumed by both the single and list datasources. Slice fields
 // are normalized to non-nil empty slices.
 func FlattenPublicCloudVMImage(img *client.PublicCloudVMImage) map[string]interface{} {
-	diskSizes := make([]interface{}, len(img.DiskSizesGb))
-	for i, s := range img.DiskSizesGb {
+	diskSizes := make([]interface{}, len(img.DiskSizesGib))
+	for i, s := range img.DiskSizesGib {
 		diskSizes[i] = s
 	}
 	families := make([]interface{}, len(img.CompatibleFamilies))
@@ -26,7 +26,7 @@ func FlattenPublicCloudVMImage(img *client.PublicCloudVMImage) map[string]interf
 		"os_family":           img.OsFamily,
 		"os_name":             img.OsName,
 		"os_version":          img.OsVersion,
-		"disk_sizes_gb":       diskSizes,
+		"disk_sizes_gib":      diskSizes,
 		"compatible_families": families,
 		"categories":          categories,
 		"family":              img.Family,

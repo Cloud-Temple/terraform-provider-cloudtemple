@@ -56,7 +56,7 @@ resource "cloudtemple_public_cloud_vm_instance" "web" {
 # - resize: change cpu/memory together with power_state = "off";
 # - grow the system disk (grow-only, VM stopped) by declaring:
 #   os_disk {
-#     size_gb = 45
+#     size_gib = 45
 #   }
 
 # A VPC-attached VM. `ip_address` registers a static IP on the VPC private
@@ -87,6 +87,6 @@ output "web_status" {
   value = cloudtemple_public_cloud_vm_instance.web.status
 }
 
-output "web_os_disk_size_gb" {
-  value = one(cloudtemple_public_cloud_vm_instance.web.os_disk[*].size_gb)
+output "web_os_disk_size_gib" {
+  value = one(cloudtemple_public_cloud_vm_instance.web.os_disk[*].size_gib)
 }

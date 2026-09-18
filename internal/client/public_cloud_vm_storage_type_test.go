@@ -35,7 +35,7 @@ func TestPublicCloudVMStorageTypeList(t *testing.T) {
 	if st.ID != "st-1" || st.Name != "Standard" || st.IopsHint != "~1500 IOPS/TB" {
 		t.Fatalf("strings not decoded: %+v", st)
 	}
-	if st.MinSizeGb != 1 || st.MaxSizeGb != 2048 || !st.IsAvailable {
+	if st.MinSizeGib != 1 || st.MaxSizeGib != 2048 || !st.IsAvailable {
 		t.Fatalf("numeric/bool fields not decoded: %+v", st)
 	}
 	if st.Sku == nil {

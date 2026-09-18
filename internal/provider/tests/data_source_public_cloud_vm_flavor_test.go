@@ -24,7 +24,7 @@ func TestAccDataSourcePublicCloudVMFlavor(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_flavor.foo", "id"),
 					resource.TestCheckResourceAttr("data.cloudtemple_public_cloud_vm_flavor.foo", "name", os.Getenv(PublicCloudVMFlavorName)),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_flavor.foo", "vcpu"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_flavor.foo", "ram_gb"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_flavor.foo", "ram_gib"),
 				),
 			},
 			{

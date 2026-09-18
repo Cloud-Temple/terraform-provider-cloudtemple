@@ -23,8 +23,8 @@ output "vcpu_usage" {
   value = "${data.cloudtemple_public_cloud_vm_quota.current.vcpu_used}/${data.cloudtemple_public_cloud_vm_quota.current.vcpu_limit}"
 }
 
-output "storage_headroom_gb" {
-  value = data.cloudtemple_public_cloud_vm_quota.current.storage_limit_gb - data.cloudtemple_public_cloud_vm_quota.current.storage_used_gb
+output "storage_headroom_gib" {
+  value = data.cloudtemple_public_cloud_vm_quota.current.storage_limit_gib - data.cloudtemple_public_cloud_vm_quota.current.storage_used_gib
 }
 ```
 
@@ -34,10 +34,10 @@ output "storage_headroom_gb" {
 ### Read-Only
 
 - `id` (String) The ID of this resource.
-- `ram_limit_mb` (Number) The maximum amount of RAM allowed for the tenant, in MB.
-- `ram_used_mb` (Number) The amount of RAM currently consumed by the tenant, in MB.
-- `storage_limit_gb` (Number) The maximum amount of storage allowed for the tenant, in GB.
-- `storage_used_gb` (Number) The amount of storage currently consumed by the tenant, in GB.
+- `ram_limit_mib` (Number) The maximum amount of RAM allowed for the tenant, in MiB.
+- `ram_used_mib` (Number) The amount of RAM currently consumed by the tenant, in MiB.
+- `storage_limit_gib` (Number) The maximum amount of storage allowed for the tenant, in GiB.
+- `storage_used_gib` (Number) The amount of storage currently consumed by the tenant, in GiB.
 - `vcpu_limit` (Number) The maximum number of vCPUs allowed for the tenant.
 - `vcpu_used` (Number) The number of vCPUs currently consumed by the tenant.
 

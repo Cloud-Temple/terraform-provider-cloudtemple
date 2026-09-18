@@ -1,6 +1,9 @@
 package client
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 type PublicCloudVMFlavorClient struct {
 	c *Client
@@ -20,7 +23,29 @@ type PublicCloudVMFlavor struct {
 	InstanceFamilyID string
 	Name             string
 	Vcpu             int
-	RamGb            int
+	RamGib           int
+}
+
+// UnmarshalJSON accepts both the current `ramGib` spelling and the deprecated
+// `ramGb` one (see public_cloud_vm_capacity.go, issue #524).
+func (f *PublicCloudVMFlavor) UnmarshalJSON(data []byte) error {
+	type plain PublicCloudVMFlavor
+	var v struct {
+		plain
+		RamGib *int
+		RamGb  *int
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*f = PublicCloudVMFlavor(v.plain)
+
+	ram, err := resolveRenamedCapacity(v.RamGib, v.RamGb, "ramGib", "ramGb", "flavor "+quotedOrUnidentified(v.plain.ID))
+	if err != nil {
+		return err
+	}
+	f.RamGib = ram
+	return nil
 }
 
 // PublicCloudVMFlavorFilter carries the optional list filters.

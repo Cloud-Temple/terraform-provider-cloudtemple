@@ -26,7 +26,7 @@ func TestPublicCloudVMInstanceFamilyList(t *testing.T) {
 	if f.ID != "fam-1" || f.Name != "Development" || f.Description != "Development familly" {
 		t.Fatalf("strings not decoded: %+v", f)
 	}
-	if f.VcpuMin != 1 || f.VcpuMax != 16 || f.RamMinGb != 2 || f.RamMaxGb != 24 {
+	if f.VcpuMin != 1 || f.VcpuMax != 16 || f.RamMinGib != 2 || f.RamMaxGib != 24 {
 		t.Fatalf("bounds not decoded: %+v", f)
 	}
 }
@@ -40,7 +40,7 @@ func TestPublicCloudVMInstanceFamilyRead(t *testing.T) {
 				t.Errorf("unexpected path: %s", r.URL.Path)
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"fam-1","name":"Development","vcpuMin":1,"vcpuMax":16}`))
+			_, _ = w.Write([]byte(`{"id":"fam-1","name":"Development","vcpuMin":1,"vcpuMax":16,"ramMinGib":1,"ramMaxGib":64}`))
 		})
 		f, err := c.PublicCloudVM().InstanceFamily().Read(ctx, "fam-1")
 		if err != nil {

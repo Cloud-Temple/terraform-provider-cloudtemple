@@ -59,7 +59,7 @@ output "data_disk_position" {
 
 ### Required
 
-- `size` (Number) The size of the disk in GB (1-2048). Grow-only; changing it extends the disk, which requires the VM to be stopped.
+- `size` (Number) The size of the disk in GiB (1-2048). Grow-only; changing it extends the disk, which requires the VM to be stopped.
 - `virtual_machine_id` (String) The ID of the VM this data disk is attached to. Immutable.
 
 ### Optional

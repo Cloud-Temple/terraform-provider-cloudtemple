@@ -57,7 +57,7 @@ output "image" {
 - `categories` (List of String) The categories of the image.
 - `compatible_families` (List of String) The IDs of the instance families this image is compatible with.
 - `description_en` (String) The English description of the image.
-- `disk_sizes_gb` (List of Number) The disk sizes (GB) provided by the image.
+- `disk_sizes_gib` (List of Number) The disk sizes (GiB) provided by the image.
 - `editor` (String) The image editor/publisher.
 - `family` (String) The image family.
 - `icon` (String) The image icon (data URI).

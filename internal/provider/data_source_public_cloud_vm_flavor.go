@@ -48,10 +48,10 @@ func dataSourcePublicCloudVMFlavor() *schema.Resource {
 				Computed:    true,
 				Description: "The number of vCPUs of the flavor.",
 			},
-			"ram_gb": {
+			"ram_gib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The amount of RAM of the flavor, in GB.",
+				Description: "The amount of RAM of the flavor, in GiB.",
 			},
 		},
 	}

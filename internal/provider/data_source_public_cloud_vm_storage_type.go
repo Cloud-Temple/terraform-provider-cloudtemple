@@ -152,15 +152,15 @@ func dataSourcePublicCloudVMStorageType() *schema.Resource {
 				Computed:    true,
 				Description: "An indicative IOPS hint for the storage type (e.g. `~1500 IOPS/TB`).",
 			},
-			"min_size_gb": {
+			"min_size_gib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The minimum disk size (GB) allowed for this storage type.",
+				Description: "The minimum disk size (GiB) allowed for this storage type.",
 			},
-			"max_size_gb": {
+			"max_size_gib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The maximum disk size (GB) allowed for this storage type.",
+				Description: "The maximum disk size (GiB) allowed for this storage type.",
 			},
 			"is_available": {
 				Type:        schema.TypeBool,

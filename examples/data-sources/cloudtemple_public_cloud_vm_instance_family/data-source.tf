@@ -6,10 +6,10 @@ data "cloudtemple_public_cloud_vm_instance_family" "family" {
 # The family id is required to create a VM, and bounds its cpu/memory sizing.
 output "family_sizing_bounds" {
   value = {
-    vcpu_min   = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_min
-    vcpu_max   = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_max
-    ram_min_gb = data.cloudtemple_public_cloud_vm_instance_family.family.ram_min_gb
-    ram_max_gb = data.cloudtemple_public_cloud_vm_instance_family.family.ram_max_gb
+    vcpu_min    = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_min
+    vcpu_max    = data.cloudtemple_public_cloud_vm_instance_family.family.vcpu_max
+    ram_min_gib = data.cloudtemple_public_cloud_vm_instance_family.family.ram_min_gib
+    ram_max_gib = data.cloudtemple_public_cloud_vm_instance_family.family.ram_max_gib
   }
 }
 

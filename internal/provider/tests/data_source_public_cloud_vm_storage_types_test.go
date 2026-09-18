@@ -17,7 +17,7 @@ func TestAccDataSourcePublicCloudVMStorageTypes(t *testing.T) {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_storage_types.all", "storage_types.#"),
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_storage_types.all", "storage_types.0.id"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_storage_types.all", "storage_types.0.max_size_gb"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_storage_types.all", "storage_types.0.max_size_gib"),
 					// The API now returns a priced SKU on each storage type (#507).
 					// Assert presence, not the live price value (which is volatile).
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_storage_types.all", "storage_types.0.sku.0.name"),

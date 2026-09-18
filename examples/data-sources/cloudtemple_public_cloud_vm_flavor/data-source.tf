@@ -5,7 +5,7 @@ data "cloudtemple_public_cloud_vm_flavor" "medium" {
 
 output "flavor_sizing" {
   value = {
-    vcpu   = data.cloudtemple_public_cloud_vm_flavor.medium.vcpu
-    ram_gb = data.cloudtemple_public_cloud_vm_flavor.medium.ram_gb
+    vcpu    = data.cloudtemple_public_cloud_vm_flavor.medium.vcpu
+    ram_gib = data.cloudtemple_public_cloud_vm_flavor.medium.ram_gib
   }
 }

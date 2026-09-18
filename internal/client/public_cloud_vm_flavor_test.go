@@ -29,7 +29,7 @@ func TestPublicCloudVMFlavorList(t *testing.T) {
 		t.Fatalf("want 2 flavors, got %d", len(flavors))
 	}
 	f := flavors[0]
-	if f.ID != "flv-1" || f.InstanceFamilyID != "fam-1" || f.Name != "dev-micro" || f.Vcpu != 1 || f.RamGb != 2 {
+	if f.ID != "flv-1" || f.InstanceFamilyID != "fam-1" || f.Name != "dev-micro" || f.Vcpu != 1 || f.RamGib != 2 {
 		t.Fatalf("flavor not decoded from wrapped response: %+v", f)
 	}
 }

@@ -23,10 +23,10 @@ func TestPublicCloudVMQuotaRead(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Read: %v", err)
 		}
-		if q.VcpuLimit != 100 || q.RamLimitMb != 204800 || q.StorageLimitGb != 500 {
+		if q.VcpuLimit != 100 || q.RamLimitMib != 204800 || q.StorageLimitGib != 500 {
 			t.Fatalf("limits not decoded: %+v", q)
 		}
-		if q.VcpuUsed != 7 || q.RamUsedMb != 10240 || q.StorageUsedGb != 148 {
+		if q.VcpuUsed != 7 || q.RamUsedMib != 10240 || q.StorageUsedGib != 148 {
 			t.Fatalf("usage not decoded: %+v", q)
 		}
 	})
