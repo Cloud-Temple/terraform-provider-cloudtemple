@@ -46,8 +46,10 @@ func TestRejectInlineAdapterIPAlreadyRegistered(t *testing.T) {
 		conflicts   map[string]*client.StaticIP
 		failOn      string
 		owner       string
+		ownerMACs   []string
 		wantRefused bool
 		wantIn      []string
+		wantNotIn   []string
 	}{
 		{
 			name:       "a free address passes",
@@ -78,7 +80,43 @@ func TestRejectInlineAdapterIPAlreadyRegistered(t *testing.T) {
 			owner: ownerVM,
 		},
 		{
-			name:       "on a CREATE (no owner) even a same-address registration is a conflict",
+			// The Compute surfaces register by MAC and the platform does not always
+			// link the machine (client fixtures: `virtualMachine: null` on xoa/vmware
+			// rows). The VM's own adapter MAC is positive proof of ownership.
+			name:       "an address held by one of THIS resource's own MACs, with NO machine link, passes (Compute update)",
+			configured: map[int]string{0: "10.0.5.103"},
+			networkAt:  map[int]string{0: "net-a"},
+			conflicts: map[string]*client.StaticIP{
+				"net-a|10.0.5.103": holder("10.0.5.103", "", "xoa", "AA:BB:CC:DD:EE:FF", false),
+			},
+			owner:     ownerVM,
+			ownerMACs: []string{"11:22:33:44:55:66", "aa:bb:cc:dd:ee:ff"}, // case-insensitive
+		},
+		{
+			name:       "an address held by a FOREIGN MAC, with no machine link, is refused on an update",
+			configured: map[int]string{0: "10.0.5.103"},
+			networkAt:  map[int]string{0: "net-a"},
+			conflicts: map[string]*client.StaticIP{
+				"net-a|10.0.5.103": holder("10.0.5.103", "", "xoa", "de:ad:be:ef:00:01", false),
+			},
+			owner:       ownerVM,
+			ownerMACs:   []string{"aa:bb:cc:dd:ee:ff"},
+			wantRefused: true,
+			wantIn:      []string{"ALREADY registered", "de:ad:be:ef:00:01"},
+		},
+		{
+			name:       "a registration with NEITHER machine link NOR MAC is not proven ours: refused",
+			configured: map[int]string{0: "10.0.5.103"},
+			networkAt:  map[int]string{0: "net-a"},
+			conflicts: map[string]*client.StaticIP{
+				"net-a|10.0.5.103": holder("10.0.5.103", "", "xoa", "", false),
+			},
+			owner:       ownerVM,
+			ownerMACs:   []string{"aa:bb:cc:dd:ee:ff", ""},
+			wantRefused: true,
+		},
+		{
+			name:       "on a CREATE (no owner) even a same-address registration is a conflict, with the replacement hint",
 			configured: map[int]string{0: "10.0.5.103"},
 			networkAt:  map[int]string{0: "net-a"},
 			conflicts: map[string]*client.StaticIP{
@@ -86,6 +124,22 @@ func TestRejectInlineAdapterIPAlreadyRegistered(t *testing.T) {
 			},
 			owner:       "",
 			wantRefused: true,
+			// A create is also how a replacement recreates the VM, and the address may
+			// then be held by the machine being replaced: the refusal must say what to
+			// do in that case (#533), for both lifecycle orderings.
+			wantIn: []string{"ALREADY registered", "destroy-before-create", "retry once the registration has disappeared", "create_before_destroy"},
+		},
+		{
+			name:       "on an UPDATE (owner known) a foreign holder is refused WITHOUT the replacement hint",
+			configured: map[int]string{0: "10.0.5.103"},
+			networkAt:  map[int]string{0: "net-a"},
+			conflicts: map[string]*client.StaticIP{
+				"net-a|10.0.5.103": holder("10.0.5.103", "someone-else", "xoa", "", false),
+			},
+			owner:       ownerVM,
+			wantRefused: true,
+			wantIn:      []string{"ALREADY registered", "someone-else"},
+			wantNotIn:   []string{"create_before_destroy"},
 		},
 		{
 			name:        "a read failure REFUSES (fail closed): unreadable must never mean free",
@@ -118,7 +172,7 @@ func TestRejectInlineAdapterIPAlreadyRegistered(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			networkIDAt := func(i int) string { return tc.networkAt[i] }
 			diags := rejectInlineAdapterIPAlreadyRegistered(ctx, tc.configured, networkIDAt,
-				checker(tc.conflicts, tc.failOn), tc.owner)
+				checker(tc.conflicts, tc.failOn), tc.owner, tc.ownerMACs)
 			if tc.wantRefused && !diags.HasError() {
 				t.Fatalf("expected a refusal, got none — a request the platform would silently decline would go through")
 			}
@@ -134,12 +188,17 @@ func TestRejectInlineAdapterIPAlreadyRegistered(t *testing.T) {
 					t.Fatalf("diagnostic is missing %q, which the user needs to act on it.\ngot: %s", want, got)
 				}
 			}
+			for _, unwanted := range tc.wantNotIn {
+				if strings.Contains(got, unwanted) {
+					t.Fatalf("diagnostic must not contain %q here.\ngot: %s", unwanted, got)
+				}
+			}
 		})
 	}
 
 	t.Run("a nil checker is a no-op, not a panic", func(t *testing.T) {
 		if diags := rejectInlineAdapterIPAlreadyRegistered(ctx, map[int]string{0: "10.0.5.1"},
-			func(int) string { return "net-a" }, nil, ""); diags != nil {
+			func(int) string { return "net-a" }, nil, "", nil); diags != nil {
 			t.Fatalf("expected no diagnostics with a nil checker, got %v", diags)
 		}
 	})
