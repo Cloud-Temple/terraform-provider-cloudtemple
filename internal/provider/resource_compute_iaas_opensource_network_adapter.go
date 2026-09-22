@@ -213,6 +213,69 @@ func openIaasNetworkAdapterCreate(ctx context.Context, d *schema.ResourceData, m
 	return openIaasNetworkAdapterUpdate(ctx, d, meta)
 }
 
+// resolveOpenIaaSAdapterAttached decides the `attached` value to write to state,
+// guarding against the power-off drift (#537). Same class as #350 on the virtual
+// disk, transposed to the VIF.
+//
+// `attached` maps to the VIF PLUG state (connect/disconnect, a RUNTIME fact), not
+// to a stored intent. On a halted/paused VM the platform reports every VIF
+// unplugged, and plugs them back on boot — so mirroring the runtime there would
+// contradict the schema's `Default: true` intent and produce a perpetual
+// `attached: false -> true` drift whose apply the platform then refuses ("VM
+// state is halted but should be running"). So:
+//   - VM running    -> mirror the runtime: a genuine unplug is visible as drift;
+//   - VM off/paused -> preserve the known intent (priorAttached);
+//   - power unknown -> fail closed (cannot decide).
+func resolveOpenIaaSAdapterAttached(runtimeAttached, priorAttached bool, adapterID, vmID, powerState string) (bool, error) {
+	switch normalizeOpenIaaSPowerState(powerState) {
+	case "on":
+		return runtimeAttached, nil
+	case "off":
+		return priorAttached, nil
+	default:
+		return false, fmt.Errorf(
+			"virtual machine %s (owning network adapter %s) has an unknown power state %q; refusing to decide the adapter attachment state on ambiguous evidence",
+			vmID, adapterID, powerState,
+		)
+	}
+}
+
+// openIaasAttachRequiresRunningVM reports why an explicit attach cannot be
+// honoured against this power state, or nil when it can be attempted. Plugging a
+// VIF is a runtime operation: the platform rejects it on a halted VM with an
+// activity failure that carries no actionable text for the user (#537).
+func openIaasAttachRequiresRunningVM(adapterID, vmID, powerState string) error {
+	switch normalizeOpenIaaSPowerState(powerState) {
+	case "on":
+		return nil
+	case "off":
+		return fmt.Errorf(
+			"network adapter %s cannot be attached while virtual machine %s is powered off (power state %q): plugging a network adapter is a runtime operation and the platform refuses it on a halted virtual machine. Start the virtual machine to attach it, or set `attached = false` — an adapter is plugged in automatically when the virtual machine boots",
+			adapterID, vmID, powerState,
+		)
+	default:
+		return fmt.Errorf(
+			"virtual machine %s (owning network adapter %s) has an unknown power state %q; refusing to attach the adapter on ambiguous evidence",
+			vmID, adapterID, powerState,
+		)
+	}
+}
+
+// openIaasAdapterVMPowerState reads the owning VM's power state, failing closed
+// when it cannot be established: a nil read (since #384 a definitive 404; a
+// genuine 403 surfaces as an access-denied error) leaves us unable to tell a
+// halted VM from a running one.
+func openIaasAdapterVMPowerState(ctx context.Context, c *client.Client, vmID, adapterID string) (string, error) {
+	vm, err := c.Compute().OpenIaaS().VirtualMachine().Read(ctx, vmID)
+	if err != nil {
+		return "", fmt.Errorf("failed to read virtual machine %s to resolve network adapter %s attachment state: %s", vmID, adapterID, err)
+	}
+	if vm == nil {
+		return "", fmt.Errorf("virtual machine %s (owning network adapter %s) could not be read; refusing to resolve the adapter attachment state on ambiguous evidence", vmID, adapterID)
+	}
+	return vm.PowerState, nil
+}
+
 func openIaasNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, meta interface{}) diag.Diagnostics {
 	c := getClient(meta)
 	var diags diag.Diagnostics
@@ -262,6 +325,26 @@ func openIaasNetworkAdapterRead(ctx context.Context, d *schema.ResourceData, met
 
 	// Mapper les données en utilisant la fonction helper
 	adapterData := helpers.FlattenOpenIaaSNetworkAdapter(networkAdapter)
+
+	// #537: the flatten copies `attached` from the runtime VIF plug state, which
+	// the platform reports false for EVERY VIF of a halted VM — not the user's
+	// intent (the VIF is plugged back on boot). Override it with a
+	// power-state-aware decision so adding an adapter to a stopped VM never
+	// produces a perpetual `attached: false -> true` drift whose apply the
+	// platform then refuses. Done HERE (not in the pure flatten helper) because it
+	// needs the VM power state and the prior intent. The owning VM is taken from
+	// the adapter itself, so an id-only import resolves it too.
+	if vmID := networkAdapter.VirtualMachineID; vmID != "" {
+		powerState, psErr := openIaasAdapterVMPowerState(ctx, c, vmID, d.Id())
+		if psErr != nil {
+			return diag.FromErr(psErr)
+		}
+		attached, resErr := resolveOpenIaaSAdapterAttached(networkAdapter.Attached, d.Get("attached").(bool), d.Id(), vmID, powerState)
+		if resErr != nil {
+			return diag.FromErr(resErr)
+		}
+		adapterData["attached"] = attached
+	}
 
 	// Définir les données dans le state
 	for k, v := range adapterData {
@@ -432,6 +515,19 @@ func openIaasNetworkAdapterUpdate(ctx context.Context, d *schema.ResourceData, m
 	if d.HasChange("attached") && !d.IsNewResource() {
 		switch d.Get("attached").(bool) {
 		case true:
+			// #537: plugging a VIF is a runtime operation. Against a halted VM the
+			// platform fails the activity with "VM state is halted but should be
+			// running", which reached the user as a bare activity UUID. Check the
+			// power state first and explain what to do instead.
+			if vmID := d.Get("virtual_machine_id").(string); vmID != "" {
+				powerState, psErr := openIaasAdapterVMPowerState(ctx, c, vmID, d.Id())
+				if psErr != nil {
+					return diag.FromErr(psErr)
+				}
+				if attachErr := openIaasAttachRequiresRunningVM(d.Id(), vmID, powerState); attachErr != nil {
+					return diag.FromErr(attachErr)
+				}
+			}
 			activityId, err := c.Compute().OpenIaaS().NetworkAdapter().Connect(ctx, d.Id())
 			if err != nil {
 				return diag.Errorf("the network adapter could not be attached: %s", err)
