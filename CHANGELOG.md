@@ -1,5 +1,11 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.13.0 (Unreleased)
+
+BUG FIXES :
+
+  * `cloudtemple_compute_iaas_opensource_network_adapter`: adding a network adapter to a **powered-off** virtual machine no longer leaves the configuration permanently non-convergent. `attached` is an intent (it defaults to `true`), but it was read back from the adapter's runtime plug state, and the platform reports every adapter of a halted virtual machine as unplugged — it plugs them back when the machine boots. Every subsequent plan therefore proposed `attached = false -> true`, and applying it issued a `connect` that the platform refused (`VM state is halted but should be running`), surfaced to the user as a bare activity identifier: the apply could never converge, and nothing in the error said why. `attached` is now resolved against the owning virtual machine's power state — the runtime value is mirrored while the machine runs, so a genuine unplug is still reported as drift, and the known intent is preserved while it is halted or paused — and an unreadable machine or an unrecognised power state fails closed rather than guessing. Requesting an attachment on a halted machine is now also refused up front with a diagnostic that says what to do, instead of being sent and failing opaquely. This mirrors the fix already applied to `cloudtemple_compute_iaas_opensource_virtual_disk`'s `connected` (#350); the declared schema is unchanged, so no state migration is needed (#537).
+
 # 1.12.1 (September 18th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
