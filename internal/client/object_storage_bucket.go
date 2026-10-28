@@ -96,10 +96,31 @@ func (c *BucketClient) Read(ctx context.Context, name string) (*Bucket, error) {
 	return &out, nil
 }
 
+// IPWhiteListEntry is one entry of the `ipWhiteList` field of the bucket
+// routes. It carries no description on purpose: the API reads an absent
+// description as "no opinion" and keeps the one already stored (for example
+// set from the console), whereas an empty string would clear it.
+type IPWhiteListEntry struct {
+	Cidr string `json:"cidr"`
+}
+
+// NewIPWhiteList maps a list of CIDRs to `ipWhiteList` entries. The deprecated
+// `whitelist` field (a bare list of CIDRs) is being removed from the API.
+func NewIPWhiteList(cidrs []string) []IPWhiteListEntry {
+	if len(cidrs) == 0 {
+		return nil
+	}
+	entries := make([]IPWhiteListEntry, len(cidrs))
+	for i, cidr := range cidrs {
+		entries[i] = IPWhiteListEntry{Cidr: cidr}
+	}
+	return entries
+}
+
 type CreateBucketRequest struct {
-	Name       string   `json:"name"`
-	AccessType string   `json:"accessType"`
-	Whitelist  []string `json:"whitelist,omitempty"`
+	Name        string             `json:"name"`
+	AccessType  string             `json:"accessType"`
+	IPWhiteList []IPWhiteListEntry `json:"ipWhiteList,omitempty"`
 }
 
 func (c *BucketClient) Create(ctx context.Context, req *CreateBucketRequest) (string, error) {
@@ -114,8 +135,8 @@ func (c *BucketClient) Delete(ctx context.Context, name string) (string, error) 
 }
 
 type UpdateWhitelistRequest struct {
-	AccessType string   `json:"accessType"`
-	Whitelist  []string `json:"whitelist,omitempty"`
+	AccessType  string             `json:"accessType"`
+	IPWhiteList []IPWhiteListEntry `json:"ipWhiteList,omitempty"`
 }
 
 func (c *BucketClient) UpdateWhitelist(ctx context.Context, name string, req *UpdateWhitelistRequest) (string, error) {

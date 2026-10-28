@@ -1,5 +1,11 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.13.0 (Unreleased)
+
+BUG FIXES :
+
+  * `cloudtemple_object_storage_bucket`: the bucket `whitelist` is now sent to the Object Storage API in the `ipWhiteList` field (`[{ "cidr": "…" }]`) instead of the `whitelist` field, which the API deprecated on May 25th, 2026 (end of support August 25th, 2026) and will remove in an upcoming release. Without this change, creating a `custom` bucket or updating the whitelist of an existing one fails once the field is removed. The Terraform schema is **unchanged**: `whitelist` is still a list of CIDRs, so no configuration change is required, **no state migration is performed or needed**, and the upgrade is not expected to produce a diff. As before, the configured list is the bucket's **whole** whitelist: a range added from the console and not declared in Terraform is removed at the next whitelist update, exactly as the `whitelist` field already removed it from the bucket's access policy. The provider sends no `description`, so the description of a range declared in Terraform and labelled from the console is kept (#545).
+
 # 1.12.1 (September 18th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 
