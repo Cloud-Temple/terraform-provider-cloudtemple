@@ -69,6 +69,18 @@ func dataSourceOpenIaasReplicationPolicies() *schema.Resource {
 								},
 							},
 						},
+						// 32-bit safety (#543): `start` and `end` carry Unix timestamps in
+						// MILLISECONDS, which overflow a 32-bit int. They are declared TypeFloat, NOT
+						// TypeInt, because the SDK's TypeInt writer decodes into a native `int`
+						// (helper/schema/field_writer_map.go: `var n int; mapstructure.Decode(v, &n)`)
+						// and mapstructure truncates instead of range-checking, so on the 386/arm
+						// builds a timestamp would be written to the state silently wrong (measured:
+						// 1759830000000 -> -1106591360). TypeFloat decodes into a float64 on every
+						// platform, and both TypeInt and TypeFloat map to the SAME cty.Number at the
+						// protocol level (helper/schema/core_schema.go), so the published contract is
+						// unchanged and no state migration is needed. The millisecond precision of the
+						// stored value is guaranteed up to 2^53 ms and enforced before the write by
+						// helpers.ValidateOpenIaaSReplicationPolicyLastRun.
 						"last_run": {
 							Type:        schema.TypeList,
 							Computed:    true,
@@ -76,12 +88,12 @@ func dataSourceOpenIaasReplicationPolicies() *schema.Resource {
 							Elem: &schema.Resource{
 								Schema: map[string]*schema.Schema{
 									"start": {
-										Type:        schema.TypeInt,
+										Type:        schema.TypeFloat,
 										Computed:    true,
 										Description: "The start timestamp of the last replication run.",
 									},
 									"end": {
-										Type:        schema.TypeInt,
+										Type:        schema.TypeFloat,
 										Computed:    true,
 										Description: "The end timestamp of the last replication run.",
 									},
@@ -107,6 +119,18 @@ func computeOpenIaaSReplicationPoliciesRead(ctx context.Context, d *schema.Resou
 	policies, err := c.Compute().OpenIaaS().Replication().Policy().List(ctx)
 	if err != nil {
 		return diag.FromErr(err)
+	}
+
+	// Refuse a timestamp the state cannot hold exactly BEFORE anything is
+	// written, so a refused read leaves the data source untouched (#543). The
+	// whole listing is refused rather than the offending policy: silently
+	// dropping it would shrink the listing with no evidence the policy is gone,
+	// and keeping it would record a rounded timestamp — both are exactly what
+	// the state-safety doctrine forbids.
+	for _, policy := range policies {
+		if err := helpers.ValidateOpenIaaSReplicationPolicyLastRun(policy); err != nil {
+			return diag.FromErr(err)
+		}
 	}
 
 	d.SetId("openiaas_replication_policies")

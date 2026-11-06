@@ -174,12 +174,12 @@
           "elem_kind": "resource",
           "elem_resource": {
             "end": {
-              "type": "TypeInt",
+              "type": "TypeFloat",
               "optional": true,
               "elem_kind": "nil"
             },
             "start": {
-              "type": "TypeInt",
+              "type": "TypeFloat",
               "optional": true,
               "elem_kind": "nil"
             },
@@ -6347,12 +6347,12 @@
               "elem_kind": "resource",
               "elem_resource": {
                 "end": {
-                  "type": "TypeInt",
+                  "type": "TypeFloat",
                   "computed": true,
                   "elem_kind": "nil"
                 },
                 "start": {
-                  "type": "TypeInt",
+                  "type": "TypeFloat",
                   "computed": true,
                   "elem_kind": "nil"
                 },
@@ -6418,12 +6418,12 @@
           "elem_kind": "resource",
           "elem_resource": {
             "end": {
-              "type": "TypeInt",
+              "type": "TypeFloat",
               "computed": true,
               "elem_kind": "nil"
             },
             "start": {
-              "type": "TypeInt",
+              "type": "TypeFloat",
               "computed": true,
               "elem_kind": "nil"
             },

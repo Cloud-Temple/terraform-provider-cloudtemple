@@ -1,5 +1,11 @@
 ***Warning: Using "Release Candidate" versions (-rc.X) in a **production environment** is **strongly discouraged**, as they may contain unresolved bugs and pose risks to the stability and security of your systems.***
 
+# 1.13.0 (Unreleased)
+
+BUG FIXES :
+
+  * `cloudtemple_compute_iaas_opensource_replication_policy` (resource and both data sources), `cloudtemple_compute_iaas_opensource_virtual_machine`: the **32-bit builds** (`386` and `arm`) no longer fail to read an Open IaaS replication policy. The Compute API returns `lastRun.start` and `lastRun.end` as Unix timestamps in **milliseconds**, which do not fit a 32-bit integer, and the provider decoded them into a platform-sized integer — so on those artifacts the read was refused outright (`json: cannot unmarshal number 1759830000000 into Go struct field ... of type int`). The failure was not confined to the replication surfaces: the Open IaaS virtual machine resource resolves its replication policy on **every** read, so on a 32-bit build `plan` and `refresh` failed for every Open IaaS virtual machine whose replication policy carried such a timestamp. The field had been absent from API responses for a while and is being restored, which is what brings the defect into reach. Builds for 64-bit platforms (`amd64`, `arm64`) were never affected. The timestamps are now decoded as 64-bit integers, and the `last_run.start` / `last_run.end` attributes are stored as a 64-bit float instead of a platform-sized integer — which, on the same builds, would have written a silently wrong value (a truncated, negative timestamp) into the state rather than failing. The **published type of both attributes is unchanged**: they were, and remain, Terraform numbers, so no configuration change is required, **no state migration is performed or needed**, and the upgrade is not expected to produce a diff. Outside the range in which a 64-bit float keeps every millisecond (±2^53 milliseconds, i.e. beyond year 287396 — unreachable for a real replication run), the read is now refused with an explicit diagnostic naming the policy, the attribute and the value, instead of recording a timestamp whose exactness cannot be guaranteed (#543).
+
 # 1.12.1 (September 18th, 2026)
 <img id="latest" src="https://badgen.net/badge/channel/latest/yellow" alt="Channel: latest" />
 

@@ -72,6 +72,18 @@ func resourceOpenIaasReplicationPolicy() *schema.Resource {
 				Description: "The ID of the machine manager associated with the replication policy.",
 				Computed:    true,
 			},
+			// 32-bit safety (#543): `start` and `end` carry Unix timestamps in
+			// MILLISECONDS, which overflow a 32-bit int. They are declared TypeFloat, NOT
+			// TypeInt, because the SDK's TypeInt writer decodes into a native `int`
+			// (helper/schema/field_writer_map.go: `var n int; mapstructure.Decode(v, &n)`)
+			// and mapstructure truncates instead of range-checking, so on the 386/arm
+			// builds a timestamp would be written to the state silently wrong (measured:
+			// 1759830000000 -> -1106591360). TypeFloat decodes into a float64 on every
+			// platform, and both TypeInt and TypeFloat map to the SAME cty.Number at the
+			// protocol level (helper/schema/core_schema.go), so the published contract is
+			// unchanged and no state migration is needed. The millisecond precision of the
+			// stored value is guaranteed up to 2^53 ms and enforced before the write by
+			// helpers.ValidateOpenIaaSReplicationPolicyLastRun.
 			"last_run": {
 				Type:        schema.TypeList,
 				Description: "The timestamp of the last run of the replication policy.",
@@ -79,12 +91,12 @@ func resourceOpenIaasReplicationPolicy() *schema.Resource {
 				Elem: &schema.Resource{
 					Schema: map[string]*schema.Schema{
 						"start": {
-							Type:        schema.TypeInt,
+							Type:        schema.TypeFloat,
 							Description: "The start time of the last run as a timestamp.",
 							Optional:    true,
 						},
 						"end": {
-							Type:        schema.TypeInt,
+							Type:        schema.TypeFloat,
 							Description: "The end time of the last run as a timestamp.",
 							Optional:    true,
 						},
@@ -151,6 +163,12 @@ func openIaasReplicationPolicyRead(ctx context.Context, d *schema.ResourceData, 
 		}
 		d.SetId("")
 		return nil
+	}
+
+	// Refuse a timestamp the state cannot hold exactly before writing anything
+	// (#543). A read error is not a deletion: the id is left untouched.
+	if err := helpers.ValidateOpenIaaSReplicationPolicyLastRun(replicationPolicy); err != nil {
+		return diag.FromErr(err)
 	}
 
 	policyData := helpers.FlattenOpenIaaSReplicationPolicy(replicationPolicy)
