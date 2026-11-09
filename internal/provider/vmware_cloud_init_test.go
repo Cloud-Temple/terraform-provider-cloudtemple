@@ -386,7 +386,7 @@ func TestVMwareCloudInitApplyAddRemoveAndPartialBatch(t *testing.T) {
 	for _, mode := range []string{"add", "remove", "partial-batch", "unchanged"} {
 		t.Run(mode, func(t *testing.T) {
 			r := resourceVirtualMachine()
-			state, cfg := cloudInitStateConfig()
+			state, _ := cloudInitStateConfig()
 			delete(state.Attributes, "cloud_init.user-data")
 			state.Attributes["cloud_init.hostname"] = "before"
 			desired := map[string]interface{}{}
@@ -398,7 +398,7 @@ func TestVMwareCloudInitApplyAddRemoveAndPartialBatch(t *testing.T) {
 			case "unchanged":
 				desired = map[string]interface{}{"hostname": "before"}
 			}
-			cfg = terraform.NewResourceConfigRaw(map[string]interface{}{"name": "investigation", "datacenter_id": "dc", "host_cluster_id": "hc", "guest_operating_system_moref": "ubuntu64Guest", "memory": 2147483648, "cpu": 2, "num_cores_per_socket": 1, "power_state": "off", "cloud_init": desired})
+			cfg := terraform.NewResourceConfigRaw(map[string]interface{}{"name": "investigation", "datacenter_id": "dc", "host_cluster_id": "hc", "guest_operating_system_moref": "ubuntu64Guest", "memory": 2147483648, "cpu": 2, "num_cores_per_socket": 1, "power_state": "off", "cloud_init": desired})
 			sentinel := map[string]interface{}{"key": float64(9000), "id": "unmanaged", "value": true, "type": "boolean", "custom": map[string]interface{}{"keep": true}}
 			props := []map[string]interface{}{{"key": float64(7000), "id": "hostname", "value": "before", "label": "User data", "type": "string", "userConfigurable": float64(1)}, sentinel}
 			writes := []string{}
