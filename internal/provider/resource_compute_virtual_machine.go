@@ -1811,6 +1811,10 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 		return diag.Errorf("internal error: updateVirtualMachine called without a virtual machine id")
 	}
 
+	if !customizing && d.HasChange("cloud_init") {
+		return updateVMwareCloudInit(ctx, d, c)
+	}
+
 	// The same ip_address preconditions the create enforces must hold on UPDATE, or
 	// they are trivially bypassed by adding the argument to an existing adapter. This
 	// runs before ANY mutation and, on refusal, leaves the previous state untouched —
