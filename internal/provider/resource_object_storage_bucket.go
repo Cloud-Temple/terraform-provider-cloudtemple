@@ -164,9 +164,9 @@ func objectStorageBucketCreate(ctx context.Context, d *schema.ResourceData, meta
 	}
 
 	activityId, err := c.ObjectStorage().Bucket().Create(ctx, &client.CreateBucketRequest{
-		Name:       d.Get("name").(string),
-		AccessType: d.Get("access_type").(string),
-		Whitelist:  whitelist,
+		Name:        d.Get("name").(string),
+		AccessType:  d.Get("access_type").(string),
+		IPWhiteList: client.NewIPWhiteList(whitelist),
 	})
 	if err != nil {
 		return diag.Errorf("failed to create bucket: %s", err)
@@ -293,8 +293,8 @@ func objectStorageBucketUpdate(ctx context.Context, d *schema.ResourceData, meta
 		}
 
 		activityId, err := c.ObjectStorage().Bucket().UpdateWhitelist(ctx, d.Get("name").(string), &client.UpdateWhitelistRequest{
-			AccessType: d.Get("access_type").(string),
-			Whitelist:  whitelist,
+			AccessType:  d.Get("access_type").(string),
+			IPWhiteList: client.NewIPWhiteList(whitelist),
 		})
 		if err != nil {
 			return diag.Errorf("failed to update bucket whitelist: %s", err)
