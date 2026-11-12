@@ -28,7 +28,7 @@ func resourceVirtualMachine() *schema.Resource {
   - by deploying a content library item with ` + "`content_library_id` and `content_library_item_id`",
 
 		CreateWithoutTimeout: computeVirtualMachineCreate,
-		ReadContext:          computeVirtualMachineRead,
+		ReadContext:          computeVirtualMachineReadRefresh,
 		UpdateContext:        computeVirtualMachineUpdate,
 		DeleteContext:        computeVirtualMachineDelete,
 
@@ -384,7 +384,7 @@ func resourceVirtualMachine() *schema.Resource {
 				Type:        schema.TypeBool,
 				Optional:    true,
 				Default:     false,
-				Description: "Allow the provider to power-cycle the virtual machine when a change requires it — e.g. changing `memory`, `cpu` or `num_cores_per_socket`, or toggling `memory_hot_add_enabled` / `cpu_hot_add_enabled`, while the VM is powered on and the change cannot be applied hot. When false (the default), such a change is refused at plan time instead of restarting the VM.",
+				Description: "Allow the provider to power-cycle the virtual machine when a change requires it — changing `memory`, `cpu` or `num_cores_per_socket`, or toggling `memory_hot_add_enabled` / `cpu_hot_add_enabled`, while the VM is powered on and the change cannot be applied hot; or changing `cloud_init`, which is always applied to a stopped machine. When false (the default), such a change is refused at plan time instead of restarting the VM. It is not needed when `power_state = \"off\"` is applied at the same time, nor to start a machine that is already stopped. For `cloud_init` it authorises the power cycle only: see the cloud-init update guide for what a restart does and does not apply inside the guest.",
 			},
 			"tags": {
 				Type:        schema.TypeMap,
@@ -970,6 +970,67 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 					return fmt.Errorf("changing memory, cpu or num_cores_per_socket (or toggling memory_hot_add_enabled / cpu_hot_add_enabled) on a powered-on virtual machine that does not support the change while running requires a restart; set `allow_vm_restart = true` to let the provider power-cycle it, or set `power_state = \"off\"`")
 				}
 				return nil
+			},
+			// #549: refuse at plan time a cloud_init change that would require
+			// powering a running virtual machine off, unless allow_vm_restart is
+			// set or the machine is being powered off anyway. The prior state is
+			// the proxy for the live machine; the apply re-decides against the
+			// real one. Fails OPEN on anything unknown, so a legitimate plan is
+			// never blocked by a value Terraform has not resolved yet.
+			func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
+				if d.Id() == "" {
+					return nil // create: cloud_init is carried by the deploy itself
+				}
+				if !d.HasChange("cloud_init") {
+					return nil
+				}
+				// A ForceNew change asks for a REPLACEMENT, and this in-place
+				// restart policy has nothing to say about one: the new machine
+				// receives cloud_init through its own deployment. CustomizeDiff
+				// runs with the EXISTING id, before the SDK resolves the
+				// replacement, so the empty-id check above cannot recognise this
+				// on its own — without this, changing cloud_init alongside a
+				// ForceNew attribute would demand a restart opt-in for a machine
+				// that is about to be replaced rather than restarted.
+				for name, sch := range resourceVirtualMachine().Schema {
+					if sch.ForceNew && (sch.Optional || sch.Required) && d.HasChange(name) {
+						return nil
+					}
+				}
+				// Fail OPEN on anything Terraform has not resolved yet. Two
+				// sources are needed and neither subsumes the other:
+				// NewValueKnown works on the legacy diff path, where the raw
+				// configuration is absent but unknown sentinels still exist; the
+				// raw configuration catches an unknown ELEMENT inside the
+				// cloud_init map, which an attribute-level check cannot see.
+				attrs := []string{"cloud_init", "power_state", "allow_vm_restart"}
+				// "cloud_init.%" is checked as well, and not as belt and braces:
+				// the SDK's map diff reader does not propagate Computed up to the
+				// map itself, so an unknown map reports as known at "cloud_init"
+				// while its element-count key does not.
+				for _, attr := range append([]string{"cloud_init.%"}, attrs...) {
+					if !d.NewValueKnown(attr) {
+						return nil
+					}
+				}
+				if raw := d.GetRawConfig(); !raw.IsNull() {
+					if !raw.IsKnown() {
+						return nil // the configuration object as a whole is unknown
+					}
+					for _, attr := range attrs {
+						if !raw.GetAttr(attr).IsWhollyKnown() {
+							return nil
+						}
+					}
+				}
+				if d.Get("allow_vm_restart").(bool) {
+					return nil // the operator authorised the power cycle
+				}
+				oldPS, newPS := d.GetChange("power_state")
+				if oldPS.(string) != "on" || newPS.(string) == "off" {
+					return nil // not running, or being powered off anyway
+				}
+				return fmt.Errorf("%s", cloudInitStoppedOnly)
 			},
 		),
 	}
@@ -1809,6 +1870,10 @@ func updateVirtualMachine(ctx context.Context, d *schema.ResourceData, meta any,
 
 	if d.Id() == "" {
 		return diag.Errorf("internal error: updateVirtualMachine called without a virtual machine id")
+	}
+
+	if !customizing && d.HasChange("cloud_init") {
+		return updateVMwareCloudInit(ctx, d, c)
 	}
 
 	// The same ip_address preconditions the create enforces must hold on UPDATE, or

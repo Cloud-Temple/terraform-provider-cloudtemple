@@ -361,7 +361,7 @@ resource "cloudtemple_compute_virtual_machine" "foo" {
 
 ### Optional
 
-- `allow_vm_restart` (Boolean) Allow the provider to power-cycle the virtual machine when a change requires it — e.g. changing `memory`, `cpu` or `num_cores_per_socket`, or toggling `memory_hot_add_enabled` / `cpu_hot_add_enabled`, while the VM is powered on and the change cannot be applied hot. When false (the default), such a change is refused at plan time instead of restarting the VM.
+- `allow_vm_restart` (Boolean) Allow the provider to power-cycle the virtual machine when a change requires it — changing `memory`, `cpu` or `num_cores_per_socket`, or toggling `memory_hot_add_enabled` / `cpu_hot_add_enabled`, while the VM is powered on and the change cannot be applied hot; or changing `cloud_init`, which is always applied to a stopped machine. When false (the default), such a change is refused at plan time instead of restarting the VM. It is not needed when `power_state = "off"` is applied at the same time, nor to start a machine that is already stopped. For `cloud_init` it authorises the power cycle only: see the cloud-init update guide for what a restart does and does not apply inside the guest.
 - `backup_sla_policies` (Set of String) The IDs of the SLA policies to assign to the virtual machine.
 - `boot_options` (Block List, Max: 1) (see [below for nested schema](#nestedblock--boot_options))
 - `clone_virtual_machine_id` (String) The ID of the virtual machine to clone. Conflict with `content_library_item_id`, `marketplace_item_id` and `guest_operating_system_moref`.
