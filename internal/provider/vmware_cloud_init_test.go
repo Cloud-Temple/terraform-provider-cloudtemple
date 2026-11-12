@@ -554,6 +554,8 @@ type cloudInitPowerFake struct {
 	modSettle bool   // another writer edits a descriptor before settlement
 	dupAfter  bool   // another writer adds a duplicate id after the shutdown
 	oddRestor bool   // the machine turns transitional before compensation
+	failGetNo int    // 403 the Nth GET on the virtual machine endpoint (1-based)
+	gets      int    // GETs taken on the virtual machine endpoint
 	reads     int    // VM reads taken since the last vApp write
 	postOff   int    // reads taken since the shutdown
 	secretLoc bool   // return an activity id carrying the secret marker
@@ -564,6 +566,11 @@ func (f *cloudInitPowerFake) handler(w http.ResponseWriter, q *http.Request) {
 	afterShutdown := len(f.actions) == 1 && f.actions[0] == "power:off"
 	switch {
 	case q.Method == "GET" && q.URL.Path == "/compute/v1/vcenters/virtual_machines/vm-investigation":
+		f.gets++
+		if f.failGetNo == f.gets {
+			w.WriteHeader(403)
+			return
+		}
 		if f.failRead && afterShutdown {
 			f.failRead = false
 			w.WriteHeader(403)
@@ -1123,6 +1130,144 @@ func TestVMwareCloudInitPlanGuardUnknowns(t *testing.T) {
 				t.Fatalf("expected the cloud_init power refusal, got: %v", err)
 			case !tc.refuse && err != nil:
 				t.Fatalf("the guard must fail open here, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestVMwareCloudInitRefreshResyncsTrackedKeys pins the refresh contract.
+//
+// Before this, `cloud_init` was a write-only record of the last applied intent:
+// an out-of-band change to a managed key was invisible for ever, which is not
+// what Terraform state means. It now resynchronises — but only over the keys it
+// already tracks. The non-adoption case below is the one that matters most: a
+// machine's vApp carries properties from its image, from deploy_options and
+// from the platform, and pulling those into state would make the next plan
+// propose to delete values the operator never declared.
+func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
+	prop := func(key float64, id, value string) map[string]interface{} {
+		return map[string]interface{}{"key": key, "id": id, "value": value,
+			"label": id, "type": "string", "userConfigurable": float64(1)}
+	}
+	for _, tc := range []struct {
+		name      string
+		tracked   map[string]string
+		props     []map[string]interface{}
+		failGetNo int
+		wantErr   string
+		want      map[string]string // expected cloud_init in state afterwards
+	}{
+		{
+			name:    "a value changed out of band becomes visible",
+			tracked: map[string]string{"user-data": "b2xk"},
+			props:   []map[string]interface{}{prop(7000, "user-data", "changed-outside")},
+			want:    map[string]string{"user-data": "changed-outside"},
+		},
+		{
+			// The whole point of the boundary: the machine carries a property
+			// the operator never declared, and refresh must not claim it.
+			name:    "untracked live properties are never adopted",
+			tracked: map[string]string{"user-data": "b2xk"},
+			props: []map[string]interface{}{prop(7000, "user-data", "b2xk"),
+				prop(7001, "hostname", "set-by-the-image"), prop(7002, "seedfrom", "http-ish")},
+			want: map[string]string{"user-data": "b2xk"},
+		},
+		{
+			name:    "a managed key deleted out of band is dropped so the plan re-adds it",
+			tracked: map[string]string{"user-data": "b2xk", "hostname": "web01"},
+			props:   []map[string]interface{}{prop(7000, "user-data", "b2xk")},
+			want:    map[string]string{"user-data": "b2xk"},
+		},
+		{
+			// Never drop a tracked key on unproven absence.
+			name:      "an unreadable vApp leaves the recorded values untouched",
+			tracked:   map[string]string{"user-data": "b2xk"},
+			props:     []map[string]interface{}{prop(7000, "user-data", "changed-outside")},
+			failGetNo: 2, // the general read succeeds; the vApp re-read does not
+			wantErr:   "left untouched",
+		},
+		{
+			name:    "duplicate entries for a tracked key fail closed",
+			tracked: map[string]string{"user-data": "b2xk"},
+			props: []map[string]interface{}{prop(7000, "user-data", "one"),
+				prop(7001, "user-data", "two")},
+			wantErr: "duplicate entries for the cloud_init key",
+		},
+		{
+			name:    "a non-string live value fails closed",
+			tracked: map[string]string{"user-data": "b2xk"},
+			props: []map[string]interface{}{{"key": float64(7000), "id": "user-data",
+				"value": float64(42), "label": "User data", "type": "string"}},
+			wantErr: "does not hold a string value",
+		},
+		{
+			// An imported machine tracks nothing, so there is nothing to
+			// resynchronise and, deliberately, nothing to adopt either.
+			name:    "nothing tracked adopts nothing",
+			tracked: nil,
+			props:   []map[string]interface{}{prop(7000, "user-data", "set-by-the-image")},
+			want:    nil,
+		},
+		{
+			// A machine that does not use cloud_init at all must not have its
+			// refresh made fragile by this feature: the vApp is never read.
+			name:      "a machine without cloud_init never reads the vApp",
+			tracked:   nil,
+			props:     []map[string]interface{}{prop(7000, "user-data", "set-by-the-image")},
+			failGetNo: 2,
+			want:      nil,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := resourceVirtualMachine()
+			state := &terraform.InstanceState{ID: "vm-investigation", Attributes: map[string]string{
+				"id": "vm-investigation", "name": "investigation", "datacenter_id": "dc",
+				"host_cluster_id": "hc", "guest_operating_system_moref": "ubuntu64Guest",
+				"memory": "2147483648", "cpu": "2", "num_cores_per_socket": "1", "power_state": "off",
+			}}
+			if len(tc.tracked) > 0 {
+				state.Attributes["cloud_init.%"] = fmt.Sprint(len(tc.tracked))
+				for k, v := range tc.tracked {
+					state.Attributes["cloud_init."+k] = v
+				}
+			}
+			f := &cloudInitPowerFake{t: t, power: "stopped", props: tc.props, failGetNo: tc.failGetNo}
+			c := newAssignTestClient(t, f.handler)
+
+			next, diags := r.RefreshWithoutUpgrade(context.Background(), state, c)
+			if tc.wantErr != "" {
+				if !diags.HasError() {
+					t.Fatalf("expected a refusal containing %q, got none", tc.wantErr)
+				}
+				if msg := fmt.Sprint(diags); !strings.Contains(msg, tc.wantErr) {
+					t.Fatalf("refusal must name its own cause (want %q); got: %s", tc.wantErr, msg)
+				}
+				// Failing closed means the prior values survive, not that they vanish.
+				for k, v := range tc.tracked {
+					if next != nil && next.Attributes["cloud_init."+k] != v {
+						t.Fatalf("a failed refresh dropped cloud_init.%s", k)
+					}
+				}
+				return
+			}
+			if diags.HasError() {
+				t.Fatal(diags)
+			}
+			for k, v := range tc.want {
+				if got := next.Attributes["cloud_init."+k]; got != v {
+					t.Fatalf("cloud_init.%s = %q, want %q", k, got, v)
+				}
+			}
+			for k := range next.Attributes {
+				if !strings.HasPrefix(k, "cloud_init.") || k == "cloud_init.%" {
+					continue
+				}
+				if _, declared := tc.want[strings.TrimPrefix(k, "cloud_init.")]; !declared {
+					t.Fatalf("refresh adopted %s, which Terraform does not manage", k)
+				}
+			}
+			if got, want := next.Attributes["cloud_init.%"], fmt.Sprint(len(tc.want)); len(tc.want) > 0 && got != want {
+				t.Fatalf("cloud_init element count = %q, want %q", got, want)
 			}
 		})
 	}

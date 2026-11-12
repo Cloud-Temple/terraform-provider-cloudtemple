@@ -720,3 +720,83 @@ func verifyVAppAddition(before, after *client.VAppSnapshot, payload map[string]i
 	}
 	return nil
 }
+
+// refreshVMwareCloudInit resynchronises `cloud_init` from the live vApp during a
+// refresh, so an out-of-band change to a managed key becomes a plan instead of
+// staying invisible. Without it the attribute is a write-only record of the last
+// applied intent, which is not what Terraform state means.
+//
+// It hydrates ONLY the keys already tracked in state, and that boundary is the
+// whole design rather than a shortcut:
+//
+//   - a virtual machine's vApp carries far more than what Terraform declared —
+//     properties from the marketplace image, from `deploy_options`, and platform
+//     ones. Hydrating every property whose id happens to be a cloud-init key
+//     would ADOPT values the operator never declared, and the next plan would
+//     then propose to DELETE them. That is worse than the blindness it fixes;
+//   - the same boundary keeps `deploy_options` out of it: creation gives that
+//     attribute precedence, and this must never start competing for its keys.
+//
+// A tracked key is removed from state only on strict positive evidence that the
+// property is absent from a COMPLETE snapshot. Anything unproven — an
+// unreadable vApp, a duplicate id, a non-string value — fails closed and leaves
+// the recorded values untouched, because a dropped key here would be read as
+// "Terraform never applied this" and silently re-added later.
+//
+// It deliberately runs on refresh only. Creation still carries cloud_init through
+// the deploy options, and its semantics are untouched; an update path that
+// already verified what it wrote has nothing to learn from re-reading it.
+func refreshVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *client.Client) diag.Diagnostics {
+	tracked, ok := d.Get("cloud_init").(map[string]interface{})
+	if !ok || len(tracked) == 0 {
+		// Nothing is tracked, so there is nothing to resynchronise — and nothing
+		// to adopt either. An imported machine stays in this branch.
+		return nil
+	}
+	live, err := c.Compute().VirtualMachine().ReadVAppSnapshot(ctx, d.Id())
+	if err != nil {
+		return diag.Errorf("cannot read the vApp properties to refresh cloud_init; the recorded values were left untouched")
+	}
+	observed := make(map[string]interface{}, len(tracked))
+	for key := range tracked {
+		var found map[string]interface{}
+		for _, p := range live.Properties {
+			if p["id"] != key {
+				continue
+			}
+			if found != nil {
+				// Which of the two is the managed one cannot be decided here,
+				// and guessing would record a value that was never applied.
+				return diag.Errorf("the vApp holds duplicate entries for the cloud_init key %q; reconcile them before refreshing", key)
+			}
+			found = p
+		}
+		if found == nil {
+			// A complete snapshot proves this one is gone. Dropping it is the
+			// point: the next plan proposes to add it back.
+			continue
+		}
+		value, ok := found["value"].(string)
+		if !ok {
+			return diag.Errorf("the vApp property for the cloud_init key %q does not hold a string value; the recorded values were left untouched", key)
+		}
+		observed[key] = value
+	}
+	if err := d.Set("cloud_init", observed); err != nil {
+		return diag.Errorf("could not record the observed cloud_init values")
+	}
+	return nil
+}
+
+// computeVirtualMachineReadRefresh is the resource's ReadContext. It is the
+// general read plus the cloud_init resynchronisation above, kept separate so
+// that create and update — which both end in computeVirtualMachineRead — keep
+// exactly the behaviour they had.
+func computeVirtualMachineReadRefresh(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
+	diags := computeVirtualMachineRead(ctx, d, meta)
+	if diags.HasError() || d.Id() == "" {
+		// A removed or unreadable resource has no vApp worth re-reading.
+		return diags
+	}
+	return append(diags, refreshVMwareCloudInit(ctx, d, getClient(meta))...)
+}

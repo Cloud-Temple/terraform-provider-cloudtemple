@@ -28,7 +28,7 @@ func resourceVirtualMachine() *schema.Resource {
   - by deploying a content library item with ` + "`content_library_id` and `content_library_item_id`",
 
 		CreateWithoutTimeout: computeVirtualMachineCreate,
-		ReadContext:          computeVirtualMachineRead,
+		ReadContext:          computeVirtualMachineReadRefresh,
 		UpdateContext:        computeVirtualMachineUpdate,
 		DeleteContext:        computeVirtualMachineDelete,
 

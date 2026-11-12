@@ -202,7 +202,33 @@ For fully automatic recovery the API would need durable idempotent operations an
 outcome lookup; an atomic edit by stable key would additionally remove the duplicate
 window.
 
-`cloud_init` remains a last-applied intent map, not general drift detection. An
-unchanged map is not refreshed from vApp properties. A state produced by the old
-silent-update bug is not automatically repaired by installing this provider;
-reconcile the recorded intent with the real VM before requesting another update.
+## Drift detection
+
+A refresh resynchronises `cloud_init` from the live vApp, so a value changed
+outside Terraform shows up as a plan instead of staying invisible.
+
+It covers **only the keys already recorded in state**, and that boundary is
+deliberate. A machine's vApp carries far more than what Terraform declared —
+properties from the image it was deployed from, from `deploy_options`, and from
+the platform. Adopting every property whose id happens to be a cloud-init key
+would pull values the operator never declared into state, and the next plan
+would then propose to delete them. So:
+
+- a **tracked** key whose live value changed is updated in state, and the next
+  plan proposes to put it back;
+- a **tracked** key that no longer exists on the machine is dropped from state,
+  and the next plan proposes to add it;
+- an **untracked** property is never adopted, whatever its id;
+- a machine that declares no `cloud_init` at all is not affected, and its vApp
+  is not even read.
+
+A tracked key is removed from state only on strict positive evidence of absence
+in a complete snapshot. An unreadable vApp, a duplicate entry for a tracked key,
+or a non-string value all fail the refresh and leave the recorded values
+untouched — dropping one would read as "Terraform never applied this".
+
+This also repairs a state left behind by the old silent-update bug, where the
+map recorded values that were never sent to the machine: the first refresh
+records what the machine actually holds, and the next apply applies the
+difference for real. An imported machine is not covered, because it records no
+`cloud_init` for the refresh to resynchronise.
