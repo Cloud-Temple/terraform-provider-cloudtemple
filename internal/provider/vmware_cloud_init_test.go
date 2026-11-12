@@ -1059,14 +1059,19 @@ func TestVMwareCloudInitVerifiedIntentConverges(t *testing.T) {
 // a value Terraform has not resolved yet must never turn into a refusal.
 func TestVMwareCloudInitPlanGuardUnknowns(t *testing.T) {
 	const unknown = "74D93920-ED26-11E3-AC10-0800200C9A66" // hcl2shim.UnknownVariableValue
+	// Built as two named values rather than one two-literal return: gofmt 1.24
+	// and later releases disagree on how to indent the latter, and CI formats
+	// with the toolchain named in go.mod.
 	base := func() (*terraform.InstanceState, map[string]interface{}) {
-		return &terraform.InstanceState{ID: "vm-1", Attributes: map[string]string{
+		state := &terraform.InstanceState{ID: "vm-1", Attributes: map[string]string{
 			"id": "vm-1", "name": "investigation", "datacenter_id": "dc", "host_cluster_id": "hc",
 			"power_state": "on", "cloud_init.%": "1", "cloud_init.user-data": "b2xk",
-		}}, map[string]interface{}{
+		}}
+		cfg := map[string]interface{}{
 			"name": "investigation", "datacenter_id": "dc", "host_cluster_id": "hc",
 			"power_state": "on", "cloud_init": map[string]interface{}{"user-data": "bmV3"},
 		}
+		return state, cfg
 	}
 	for _, tc := range []struct {
 		name   string
