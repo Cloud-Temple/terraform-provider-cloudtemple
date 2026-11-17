@@ -101,7 +101,7 @@ func (c *BucketClient) Read(ctx context.Context, name string) (*Bucket, error) {
 // description as "no opinion" and keeps the one already stored (for example
 // set from the console), whereas an empty string would clear it.
 type IPWhiteListEntry struct {
-	Cidr string `json:"cidr"`
+	CIDR string `json:"cidr"`
 }
 
 // NewIPWhiteList maps a list of CIDRs to `ipWhiteList` entries. The deprecated
@@ -112,7 +112,7 @@ func NewIPWhiteList(cidrs []string) []IPWhiteListEntry {
 	}
 	entries := make([]IPWhiteListEntry, len(cidrs))
 	for i, cidr := range cidrs {
-		entries[i] = IPWhiteListEntry{Cidr: cidr}
+		entries[i] = IPWhiteListEntry{CIDR: cidr}
 	}
 	return entries
 }
