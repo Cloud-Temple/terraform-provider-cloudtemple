@@ -417,14 +417,7 @@ func TestAccResourceVirtualMachineVPCInline(t *testing.T) {
 // configuration surface.
 func vmwareVPCTestClient(t *testing.T) *client.Client {
 	t.Helper()
-	cfg := client.DefaultConfig()
-	cfg.ClientID = os.Getenv(testClientIDEnvName)
-	cfg.SecretID = os.Getenv(testSecretIDEnvName)
-	c, err := client.NewClient(cfg)
-	if err != nil {
-		t.Fatalf("NewClient: %v", err)
-	}
-	return c
+	return testAccClient(t)
 }
 
 // TestAccResourceVirtualMachineIPOnNonVPCRejected proves live that a static IP on a

@@ -107,12 +107,17 @@ func entriesForLog(entries []*client.BucketWhitelistEntry) []client.BucketWhitel
 
 // testAccCheckObjectStorageBucketDestroyed requires the bucket to be absent
 // from a complete listing once the test has destroyed it. A complete HTTP 200
-// listing is the only acceptable proof of absence (#281).
+// listing is the only acceptable proof of absence (#281), and a JSON `null`
+// body is not a listing: it decodes to a nil slice that would otherwise read
+// as "no bucket at all".
 func testAccCheckObjectStorageBucketDestroyed(t *testing.T, name string) resource.TestCheckFunc {
 	return func(_ *terraform.State) error {
 		buckets, err := testAccClient(t).ObjectStorage().Bucket().ListStrict(context.Background())
 		if err != nil {
 			return fmt.Errorf("list the buckets to confirm the deletion of %s: %w", name, err)
+		}
+		if buckets == nil {
+			return fmt.Errorf("the bucket listing is null, so it cannot prove that %s was deleted", name)
 		}
 		for _, b := range buckets {
 			if b.Name == name {
