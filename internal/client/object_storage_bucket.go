@@ -139,6 +139,42 @@ type UpdateWhitelistRequest struct {
 	IPWhiteList []IPWhiteListEntry `json:"ipWhiteList,omitempty"`
 }
 
+// BucketWhitelistEntry is one entry of the whitelist the platform holds for a
+// bucket, as returned by GET /storage/object/v1/buckets/{bucket}/whitelist
+// when `includeDescriptions=true` is asked (without it the route answers a
+// bare list of CIDR strings). Source tells where the entry comes from
+// (`client` for a range declared by the tenant).
+type BucketWhitelistEntry struct {
+	CIDR        string `json:"cidr"`
+	Description string `json:"description"`
+	Source      string `json:"source"`
+}
+
+// ReadWhitelist returns the whitelist the platform currently holds for a
+// bucket. The resource does not read it back (the `whitelist` attribute is
+// write-only), so this is the evidence channel used by the acceptance tests to
+// check what the platform recorded rather than what the state holds. Only a
+// complete HTTP 200 is accepted: a partial answer cannot stand as evidence.
+func (c *BucketClient) ReadWhitelist(ctx context.Context, name string) ([]*BucketWhitelistEntry, error) {
+	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s/whitelist", name)
+	r.params.Set("includeDescriptions", "true")
+	resp, err := c.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireHttpCodes(resp, 200); err != nil {
+		return nil, err
+	}
+
+	var out []*BucketWhitelistEntry
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (c *BucketClient) UpdateWhitelist(ctx context.Context, name string, req *UpdateWhitelistRequest) (string, error) {
 	r := c.c.newRequest("PUT", "/storage/object/v1/buckets/%s/whitelist", name)
 	r.obj = req
