@@ -212,6 +212,22 @@ how far the update got. The four cases are distinct and are treated differently:
   reconcile. If one has, the machine is left stopped and the diagnostic says so
   — the applied values are still kept.
 
+### What a failed apply records about power
+
+Terraform persists the values a failed apply had *planned*, not what happened.
+Left alone, an apply that deliberately leaves a machine stopped would record it
+as running — the one state the provider knows it is not in.
+
+So a failed `cloud_init` update records the **last power state a live read
+confirmed**, and nothing when no read confirmed one. A transitional or
+unrecognised state confirms nothing and records nothing: the last stable
+observation stands. A refusal whose observation contradicts the planned value
+does not freeze the state, because freezing it would keep exactly the answer
+that read has ruled out.
+
+In practice: when a failure leaves the machine stopped, the state says `off`,
+and the next plan proposes to start it rather than reporting nothing to do.
+
 Settling the power state at the end follows the same rule as the shutdown: the
 machine must be observably running or stopped. A transitional or unrecognised
 state is not evidence of the opposite stable state, so the provider leaves the

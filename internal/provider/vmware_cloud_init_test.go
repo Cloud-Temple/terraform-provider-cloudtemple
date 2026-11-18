@@ -799,96 +799,96 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 		{name: "plan-refuses-without-optin", statePower: "on", cfgPower: "on", livePower: "running",
 			planFails: true, diagnostic: "allow_vm_restart"},
 		// Prior state is a stale proxy; only the live machine is authority.
-		{name: "apply-refuses-on-live-authority", statePower: "off", cfgPower: "on", livePower: "running",
+		{name: "apply-refuses-on-live-authority", wantState: "off", statePower: "off", cfgPower: "on", livePower: "running",
 			applyFails: true, actions: "[]", wantLive: "running", wantIntent: "b2xk", diagnostic: "allow_vm_restart"},
 		// An unsupported live power state is not evidence of "stopped".
-		{name: "unsupported-power-state-fails-closed", statePower: "off", cfgPower: "off", livePower: "secret-from-api",
+		{name: "unsupported-power-state-fails-closed", wantState: "off", statePower: "off", cfgPower: "off", livePower: "secret-from-api",
 			applyFails: true, actions: "[]", wantIntent: "b2xk", wantLive: "secret-from-api",
 			diagnostic: "unsupported power state"},
 		// Exempting the two power attributes must not have opened the guard.
-		{name: "other-attribute-still-refused", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "other-attribute-still-refused", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			otherAttr: "name", applyFails: true, actions: "[]", wantLive: "running", wantIntent: "b2xk",
 			diagnostic: `"name"`},
-		{name: "other-attribute-tags-still-refused", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "other-attribute-tags-still-refused", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			otherAttr: "tags", applyFails: true, actions: "[]", wantLive: "running", wantIntent: "b2xk",
 			diagnostic: `"tags"`},
 		// An inapplicable configuration must cost NO downtime.
-		{name: "invalid-config-refused-before-downtime", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "invalid-config-refused-before-downtime", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			unsafe: true, applyFails: true, actions: "[]", wantLive: "running", wantIntent: "b2xk",
 			diagnostic: "cannot update cloud_init"},
 
 		// --- failures around the shutdown -------------------------------------
 		// An unconfirmed shutdown must NOT be "compensated" by a power-on that
 		// could race a shutdown still settling.
-		{name: "unconfirmed-shutdown-fails-closed", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "unconfirmed-shutdown-fails-closed", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			failRead: true, applyFails: true, actions: "[power:off]", wantLive: "stopped", wantIntent: "b2xk",
 			diagnostic: "could not be re-read"},
-		{name: "shutdown-reported-but-still-running", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "shutdown-reported-but-still-running", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			staysOn: true, applyFails: true, actions: "[power:off]", wantLive: "running", wantIntent: "b2xk",
 			diagnostic: "not stopped after the power-off"},
-		{name: "power-off-activity-fails", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "power-off-activity-fails", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			failPower: "off", applyFails: true, actions: "[power:off]", wantLive: "running", wantIntent: "b2xk",
 			diagnostic: "may still be in progress"},
 		// A confirmed shutdown followed by a failure that wrote nothing DOES give
 		// the machine back — the mirror image of the invariant below.
-		{name: "drift-during-shutdown-restores-power", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "drift-during-shutdown-restores-power", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			drift: true, applyFails: true, actions: "[power:off power:on]", wantLive: "running", wantIntent: "b2xk",
 			diagnostic: "changed while the virtual machine was being powered off"},
 
 		// --- the two load-bearing invariants ----------------------------------
 		// A write whose outcome is unknown must never be booted into.
-		{name: "write-activity-failure-stays-stopped", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "write-activity-failure-stays-stopped", wantState: "off", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			failWrite: "DELETE", applyFails: true, actions: "[power:off POST DELETE]", wantLive: "stopped",
 			wantIntent: "b2xk", recovery: true},
 		// Same, when the HTTP call itself fails: mutated must already be set
 		// BEFORE the request, not after a successful return.
-		{name: "write-call-failure-stays-stopped", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "write-call-failure-stays-stopped", wantState: "off", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			failCall: "POST", applyFails: true, actions: "[power:off POST]", wantLive: "stopped",
 			wantIntent: "b2xk", recovery: true},
 		// A VERIFIED transaction whose power settlement fails must KEEP its new
 		// intent: rolling it back would make every later apply refuse forever.
-		{name: "verified-then-start-fails-keeps-intent", statePower: "off", cfgPower: "on", livePower: "stopped",
+		{name: "verified-then-start-fails-keeps-intent", wantState: "off", statePower: "off", cfgPower: "on", livePower: "stopped",
 			failPower: "on", applyFails: true, actions: "[POST DELETE power:on]", wantLive: "stopped",
 			wantIntent: "bmV3", diagnostic: "applied and verified"},
 		// A completed power-on activity is not evidence that the machine runs.
-		{name: "start-not-confirmed-keeps-intent", statePower: "off", cfgPower: "on", livePower: "stopped",
+		{name: "start-not-confirmed-keeps-intent", wantState: "off", statePower: "off", cfgPower: "on", livePower: "stopped",
 			onNoOp: true, applyFails: true, actions: "[POST DELETE power:on]", wantLive: "stopped",
 			wantIntent: "bmV3", diagnostic: "could not be confirmed powered on"},
 		// Settlement must not act on a state it cannot interpret: "not the target"
 		// is not "the opposite of the target", and powering on could race a
 		// shutdown that has not settled.
-		{name: "settlement-refuses-transitional-state", statePower: "off", cfgPower: "on", livePower: "stopped",
+		{name: "settlement-refuses-transitional-state", wantState: "off", statePower: "off", cfgPower: "on", livePower: "stopped",
 			oddLater: true, applyFails: true, actions: "[POST DELETE]", wantLive: "stopped",
 			wantIntent: "bmV3", diagnostic: "unsupported power state, so its power state was left untouched"},
 		// The activity id is taken verbatim from a Location header the client does
 		// not constrain, so it must never be echoed into a diagnostic.
-		{name: "activity-id-is-never-echoed", statePower: "off", cfgPower: "off", livePower: "stopped",
+		{name: "activity-id-is-never-echoed", wantState: "off", statePower: "off", cfgPower: "off", livePower: "stopped",
 			secretLoc: true, applyFails: true, actions: "[POST]", wantLive: "stopped",
 			wantIntent: "b2xk", recovery: true, diagnostic: "not reportable"},
 		// "This apply wrote nothing" is NOT "the machine is safe to start". If
 		// another writer leaves a duplicate id behind, the provider must not be
 		// the actor that boots a guest into it — not even to undo its own
 		// shutdown, and not even though the re-plan already named the problem.
-		{name: "duplicate-after-shutdown-stays-off", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "duplicate-after-shutdown-stays-off", wantState: "off", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			dupAfter: true, applyFails: true, actions: "[power:off]", wantLive: "stopped", wantIntent: "b2xk",
 			diagnostic: "duplicate entries for a managed cloud_init key"},
 		// Same rule once the transaction is verified: settlement sees the
 		// duplicate in the very snapshot it reads, so it must not power on.
-		{name: "duplicate-before-settlement-stays-off", statePower: "off", cfgPower: "on", livePower: "stopped",
+		{name: "duplicate-before-settlement-stays-off", wantState: "off", statePower: "off", cfgPower: "on", livePower: "stopped",
 			dupSettle: true, applyFails: true, actions: "[POST DELETE]", wantLive: "stopped", wantIntent: "bmV3",
 			diagnostic: "duplicate entries for a managed cloud_init key"},
 		// Not only duplicates: any divergence from the snapshot this apply proved
 		// means another writer is active, and the guest must not boot into it.
-		{name: "vapp-edited-before-settlement-stays-off", statePower: "off", cfgPower: "on", livePower: "stopped",
+		{name: "vapp-edited-before-settlement-stays-off", wantState: "off", statePower: "off", cfgPower: "on", livePower: "stopped",
 			modSettle: true, applyFails: true, actions: "[POST DELETE]", wantLive: "stopped", wantIntent: "bmV3",
 			diagnostic: "no longer matches the state this apply verified"},
 		// A transitional state is not a stopped one, on the compensation path too.
-		{name: "transitional-before-restore-stays-off", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "transitional-before-restore-stays-off", wantState: "off", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			drift: true, oddRestor: true, applyFails: true, actions: "[power:off]", wantLive: "stopped",
 			wantIntent: "b2xk", diagnostic: "not observably stopped"},
 		// The same discipline on the compensation path: a power-on that does not
 		// take effect must be reported as unconfirmed, not as a restored machine.
-		{name: "restore-not-confirmed-is-reported", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+		{name: "restore-not-confirmed-is-reported", wantState: "off", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			drift: true, onNoOp: true, applyFails: true, actions: "[power:off power:on]", wantLive: "stopped",
 			wantIntent: "b2xk", diagnostic: "could not be confirmed running again"},
 	} {
@@ -969,11 +969,15 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 			if next.Attributes["cloud_init.user-data"] != tc.wantIntent {
 				t.Fatalf("persisted cloud_init = %q, want %q", next.Attributes["cloud_init.user-data"], tc.wantIntent)
 			}
-			if tc.applyFails {
-				return
-			}
+			// A FAILED apply is exactly where the recorded power state matters:
+			// the SDK persists PLANNED values on error, so exempting failures
+			// from this check is what let a machine deliberately left stopped be
+			// recorded as running.
 			if next.Attributes["power_state"] != tc.wantState {
 				t.Fatalf("recorded power_state = %q, want %q", next.Attributes["power_state"], tc.wantState)
+			}
+			if tc.applyFails {
+				return
 			}
 			after, err := r.Diff(context.Background(), next, cfg, nil)
 			if err != nil {

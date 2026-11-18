@@ -46,6 +46,10 @@ type cloudInitRun struct {
 	poweredOff bool // the shutdown was issued AND confirmed by a live snapshot
 	mutated    bool // at least one vApp write was attempted; outcome may be unknown
 	verified   bool // the whole vApp transaction completed and was verified
+	// observed is the last power state a LIVE read confirmed, in the schema's
+	// vocabulary ("on"/"off"), empty until one does. A completed activity never
+	// sets it: the platform can accept a request whose response is lost.
+	observed string
 	// proven is the last vApp this invocation OBSERVED and accepted. It is not by
 	// itself a certificate of soundness: the shutdown stores it before the
 	// re-plan runs, so it can already carry a duplicate another writer left
@@ -88,6 +92,24 @@ func updateVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *clien
 		}
 		if err := d.Set("cloud_init", old); err != nil {
 			diags = append(diags, diag.Errorf("could not restore previous cloud_init intent")...)
+		}
+	}()
+
+	// The SDK persists PLANNED values when an update returns an error, so a
+	// machine this apply deliberately left stopped would be recorded as running
+	// — the opposite of what happened, and a contradiction of this path's own
+	// rule that a power action is only ever recorded after a live read confirms
+	// its effect. Record what was actually observed instead.
+	//
+	// Only positive evidence counts: run.observed is set solely by a live read
+	// that returned a stable state. With none, the prior state stands, which is
+	// what the callers that freeze the state with d.Partial already arrange.
+	defer func() {
+		if !diags.HasError() || run.observed == "" {
+			return
+		}
+		if err := d.Set("power_state", run.observed); err != nil {
+			diags = append(diags, diag.Errorf("could not record the observed power state")...)
 		}
 	}()
 
@@ -270,6 +292,7 @@ func cloudInitSettlePower(ctx context.Context, c *client.Client, d *schema.Resou
 		want, action, recorded = "running", "on", "on"
 	}
 	observed, err := cloudInitLivePower(ctx, c, id)
+	cloudInitRecordPower(run, observed)
 	if err != nil {
 		return diag.Errorf("cloud_init was applied and verified but the virtual machine's power state could not be read afterwards; re-run apply to converge. Terraform's recorded power state may be stale until the next refresh")
 	}
@@ -296,6 +319,7 @@ func cloudInitSettlePower(ctx context.Context, c *client.Client, d *schema.Resou
 		// question: the platform can accept a request whose response is lost. Only
 		// a live read decides, and an unreadable one is reported as unknown.
 		observed, err = cloudInitLivePower(ctx, c, id)
+		cloudInitRecordPower(run, observed)
 		if err != nil || observed != want {
 			if powerErr != nil {
 				return diag.Errorf("cloud_init was applied and verified but the virtual machine could not be confirmed powered %s afterwards (%s); check its power state, then set it manually or re-run apply", action, powerErr)
@@ -397,6 +421,7 @@ func cloudInitShutdown(ctx context.Context, d *schema.ResourceData, c *client.Cl
 		return nil, refuseBeforeAnyMutation(d, diag.Errorf("the virtual machine is not stopped after the power-off reported completion; no vApp property was written and cloud_init was not changed. The shutdown may still be settling: check the machine before re-running apply"))
 	}
 	run.poweredOff = true
+	run.observed = "off"
 	run.proven = stopped
 	return stopped, nil
 }
@@ -479,7 +504,7 @@ func cloudInitAbort(ctx context.Context, c *client.Client, d *schema.ResourceDat
 	// rejected a duplicate left by another writer has told us, in so many words,
 	// that the guest must not boot now.
 	if err := cloudInitSafeToStart(ctx, c, id, run); err != nil {
-		return refuseBeforeAnyMutation(d, append(cause, diag.Diagnostic{
+		return cloudInitRefuse(d, run, append(cause, diag.Diagnostic{
 			Severity: diag.Error,
 			Summary:  "virtual machine was deliberately left powered off",
 			Detail:   fmt.Sprintf("The provider powered the virtual machine off for a cloud_init update and wrote nothing, but did not start it again because %s. Reconcile the vApp, then power it on yourself or re-run `terraform apply`.", err),
@@ -491,22 +516,21 @@ func cloudInitAbort(ctx context.Context, c *client.Client, d *schema.ResourceDat
 	// Neither a completed activity nor a failed call settles the question: the
 	// platform can accept a request whose response is lost. Report only what a
 	// live snapshot shows, and say so plainly when it cannot be read.
-	running := false
-	if live, err := c.Compute().VirtualMachine().ReadVAppSnapshot(ctx, id); err == nil {
-		running = live.PowerState == "running"
-	}
-	if running {
-		return refuseBeforeAnyMutation(d, append(cause, diag.Diagnostic{
+	live, _ := cloudInitLivePower(ctx, c, id)
+	cloudInitRecordPower(run, live)
+	if live == "running" {
+		return cloudInitRefuse(d, run, append(cause, diag.Diagnostic{
 			Severity: diag.Warning,
 			Summary:  "virtual machine was powered back on",
 			Detail:   "The provider powered the virtual machine off for a cloud_init update, wrote nothing to the vApp, and has confirmed it running again. Re-run `terraform apply` to converge.",
 		}))
 	}
-	return refuseBeforeAnyMutation(d, append(cause, diag.Diagnostic{
+	left := append(cause, diag.Diagnostic{
 		Severity: diag.Error,
 		Summary:  "virtual machine could not be confirmed running again",
 		Detail:   "The provider powered the virtual machine off for a cloud_init update and could not confirm it running again. No vApp property was written, so the machine is safe to start: check its power state and start it manually, or re-run `terraform apply`.",
-	}))
+	})
+	return cloudInitRefuse(d, run, left)
 }
 
 func cloudInitUpdateError(stage, activity string) diag.Diagnostics {
@@ -845,6 +869,36 @@ func cloudInitChangeIsOwnedByDeployOptions(d *schema.ResourceDiff) bool {
 		}
 	}
 	return changed
+}
+
+// cloudInitRefuse freezes the state so a failed update cannot persist planned
+// values — the SDK's default on error — EXCEPT where a live read has positively
+// contradicted the planned power state. Freezing there would keep the one
+// answer the provider has just ruled out: "running", for a machine it powered
+// off itself and is deliberately leaving down.
+//
+// Everything else this path may change is handled on its own: cloud_init by the
+// rollback deferred in updateVMwareCloudInit, power_state by the deferred that
+// records run.observed, and no other attribute can travel with cloud_init in an
+// in-place update.
+func cloudInitRefuse(d *schema.ResourceData, run *cloudInitRun, diags diag.Diagnostics) diag.Diagnostics {
+	if run.observed != "" && run.observed != d.Get("power_state").(string) {
+		return diags
+	}
+	return refuseBeforeAnyMutation(d, diags)
+}
+
+// cloudInitRecordPower stores a live power observation in the schema's
+// vocabulary. An unrecognised or transitional state records nothing: it is not
+// evidence of either stable state, and guessing is what this path exists to
+// avoid.
+func cloudInitRecordPower(run *cloudInitRun, live string) {
+	switch live {
+	case "running":
+		run.observed = "on"
+	case "stopped":
+		run.observed = "off"
+	}
 }
 
 // cloudInitRefreshWarning degrades a refresh anomaly to a warning. A refresh
