@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -971,6 +972,48 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 				}
 				return nil
 			},
+			// #549: a key declared in BOTH cloud_init and deploy_options is
+			// refused at plan time, on create as well as on update.
+			//
+			// Creation merges the two maps into a single deploy request and gives
+			// deploy_options precedence, so the cloud_init value for a shared key
+			// is silently dropped and never reaches the machine — while state
+			// records it as if it had been applied. Nothing tells the operator.
+			// The update path refuses a shared key too, but only once the apply
+			// has begun and only for a key that CHANGES, so an unchanging
+			// collision is never reported at all.
+			//
+			// Refusing the whole overlap here makes the ambiguity impossible to
+			// express. Keys that do not overlap are untouched: declaring
+			// unrelated deploy_options alongside a cloud_init is the ordinary
+			// case and stays valid. cloud_init's own key validation restricts it
+			// to the seven cloud-init keys, so an overlap is by construction a
+			// cloud-init key claimed by deploy_options.
+			//
+			// Unknowns need no special handling: an unresolved map reads as empty
+			// here, which skips the check, and the apply-time refusal still
+			// covers a changed shared key.
+			func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
+				cloudInit, _ := d.Get("cloud_init").(map[string]interface{})
+				deploy, _ := d.Get("deploy_options").(map[string]interface{})
+				if len(cloudInit) == 0 || len(deploy) == 0 {
+					return nil
+				}
+				var shared []string
+				for key := range cloudInit {
+					if _, both := deploy[key]; both {
+						shared = append(shared, key)
+					}
+				}
+				if len(shared) == 0 {
+					return nil
+				}
+				// Map iteration order must not change the diagnostic.
+				sort.Strings(shared)
+				return fmt.Errorf(
+					"%s declared in both cloud_init and deploy_options: creation sends the deploy_options value and the cloud_init one is never applied, so declare each key in exactly one of the two maps",
+					strings.Join(shared, ", "))
+			},
 			// #549: refuse at plan time a cloud_init change that would require
 			// powering a running virtual machine off, unless allow_vm_restart is
 			// set or the machine is being powered off anyway. The prior state is
@@ -1022,6 +1065,11 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 							return nil
 						}
 					}
+				}
+				// A change confined to keys deploy_options owns plans no vApp
+				// write at all, so it interrupts nothing and needs no opt-in.
+				if cloudInitChangeIsOwnedByDeployOptions(d) {
+					return nil
 				}
 				if d.Get("allow_vm_restart").(bool) {
 					return nil // the operator authorised the power cycle

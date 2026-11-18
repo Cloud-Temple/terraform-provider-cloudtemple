@@ -4,8 +4,9 @@
 schema. Creation still passes these values to the Marketplace deployment options.
 An update instead changes the VM's vApp properties using the VMware property API;
 it does not replace the VM. Existing configurations with an unchanged `cloud_init`
-map do not enter the new update path. There is no schema version change, state
-migration, or new refresh mapping for this attribute.
+map do not enter the new update path. There is no schema version change and no
+state migration. A refresh does now resynchronise this attribute's recorded
+values from the machine, within the bounds described under Drift detection.
 
 Previously, Terraform could plan an in-place change and successfully apply it
 without sending any cloud-init update. The state then contained the requested
@@ -91,6 +92,51 @@ A successful apply means the vApp properties now hold the declared values and
 the machine reached the declared power state. It does not mean the guest has
 consumed them.
 
+## Declaring a key in both maps
+
+`cloud_init` and `deploy_options` end up in the **same** deployment request, and
+`deploy_options` takes precedence. A key declared in both therefore reaches the
+machine with its `deploy_options` value, while state records the `cloud_init`
+one as though it had been applied. Nothing used to report this.
+
+Declaring a key in both is refused at **plan** time, on creation as well as on
+update, and whether or not the key changes:
+
+```
+Error: user-data declared in both cloud_init and deploy_options: creation sends
+the deploy_options value and the cloud_init one is never applied, so declare
+each key in exactly one of the two maps
+```
+
+The refusal is scoped to the **overlap**, not to using both attributes:
+
+- `cloud_init` alongside unrelated `deploy_options` is the ordinary case and
+  stays valid;
+- `deploy_options` may own a cloud-init key outright — `hostname`, say — as long
+  as `cloud_init` does not also claim it. The update path simply does not manage
+  that key;
+- only a key present in **both** maps is refused.
+
+`cloud_init` restricts its own keys to the seven cloud-init ones, so an overlap
+is by construction a cloud-init key claimed by `deploy_options`.
+
+### Resolving one
+
+Remove the key from **`cloud_init`**, not from `deploy_options`. The two moves
+are not equivalent:
+
+- `deploy_options` is `ForceNew`, so editing it at all **replaces the machine**;
+- `cloud_init` is not. Removing the key from it is an in-place change, and it
+  deliberately does **not** delete the vApp property — `deploy_options` still
+  declares that value and the machine keeps it.
+
+So on an existing resource, drop the key from `cloud_init`: nothing about the
+machine changes, because the value it holds was the `deploy_options` one all
+along. Terraform merely stops recording the key twice.
+
+If `cloud_init` is the map that should own the key, the key has to leave
+`deploy_options`, and that is a replacement.
+
 ## API constraints
 
 The public API provides add and delete operations, not an atomic edit. A
@@ -101,9 +147,9 @@ properties must remain unchanged in every verified snapshot. Numeric property
 keys can change; the Terraform resource ID does not.
 
 The entire edit set is validated before writing. Updates require vApp to be enabled,
-unique IDs for changed properties, and a complete property snapshot. A changed key
-also present in `deploy_options` is refused because creation gives that attribute
-precedence. A previously managed property that is missing, an unmanaged existing
+unique IDs for changed properties, and a complete property snapshot. A key present in
+`deploy_options` is never written or deleted by this path, because creation gives
+that attribute precedence; declaring it in both maps is refused at plan time. A previously managed property that is missing, an unmanaged existing
 property, or an unexpected live value requires reconciliation before updating.
 Unchanged legacy keys acquire no new ownership, and no validation beyond one
 thing: before the provider starts a machine, any key present in the declared or
@@ -155,9 +201,10 @@ how far the update got. The four cases are distinct and are treated differently:
 - **The transaction was verified and a LATER step failed** — the general read
   of the machine, or the power settlement. The vApp holds the declared values,
   so Terraform **keeps** them in state. Rolling that intent back would be
-  permanent, not merely untidy: `cloud_init` is never hydrated from the machine,
-  so a later apply would see an added key as one it must refuse to adopt, or a
-  removed key as one that has gone missing, with nothing left to repair it.
+  permanent, not merely untidy: the refresh never adds a key back and never
+  removes one it can no longer observe, so a later apply would see an added key
+  as one it must refuse to adopt, or a removed key as one that has gone
+  missing, with nothing left to repair it.
   Only the remaining state is left to converge — re-run apply, or set the power
   state by hand. These failures say "applied and verified" and deliberately do
   **not** print the recovery procedure above: the properties are already correct
@@ -207,28 +254,45 @@ window.
 A refresh resynchronises `cloud_init` from the live vApp, so a value changed
 outside Terraform shows up as a plan instead of staying invisible.
 
-It covers **only the keys already recorded in state**, and that boundary is
-deliberate. A machine's vApp carries far more than what Terraform declared —
-properties from the image it was deployed from, from `deploy_options`, and from
-the platform. Adopting every property whose id happens to be a cloud-init key
-would pull values the operator never declared into state, and the next plan
-would then propose to delete them. So:
+It only ever **replaces a value**, on a key Terraform already tracks and that
+this attribute actually owns. It never adds a key, never removes one, and never
+fails. Each bound exists because crossing it breaks a configuration that has not
+changed:
 
-- a **tracked** key whose live value changed is updated in state, and the next
-  plan proposes to put it back;
-- a **tracked** key that no longer exists on the machine is dropped from state,
-  and the next plan proposes to add it;
-- an **untracked** property is never adopted, whatever its id;
+- an **untracked** property is never adopted, whatever its id. A machine's vApp
+  also carries values from the image it was deployed from, from `deploy_options`
+  and from the platform; pulling those into state would make the next plan
+  propose to delete values the operator never declared.
+- a **tracked** key missing from the vApp is **kept**, not dropped. Absence is
+  not evidence of deletion: a machine created by clone or from scratch receives
+  no deploy options at all, so it legitimately records keys its vApp never held.
+  Dropping them would make an unchanged configuration plan — and on a running
+  machine without `allow_vm_restart`, that plan is then refused outright.
+- a key also declared in **`deploy_options`** is never resynchronised. Creation
+  sends the `deploy_options` value for a key present in both maps, so the live
+  property belongs to that attribute. Recording it here would leave a difference
+  the update path refuses for collision, with no way to converge.
+- an anomaly never **fails** the refresh. An unreadable vApp, duplicate entries
+  for a tracked key, or a non-string value are reported as **warnings** and
+  leave the recorded value in place. A failed refresh takes the whole plan with
+  it and leaves no provider-side recovery, which is too blunt for a step that
+  only corrects values. Degradation is per key: one unreadable key does not
+  freeze the resynchronisation of the others.
 - a machine that declares no `cloud_init` at all is not affected, and its vApp
   is not even read.
 
-A tracked key is removed from state only on strict positive evidence of absence
-in a complete snapshot. An unreadable vApp, a duplicate entry for a tracked key,
-or a non-string value all fail the refresh and leave the recorded values
-untouched — dropping one would read as "Terraform never applied this".
+### What drift detection does not repair
 
-This also repairs a state left behind by the old silent-update bug, where the
-map recorded values that were never sent to the machine: the first refresh
-records what the machine actually holds, and the next apply applies the
-difference for real. An imported machine is not covered, because it records no
-`cloud_init` for the refresh to resynchronise.
+It repairs a state left by the original silent-update defect **only where the
+key exists on the machine**: creation did send it, a later plan recorded a new
+value without sending it, and the refresh now restores what the machine holds so
+the next apply applies the difference for real.
+
+A key the machine **never received** is not repaired. A `cloud_init` declared on
+a clone or a from-scratch creation is never sent — neither path carries deploy
+options — yet it is recorded in state. The refresh keeps it, so the
+configuration stays convergent and silent. Changing the value is what brings
+such a key into the update path and onto the machine.
+
+An imported machine records no `cloud_init`, so there is nothing to
+resynchronise and, deliberately, nothing to adopt.

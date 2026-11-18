@@ -80,7 +80,8 @@ func updateVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *clien
 		// A VERIFIED transaction must not be rolled back. Once the vApp holds the
 		// new values, restoring the old intent would make every later apply refuse
 		// — an added key then looks unadopted, a removed one looks lost — and
-		// nothing repairs it, because cloud_init is never hydrated by the read.
+		// the refresh cannot repair it: it never adds a key back, and it never
+		// removes one it can no longer observe.
 		// Only a transaction that did not complete gives back the prior intent.
 		if run.verified {
 			return
@@ -566,6 +567,15 @@ func planCloudInitEdits(vm *client.VAppSnapshot, old, desired, deploy map[string
 			return nil, fmt.Errorf("a changed property ID cannot be transmitted without API normalization")
 		}
 		if _, ok := deploy[id]; ok {
+			if _, present := desired[id]; !present {
+				// deploy_options owns this key's live value, so dropping it from
+				// cloud_init means "stop recording it here", not "delete it from
+				// the machine": deleting would destroy a value the configuration
+				// still declares. Skipping is also the only non-destructive way
+				// out of a collision, since deploy_options is ForceNew and
+				// editing it replaces the machine.
+				continue
+			}
 			return nil, fmt.Errorf("a changed cloud_init key also belongs to deploy_options; resolve ownership first")
 		}
 		var live map[string]interface{}
@@ -721,31 +731,26 @@ func verifyVAppAddition(before, after *client.VAppSnapshot, payload map[string]i
 	return nil
 }
 
-// refreshVMwareCloudInit resynchronises `cloud_init` from the live vApp during a
-// refresh, so an out-of-band change to a managed key becomes a plan instead of
-// staying invisible. Without it the attribute is a write-only record of the last
-// applied intent, which is not what Terraform state means.
+// refreshVMwareCloudInit resynchronises the tracked cloud_init keys from the
+// live vApp. Its contract is deliberately narrow, because this runs on every
+// plan and must never turn an unrelated condition into a failed one:
 //
-// It hydrates ONLY the keys already tracked in state, and that boundary is the
-// whole design rather than a shortcut:
+//   - it never ADDS a key, so a property the operator never declared — from the
+//     image, from deploy_options, from the platform — is never adopted;
+//   - it never REMOVES a key. Absence is not evidence of deletion: the clone and
+//     from-scratch creation paths send no deploy options at all, so an ordinary
+//     machine can track keys its vApp never received. Dropping those would make
+//     an unchanged configuration plan, and that plan is then refused outright on
+//     a running machine without allow_vm_restart;
+//   - it never touches a key that deploy_options also declares. Creation sends
+//     the deploy_options value for a shared key, so the live property belongs to
+//     that attribute; recording it here would leave a diff the planner refuses
+//     for collision, for ever;
+//   - it never FAILS. Every anomaly degrades to a warning and leaves the
+//     recorded value in place.
 //
-//   - a virtual machine's vApp carries far more than what Terraform declared —
-//     properties from the marketplace image, from `deploy_options`, and platform
-//     ones. Hydrating every property whose id happens to be a cloud-init key
-//     would ADOPT values the operator never declared, and the next plan would
-//     then propose to DELETE them. That is worse than the blindness it fixes;
-//   - the same boundary keeps `deploy_options` out of it: creation gives that
-//     attribute precedence, and this must never start competing for its keys.
-//
-// A tracked key is removed from state only on strict positive evidence that the
-// property is absent from a COMPLETE snapshot. Anything unproven — an
-// unreadable vApp, a duplicate id, a non-string value — fails closed and leaves
-// the recorded values untouched, because a dropped key here would be read as
-// "Terraform never applied this" and silently re-added later.
-//
-// It deliberately runs on refresh only. Creation still carries cloud_init through
-// the deploy options, and its semantics are untouched; an update path that
-// already verified what it wrote has nothing to learn from re-reading it.
+// What remains is the single case it exists for: a key Terraform owns, whose
+// live value is observably different.
 func refreshVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *client.Client) diag.Diagnostics {
 	tracked, ok := d.Get("cloud_init").(map[string]interface{})
 	if !ok || len(tracked) == 0 {
@@ -753,39 +758,104 @@ func refreshVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *clie
 		// to adopt either. An imported machine stays in this branch.
 		return nil
 	}
+	deploy, _ := d.Get("deploy_options").(map[string]interface{})
 	live, err := c.Compute().VirtualMachine().ReadVAppSnapshot(ctx, d.Id())
 	if err != nil {
-		return diag.Errorf("cannot read the vApp properties to refresh cloud_init; the recorded values were left untouched")
+		return cloudInitRefreshWarning("the vApp properties could not be read, so the recorded cloud_init values were left untouched")
 	}
+	var diags diag.Diagnostics
 	observed := make(map[string]interface{}, len(tracked))
-	for key := range tracked {
+	for key, was := range tracked {
+		// The recorded value is the default outcome for every key. Only a value
+		// positively observed on a property this attribute owns replaces it.
+		observed[key] = was
+		if _, shared := deploy[key]; shared {
+			continue
+		}
 		var found map[string]interface{}
+		duplicated := false
 		for _, p := range live.Properties {
 			if p["id"] != key {
 				continue
 			}
 			if found != nil {
-				// Which of the two is the managed one cannot be decided here,
-				// and guessing would record a value that was never applied.
-				return diag.Errorf("the vApp holds duplicate entries for the cloud_init key %q; reconcile them before refreshing", key)
+				duplicated = true
+				break
 			}
 			found = p
 		}
+		if duplicated {
+			// Which of the two is the managed one cannot be decided here, and
+			// guessing would record a value that was never applied.
+			diags = append(diags, cloudInitRefreshWarning(fmt.Sprintf("the vApp holds duplicate entries for the cloud_init key %q, so its recorded value was left untouched", key))...)
+			continue
+		}
 		if found == nil {
-			// A complete snapshot proves this one is gone. Dropping it is the
-			// point: the next plan proposes to add it back.
 			continue
 		}
 		value, ok := found["value"].(string)
 		if !ok {
-			return diag.Errorf("the vApp property for the cloud_init key %q does not hold a string value; the recorded values were left untouched", key)
+			diags = append(diags, cloudInitRefreshWarning(fmt.Sprintf("the vApp property for the cloud_init key %q does not hold a string value, so its recorded value was left untouched", key))...)
+			continue
 		}
 		observed[key] = value
 	}
 	if err := d.Set("cloud_init", observed); err != nil {
-		return diag.Errorf("could not record the observed cloud_init values")
+		return append(diags, cloudInitRefreshWarning("the observed cloud_init values could not be recorded")...)
 	}
-	return nil
+	return diags
+}
+
+// cloudInitChangeIsOwnedByDeployOptions reports whether EVERY cloud_init key
+// this plan changes is also declared in deploy_options.
+//
+// The update planner skips such a key — it neither writes nor deletes it,
+// because deploy_options owns the live value — so the apply performs no vApp
+// write and needs no quiescent machine. Without this, the only non-destructive
+// way out of a collision (dropping the key from cloud_init) would demand a
+// restart opt-in on a running machine, to authorise an edit that touches
+// nothing.
+//
+// It returns false unless something actually changes, so it can never turn a
+// no-op plan into an exemption, and false as soon as one changed key is NOT
+// deploy-owned: a mixed change still writes to the vApp.
+func cloudInitChangeIsOwnedByDeployOptions(d *schema.ResourceDiff) bool {
+	deploy, _ := d.Get("deploy_options").(map[string]interface{})
+	if len(deploy) == 0 {
+		return false
+	}
+	oldRaw, newRaw := d.GetChange("cloud_init")
+	oldMap, _ := oldRaw.(map[string]interface{})
+	newMap, _ := newRaw.(map[string]interface{})
+	changed := false
+	for key, was := range oldMap {
+		if want, present := newMap[key]; !present || want != was {
+			if _, owned := deploy[key]; !owned {
+				return false
+			}
+			changed = true
+		}
+	}
+	for key, want := range newMap {
+		if was, present := oldMap[key]; !present || was != want {
+			if _, owned := deploy[key]; !owned {
+				return false
+			}
+			changed = true
+		}
+	}
+	return changed
+}
+
+// cloudInitRefreshWarning degrades a refresh anomaly to a warning. A refresh
+// that fails takes the whole plan with it and leaves the operator no provider
+// side recovery, which is too blunt for a step that only ever corrects values.
+func cloudInitRefreshWarning(detail string) diag.Diagnostics {
+	return diag.Diagnostics{{
+		Severity: diag.Warning,
+		Summary:  "cloud_init was not resynchronised from the vApp",
+		Detail:   detail,
+	}}
 }
 
 // computeVirtualMachineReadRefresh is the resource's ReadContext. It is the

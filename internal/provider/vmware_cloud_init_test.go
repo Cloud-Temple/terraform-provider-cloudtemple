@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
@@ -105,7 +106,7 @@ func TestVMwareCloudInitApplyReplacesBeforeDeleting(t *testing.T) {
 }
 
 func TestVMwareCloudInitFailureRetainsSDKState(t *testing.T) {
-	for _, mode := range []string{"read403", "read206", "missing-list", "null-list", "wrong-id", "duplicate-key", "duplicate-id", "running-no-optin", "power-unknown", "disabled", "missing-managed", "drift", "unsafe-value", "empty-value", "deploy-collision", "mixed-change", "post-lost", "post-delayed", "wait-add", "read-add", "wrong-clone", "collateral-change", "concurrent-before-delete", "delete-lost", "wait-delete", "read-after-delete", "final-vapp-check", "verified-then-read-fails", "cancel", "id-missing", "id-null", "id-number", "later-invalid"} {
+	for _, mode := range []string{"read403", "read206", "missing-list", "null-list", "wrong-id", "duplicate-key", "duplicate-id", "running-no-optin", "power-unknown", "disabled", "missing-managed", "drift", "unsafe-value", "empty-value", "mixed-change", "post-lost", "post-delayed", "wait-add", "read-add", "wrong-clone", "collateral-change", "concurrent-before-delete", "delete-lost", "wait-delete", "read-after-delete", "final-vapp-check", "verified-then-read-fails", "cancel", "id-missing", "id-null", "id-number", "later-invalid"} {
 		t.Run(mode, func(t *testing.T) {
 			r := resourceVirtualMachine()
 			state, cfg := cloudInitStateConfig()
@@ -125,12 +126,6 @@ func TestVMwareCloudInitFailureRetainsSDKState(t *testing.T) {
 			}
 			if mode == "empty-value" {
 				cfg.Raw["cloud_init"] = map[string]interface{}{"user-data": ""}
-				cfg.Config = cfg.Raw
-			}
-			if mode == "deploy-collision" {
-				state.Attributes["deploy_options.%"] = "1"
-				state.Attributes["deploy_options.user-data"] = "legacy"
-				cfg.Raw["deploy_options"] = map[string]interface{}{"user-data": "legacy"}
 				cfg.Config = cfg.Raw
 			}
 			if mode == "running-no-optin" {
@@ -281,7 +276,8 @@ func TestVMwareCloudInitFailureRetainsSDKState(t *testing.T) {
 			// The vApp transaction is verified before the general VM read, so a
 			// failure in that read must NOT give the prior intent back: the
 			// machine already holds the new values, and restoring the old ones
-			// would be permanent (cloud_init is never hydrated by the read).
+			// would be permanent — the refresh never adds a key back and never
+			// removes one it can no longer observe.
 			verified := mode == "verified-then-read-fails"
 			wantIntent := "b2xk"
 			if verified {
@@ -373,6 +369,37 @@ func TestVMwareCloudInitPlanOwnershipAndValidation(t *testing.T) {
 		_, err := planCloudInitEdits(snapshot(), nil, map[string]interface{}{"hostname": "after"}, nil)
 		if err == nil {
 			t.Fatal("adopted unmanaged property")
+		}
+	})
+	// Resolving a collision must have a way out. Removing the key from
+	// deploy_options is not one: that attribute is ForceNew, so editing it
+	// replaces the machine. The only in-place remedy is to drop the key from
+	// cloud_init — which is a CHANGE, so the refusal below would catch it and
+	// leave the operator with no non-destructive move at all.
+	//
+	// Dropping it must also not DELETE the property: deploy_options still
+	// declares it, and its value is the one the machine actually holds.
+	t.Run("stop managing a key deploy_options owns", func(t *testing.T) {
+		edits, err := planCloudInitEdits(snapshot(), old, map[string]interface{}{},
+			map[string]interface{}{"hostname": "legacy"})
+		if err != nil {
+			t.Fatalf("dropping a key deploy_options owns must be allowed: %v", err)
+		}
+		if len(edits) != 0 {
+			t.Fatalf("a key deploy_options owns must be neither written nor deleted; got %d edit(s)", len(edits))
+		}
+	})
+	// The LAST barrier before a write. The plan-time guard refuses the whole
+	// overlap earlier, so Terraform no longer reaches this one — it stays
+	// because nothing may write a shared key, whatever path got here.
+	t.Run("refuse a key also owned by deploy_options", func(t *testing.T) {
+		_, err := planCloudInitEdits(snapshot(), old, map[string]interface{}{"hostname": "after"},
+			map[string]interface{}{"hostname": "legacy"})
+		if err == nil {
+			t.Fatal("planned a write for a key deploy_options also declares")
+		}
+		if !strings.Contains(err.Error(), "deploy_options") {
+			t.Fatalf("the refusal must name deploy_options; got: %v", err)
 		}
 	})
 	t.Run("settled already desired", func(t *testing.T) {
@@ -964,10 +991,11 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 //
 // When the vApp transaction is verified and only the power settlement fails,
 // the applied intent stays in state. Restoring the old map instead would be
-// PERMANENT rather than merely untidy: cloud_init is never hydrated from the
-// machine, so the next plan would ask to add a key the vApp already has (which
-// the planner refuses to adopt) or to restore one it no longer has (which the
-// planner refuses as lost), for ever. Each shape is exercised separately
+// PERMANENT rather than merely untidy. The refresh cannot undo it: it never
+// adds a key back, and never removes one it can no longer observe. So the next
+// plan would ask to add a key the vApp already has (which the planner refuses
+// to adopt) or to restore one it no longer has (which the planner refuses as
+// lost), for ever. Each shape is exercised separately
 // because a fix that only kept replacements would pass a replacement-only test.
 func TestVMwareCloudInitVerifiedIntentConverges(t *testing.T) {
 	for _, tc := range []struct {
@@ -1135,15 +1163,207 @@ func TestVMwareCloudInitPlanGuardUnknowns(t *testing.T) {
 	}
 }
 
+// TestVMwareCloudInitDeployOptionsCollision pins the plan-time refusal of a key
+// declared in both maps.
+//
+// Creation merges cloud_init into deploy_options and gives deploy_options
+// precedence, so a shared key's cloud_init value is dropped before the deploy
+// request is built and never reaches the machine — while state records it as
+// applied. The update path refuses a shared key as well, but only once the
+// apply has begun and only for a key that CHANGES. Neither reports an
+// unchanging collision, and neither reports anything at all on create.
+//
+// The refusal is scoped to the OVERLAP, not to using both attributes: cloud_init
+// alongside unrelated deploy_options is the ordinary case, and deploy_options
+// may own a cloud-init key outright as long as cloud_init does not claim it too.
+func TestVMwareCloudInitDeployOptionsCollision(t *testing.T) {
+	const unknown = "74D93920-ED26-11E3-AC10-0800200C9A66" // hcl2shim.UnknownVariableValue
+	base := func() (*terraform.InstanceState, map[string]interface{}) {
+		state := &terraform.InstanceState{ID: "vm-1", Attributes: map[string]string{
+			"id": "vm-1", "name": "investigation", "datacenter_id": "dc", "host_cluster_id": "hc",
+			"power_state": "off", "cloud_init.%": "1", "cloud_init.user-data": "b2xk",
+		}}
+		cfg := map[string]interface{}{
+			"name": "investigation", "datacenter_id": "dc", "host_cluster_id": "hc",
+			"power_state": "off", "cloud_init": map[string]interface{}{"user-data": "bmV3"},
+		}
+		return state, cfg
+	}
+	for _, tc := range []struct {
+		name    string
+		mutate  func(*terraform.InstanceState, map[string]interface{})
+		refuse  []string // keys the collision diagnostic must name, in order
+		restart bool     // expects the power-state refusal instead
+	}{
+		{
+			name: "a shared key is refused on update",
+			mutate: func(_ *terraform.InstanceState, c map[string]interface{}) {
+				c["deploy_options"] = map[string]interface{}{"user-data": "owned-by-deploy"}
+			},
+			refuse: []string{"user-data"},
+		},
+		{
+			// The case nothing covered before: creation is where the value is
+			// actually dropped, and it had no check at all.
+			name: "a shared key is refused on create",
+			mutate: func(st *terraform.InstanceState, c map[string]interface{}) {
+				st.ID = ""
+				c["deploy_options"] = map[string]interface{}{"user-data": "owned-by-deploy"}
+			},
+			refuse: []string{"user-data"},
+		},
+		{
+			// The apply-time refusal only looks at CHANGED keys, so a collision
+			// already sitting in state was silent for the whole life of the
+			// resource. Nothing about cloud_init or deploy_options moves here —
+			// only an unrelated attribute does, which is what an operator
+			// actually does to a machine deployed years ago.
+			//
+			// deploy_options must be identical in state AND config: it is
+			// ForceNew, and declaring it fresh would make this a REPLACEMENT,
+			// where the SDK reports every attribute as changing and the case
+			// would no longer isolate anything.
+			name: "a collision already in state is refused when nothing about it changes",
+			mutate: func(st *terraform.InstanceState, c map[string]interface{}) {
+				st.Attributes["deploy_options.%"] = "1"
+				st.Attributes["deploy_options.user-data"] = "legacy"
+				c["deploy_options"] = map[string]interface{}{"user-data": "legacy"}
+				c["cloud_init"] = map[string]interface{}{"user-data": "b2xk"}
+				c["name"] = "renamed" // the only real change in this plan
+			},
+			refuse: []string{"user-data"},
+		},
+		{
+			// Determinism: map iteration order must not reorder the message.
+			name: "every shared key is named, in a stable order",
+			mutate: func(st *terraform.InstanceState, c map[string]interface{}) {
+				st.Attributes["cloud_init.%"] = "2"
+				st.Attributes["cloud_init.hostname"] = "web01"
+				c["cloud_init"] = map[string]interface{}{"user-data": "bmV3", "hostname": "web02"}
+				c["deploy_options"] = map[string]interface{}{
+					"user-data": "a", "hostname": "b", "disk_provisioning_type": "thin"}
+			},
+			refuse: []string{"hostname", "user-data"},
+		},
+		{
+			// The ordinary case the operator asked about: both attributes used,
+			// no overlap. This must stay valid.
+			name: "unrelated deploy_options alongside cloud_init pass",
+			mutate: func(_ *terraform.InstanceState, c map[string]interface{}) {
+				c["deploy_options"] = map[string]interface{}{"disk_provisioning_type": "thin"}
+			},
+		},
+		{
+			// deploy_options may own a cloud-init key outright. Only cloud_init
+			// ALSO claiming it creates the ambiguity.
+			name: "a cloud-init key owned only by deploy_options passes",
+			mutate: func(_ *terraform.InstanceState, c map[string]interface{}) {
+				c["deploy_options"] = map[string]interface{}{"hostname": "web01"}
+			},
+		},
+		{
+			// Dropping the key from cloud_init is the only non-destructive way
+			// out of a collision, and it plans no vApp write: the key is
+			// skipped, not deleted. Demanding the restart opt-in for it would
+			// make the remedy cost an interruption to change nothing — on a
+			// running machine, which is the case that needs the remedy most.
+			name: "resolving a collision on a running machine needs no opt-in",
+			mutate: func(st *terraform.InstanceState, c map[string]interface{}) {
+				st.Attributes["power_state"] = "on"
+				st.Attributes["deploy_options.%"] = "1"
+				st.Attributes["deploy_options.user-data"] = "legacy"
+				c["power_state"] = "on"
+				c["deploy_options"] = map[string]interface{}{"user-data": "legacy"}
+				delete(c, "cloud_init")
+			},
+		},
+		{
+			// The exemption is confined to deploy-owned keys. An ordinary
+			// removal does write to the vApp, so it still needs the machine
+			// stopped — the exemption must not become a general bypass.
+			name: "removing an ordinary key on a running machine still needs the opt-in",
+			mutate: func(st *terraform.InstanceState, c map[string]interface{}) {
+				st.Attributes["power_state"] = "on"
+				st.Attributes["deploy_options.%"] = "1"
+				st.Attributes["deploy_options.disk_provisioning_type"] = "thin"
+				c["power_state"] = "on"
+				c["deploy_options"] = map[string]interface{}{"disk_provisioning_type": "thin"}
+				delete(c, "cloud_init")
+			},
+			restart: true,
+		},
+		{
+			name: "cloud_init alone passes",
+		},
+		{
+			name: "deploy_options alone passes",
+			mutate: func(st *terraform.InstanceState, c map[string]interface{}) {
+				delete(st.Attributes, "cloud_init.%")
+				delete(st.Attributes, "cloud_init.user-data")
+				delete(c, "cloud_init")
+				c["deploy_options"] = map[string]interface{}{"user-data": "owned-by-deploy"}
+			},
+		},
+		{
+			// An unresolved map reads as empty here, so the check skips rather
+			// than refusing a plan Terraform has not finished resolving.
+			name: "an unknown cloud_init map does not refuse",
+			mutate: func(_ *terraform.InstanceState, c map[string]interface{}) {
+				c["cloud_init"] = unknown
+				c["deploy_options"] = map[string]interface{}{"user-data": "owned-by-deploy"}
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			st, raw := base()
+			if tc.mutate != nil {
+				tc.mutate(st, raw)
+			}
+			_, err := resourceVirtualMachine().Diff(context.Background(), st, terraform.NewResourceConfigRaw(raw), nil)
+			if tc.restart {
+				if err == nil || !strings.Contains(err.Error(), "allow_vm_restart") {
+					t.Fatalf("expected the power-state refusal, got: %v", err)
+				}
+				return
+			}
+			if len(tc.refuse) == 0 {
+				if err != nil {
+					t.Fatalf("the guard must not refuse here, got: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("expected the collision refusal, got none")
+			}
+			msg := err.Error()
+			if !strings.Contains(msg, "both cloud_init and deploy_options") {
+				t.Fatalf("the refusal must name the two attributes; got: %s", msg)
+			}
+			// Pinned as one substring so the order is part of the contract.
+			if want := strings.Join(tc.refuse, ", "); !strings.Contains(msg, want) {
+				t.Fatalf("the refusal must name %q, in that order; got: %s", want, msg)
+			}
+		})
+	}
+}
+
 // TestVMwareCloudInitRefreshResyncsTrackedKeys pins the refresh contract.
 //
 // Before this, `cloud_init` was a write-only record of the last applied intent:
 // an out-of-band change to a managed key was invisible for ever, which is not
-// what Terraform state means. It now resynchronises — but only over the keys it
-// already tracks. The non-adoption case below is the one that matters most: a
-// machine's vApp carries properties from its image, from deploy_options and
-// from the platform, and pulling those into state would make the next plan
-// propose to delete values the operator never declared.
+// what Terraform state means. It now resynchronises, within four bounds that
+// each exist because crossing it breaks an ordinary, unchanged configuration:
+//
+//   - it never adopts an untracked property — a machine's vApp also carries
+//     values from its image, from deploy_options and from the platform;
+//   - it never drops a tracked key. Clone and from-scratch creations send no
+//     deploy options, so those machines legitimately track keys their vApp never
+//     received; dropping them makes an unchanged configuration plan, and that
+//     plan is refused on a running machine without allow_vm_restart;
+//   - it never touches a key deploy_options also declares, because creation
+//     sends the deploy_options value and the planner refuses shared keys;
+//   - it never fails, per key or at all. A failed refresh takes the whole plan
+//     with it and offers no provider-side recovery.
 func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
 	prop := func(key float64, id, value string) map[string]interface{} {
 		return map[string]interface{}{"key": key, "id": id, "value": value,
@@ -1152,9 +1372,10 @@ func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
 	for _, tc := range []struct {
 		name      string
 		tracked   map[string]string
+		deploy    map[string]string
 		props     []map[string]interface{}
 		failGetNo int
-		wantErr   string
+		wantWarn  string
 		want      map[string]string // expected cloud_init in state afterwards
 	}{
 		{
@@ -1173,32 +1394,57 @@ func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
 			want: map[string]string{"user-data": "b2xk"},
 		},
 		{
-			name:    "a managed key deleted out of band is dropped so the plan re-adds it",
+			// A clone or from-scratch machine tracks keys its vApp never got,
+			// because neither creation path sends deploy options. Dropping them
+			// would make this unchanged configuration plan.
+			name:    "a key absent from the vApp is kept, not dropped",
 			tracked: map[string]string{"user-data": "b2xk", "hostname": "web01"},
 			props:   []map[string]interface{}{prop(7000, "user-data", "b2xk")},
-			want:    map[string]string{"user-data": "b2xk"},
+			want:    map[string]string{"user-data": "b2xk", "hostname": "web01"},
 		},
 		{
-			// Never drop a tracked key on unproven absence.
-			name:      "an unreadable vApp leaves the recorded values untouched",
-			tracked:   map[string]string{"user-data": "b2xk"},
+			// Creation sends the deploy_options value for a shared key, so the
+			// live property belongs to that attribute. Recording it here leaves
+			// a diff the planner then refuses for collision, with no way out.
+			name:    "a key shared with deploy_options is never resynchronised",
+			tracked: map[string]string{"user-data": "declared-in-cloud-init"},
+			deploy:  map[string]string{"user-data": "declared-in-deploy-options"},
+			props:   []map[string]interface{}{prop(7000, "user-data", "declared-in-deploy-options")},
+			want:    map[string]string{"user-data": "declared-in-cloud-init"},
+		},
+		{
+			name:      "an unreadable vApp leaves every recorded value untouched",
+			tracked:   map[string]string{"user-data": "b2xk", "hostname": "web01"},
 			props:     []map[string]interface{}{prop(7000, "user-data", "changed-outside")},
 			failGetNo: 2, // the general read succeeds; the vApp re-read does not
-			wantErr:   "left untouched",
+			wantWarn:  "could not be read",
+			want:      map[string]string{"user-data": "b2xk", "hostname": "web01"},
 		},
 		{
-			name:    "duplicate entries for a tracked key fail closed",
+			name:    "duplicate entries leave that key untouched",
 			tracked: map[string]string{"user-data": "b2xk"},
 			props: []map[string]interface{}{prop(7000, "user-data", "one"),
 				prop(7001, "user-data", "two")},
-			wantErr: "duplicate entries for the cloud_init key",
+			wantWarn: "duplicate entries for the cloud_init key",
+			want:     map[string]string{"user-data": "b2xk"},
 		},
 		{
-			name:    "a non-string live value fails closed",
+			name:    "a non-string live value leaves that key untouched",
 			tracked: map[string]string{"user-data": "b2xk"},
 			props: []map[string]interface{}{{"key": float64(7000), "id": "user-data",
 				"value": float64(42), "label": "User data", "type": "string"}},
-			wantErr: "does not hold a string value",
+			wantWarn: "does not hold a string value",
+			want:     map[string]string{"user-data": "b2xk"},
+		},
+		{
+			// Degradation is per key, not a global bail-out: one unreadable key
+			// must not freeze the resynchronisation of a healthy one.
+			name:    "one anomalous key does not block another",
+			tracked: map[string]string{"user-data": "b2xk", "hostname": "web01"},
+			props: []map[string]interface{}{prop(7000, "user-data", "one"),
+				prop(7001, "user-data", "two"), prop(7002, "hostname", "renamed-outside")},
+			wantWarn: "duplicate entries for the cloud_init key",
+			want:     map[string]string{"user-data": "b2xk", "hostname": "renamed-outside"},
 		},
 		{
 			// An imported machine tracks nothing, so there is nothing to
@@ -1231,28 +1477,37 @@ func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
 					state.Attributes["cloud_init."+k] = v
 				}
 			}
+			if len(tc.deploy) > 0 {
+				state.Attributes["deploy_options.%"] = fmt.Sprint(len(tc.deploy))
+				for k, v := range tc.deploy {
+					state.Attributes["deploy_options."+k] = v
+				}
+			}
 			f := &cloudInitPowerFake{t: t, power: "stopped", props: tc.props, failGetNo: tc.failGetNo}
 			c := newAssignTestClient(t, f.handler)
 
 			next, diags := r.RefreshWithoutUpgrade(context.Background(), state, c)
-			if tc.wantErr != "" {
-				if !diags.HasError() {
-					t.Fatalf("expected a refusal containing %q, got none", tc.wantErr)
-				}
-				if msg := fmt.Sprint(diags); !strings.Contains(msg, tc.wantErr) {
-					t.Fatalf("refusal must name its own cause (want %q); got: %s", tc.wantErr, msg)
-				}
-				// Failing closed means the prior values survive, not that they vanish.
-				for k, v := range tc.tracked {
-					if next != nil && next.Attributes["cloud_init."+k] != v {
-						t.Fatalf("a failed refresh dropped cloud_init.%s", k)
-					}
-				}
-				return
-			}
+
+			// The invariant that makes every bound above safe to rely on: a
+			// refresh anomaly never reaches the operator as a failed plan.
 			if diags.HasError() {
-				t.Fatal(diags)
+				t.Fatalf("refresh must never fail a plan; got: %s", fmt.Sprint(diags))
 			}
+			warned := ""
+			for _, d := range diags {
+				if d.Severity != diag.Warning {
+					t.Fatalf("unexpected diagnostic severity %v: %s", d.Severity, d.Detail)
+				}
+				warned += d.Detail + "\n"
+			}
+			if tc.wantWarn == "" {
+				if warned != "" {
+					t.Fatalf("expected no warning, got: %s", warned)
+				}
+			} else if !strings.Contains(warned, tc.wantWarn) {
+				t.Fatalf("warning must name its own cause (want %q); got: %q", tc.wantWarn, warned)
+			}
+
 			for k, v := range tc.want {
 				if got := next.Attributes["cloud_init."+k]; got != v {
 					t.Fatalf("cloud_init.%s = %q, want %q", k, got, v)
