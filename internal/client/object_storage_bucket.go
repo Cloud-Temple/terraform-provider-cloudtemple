@@ -96,10 +96,17 @@ func (c *BucketClient) Read(ctx context.Context, name string) (*Bucket, error) {
 	return &out, nil
 }
 
+// IPWhitelistEntry is one entry of `ipWhiteList`. It carries no description:
+// an absent description keeps the one stored for the range, an empty string
+// would clear it.
+type IPWhitelistEntry struct {
+	CIDR string `json:"cidr"`
+}
+
 type CreateBucketRequest struct {
-	Name       string   `json:"name"`
-	AccessType string   `json:"accessType"`
-	Whitelist  []string `json:"whitelist,omitempty"`
+	Name        string             `json:"name"`
+	AccessType  string             `json:"accessType"`
+	IPWhitelist []IPWhitelistEntry `json:"ipWhiteList,omitempty"`
 }
 
 func (c *BucketClient) Create(ctx context.Context, req *CreateBucketRequest) (string, error) {
@@ -114,8 +121,28 @@ func (c *BucketClient) Delete(ctx context.Context, name string) (string, error) 
 }
 
 type UpdateWhitelistRequest struct {
-	AccessType string   `json:"accessType"`
-	Whitelist  []string `json:"whitelist,omitempty"`
+	AccessType  string             `json:"accessType"`
+	IPWhitelist []IPWhitelistEntry `json:"ipWhiteList,omitempty"`
+}
+
+// ListWhitelist returns the CIDRs the platform applies to a bucket.
+func (c *BucketClient) ListWhitelist(ctx context.Context, name string) ([]string, error) {
+	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s/whitelist", name)
+	resp, err := c.c.doRequest(ctx, r)
+	if err != nil {
+		return nil, err
+	}
+	defer closeResponseBody(resp)
+	if err := requireOK(resp); err != nil {
+		return nil, err
+	}
+
+	var out []string
+	if err := decodeBody(resp, &out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
 }
 
 func (c *BucketClient) UpdateWhitelist(ctx context.Context, name string, req *UpdateWhitelistRequest) (string, error) {
