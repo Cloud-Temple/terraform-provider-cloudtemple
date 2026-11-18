@@ -21,9 +21,7 @@ const (
 	testCompanyIDEnvName = "SHIVA_TEST_COMPANY_ID"
 )
 
-// testAccClient builds an API client with the suite's credentials, for the
-// out-of-band live assertions that read what the platform holds rather than
-// what the state holds.
+// testAccClient builds an API client with the suite's credentials.
 func testAccClient(t *testing.T) *client.Client {
 	t.Helper()
 	cfg := client.DefaultConfig()

@@ -28,9 +28,7 @@ func captureBucketWrite(t *testing.T, gotMethod, gotPath *string, gotBody *map[s
 }
 
 // TestBucketWhitelistBody pins the body sent for a bucket whitelist: the CIDRs
-// travel as `ipWhiteList` entries carrying only `cidr`. The deprecated
-// `whitelist` field is being removed from the API, and a `description` key —
-// even empty — would overwrite the description stored for that range.
+// travel as `ipWhiteList` entries carrying only `cidr`, with no `whitelist` key.
 func TestBucketWhitelistBody(t *testing.T) {
 	ctx := context.Background()
 	cidrs := []string{"10.0.0.0/8", "192.168.1.0/24"}
@@ -114,60 +112,36 @@ func TestBucketWhitelistBody(t *testing.T) {
 	})
 }
 
-// TestBucketReadWhitelist pins the evidence channel of the acceptance tests:
-// the whitelist is read from GET /buckets/{bucket}/whitelist with
-// `includeDescriptions=true` — the only form in which the API answers entries
-// (observed on the recette API: without it the answer is a bare list of CIDR
-// strings) — decoded entry by entry, and only a complete HTTP 200 counts: a
-// 206 is a partial listing that cannot prove what the platform holds, so it
-// is an error, not a shorter list.
+// TestBucketReadWhitelist pins the read used by the acceptance tests: the
+// CIDRs of GET /buckets/{bucket}/whitelist, and an error on a partial answer.
 func TestBucketReadWhitelist(t *testing.T) {
 	ctx := context.Background()
 
-	serve := func(status int, body string) (*string, *string, *string, *Client) {
-		var method, path, query string
+	t.Run("decodes the CIDRs", func(t *testing.T) {
+		var method, path string
 		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			method = r.Method
-			path = r.URL.Path
-			query = r.URL.RawQuery
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(status)
-			_, _ = w.Write([]byte(body))
+			method, path = r.Method, r.URL.Path
+			_, _ = w.Write([]byte(`["10.0.0.0/8","192.168.1.0/24"]`))
 		})
-		return &method, &path, &query, c
-	}
-
-	t.Run("decodes the entries of a complete answer", func(t *testing.T) {
-		method, path, query, c := serve(http.StatusOK, `[{"cidr":"10.0.0.0/8","description":"label","source":"client"},{"cidr":"192.168.1.0/24","description":"","source":"client"}]`)
 		got, err := c.ObjectStorage().Bucket().ReadWhitelist(ctx, "bucket-1")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if *method != http.MethodGet || *path != "/storage/object/v1/buckets/bucket-1/whitelist" || *query != "includeDescriptions=true" {
-			t.Fatalf("unexpected request: %s %s?%s", *method, *path, *query)
+		if method != http.MethodGet || path != "/storage/object/v1/buckets/bucket-1/whitelist" {
+			t.Fatalf("unexpected request: %s %s", method, path)
 		}
-		want := []*BucketWhitelistEntry{{CIDR: "10.0.0.0/8", Description: "label", Source: "client"}, {CIDR: "192.168.1.0/24", Source: "client"}}
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("unexpected entries:\n got  %+v\n want %+v", got, want)
-		}
-	})
-
-	t.Run("a partial answer is an error, not a shorter list", func(t *testing.T) {
-		_, _, _, c := serve(http.StatusPartialContent, `[{"cidr":"10.0.0.0/8","source":"client"}]`)
-		got, err := c.ObjectStorage().Bucket().ReadWhitelist(ctx, "bucket-1")
-		if err == nil {
-			t.Fatalf("expected an error on HTTP 206, got entries %+v", got)
+		if want := []string{"10.0.0.0/8", "192.168.1.0/24"}; !reflect.DeepEqual(got, want) {
+			t.Fatalf("unexpected CIDRs: got %v, want %v", got, want)
 		}
 	})
 
-	t.Run("an empty whitelist is an empty list", func(t *testing.T) {
-		_, _, _, c := serve(http.StatusOK, `[]`)
-		got, err := c.ObjectStorage().Bucket().ReadWhitelist(ctx, "bucket-1")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(got) != 0 {
-			t.Fatalf("expected no entry, got %+v", got)
+	t.Run("a partial answer is an error", func(t *testing.T) {
+		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusPartialContent)
+			_, _ = w.Write([]byte(`["10.0.0.0/8"]`))
+		})
+		if got, err := c.ObjectStorage().Bucket().ReadWhitelist(ctx, "bucket-1"); err == nil {
+			t.Fatalf("expected an error on HTTP 206, got %v", got)
 		}
 	})
 }

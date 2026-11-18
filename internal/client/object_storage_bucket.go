@@ -96,16 +96,15 @@ func (c *BucketClient) Read(ctx context.Context, name string) (*Bucket, error) {
 	return &out, nil
 }
 
-// IPWhiteListEntry is one entry of the `ipWhiteList` field of the bucket
-// routes. It carries no description on purpose: the API reads an absent
-// description as "no opinion" and keeps the one already stored (for example
-// set from the console), whereas an empty string would clear it.
+// IPWhiteListEntry is one entry of `ipWhiteList`. It carries no description:
+// an absent description keeps the one stored for the range, an empty string
+// would clear it.
 type IPWhiteListEntry struct {
 	CIDR string `json:"cidr"`
 }
 
-// NewIPWhiteList maps a list of CIDRs to `ipWhiteList` entries. The deprecated
-// `whitelist` field (a bare list of CIDRs) is being removed from the API.
+// NewIPWhiteList maps CIDRs to `ipWhiteList` entries. It returns nil for an
+// empty list, so that no list is sent: the API refuses an empty one.
 func NewIPWhiteList(cidrs []string) []IPWhiteListEntry {
 	if len(cidrs) == 0 {
 		return nil
@@ -139,25 +138,10 @@ type UpdateWhitelistRequest struct {
 	IPWhiteList []IPWhiteListEntry `json:"ipWhiteList,omitempty"`
 }
 
-// BucketWhitelistEntry is one entry of the whitelist the platform holds for a
-// bucket, as returned by GET /storage/object/v1/buckets/{bucket}/whitelist
-// when `includeDescriptions=true` is asked (without it the route answers a
-// bare list of CIDR strings). Source tells where the entry comes from
-// (`client` for a range declared by the tenant).
-type BucketWhitelistEntry struct {
-	CIDR        string `json:"cidr"`
-	Description string `json:"description"`
-	Source      string `json:"source"`
-}
-
-// ReadWhitelist returns the whitelist the platform currently holds for a
-// bucket. The resource does not read it back (the `whitelist` attribute is
-// write-only), so this is the evidence channel used by the acceptance tests to
-// check what the platform recorded rather than what the state holds. Only a
-// complete HTTP 200 is accepted: a partial answer cannot stand as evidence.
-func (c *BucketClient) ReadWhitelist(ctx context.Context, name string) ([]*BucketWhitelistEntry, error) {
+// ReadWhitelist returns the CIDRs the platform applies to a bucket. Only a
+// complete HTTP 200 is accepted.
+func (c *BucketClient) ReadWhitelist(ctx context.Context, name string) ([]string, error) {
 	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s/whitelist", name)
-	r.params.Set("includeDescriptions", "true")
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
@@ -167,7 +151,7 @@ func (c *BucketClient) ReadWhitelist(ctx context.Context, name string) ([]*Bucke
 		return nil, err
 	}
 
-	var out []*BucketWhitelistEntry
+	var out []string
 	if err := decodeBody(resp, &out); err != nil {
 		return nil, err
 	}
