@@ -3,10 +3,12 @@ package provider
 import (
 	"context"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"testing"
 
+	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/resource"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
@@ -61,7 +63,7 @@ func TestAccResourceObjectStorageBucket_CustomWithWhitelist(t *testing.T) {
 func testAccCheckObjectStorageBucketPlatformWhitelist(t *testing.T, resourceName string, want []string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
 		name := s.RootModule().Resources[resourceName].Primary.Attributes["name"]
-		got, err := testAccClient(t).ObjectStorage().Bucket().ReadWhitelist(context.Background(), name)
+		got, err := bucketTestClient(t).ObjectStorage().Bucket().ListWhitelist(context.Background(), name)
 		if err != nil {
 			return fmt.Errorf("read the whitelist of bucket %s: %w", name, err)
 		}
@@ -74,6 +76,20 @@ func testAccCheckObjectStorageBucketPlatformWhitelist(t *testing.T, resourceName
 		}
 		return nil
 	}
+}
+
+// bucketTestClient builds an API client for the out-of-band whitelist check
+// above, with the credentials the acceptance suite already requires.
+func bucketTestClient(t *testing.T) *client.Client {
+	t.Helper()
+	cfg := client.DefaultConfig()
+	cfg.ClientID = os.Getenv(testClientIDEnvName)
+	cfg.SecretID = os.Getenv(testSecretIDEnvName)
+	c, err := client.NewClient(cfg)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	return c
 }
 
 func TestAccResourceObjectStorageBucket_WithVersioning(t *testing.T) {

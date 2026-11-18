@@ -31,7 +31,7 @@ func captureBucketWrite(t *testing.T, gotMethod, gotPath *string, gotBody *map[s
 // travel as `ipWhiteList` entries carrying only `cidr`, with no `whitelist` key.
 func TestBucketWhitelistBody(t *testing.T) {
 	ctx := context.Background()
-	cidrs := []string{"10.0.0.0/8", "192.168.1.0/24"}
+	entries := []IPWhitelistEntry{{CIDR: "10.0.0.0/8"}, {CIDR: "192.168.1.0/24"}}
 	wantEntries := []any{
 		map[string]any{"cidr": "10.0.0.0/8"},
 		map[string]any{"cidr": "192.168.1.0/24"},
@@ -44,7 +44,7 @@ func TestBucketWhitelistBody(t *testing.T) {
 		if _, err := c.ObjectStorage().Bucket().Create(ctx, &CreateBucketRequest{
 			Name:        "bucket-1",
 			AccessType:  "custom",
-			IPWhiteList: NewIPWhiteList(cidrs),
+			IPWhitelist: entries,
 		}); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -63,7 +63,7 @@ func TestBucketWhitelistBody(t *testing.T) {
 		c := newPATTestClient(t, captureBucketWrite(t, &method, &path, &body))
 		if _, err := c.ObjectStorage().Bucket().UpdateWhitelist(ctx, "bucket-1", &UpdateWhitelistRequest{
 			AccessType:  "custom",
-			IPWhiteList: NewIPWhiteList(cidrs),
+			IPWhitelist: entries,
 		}); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -85,7 +85,7 @@ func TestBucketWhitelistBody(t *testing.T) {
 		if _, err := c.ObjectStorage().Bucket().Create(ctx, &CreateBucketRequest{
 			Name:        "bucket-1",
 			AccessType:  "private",
-			IPWhiteList: NewIPWhiteList([]string{}),
+			IPWhitelist: []IPWhitelistEntry{},
 		}); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -101,7 +101,7 @@ func TestBucketWhitelistBody(t *testing.T) {
 		c := newPATTestClient(t, captureBucketWrite(t, &method, &path, &body))
 		if _, err := c.ObjectStorage().Bucket().UpdateWhitelist(ctx, "bucket-1", &UpdateWhitelistRequest{
 			AccessType:  "private",
-			IPWhiteList: NewIPWhiteList([]string{}),
+			IPWhitelist: []IPWhitelistEntry{},
 		}); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -112,36 +112,22 @@ func TestBucketWhitelistBody(t *testing.T) {
 	})
 }
 
-// TestBucketReadWhitelist pins the read used by the acceptance tests: the
-// CIDRs of GET /buckets/{bucket}/whitelist, and an error on a partial answer.
-func TestBucketReadWhitelist(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("decodes the CIDRs", func(t *testing.T) {
-		var method, path string
-		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			method, path = r.Method, r.URL.Path
-			_, _ = w.Write([]byte(`["10.0.0.0/8","192.168.1.0/24"]`))
-		})
-		got, err := c.ObjectStorage().Bucket().ReadWhitelist(ctx, "bucket-1")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if method != http.MethodGet || path != "/storage/object/v1/buckets/bucket-1/whitelist" {
-			t.Fatalf("unexpected request: %s %s", method, path)
-		}
-		if want := []string{"10.0.0.0/8", "192.168.1.0/24"}; !reflect.DeepEqual(got, want) {
-			t.Fatalf("unexpected CIDRs: got %v, want %v", got, want)
-		}
+// TestBucketListWhitelist pins the read used by the acceptance tests: the
+// CIDRs of GET /buckets/{bucket}/whitelist.
+func TestBucketListWhitelist(t *testing.T) {
+	var method, path string
+	c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+		method, path = r.Method, r.URL.Path
+		_, _ = w.Write([]byte(`["10.0.0.0/8","192.168.1.0/24"]`))
 	})
-
-	t.Run("a partial answer is an error", func(t *testing.T) {
-		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusPartialContent)
-			_, _ = w.Write([]byte(`["10.0.0.0/8"]`))
-		})
-		if got, err := c.ObjectStorage().Bucket().ReadWhitelist(ctx, "bucket-1"); err == nil {
-			t.Fatalf("expected an error on HTTP 206, got %v", got)
-		}
-	})
+	got, err := c.ObjectStorage().Bucket().ListWhitelist(context.Background(), "bucket-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if method != http.MethodGet || path != "/storage/object/v1/buckets/bucket-1/whitelist" {
+		t.Fatalf("unexpected request: %s %s", method, path)
+	}
+	if want := []string{"10.0.0.0/8", "192.168.1.0/24"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected CIDRs: got %v, want %v", got, want)
+	}
 }

@@ -21,19 +21,6 @@ const (
 	testCompanyIDEnvName = "SHIVA_TEST_COMPANY_ID"
 )
 
-// testAccClient builds an API client with the suite's credentials.
-func testAccClient(t *testing.T) *client.Client {
-	t.Helper()
-	cfg := client.DefaultConfig()
-	cfg.ClientID = os.Getenv(testClientIDEnvName)
-	cfg.SecretID = os.Getenv(testSecretIDEnvName)
-	c, err := client.NewClient(cfg)
-	if err != nil {
-		t.Fatalf("NewClient: %v", err)
-	}
-	return c
-}
-
 func TestMain(m *testing.M) {
 
 	// err := godotenv.Load("../../.env")

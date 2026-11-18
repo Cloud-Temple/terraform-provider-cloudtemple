@@ -96,30 +96,17 @@ func (c *BucketClient) Read(ctx context.Context, name string) (*Bucket, error) {
 	return &out, nil
 }
 
-// IPWhiteListEntry is one entry of `ipWhiteList`. It carries no description:
+// IPWhitelistEntry is one entry of `ipWhiteList`. It carries no description:
 // an absent description keeps the one stored for the range, an empty string
 // would clear it.
-type IPWhiteListEntry struct {
+type IPWhitelistEntry struct {
 	CIDR string `json:"cidr"`
-}
-
-// NewIPWhiteList maps CIDRs to `ipWhiteList` entries. It returns nil for an
-// empty list, so that no list is sent: the API refuses an empty one.
-func NewIPWhiteList(cidrs []string) []IPWhiteListEntry {
-	if len(cidrs) == 0 {
-		return nil
-	}
-	entries := make([]IPWhiteListEntry, len(cidrs))
-	for i, cidr := range cidrs {
-		entries[i] = IPWhiteListEntry{CIDR: cidr}
-	}
-	return entries
 }
 
 type CreateBucketRequest struct {
 	Name        string             `json:"name"`
 	AccessType  string             `json:"accessType"`
-	IPWhiteList []IPWhiteListEntry `json:"ipWhiteList,omitempty"`
+	IPWhitelist []IPWhitelistEntry `json:"ipWhiteList,omitempty"`
 }
 
 func (c *BucketClient) Create(ctx context.Context, req *CreateBucketRequest) (string, error) {
@@ -135,19 +122,18 @@ func (c *BucketClient) Delete(ctx context.Context, name string) (string, error) 
 
 type UpdateWhitelistRequest struct {
 	AccessType  string             `json:"accessType"`
-	IPWhiteList []IPWhiteListEntry `json:"ipWhiteList,omitempty"`
+	IPWhitelist []IPWhitelistEntry `json:"ipWhiteList,omitempty"`
 }
 
-// ReadWhitelist returns the CIDRs the platform applies to a bucket. Only a
-// complete HTTP 200 is accepted.
-func (c *BucketClient) ReadWhitelist(ctx context.Context, name string) ([]string, error) {
+// ListWhitelist returns the CIDRs the platform applies to a bucket.
+func (c *BucketClient) ListWhitelist(ctx context.Context, name string) ([]string, error) {
 	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s/whitelist", name)
 	resp, err := c.c.doRequest(ctx, r)
 	if err != nil {
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireHttpCodes(resp, 200); err != nil {
+	if err := requireOK(resp); err != nil {
 		return nil, err
 	}
 
