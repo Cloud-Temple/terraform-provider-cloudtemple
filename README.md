@@ -68,9 +68,6 @@ In order to run the test suite, rename `.env.test.dist` to `.env.test` in the
 root directory and fill the environment variables with existing, correct data
 from the Shiva instance you want to work with. Use the Shiva console or the API
 to get the data, or contact a project administrator for more information.
-Against a public gateway (production or recette), set `SHIVA_TEST_API_SUFFIX=1`:
-the acceptance tests then call the API under the `/api` prefix, as the provider
-does by default.
 
 To run the Go client tests:
 

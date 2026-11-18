@@ -19,17 +19,7 @@ const (
 	testClientIDEnvName  = "SHIVA_TEST_CLIENT_ID"
 	testSecretIDEnvName  = "SHIVA_TEST_SECRET_ID"
 	testCompanyIDEnvName = "SHIVA_TEST_COMPANY_ID"
-	// testAPISuffixEnvName, when set to "1", makes the suite prefix every API
-	// path with `/api`, as the provider does by default: the public gateways
-	// (production and recette) only serve the API under that prefix.
-	testAPISuffixEnvName = "SHIVA_TEST_API_SUFFIX"
 )
-
-// testAPISuffix reports whether the suite must call the API under the `/api`
-// prefix (see testAPISuffixEnvName).
-func testAPISuffix() bool {
-	return os.Getenv(testAPISuffixEnvName) == "1"
-}
 
 // testAccClient builds an API client with the suite's credentials, for the
 // out-of-band live assertions that read what the platform holds rather than
@@ -39,7 +29,6 @@ func testAccClient(t *testing.T) *client.Client {
 	cfg := client.DefaultConfig()
 	cfg.ClientID = os.Getenv(testClientIDEnvName)
 	cfg.SecretID = os.Getenv(testSecretIDEnvName)
-	cfg.ApiSuffix = testAPISuffix()
 	c, err := client.NewClient(cfg)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
@@ -74,7 +63,6 @@ func TestMain(m *testing.M) {
 	config := client.DefaultConfig()
 	config.ClientID = os.Getenv(testClientIDEnvName)
 	config.SecretID = os.Getenv(testSecretIDEnvName)
-	config.ApiSuffix = testAPISuffix()
 
 	c, err := client.NewClient(config)
 	if err != nil {
@@ -177,7 +165,7 @@ func TestMain(m *testing.M) {
 var providerFactories = map[string]func() (*schema.Provider, error){
 	"cloudtemple": func() (*schema.Provider, error) {
 		p := providerpkg.New("dev")()
-		p.Schema["api_suffix"].Default = testAPISuffix()
+		p.Schema["api_suffix"].Default = false
 		return p, nil
 	},
 }

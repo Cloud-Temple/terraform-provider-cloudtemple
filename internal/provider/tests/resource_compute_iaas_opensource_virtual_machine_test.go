@@ -497,7 +497,14 @@ resource "cloudtemple_compute_iaas_opensource_virtual_machine" "vpc" {
 // to run without them), so this adds no new configuration surface.
 func vpcTestClient(t *testing.T) *client.Client {
 	t.Helper()
-	return testAccClient(t)
+	cfg := client.DefaultConfig()
+	cfg.ClientID = os.Getenv(testClientIDEnvName)
+	cfg.SecretID = os.Getenv(testSecretIDEnvName)
+	c, err := client.NewClient(cfg)
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+	return c
 }
 
 // TestAccResourceIaasOpensourceVirtualMachineIPReconvergesWithoutAdapterDiff is the
