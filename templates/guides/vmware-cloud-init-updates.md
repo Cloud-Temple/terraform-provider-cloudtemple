@@ -50,7 +50,11 @@ not already ask to interrupt:
 
 Only `power_state` and `allow_vm_restart` may change in the same apply as
 `cloud_init` in an **in-place update**. Every other change to the resource is
-still refused there; apply it separately. A change to a `ForceNew` attribute
+refused at **plan** time, naming the attribute, so you learn before an apply
+begins rather than once the update is under way; apply it separately. When the
+other attribute's new value is not yet resolved at plan time — it comes from
+another resource, say — the plan lets it through and the refusal arrives at
+apply instead, since only then is there a value to judge. A change to a `ForceNew` attribute
 such as `deploy_options` is a different thing entirely: it asks for a
 replacement, the new machine receives `cloud_init` through its own deployment,
 and none of this update path — including the restart opt-in — applies to it. The configuration is validated in full **before** anything is

@@ -1040,6 +1040,16 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 						return nil
 					}
 				}
+				// The sole-change rule, brought forward from the apply so the
+				// operator learns before anything begins rather than after the
+				// update path has already been entered. It is reported here only
+				// when the other attribute's new value is RESOLVED: an unknown
+				// one reports as changed whether or not it will be, and refusing
+				// on that would block a legitimate plan. The apply-time copy sees
+				// the resolved value and remains the authoritative one.
+				if name := cloudInitOtherChangedAttribute(cloudInitKnownChanges{d}); name != "" {
+					return fmt.Errorf("cannot change %q in the same apply as cloud_init: apply the cloud_init change on its own", name)
+				}
 				// Fail OPEN on anything Terraform has not resolved yet. Two
 				// sources are needed and neither subsumes the other:
 				// NewValueKnown works on the legacy diff path, where the raw

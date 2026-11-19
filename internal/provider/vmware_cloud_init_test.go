@@ -106,7 +106,7 @@ func TestVMwareCloudInitApplyReplacesBeforeDeleting(t *testing.T) {
 }
 
 func TestVMwareCloudInitFailureRetainsSDKState(t *testing.T) {
-	for _, mode := range []string{"read403", "read206", "missing-list", "null-list", "wrong-id", "duplicate-key", "duplicate-id", "running-no-optin", "power-unknown", "disabled", "missing-managed", "drift", "unsafe-value", "empty-value", "mixed-change", "post-lost", "post-delayed", "wait-add", "read-add", "wrong-clone", "collateral-change", "concurrent-before-delete", "delete-lost", "wait-delete", "read-after-delete", "final-vapp-check", "verified-then-read-fails", "cancel", "id-missing", "id-null", "id-number", "later-invalid"} {
+	for _, mode := range []string{"read403", "read206", "missing-list", "null-list", "wrong-id", "duplicate-key", "duplicate-id", "running-no-optin", "power-unknown", "disabled", "missing-managed", "drift", "unsafe-value", "empty-value", "mixed-change-unknown", "post-lost", "post-delayed", "wait-add", "read-add", "wrong-clone", "collateral-change", "concurrent-before-delete", "delete-lost", "wait-delete", "read-after-delete", "final-vapp-check", "verified-then-read-fails", "cancel", "id-missing", "id-null", "id-number", "later-invalid"} {
 		t.Run(mode, func(t *testing.T) {
 			r := resourceVirtualMachine()
 			state, cfg := cloudInitStateConfig()
@@ -128,12 +128,17 @@ func TestVMwareCloudInitFailureRetainsSDKState(t *testing.T) {
 				cfg.Raw["cloud_init"] = map[string]interface{}{"user-data": ""}
 				cfg.Config = cfg.Raw
 			}
-			if mode == "running-no-optin" {
-				cfg.Raw["power_state"] = "on"
+			// The ONE path that still reaches the apply-time sole-change check:
+			// an attribute whose new value the plan could not resolve. The plan
+			// guard deliberately fails open there, so without this check a
+			// cloud_init update would be interleaved with a real change to
+			// another attribute.
+			if mode == "mixed-change-unknown" {
+				cfg.Raw["name"] = "74D93920-ED26-11E3-AC10-0800200C9A66" // hcl2shim.UnknownVariableValue
 				cfg.Config = cfg.Raw
 			}
-			if mode == "mixed-change" {
-				cfg.Raw["name"] = "new-name"
+			if mode == "running-no-optin" {
+				cfg.Raw["power_state"] = "on"
 				cfg.Config = cfg.Raw
 			}
 			props := []map[string]interface{}{{"key": float64(7000), "id": "user-data", "value": "b2xk", "label": "User data", "type": "string", "userConfigurable": float64(1), "description": "preserve me"}}
@@ -321,8 +326,9 @@ func TestVMwareCloudInitFailureRetainsSDKState(t *testing.T) {
 			// produced the failure: pin each power refusal to its OWN diagnostic,
 			// or removing it passes anyway because a later check catches the case.
 			if want := map[string]string{
-				"power-unknown":    "unsupported power state",
-				"running-no-optin": "allow_vm_restart",
+				"power-unknown":        "unsupported power state",
+				"running-no-optin":     "allow_vm_restart",
+				"mixed-change-unknown": `"name"`,
 			}[mode]; want != "" && !strings.Contains(message, want) {
 				t.Fatalf("mode %s must be refused by its own guard; got: %s", mode, message)
 			}
@@ -844,12 +850,10 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 			applyFails: true, actions: "[]", wantIntent: "b2xk", wantLive: "secret-from-api",
 			diagnostic: "unsupported power state"},
 		// Exempting the two power attributes must not have opened the guard.
-		{name: "other-attribute-still-refused", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
-			otherAttr: "name", applyFails: true, actions: "[]", wantLive: "running", wantIntent: "b2xk",
-			diagnostic: `"name"`},
-		{name: "other-attribute-tags-still-refused", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
-			otherAttr: "tags", applyFails: true, actions: "[]", wantLive: "running", wantIntent: "b2xk",
-			diagnostic: `"tags"`},
+		{name: "other-attribute-still-refused", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+			otherAttr: "name", planFails: true, diagnostic: `"name"`},
+		{name: "other-attribute-tags-still-refused", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+			otherAttr: "tags", planFails: true, diagnostic: `"tags"`},
 		// An inapplicable configuration must cost NO downtime.
 		{name: "invalid-config-refused-before-downtime", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			unsafe: true, applyFails: true, actions: "[]", wantLive: "running", wantIntent: "b2xk",
@@ -1131,6 +1135,61 @@ func TestVMwareCloudInitVerifiedIntentConverges(t *testing.T) {
 	}
 }
 
+// cloudInitFakeChanges answers the sole-change rule without a diff engine.
+type cloudInitFakeChanges map[string]bool
+
+func (f cloudInitFakeChanges) HasChange(name string) bool { return f[name] }
+
+// TestVMwareCloudInitSoleChangeRule pins which attributes may travel with
+// cloud_init. The rule is evaluated twice — brought forward to the plan so the
+// operator learns before an apply begins, and again at apply where it is
+// authoritative because the plan copy fails open on unresolved values — so it
+// lives in one function and is pinned here directly rather than only through
+// whichever of the two happens to fire first.
+func TestVMwareCloudInitSoleChangeRule(t *testing.T) {
+	// Derived from the schema rather than hard-coded, so the case keeps meaning
+	// if the attribute it picks is ever renamed.
+	computedOnly := ""
+	for name, sch := range resourceVirtualMachine().Schema {
+		if sch.Computed && !sch.Optional && !sch.Required {
+			if computedOnly == "" || name < computedOnly {
+				computedOnly = name
+			}
+		}
+	}
+	if computedOnly == "" {
+		t.Fatal("the schema has no computed-only attribute; this case can no longer be expressed")
+	}
+	for _, tc := range []struct {
+		name    string
+		changed []string
+		want    string
+	}{
+		{name: "cloud_init alone", changed: []string{"cloud_init"}},
+		// The opt-in has to be grantable in the same apply as the change it
+		// authorises, and this path drives power itself.
+		{name: "power_state may travel with it", changed: []string{"cloud_init", "power_state"}},
+		{name: "allow_vm_restart may travel with it", changed: []string{"cloud_init", "allow_vm_restart"}},
+		{name: "both power attributes may travel with it", changed: []string{"cloud_init", "power_state", "allow_vm_restart"}},
+		{name: "any other attribute is named", changed: []string{"cloud_init", "name"}, want: "name"},
+		{name: "a computed-only attribute is not a change the operator made", changed: []string{"cloud_init", computedOnly}},
+		// Schema iteration order is random. Without sorting, the diagnostic named
+		// a different attribute from run to run, which no operator can script
+		// against and no test can pin.
+		{name: "several changed attributes always resolve to the same one", changed: []string{"cloud_init", "tags", "name", "memory"}, want: "memory"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			set := cloudInitFakeChanges{}
+			for _, n := range tc.changed {
+				set[n] = true
+			}
+			if got := cloudInitOtherChangedAttribute(set); got != tc.want {
+				t.Fatalf("cloudInitOtherChangedAttribute = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
 // TestVMwareCloudInitPlanGuardUnknowns pins the plan-time guard's edges. It must
 // refuse exactly one situation and fail OPEN on everything it cannot decide:
 // a value Terraform has not resolved yet must never turn into a refusal.
@@ -1151,9 +1210,10 @@ func TestVMwareCloudInitPlanGuardUnknowns(t *testing.T) {
 		return state, cfg
 	}
 	for _, tc := range []struct {
-		name   string
-		mutate func(*terraform.InstanceState, map[string]interface{})
-		refuse bool
+		name       string
+		mutate     func(*terraform.InstanceState, map[string]interface{})
+		refuse     bool
+		refuseWith string // the substring the refusal must carry; defaults to the power one
 	}{
 		{name: "running, changed, no opt-in => the one refusal", refuse: true},
 		{name: "create", mutate: func(st *terraform.InstanceState, _ map[string]interface{}) { st.ID = "" }},
@@ -1188,6 +1248,19 @@ func TestVMwareCloudInitPlanGuardUnknowns(t *testing.T) {
 		{name: "replacement via a ForceNew change", mutate: func(_ *terraform.InstanceState, c map[string]interface{}) {
 			c["deploy_options"] = map[string]interface{}{"disk_provisioning_type": "thin"}
 		}},
+		// The sole-change rule, now reported at plan time instead of after the
+		// update path has been entered.
+		{name: "another attribute changed in the same apply", refuse: true, refuseWith: `"name"`,
+			mutate: func(_ *terraform.InstanceState, c map[string]interface{}) {
+				c["allow_vm_restart"] = true // so the power guard cannot be what refuses
+				c["name"] = "renamed"
+			}},
+		// ...but only once its new value is resolved. An unknown reports as
+		// changed whether or not it will be, and the apply-time copy decides.
+		{name: "another attribute unknown in the same apply", mutate: func(_ *terraform.InstanceState, c map[string]interface{}) {
+			c["allow_vm_restart"] = true
+			c["name"] = unknown
+		}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			st, raw := base()
@@ -1196,8 +1269,14 @@ func TestVMwareCloudInitPlanGuardUnknowns(t *testing.T) {
 			}
 			_, err := resourceVirtualMachine().Diff(context.Background(), st, terraform.NewResourceConfigRaw(raw), nil)
 			switch {
-			case tc.refuse && (err == nil || !strings.Contains(err.Error(), "allow_vm_restart")):
-				t.Fatalf("expected the cloud_init power refusal, got: %v", err)
+			case tc.refuse && func() bool {
+				want := tc.refuseWith
+				if want == "" {
+					want = "allow_vm_restart"
+				}
+				return err == nil || !strings.Contains(err.Error(), want)
+			}():
+				t.Fatalf("expected the cloud_init refusal to name its own cause, got: %v", err)
 			case !tc.refuse && err != nil:
 				t.Fatalf("the guard must fail open here, got: %v", err)
 			}

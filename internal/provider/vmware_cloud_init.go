@@ -113,18 +113,11 @@ func updateVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *clien
 		}
 	}()
 
-	// Only the two power-intent attributes may travel with cloud_init. This path
-	// drives power itself, and allow_vm_restart is the opt-in for doing so —
-	// refusing it here would make the opt-in impossible to grant in the same apply
-	// as the change it authorises.
-	for name, s := range resourceVirtualMachine().Schema {
-		switch name {
-		case "cloud_init", "power_state", "allow_vm_restart":
-			continue
-		}
-		if (s.Optional || s.Required) && d.HasChange(name) {
-			return refuseBeforeAnyMutation(d, diag.Errorf("cannot change %q in the same apply as cloud_init: apply the cloud_init change on its own", name))
-		}
+	// The AUTHORITATIVE copy of the sole-change rule. The plan-time guard reports
+	// it earlier, but fails open on a value Terraform has not resolved yet, so
+	// this one still decides.
+	if name := cloudInitOtherChangedAttribute(d); name != "" {
+		return refuseBeforeAnyMutation(d, diag.Errorf("cannot change %q in the same apply as cloud_init: apply the cloud_init change on its own", name))
 	}
 
 	run.deploy = d.Get("deploy_options").(map[string]interface{})
@@ -889,6 +882,54 @@ func cloudInitChangeIsOwnedByDeployOptions(d *schema.ResourceDiff) bool {
 		}
 	}
 	return changed
+}
+
+// cloudInitChangeSet is the slice of ResourceData and ResourceDiff the sole-
+// change rule needs, so the same rule can be evaluated at plan time and at apply
+// time instead of being written twice and drifting apart.
+type cloudInitChangeSet interface {
+	HasChange(string) bool
+}
+
+// cloudInitOtherChangedAttribute names an attribute that would change in the
+// same apply as cloud_init, or "" when none would.
+//
+// Only the two power-intent attributes may travel with cloud_init: this path
+// drives power itself, and allow_vm_restart is the opt-in for doing so, so
+// refusing it would make the opt-in impossible to grant in the same apply as
+// the change it authorises. Everything else is refused, because the vApp
+// add/delete sequence is non-atomic and assumes a quiescent machine.
+//
+// The names are sorted before one is picked. Schema iteration order is random,
+// so without this the diagnostic named a different attribute from run to run
+// when several had changed — which makes a refusal impossible to script against
+// and a test impossible to pin.
+func cloudInitOtherChangedAttribute(d cloudInitChangeSet) string {
+	var changed []string
+	for name, s := range resourceVirtualMachine().Schema {
+		switch name {
+		case "cloud_init", "power_state", "allow_vm_restart":
+			continue
+		}
+		if (s.Optional || s.Required) && d.HasChange(name) {
+			changed = append(changed, name)
+		}
+	}
+	if len(changed) == 0 {
+		return ""
+	}
+	sort.Strings(changed)
+	return changed[0]
+}
+
+// cloudInitKnownChanges reports a change only once Terraform has resolved the
+// new value. At plan time an unresolved attribute reports as changed whether or
+// not it will be, so taking it at face value would refuse a legitimate plan;
+// the apply-time check sees the resolved value and decides for real.
+type cloudInitKnownChanges struct{ d *schema.ResourceDiff }
+
+func (k cloudInitKnownChanges) HasChange(name string) bool {
+	return k.d.NewValueKnown(name) && k.d.HasChange(name)
 }
 
 // cloudInitRefuse freezes the state so a failed update cannot persist planned
