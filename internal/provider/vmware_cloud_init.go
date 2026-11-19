@@ -222,7 +222,11 @@ func cloudInitApplyEdits(ctx context.Context, d *schema.ResourceData, c *client.
 			if err != nil {
 				return cloudInitFail(ctx, c, d, id, run, "adding property", activity)
 			}
-			// A silent waiter prevents backend-echoed cloud-init from leaking into debug logs.
+			// A silent waiter keeps backend-echoed cloud-init out of the DIAGNOSTICS
+			// and out of the activity logs. It does NOT protect the request body:
+			// that is masked by path in the logging transport, because a descriptor
+			// carries its secret as a VALUE ("id":"password") that no key-based
+			// redaction can recognise.
 			if _, err = c.Activity().WaitForCompletion(ctx, activity, nil); err != nil {
 				return cloudInitFail(ctx, c, d, id, run, "waiting for property addition", activity)
 			}
@@ -245,7 +249,11 @@ func cloudInitApplyEdits(ctx context.Context, d *schema.ResourceData, c *client.
 			if err != nil {
 				return cloudInitFail(ctx, c, d, id, run, "deleting original property", activity)
 			}
-			// A silent waiter prevents backend-echoed cloud-init from leaking into debug logs.
+			// A silent waiter keeps backend-echoed cloud-init out of the DIAGNOSTICS
+			// and out of the activity logs. It does NOT protect the request body:
+			// that is masked by path in the logging transport, because a descriptor
+			// carries its secret as a VALUE ("id":"password") that no key-based
+			// redaction can recognise.
 			if _, err = c.Activity().WaitForCompletion(ctx, activity, nil); err != nil {
 				return cloudInitFail(ctx, c, d, id, run, "waiting for original property deletion", activity)
 			}
@@ -434,9 +442,12 @@ func cloudInitReadVM(ctx context.Context, c *client.Client, id, purpose string) 
 // cloudInitPowerAction is this path's own power helper. It deliberately does NOT
 // reuse vmwarePowerAction: that one interpolates raw API errors into diagnostics
 // and waits with getWaiterOptions, which logs backend messages at debug level.
-// Everything on the cloud_init path keeps backend text out of diagnostics AND
-// logs, because a cloud-init payload can hold credentials and an activity error
-// can carry a backend description, result or reason.
+// Everything on the cloud_init path keeps backend text out of diagnostics and
+// out of the ACTIVITY logs, because a cloud-init payload can hold credentials
+// and an activity error can carry a backend description, result or reason.
+//
+// This says nothing about request and response BODIES, which the logging
+// transport handles: see the vapp_properties clause in its RoundTrip.
 func cloudInitPowerAction(ctx context.Context, c *client.Client, vm *client.VirtualMachine, id, action string) error {
 	req := &client.PowerRequest{ID: id, DatacenterId: vm.Datacenter.ID, PowerAction: action}
 	if action == "on" {

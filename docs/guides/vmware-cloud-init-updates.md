@@ -247,6 +247,18 @@ how far the update got. The four cases are distinct and are treated differently:
   reconcile. If one has, the machine is left stopped and the diagnostic says so
   — the applied values are still kept.
 
+### Cancelling, and the timeout
+
+Interrupting an apply (Ctrl-C) or hitting the operation timeout after the
+machine has been powered off leaves it **stopped**. The provider does not power
+it back on: once a vApp write has been attempted the machine must stay down
+until the properties are reconciled, and before any write there is no safe
+moment to decide a cancelled apply meant "put it back".
+
+This matches the sizing power-cycle that shares `allow_vm_restart`. Re-run
+`terraform apply` to converge, or start the machine yourself once you have
+checked its vApp properties.
+
 ### What a failed apply records about power
 
 Terraform persists the values a failed apply had *planned*, not what happened.
