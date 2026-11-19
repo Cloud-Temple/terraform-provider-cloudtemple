@@ -616,10 +616,30 @@ func planCloudInitEdits(vm *client.VAppSnapshot, old, desired, deploy map[string
 		if managed && live == nil {
 			return nil, fmt.Errorf("a previously managed property is missing; reconcile it before applying (metadata cannot be reconstructed)")
 		}
-		if !managed && live != nil {
-			return nil, fmt.Errorf("a newly managed key already exists in vApp; refusing to adopt or overwrite it")
-		}
-		if live != nil && live["value"] != was && (!present || live["value"] != want) {
+		// A key the configuration declares is a key the configuration owns, even
+		// when the machine already carries it. Terraform is the source of truth,
+		// so the declared value wins and overwrites the live one.
+		//
+		// Refusing to adopt used to look like the safe answer, and for a machine
+		// Terraform created it costs nothing — a key it created is always
+		// managed. For an IMPORTED machine it is a dead end: an import records no
+		// cloud_init, so every declared key is unmanaged and every one of them
+		// already exists on the machine by construction. No configuration could
+		// converge, not even one declaring the exact values the machine held.
+		//
+		// Adoption is safe to express here because the write is not a fresh
+		// property: the replacement below clones the LIVE descriptor and swaps
+		// only its value, so OVF-provided metadata survives, and vAppPayload
+		// still refuses anything the public API cannot replay faithfully.
+		//
+		// What adoption does carry is a lifecycle: an adopted key is managed from
+		// then on, so removing it from the configuration later DELETES the vApp
+		// property, exactly as for a key Terraform created.
+		//
+		// Drift is only meaningful against a recorded intent. An unmanaged key
+		// has none — there is nothing it could have drifted from — so the check
+		// below is confined to keys this resource already tracks.
+		if managed && live != nil && live["value"] != was && (!present || live["value"] != want) {
 			return nil, fmt.Errorf("a changed vApp property has drifted; reconcile it before applying")
 		}
 		if present && live != nil && live["value"] == want {

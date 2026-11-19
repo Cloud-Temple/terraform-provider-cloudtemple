@@ -365,10 +365,48 @@ func TestVMwareCloudInitPlanOwnershipAndValidation(t *testing.T) {
 			t.Fatalf("bad addition plan: %v", err)
 		}
 	})
-	t.Run("do not adopt preexisting property", func(t *testing.T) {
-		_, err := planCloudInitEdits(snapshot(), nil, map[string]interface{}{"hostname": "after"}, nil)
-		if err == nil {
-			t.Fatal("adopted unmanaged property")
+	// This pair replaces a test that asserted the opposite. Refusing to adopt
+	// made an IMPORTED machine unmanageable: an import records no cloud_init, so
+	// every declared key is unmanaged and every one already exists on the
+	// machine, and no configuration could converge — not even one declaring the
+	// values the machine already held. Terraform is the source of truth, so the
+	// declared value wins.
+	t.Run("adopt a key whose live value already matches", func(t *testing.T) {
+		edits, err := planCloudInitEdits(snapshot(), nil, map[string]interface{}{"hostname": "before"}, nil)
+		if err != nil {
+			t.Fatalf("declaring the value the machine already holds must converge: %v", err)
+		}
+		if len(edits) != 0 {
+			t.Fatalf("a value already in place must plan no write; got %d edit(s)", len(edits))
+		}
+	})
+	t.Run("adopt a key by overwriting its live value", func(t *testing.T) {
+		edits, err := planCloudInitEdits(snapshot(), nil, map[string]interface{}{"hostname": "after"}, nil)
+		if err != nil {
+			t.Fatalf("the declared value must win over the live one: %v", err)
+		}
+		if len(edits) != 1 || edits[0].replacement == nil {
+			t.Fatalf("adoption must plan a replacement; got %#v", edits)
+		}
+		if !reflect.DeepEqual(edits[0].original, original) {
+			t.Fatal("adoption must replace the LIVE descriptor, not invent a new one")
+		}
+		if edits[0].replacement["value"] != "after" {
+			t.Fatalf("replacement value = %v, want \"after\"", edits[0].replacement["value"])
+		}
+		// The point of cloning the live descriptor: metadata the image provided
+		// survives the add-then-delete, which a fresh property would discard.
+		if edits[0].replacement["label"] != "Hostname" {
+			t.Fatalf("adoption dropped the live metadata: %#v", edits[0].replacement)
+		}
+	})
+	// Adoption must not weaken the guard that protects a key already tracked.
+	t.Run("a tracked key that drifted is still refused", func(t *testing.T) {
+		vm := snapshot()
+		vm.Properties = []map[string]interface{}{{"key": float64(1), "id": "hostname", "value": "changed-elsewhere"}}
+		_, err := planCloudInitEdits(vm, old, map[string]interface{}{"hostname": "after"}, nil)
+		if err == nil || !strings.Contains(err.Error(), "drifted") {
+			t.Fatalf("a drifted tracked key must still be refused; got: %v", err)
 		}
 	})
 	// Resolving a collision must have a way out. Removing the key from

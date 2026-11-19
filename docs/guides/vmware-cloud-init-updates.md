@@ -137,6 +137,35 @@ along. Terraform merely stops recording the key twice.
 If `cloud_init` is the map that should own the key, the key has to leave
 `deploy_options`, and that is a replacement.
 
+## Importing a machine that already carries cloud-init
+
+A key the configuration declares is a key the configuration owns, even when the
+machine already carries it. The declared value wins and **overwrites** the live
+one.
+
+This matters most after `terraform import`, which records no `cloud_init` at
+all. Every declared key is therefore untracked, and on a machine deployed with
+cloud-init every one of them already exists — so refusing to adopt them, as
+earlier releases did, left no configuration that could converge. Not even one
+declaring exactly the values the machine already held.
+
+The overwrite is a replacement of the existing property, not a fresh one: its
+descriptor is cloned and only the value is swapped, so metadata the image's OVF
+provided survives. A declared value identical to the live one plans no write at
+all.
+
+> **The plan under-reports this.** `cloud_init` holds only keys already in
+> state, and a refresh cannot hydrate a key the configuration declares but state
+> does not track — the configuration is not available to it. So after an import
+> the plan reads `+ cloud_init = { ... }`, a creation, while the apply replaces
+> a value that was already on the machine and that the plan never showed you.
+> **Read the machine's vApp properties before the first apply on an imported
+> resource.**
+
+Adoption also carries a lifecycle: an adopted key is managed from then on, so
+removing it from the configuration later **deletes** the vApp property, exactly
+as for a key Terraform created.
+
 ## API constraints
 
 The public API provides add and delete operations, not an atomic edit. A
@@ -201,10 +230,12 @@ how far the update got. The four cases are distinct and are treated differently:
 - **The transaction was verified and a LATER step failed** — the general read
   of the machine, or the power settlement. The vApp holds the declared values,
   so Terraform **keeps** them in state. Rolling that intent back would be
-  permanent, not merely untidy: the refresh never adds a key back and never
-  removes one it can no longer observe, so a later apply would see an added key
-  as one it must refuse to adopt, or a removed key as one that has gone
-  missing, with nothing left to repair it.
+  permanent for a REMOVED key, not merely untidy: the refresh never removes a
+  key it can no longer observe, so a later apply would see it as a managed
+  property that has gone missing and refuse, with nothing left to repair it. An
+  added key would now recover on its own, since a declared key the machine
+  already carries is adopted — but the rule covers both, because rolling back an
+  intent the machine has accepted also hides a write that really happened.
   Only the remaining state is left to converge — re-run apply, or set the power
   state by hand. These failures say "applied and verified" and deliberately do
   **not** print the recovery procedure above: the properties are already correct
@@ -310,5 +341,7 @@ options — yet it is recorded in state. The refresh keeps it, so the
 configuration stays convergent and silent. Changing the value is what brings
 such a key into the update path and onto the machine.
 
-An imported machine records no `cloud_init`, so there is nothing to
-resynchronise and, deliberately, nothing to adopt.
+An imported machine records no `cloud_init`, so a refresh has nothing to
+resynchronise and, deliberately, adopts nothing: adoption is a decision for an
+apply, which has the configuration to decide it with. See *Importing a machine
+that already carries cloud-init* above.
