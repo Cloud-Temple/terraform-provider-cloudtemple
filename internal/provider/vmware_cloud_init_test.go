@@ -12,6 +12,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
@@ -626,10 +627,14 @@ type cloudInitPowerFake struct {
 	dupAfter  bool   // another writer adds a duplicate id after the shutdown
 	oddRestor bool   // the machine turns transitional before compensation
 	failGetNo int    // 403 the Nth GET on the virtual machine endpoint (1-based)
-	gets      int    // GETs taken on the virtual machine endpoint
-	reads     int    // VM reads taken since the last vApp write
-	postOff   int    // reads taken since the shutdown
-	secretLoc bool   // return an activity id carrying the secret marker
+	// The two response shapes the general read tolerates and the vApp
+	// snapshot does not, each applied to the Nth GET (1-based).
+	code206No   int
+	nullPropsNo int
+	gets        int  // GETs taken on the virtual machine endpoint
+	reads       int  // VM reads taken since the last vApp write
+	postOff     int  // reads taken since the shutdown
+	secretLoc   bool // return an activity id carrying the secret marker
 }
 
 func (f *cloudInitPowerFake) handler(w http.ResponseWriter, q *http.Request) {
@@ -641,6 +646,13 @@ func (f *cloudInitPowerFake) handler(w http.ResponseWriter, q *http.Request) {
 		if f.failGetNo == f.gets {
 			w.WriteHeader(403)
 			return
+		}
+		props := f.props
+		if f.nullPropsNo == f.gets {
+			props = nil // encodes as JSON null, which the general read tolerates
+		}
+		if f.code206No == f.gets {
+			w.WriteHeader(206)
 		}
 		if f.failRead && afterShutdown {
 			f.failRead = false
@@ -681,7 +693,7 @@ func (f *cloudInitPowerFake) handler(w http.ResponseWriter, q *http.Request) {
 		}
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"id": "vm-investigation", "name": "investigation", "powerState": power,
-			"vAppEnabled": true, "vAppProperties": f.props,
+			"vAppEnabled": true, "vAppProperties": props,
 			"memory": 2147483648, "cpu": 2, "numCoresPerSocket": 1,
 			"datacenter": map[string]string{"id": "dc"}, "hostCluster": map[string]string{"id": "hc"},
 			"operatingSystemMoref": "ubuntu64Guest",
@@ -1190,6 +1202,196 @@ func TestVMwareCloudInitSoleChangeRule(t *testing.T) {
 	}
 }
 
+// TestVMwareCloudInitPlanGuardRawConfig exercises the plan guard against a REAL
+// configuration object rather than the legacy shim.
+//
+// TestVMwareCloudInitPlanGuardUnknowns builds its configuration with
+// terraform.NewResourceConfigRaw, which leaves GetRawConfig null — so the
+// raw-configuration branch of the guard is skipped entirely there, and whatever
+// it does or does not catch, that table cannot tell. These cases go through
+// NewResourceConfigShimmed, where the guard sees the cty object Terraform
+// actually passes.
+//
+// The configuration is built from the schema's own implied type rather than
+// written out attribute by attribute, so it keeps working when the schema gains
+// one.
+func TestVMwareCloudInitPlanGuardRawConfig(t *testing.T) {
+	block := resourceVirtualMachine().CoreConfigSchema()
+	config := func(cloudInit cty.Value, extra map[string]cty.Value) *terraform.ResourceConfig {
+		vals := map[string]cty.Value{}
+		for name, ty := range block.ImpliedType().AttributeTypes() {
+			vals[name] = cty.NullVal(ty)
+		}
+		vals["name"] = cty.StringVal("investigation")
+		vals["datacenter_id"] = cty.StringVal("dc")
+		vals["host_cluster_id"] = cty.StringVal("hc")
+		vals["guest_operating_system_moref"] = cty.StringVal("ubuntu64Guest")
+		vals["power_state"] = cty.StringVal("on")
+		vals["cloud_init"] = cloudInit
+		for k, v := range extra {
+			vals[k] = v
+		}
+		return terraform.NewResourceConfigShimmed(cty.ObjectVal(vals), block)
+	}
+	known := cty.MapVal(map[string]cty.Value{"user-data": cty.StringVal("bmV3")})
+
+	for _, tc := range []struct {
+		name      string
+		cloudInit cty.Value
+		extra     map[string]cty.Value
+		refuse    bool
+	}{
+		// The one refusal: everything resolved, machine running, no opt-in.
+		{name: "running, changed, no opt-in", cloudInit: known, refuse: true},
+		{name: "opt-in granted", cloudInit: known,
+			extra: map[string]cty.Value{"allow_vm_restart": cty.True}},
+		// The cases the raw-configuration branch exists for. An unknown ELEMENT
+		// leaves the map's element count known, so an attribute-level check has
+		// nothing to notice; only the configuration object shows it.
+		{name: "an unknown element inside the map", cloudInit: cty.MapVal(map[string]cty.Value{
+			"user-data": cty.UnknownVal(cty.String)})},
+		{name: "one known and one unknown element", cloudInit: cty.MapVal(map[string]cty.Value{
+			"user-data": cty.StringVal("bmV3"), "hostname": cty.UnknownVal(cty.String)})},
+		{name: "the whole map unknown", cloudInit: cty.UnknownVal(cty.Map(cty.String))},
+		{name: "an unknown power_state", cloudInit: known,
+			extra: map[string]cty.Value{"power_state": cty.UnknownVal(cty.String)}},
+		{name: "an unknown opt-in", cloudInit: known,
+			extra: map[string]cty.Value{"allow_vm_restart": cty.UnknownVal(cty.Bool)}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			// Everything the configuration sets must already be in state, or the
+			// sole-change rule fires and masks what this table is about.
+			state := &terraform.InstanceState{ID: "vm-1", Attributes: map[string]string{
+				"id": "vm-1", "name": "investigation", "datacenter_id": "dc", "host_cluster_id": "hc",
+				"guest_operating_system_moref": "ubuntu64Guest",
+				"power_state":                  "on", "cloud_init.%": "1", "cloud_init.user-data": "b2xk",
+			}}
+			_, err := resourceVirtualMachine().Diff(context.Background(), state, config(tc.cloudInit, tc.extra), nil)
+			if tc.refuse {
+				if err == nil || !strings.Contains(err.Error(), "allow_vm_restart") {
+					t.Fatalf("expected the power refusal, got: %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("the guard must fail open here, got: %v", err)
+			}
+		})
+	}
+}
+
+// TestVerifyVAppAdditionContract pins what the provider will accept as proof
+// that its own addition took effect.
+//
+// The end-to-end tests cannot do this. Their fake servers append the submitted
+// descriptor to the snapshot unchanged, so the "after" they return is derived
+// from the payload and verifyVAppAddition can never disagree with it — the
+// check passes by construction rather than by being right. The real API is
+// under no such obligation: it assigns the numeric key itself, and nothing in
+// this repository establishes that it echoes every other field verbatim.
+//
+// So the contract is pinned here against hand-built snapshots, where "after"
+// owes nothing to the payload.
+func TestVerifyVAppAdditionContract(t *testing.T) {
+	existing := func() map[string]interface{} {
+		return map[string]interface{}{"key": float64(1), "id": "hostname", "value": "before",
+			"label": "Hostname", "type": "string", "userConfigurable": float64(1)}
+	}
+	added := func() map[string]interface{} {
+		return map[string]interface{}{"key": float64(2), "id": "user-data", "value": "bmV3",
+			"label": "User data", "type": "string", "userConfigurable": float64(1)}
+	}
+	payload := map[string]interface{}{"id": "user-data", "value": "bmV3",
+		"label": "User data", "type": "string", "userConfigurable": true}
+
+	for _, tc := range []struct {
+		name   string
+		mutate func(after *client.VAppSnapshot)
+		accept bool
+		// Which refusal must fire. Asserting only "it errored" lets a different
+		// check pass for the wrong reason, after which removing the one under
+		// test still leaves the suite green.
+		because string
+	}{
+		{name: "a faithful addition", accept: true},
+		// Identity, power and vApp state are part of the proof: a snapshot of
+		// another machine, or of this one no longer stopped, proves nothing
+		// about what was just written.
+		{name: "the snapshot belongs to another machine", because: "unexpected addition result", mutate: func(a *client.VAppSnapshot) { a.ID = "vm-other" }},
+		{name: "the machine is no longer stopped", because: "unexpected addition result", mutate: func(a *client.VAppSnapshot) { a.PowerState = "running" }},
+		{name: "the vApp is no longer enabled", because: "unexpected addition result", mutate: func(a *client.VAppSnapshot) { a.Enabled = false }},
+		{name: "nothing was added", because: "unexpected addition result", mutate: func(a *client.VAppSnapshot) {
+			a.Properties = a.Properties[:1]
+		}},
+		{name: "more than one property appeared", because: "unexpected addition result", mutate: func(a *client.VAppSnapshot) {
+			extra := added()
+			extra["key"] = float64(3)
+			extra["id"] = "seedfrom"
+			a.Properties = append(a.Properties, extra)
+		}},
+		// An unrelated property that moved means another writer is active, and
+		// the sequence can no longer reason about what it is deleting next.
+		{name: "an existing descriptor changed", because: "existing descriptor changed", mutate: func(a *client.VAppSnapshot) {
+			a.Properties[0]["value"] = "changed-by-someone-else"
+		}},
+		// The API assigns the numeric key, so that one field is expected to
+		// differ. Everything else must come back as it was sent.
+		{name: "the added descriptor has a different id", because: "added descriptor differs", mutate: func(a *client.VAppSnapshot) {
+			a.Properties[1]["id"] = "user_data"
+		}},
+		{name: "the added descriptor lost its label", because: "added descriptor differs", mutate: func(a *client.VAppSnapshot) {
+			delete(a.Properties[1], "label")
+		}},
+		{name: "the added descriptor has a different value", because: "added descriptor differs", mutate: func(a *client.VAppSnapshot) {
+			a.Properties[1]["value"] = "something-else"
+		}},
+		{name: "the added descriptor flipped userConfigurable", because: "added descriptor differs", mutate: func(a *client.VAppSnapshot) {
+			a.Properties[1]["userConfigurable"] = float64(0)
+		}},
+		{name: "the added descriptor carries a field the API cannot replay", because: "added descriptor differs", mutate: func(a *client.VAppSnapshot) {
+			a.Properties[1]["typeReference"] = "something"
+		}},
+		// The count check is the only thing standing between this and silent
+		// data loss: the loop would find the added descriptor, set found, and
+		// return success while an existing property had vanished.
+		{name: "an existing property vanished as the new one appeared", because: "unexpected addition result",
+			mutate: func(a *client.VAppSnapshot) {
+				a.Properties = a.Properties[1:]
+			}},
+		// Two descriptors matching the payload is not success twice over: it is
+		// the duplicate state the delete step is about to reason against.
+		{name: "the descriptor was added twice", because: "added descriptor differs", mutate: func(a *client.VAppSnapshot) {
+			twin := added()
+			twin["key"] = float64(3)
+			a.Properties = append(a.Properties, twin)
+			a.Properties[0] = twin // keep the count at before+1 by displacing the existing one
+			a.Properties = a.Properties[1:]
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			before := &client.VAppSnapshot{ID: "vm-1", PowerState: "stopped", Enabled: true,
+				Properties: []map[string]interface{}{existing()}}
+			after := &client.VAppSnapshot{ID: "vm-1", PowerState: "stopped", Enabled: true,
+				Properties: []map[string]interface{}{existing(), added()}}
+			if tc.mutate != nil {
+				tc.mutate(after)
+			}
+			err := verifyVAppAddition(before, after, payload)
+			if tc.accept && err != nil {
+				t.Fatalf("a faithful addition must be accepted; got: %v", err)
+			}
+			if !tc.accept {
+				if err == nil {
+					t.Fatal("accepted an addition the provider cannot prove it made")
+				}
+				if !strings.Contains(err.Error(), tc.because) {
+					t.Fatalf("refused for the wrong reason: want %q, got %q", tc.because, err)
+				}
+			}
+		})
+	}
+}
+
 // TestVMwareCloudInitPlanGuardUnknowns pins the plan-time guard's edges. It must
 // refuse exactly one situation and fail OPEN on everything it cannot decide:
 // a value Terraform has not resolved yet must never turn into a refusal.
@@ -1496,8 +1698,12 @@ func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
 		deploy    map[string]string
 		props     []map[string]interface{}
 		failGetNo int
-		wantWarn  string
-		want      map[string]string // expected cloud_init in state afterwards
+		// The two response shapes the general read tolerates and the vApp
+		// snapshot does not: HTTP 206, and a null property list.
+		code206No   int
+		nullPropsNo int
+		wantWarn    string
+		want        map[string]string // expected cloud_init in state afterwards
 	}{
 		{
 			name:    "a value changed out of band becomes visible",
@@ -1532,6 +1738,28 @@ func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
 			deploy:  map[string]string{"user-data": "declared-in-deploy-options"},
 			props:   []map[string]interface{}{prop(7000, "user-data", "declared-in-deploy-options")},
 			want:    map[string]string{"user-data": "declared-in-cloud-init"},
+		},
+		{
+			// The general read accepts HTTP 206; the vApp snapshot requires 200.
+			// Whether the platform ever answers 206 for a single machine is not
+			// established, so what matters is that it degrades rather than
+			// taking the plan down with it.
+			name:      "a 206 response leaves every recorded value untouched",
+			tracked:   map[string]string{"user-data": "b2xk", "hostname": "web01"},
+			props:     []map[string]interface{}{prop(7000, "user-data", "changed-outside")},
+			code206No: 2,
+			wantWarn:  "could not be read",
+			want:      map[string]string{"user-data": "b2xk", "hostname": "web01"},
+		},
+		{
+			// Likewise a machine whose vApp is absent: the snapshot refuses an
+			// incomplete answer rather than read it as "every property is gone".
+			name:        "a null property list leaves every recorded value untouched",
+			tracked:     map[string]string{"user-data": "b2xk", "hostname": "web01"},
+			props:       []map[string]interface{}{prop(7000, "user-data", "changed-outside")},
+			nullPropsNo: 2,
+			wantWarn:    "could not be read",
+			want:        map[string]string{"user-data": "b2xk", "hostname": "web01"},
 		},
 		{
 			name:      "an unreadable vApp leaves every recorded value untouched",
@@ -1604,7 +1832,8 @@ func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
 					state.Attributes["deploy_options."+k] = v
 				}
 			}
-			f := &cloudInitPowerFake{t: t, power: "stopped", props: tc.props, failGetNo: tc.failGetNo}
+			f := &cloudInitPowerFake{t: t, power: "stopped", props: tc.props, failGetNo: tc.failGetNo,
+				code206No: tc.code206No, nullPropsNo: tc.nullPropsNo}
 			c := newAssignTestClient(t, f.handler)
 
 			next, diags := r.RefreshWithoutUpgrade(context.Background(), state, c)

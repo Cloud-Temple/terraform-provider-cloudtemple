@@ -1050,30 +1050,28 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 				if name := cloudInitOtherChangedAttribute(cloudInitKnownChanges{d}); name != "" {
 					return fmt.Errorf("cannot change %q in the same apply as cloud_init: apply the cloud_init change on its own", name)
 				}
-				// Fail OPEN on anything Terraform has not resolved yet. Two
-				// sources are needed and neither subsumes the other:
-				// NewValueKnown works on the legacy diff path, where the raw
-				// configuration is absent but unknown sentinels still exist; the
-				// raw configuration catches an unknown ELEMENT inside the
-				// cloud_init map, which an attribute-level check cannot see.
-				attrs := []string{"cloud_init", "power_state", "allow_vm_restart"}
+				// Fail OPEN on anything Terraform has not resolved yet.
+				//
+				// This used to consult the raw configuration object as well, on
+				// the stated grounds that NewValueKnown cannot see an unknown
+				// ELEMENT inside the cloud_init map. That was not true: exercised
+				// against a real cty configuration — not the legacy shim, which
+				// leaves the raw object null and so could never have shown this —
+				// NewValueKnown catches the unknown element, the partially
+				// unknown map and the wholly unknown map alike. The branch was
+				// unreachable belt and braces behind a claim that did not hold,
+				// which is worse than no branch at all. It is gone, and
+				// TestVMwareCloudInitPlanGuardRawConfig is what now proves the
+				// guard fails open through a real configuration object.
+				//
 				// "cloud_init.%" is checked as well, and not as belt and braces:
 				// the SDK's map diff reader does not propagate Computed up to the
 				// map itself, so an unknown map reports as known at "cloud_init"
 				// while its element-count key does not.
+				attrs := []string{"cloud_init", "power_state", "allow_vm_restart"}
 				for _, attr := range append([]string{"cloud_init.%"}, attrs...) {
 					if !d.NewValueKnown(attr) {
 						return nil
-					}
-				}
-				if raw := d.GetRawConfig(); !raw.IsNull() {
-					if !raw.IsKnown() {
-						return nil // the configuration object as a whole is unknown
-					}
-					for _, attr := range attrs {
-						if !raw.GetAttr(attr).IsWhollyKnown() {
-							return nil
-						}
 					}
 				}
 				// A change confined to keys deploy_options owns plans no vApp
