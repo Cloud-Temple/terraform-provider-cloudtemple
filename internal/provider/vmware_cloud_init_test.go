@@ -1712,6 +1712,34 @@ func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
 			want:    map[string]string{"user-data": "changed-outside"},
 		},
 		{
+			// Measured on the platform: creation accepts a value the update
+			// path refuses, and stores a normalised form — '/' comes back
+			// HTML-escaped. Recording that form would raise a diff against the
+			// declared value which the planner then refuses to write, for ever,
+			// and on a running machine the plan itself would fail. The recorded
+			// value stays, which is what 1.12 did and it converged.
+			name:    "a recorded value carrying '/' is never resynchronised",
+			tracked: map[string]string{"user-data": "YWJj/ZGVm"},
+			props:   []map[string]interface{}{prop(7000, "user-data", "YWJj&#x2F;ZGVm")},
+			want:    map[string]string{"user-data": "YWJj/ZGVm"},
+		},
+		{
+			// Same rule, the other normalisation the platform was seen to apply.
+			name:    "a recorded value with surrounding whitespace is never resynchronised",
+			tracked: map[string]string{"hostname": " web01 "},
+			props:   []map[string]interface{}{prop(7000, "hostname", "web01")},
+			want:    map[string]string{"hostname": " web01 "},
+		},
+		{
+			// The bound is per key, and it must not spill: an unwritable key
+			// freezes only itself.
+			name:    "an unwritable key does not freeze a writable one",
+			tracked: map[string]string{"user-data": "YWJj/ZGVm", "hostname": "web01"},
+			props: []map[string]interface{}{prop(7000, "user-data", "YWJj&#x2F;ZGVm"),
+				prop(7001, "hostname", "renamed-outside")},
+			want: map[string]string{"user-data": "YWJj/ZGVm", "hostname": "renamed-outside"},
+		},
+		{
 			// The whole point of the boundary: the machine carries a property
 			// the operator never declared, and refresh must not claim it.
 			name:    "untracked live properties are never adopted",
@@ -1873,6 +1901,118 @@ func TestVMwareCloudInitRefreshResyncsTrackedKeys(t *testing.T) {
 			}
 			if got, want := next.Attributes["cloud_init.%"], fmt.Sprint(len(tc.want)); len(tc.want) > 0 && got != want {
 				t.Fatalf("cloud_init element count = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+// TestVMwareCloudInitValueValidation pins the creation-time value rule.
+//
+// Measured on the platform, in three places: the deployment API stores a value
+// it has mutated. vCenter held &#x2F; where a '/' was sent; the OVF environment
+// handed to the guest carried the escaped form; and an SSH key cloud-init
+// installed from it had both of its '/' replaced, so it could never
+// authenticate. The control machine, same image and same configuration but a
+// key without '/', came out intact.
+//
+// None of that is reported anywhere: the apply succeeds and the value simply
+// never takes effect. The update path already refused these values; this test
+// pins the same rule at creation, which is the only place the failure could
+// still be introduced.
+func TestVMwareCloudInitValueValidation(t *testing.T) {
+	const unknown = "74D93920-ED26-11E3-AC10-0800200C9A66" // hcl2shim.UnknownVariableValue
+	for _, tc := range []struct {
+		name   string
+		ci     map[string]interface{}
+		refuse []string // substrings every diagnostic text must carry, in order
+	}{
+		{
+			name: "an ordinary Base64 payload passes",
+			ci:   map[string]interface{}{"user-data": "b2xkCg", "hostname": "web01"},
+		},
+		{
+			// The headline case: this is what reaches the machine as &#x2F;.
+			name:   "a value carrying a slash is refused, naming the character",
+			ci:     map[string]interface{}{"user-data": "YWJj/ZGVm"},
+			refuse: []string{`"user-data"`, `contains '/' at offset 4`},
+		},
+		{
+			// A URL cannot not contain '/', so seedfrom is unusable until the
+			// platform stops escaping. Saying so at plan time beats a machine
+			// that boots and ignores it.
+			name:   "a seedfrom URL is refused",
+			ci:     map[string]interface{}{"seedfrom": "http://seed.example.com/data/"},
+			refuse: []string{`"seedfrom"`, `contains '/'`},
+		},
+		{
+			name:   "surrounding whitespace is refused",
+			ci:     map[string]interface{}{"hostname": " web01 "},
+			refuse: []string{`"hostname"`, "leading or trailing whitespace"},
+		},
+		{
+			name:   "an empty value is refused",
+			ci:     map[string]interface{}{"hostname": ""},
+			refuse: []string{`"hostname"`, "is empty"},
+		},
+		{
+			name:   "an ampersand is refused",
+			ci:     map[string]interface{}{"password": "a&b"},
+			refuse: []string{`"password"`, `contains '&'`},
+		},
+		{
+			// Map iteration order is random; two bad values must always be
+			// reported in the same order or the diagnostics churn between runs.
+			name: "several bad values are reported in a stable order",
+			ci:   map[string]interface{}{"user-data": "a/b", "hostname": " x "},
+			refuse: []string{`"hostname"`, "leading or trailing whitespace",
+				`"user-data"`, `contains '/'`},
+		},
+		{
+			// The pre-existing key rule must survive being composed with the
+			// value rule.
+			name:   "an unknown key is still refused",
+			ci:     map[string]interface{}{"not-a-cloud-init-key": "fine"},
+			refuse: []string{"not allowed for cloud-init"},
+		},
+		{
+			// A value Terraform has not resolved yet must never be refused: the
+			// sentinel carries no forbidden character, so it passes on its own.
+			name: "an unresolved value is not refused",
+			ci:   map[string]interface{}{"user-data": unknown},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			raw := map[string]interface{}{
+				// Validate() enforces the UUID format on these, unlike Diff().
+				"name":                         "investigation",
+				"datacenter_id":                "11111111-1111-1111-1111-111111111111",
+				"host_cluster_id":              "22222222-2222-2222-2222-222222222222",
+				"guest_operating_system_moref": "ubuntu64Guest", "memory": 2147483648, "cpu": 2,
+				"cloud_init": tc.ci,
+			}
+			diags := resourceVirtualMachine().Validate(terraform.NewResourceConfigRaw(raw))
+
+			var text string
+			for _, d := range diags {
+				text += d.Summary + " " + d.Detail + "\n"
+			}
+			if len(tc.refuse) == 0 {
+				if diags.HasError() {
+					t.Fatalf("this configuration must validate; got: %s", text)
+				}
+				return
+			}
+			if !diags.HasError() {
+				t.Fatal("expected a refusal, got none")
+			}
+			// Pinned as one ordered walk, so the sequence is part of the contract.
+			rest := text
+			for _, want := range tc.refuse {
+				i := strings.Index(rest, want)
+				if i < 0 {
+					t.Fatalf("the refusal must carry %q, in order; got: %s", want, text)
+				}
+				rest = rest[i+len(want):]
 			}
 		})
 	}

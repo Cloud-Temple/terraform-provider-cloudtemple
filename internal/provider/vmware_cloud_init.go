@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -11,8 +12,10 @@ import (
 
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/client"
 	"github.com/cloud-temple/terraform-provider-cloudtemple/internal/provider/helpers"
+	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/validation"
 )
 
 const cloudInitRecovery = "The VM may have partial or duplicate vApp properties. Keep it stopped. Do not reapply or power it on until all backend activities/tasks have finished and the properties have been reconciled. Terraform retains the previous cloud_init intent; this is not a backend rollback."
@@ -682,6 +685,81 @@ func planCloudInitEdits(vm *client.VAppSnapshot, old, desired, deploy map[string
 
 // The public API trims and HTML-escapes all strings, including '/'. Reject a
 // non-round-trippable request before any write instead of persisting false intent.
+// cloudInitKeys is the documented set of cloud-init property names.
+var cloudInitKeys = regexp.MustCompile(strings.Join([]string{
+	"^user-data$",
+	"^network-config$",
+	"^public-keys$",
+	"^instance-id$",
+	"^password$",
+	"^hostname$",
+	"^seedfrom$"}, "|"))
+
+// validateCloudInitMap refuses a key the platform does not know, and a VALUE it
+// cannot store faithfully.
+//
+// The value rule is the one the update path already applies; enforcing it at
+// CREATION too closes a silent failure. The deployment API was measured to
+// mutate what it is given: it trims surrounding whitespace, and it HTML-escapes
+// '/' into the six literal characters &#x2F;. That escaped form is what reaches
+// the machine — observed in vCenter, in the OVF environment handed to the
+// guest, and in an SSH key cloud-init installed from it, where both '/' had
+// become &#x2F; so the key could never authenticate.
+//
+// Nothing reports any of this. The apply succeeds, the machine boots, the
+// declared value never takes effect, and no later apply can repair it because
+// the update path refuses to write that value back. Refusing at plan time
+// cannot make such a value work — only the platform can — but it stops
+// Terraform from reporting success for something that did not happen.
+//
+// A `seedfrom` URL is affected by construction, and so is the Base64 body of
+// most SSH public keys.
+func validateCloudInitMap() schema.SchemaValidateDiagFunc {
+	keys := validation.MapKeyMatch(cloudInitKeys, `The following key is not allowed for cloud-init`)
+	return func(i interface{}, p cty.Path) diag.Diagnostics {
+		diags := keys(i, p)
+		m, ok := i.(map[string]interface{})
+		if !ok {
+			return diags
+		}
+		names := make([]string, 0, len(m))
+		for name := range m {
+			names = append(names, name)
+		}
+		// Map iteration order is random; the diagnostics must not be.
+		sort.Strings(names)
+		for _, name := range names {
+			s, ok := m[name].(string)
+			if !ok || transparentVAppString(s) {
+				continue
+			}
+			diags = append(diags, diag.Diagnostic{
+				Severity:      diag.Error,
+				Summary:       "cloud_init value cannot be stored faithfully",
+				Detail:        fmt.Sprintf("The value of %q %s. The deployment API trims surrounding whitespace and HTML-escapes & < > \" ' / ` and \\, so the machine would receive a value different from the one declared — with no error reported, and no way to apply the difference afterwards.", name, cloudInitValueFault(s)),
+				AttributePath: append(p, cty.IndexStep{Key: cty.StringVal(name)}),
+			})
+		}
+		return diags
+	}
+}
+
+// cloudInitValueFault names what makes a value untransmittable. An operator
+// looking at three kilobytes of Base64 cannot find the offending character
+// unaided, so the diagnostic points straight at it.
+func cloudInitValueFault(s string) string {
+	switch {
+	case s == "":
+		return "is empty"
+	case strings.TrimSpace(s) != s:
+		return "has leading or trailing whitespace"
+	}
+	if i := strings.IndexAny(s, "&<>\"'/`\\"); i >= 0 {
+		return fmt.Sprintf("contains %q at offset %d", s[i], i)
+	}
+	return "cannot be transmitted without API normalization"
+}
+
 func transparentVAppString(s string) bool {
 	return s != "" && strings.TrimSpace(s) == s && !strings.ContainsAny(s, "&<>\"'/`\\")
 }
@@ -794,11 +872,15 @@ func verifyVAppAddition(before, after *client.VAppSnapshot, payload map[string]i
 //     the deploy_options value for a shared key, so the live property belongs to
 //     that attribute; recording it here would leave a diff the planner refuses
 //     for collision, for ever;
+//   - it never touches a key whose RECORDED value this provider could not write
+//     back. Creation accepts strings the update path refuses, and the platform
+//     normalises them, so such a key would gain a diff that can never be
+//     applied;
 //   - it never FAILS. Every anomaly degrades to a warning and leaves the
 //     recorded value in place.
 //
 // What remains is the single case it exists for: a key Terraform owns, whose
-// live value is observably different.
+// live value is observably different and whose recorded value it could restore.
 func refreshVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *client.Client) diag.Diagnostics {
 	tracked, ok := d.Get("cloud_init").(map[string]interface{})
 	if !ok || len(tracked) == 0 {
@@ -818,6 +900,23 @@ func refreshVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *clie
 		// positively observed on a property this attribute owns replaces it.
 		observed[key] = was
 		if _, shared := deploy[key]; shared {
+			continue
+		}
+		// A value this provider could never write back is not worth a diff.
+		// Creation accepts strings the update path refuses, and the platform was
+		// observed to normalise them: it trims surrounding whitespace and
+		// HTML-escapes '/'. Resynchronising such a key would record the
+		// normalised form, raise a diff against the declared one, and then
+		// refuse to apply it — permanently, and on a running machine the plan
+		// itself would fail. Leaving it alone is what 1.12 did, and it
+		// converged.
+		//
+		// This contains the damage; it does not repair the cause. Creation
+		// still accepts a value the platform will deform. Whether that deforms
+		// the value ON THE MACHINE, or only the one the API reports back, is
+		// unestablished — and the answer decides whether creation should refuse
+		// these values outright.
+		if s, ok := was.(string); !ok || !transparentVAppString(s) {
 			continue
 		}
 		var found map[string]interface{}

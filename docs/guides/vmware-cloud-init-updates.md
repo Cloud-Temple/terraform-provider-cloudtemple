@@ -196,8 +196,22 @@ This applies to IDs and preserved metadata too. Use the image's supported encodi
 where appropriate, but note that ordinary Base64 can itself contain `/`; it is
 not universally safe. Unsupported metadata or non-string property types cannot be
 replaced without loss and are refused. Unrelated properties remain untouched.
-These restrictions apply only when requesting a cloud-init update, not on creation
-or when retaining an existing map.
+These restrictions now apply **at creation as well**, and they are enforced at
+plan time, because the platform does not reject such a value — it stores a
+mutated one. Measured in three places: vCenter holds `&#x2F;` where a `/` was
+sent; the OVF environment handed to the guest carries the escaped form; and an
+SSH key cloud-init installed from such a value had both of its `/` replaced, so
+it could never authenticate. A control machine — same image, same configuration,
+a key without `/` — came out intact.
+
+Nothing reported any of that. The apply succeeded, the machine booted, and the
+declared value never took effect. Refusing at plan time cannot make such a value
+work, since only the platform can; it stops Terraform from reporting success for
+something that did not happen.
+
+A `seedfrom` URL is affected by construction, and so is the Base64 body of most
+SSH public keys. Retaining an existing map is unaffected: the rule looks at what
+a configuration declares, not at what a machine already holds.
 
 ## Failure and recovery
 
@@ -341,6 +355,12 @@ changed:
   it and leaves no provider-side recovery, which is too blunt for a step that
   only corrects values. Degradation is per key: one unreadable key does not
   freeze the resynchronisation of the others.
+- a key whose **recorded value this provider could not write back** is never
+  resynchronised. Creation accepts strings the update path refuses, and the
+  platform normalises them: surrounding whitespace is trimmed and `/` comes
+  back HTML-escaped as `&#x2F;`. Recording that normalised form would raise a
+  difference against the declared value which the update path then refuses to
+  apply — permanently, and on a running machine the plan itself would fail.
 - a machine that declares no `cloud_init` at all is not affected, and its vApp
   is not even read.
 
@@ -356,6 +376,20 @@ a clone or a from-scratch creation is never sent — neither path carries deploy
 options — yet it is recorded in state. The refresh keeps it, so the
 configuration stays convergent and silent. Changing the value is what brings
 such a key into the update path and onto the machine.
+
+A value the platform **deformed on creation** is not repaired either, and this
+is the widest of the three. The deployment API trims surrounding whitespace and
+HTML-escapes `/`, so a `seedfrom` URL, a raw `public-keys`, a password with
+special characters, or a Base64 payload containing `/` is stored in a form that
+differs from what was declared. The refresh leaves those keys alone, exactly as
+releases before 1.13.0 did, and the configuration stays convergent. Drift on
+them is not detected — there would be no point, since the update path refuses to
+write the declared value back.
+
+Whether the platform deforms the value **on the machine** or only the copy it
+reports back is not established. That answer decides whether creation should
+refuse these values outright instead of accepting them; until it is known, this
+provider contains the damage rather than guessing.
 
 An imported machine records no `cloud_init`, so a refresh has nothing to
 resynchronise and, deliberately, adopts nothing: adoption is a decision for an

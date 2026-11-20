@@ -111,15 +111,10 @@ func resourceVirtualMachine() *schema.Resource {
 				Elem: &schema.Schema{
 					Type: schema.TypeString,
 				},
-				ValidateDiagFunc: validation.MapKeyMatch(regexp.MustCompile(strings.Join([]string{
-					"^user-data$",
-					"^network-config$",
-					"^public-keys$",
-					"^instance-id$",
-					"^password$",
-					"^hostname$",
-					"^seedfrom$"},
-					"|")), `The following key is not allowed for cloud-init`),
+				// Keys AND values. The value rule is the one the update path
+				// applies, enforced here so a value the platform would deform is
+				// refused at plan time rather than silently mangled on the machine.
+				ValidateDiagFunc: validateCloudInitMap(),
 			},
 			"customize": {
 				Type:        schema.TypeList,
