@@ -477,14 +477,58 @@ func TestVMwareCloudInitPlanOwnershipAndValidation(t *testing.T) {
 			t.Fatalf("a different value must still be refused; got: %v", err)
 		}
 	})
-	t.Run("an unmeasured escape is still drift", func(t *testing.T) {
-		// '&' is in the REFUSAL set on the strength of a common escape table,
-		// but only '/' and trimming were measured. Guessing "&amp;" here would
-		// widen the exemption on an assumption.
-		_, err := planCloudInitEdits(deformed("a&amp;b"), map[string]interface{}{"hostname": "a&b"},
+	t.Run("an unmeasured entity form is still drift", func(t *testing.T) {
+		// The table holds the forms that were MEASURED. "&#38;" is the decimal
+		// entity for '&' — a perfectly plausible escaping that this platform was
+		// NOT observed to produce. Recognising it would widen the exemption on
+		// an assumption, which is the one thing a recognition must not do.
+		_, err := planCloudInitEdits(deformed("a&#38;b"), map[string]interface{}{"hostname": "a&b"},
 			map[string]interface{}{}, nil)
 		if err == nil || !strings.Contains(err.Error(), "drifted") {
-			t.Fatalf("an unmeasured transform must still be refused; got: %v", err)
+			t.Fatalf("an unmeasured entity form must still be refused; got: %v", err)
+		}
+	})
+	// The characters the DEPLOYMENT path was measured escaping differ from the
+	// ones the vApp path escapes: on one environment the deployment escaped '<'
+	// alone, on another it escaped '/'. A live run proved that reproducing a
+	// single forward form leaves the dead end wide open on the first of those,
+	// so each measured character has a case, and so does a partial subset.
+	t.Run("a '<' the deployment path escaped is not drift", func(t *testing.T) {
+		_, err := planCloudInitEdits(deformed("a&lt;b"), map[string]interface{}{"hostname": "a<b"},
+			map[string]interface{}{}, nil)
+		if err != nil {
+			t.Fatalf("the escape this platform actually produces must be recognised: %v", err)
+		}
+	})
+	t.Run("a partial subset is not drift", func(t *testing.T) {
+		// Verbatim from the live measurement: the deployment path escaped '<'
+		// and left the other seven characters alone, in the same value.
+		_, err := planCloudInitEdits(deformed(`A/B&C&lt;D>E"F'G`+"`"+`H\I`),
+			map[string]interface{}{"hostname": `A/B&C<D>E"F'G` + "`" + `H\I`},
+			map[string]interface{}{}, nil)
+		if err != nil {
+			t.Fatalf("a value escaped in part must be recognised: %v", err)
+		}
+	})
+	t.Run("the whole measured table is not drift", func(t *testing.T) {
+		// Verbatim from the live measurement of the vApp property path.
+		_, err := planCloudInitEdits(
+			deformed("A&#x2F;B&amp;C&lt;D&gt;E&quot;F&#x27;G&#96;H&#x5C;I"),
+			map[string]interface{}{"hostname": `A/B&C<D>E"F'G` + "`" + `H\I`},
+			map[string]interface{}{}, nil)
+		if err != nil {
+			t.Fatalf("the full measured escaping must be recognised: %v", err)
+		}
+	})
+	t.Run("a literal entity in the declared value is not mangled", func(t *testing.T) {
+		// The ordering hazard. A declared value containing a literal "&lt;" is
+		// stored as "&amp;lt;". Un-escaping '&' before the others turns that
+		// into "<" — a character the operator never wrote — and the comparison
+		// then fails, so the operator is told their own value has drifted.
+		_, err := planCloudInitEdits(deformed("a&amp;lt;b"), map[string]interface{}{"hostname": "a&lt;b"},
+			map[string]interface{}{}, nil)
+		if err != nil {
+			t.Fatalf("a literal entity must survive the reversal: %v", err)
 		}
 	})
 	t.Run("the escaped form is recognised only against the key it belongs to", func(t *testing.T) {

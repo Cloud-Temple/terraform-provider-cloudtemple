@@ -235,18 +235,43 @@ declaration is not one of the options. Two moves resolve it, both **in place**:
 - **declare a transmittable form** — a key without `/`, or a value the image can
   consume in another encoding.
 
+> **`terraform destroy` is refused too, while the value is still declared.** The
+> rule looks at the configuration, and `destroy` evaluates it like any other
+> operation, so a resource carrying such a value cannot even be deleted until the
+> declaration is corrected. Drop the offending key from `cloud_init` first, then
+> destroy.
+
 Either way, the machine's vApp holds the *escaped* value while the state holds
 the declared one. That difference is **not** drift: it is this provider's own
-recorded intent in the form the platform chose to store it. It is recognised as
-such for the deformation that was measured — surrounding whitespace, and `/`
-stored as `&#x2F;` — and the change then applies like any other, on a stopped
-machine.
+recorded intent in the form the platform chose to store it, and the change then
+applies like any other, on a stopped machine.
 
-A value deformed through some **other** character is not reconstructed, because
-no such transformation has been measured, and guessing one would mean treating
-somebody else's edit as our own. Those keys still report `a changed vApp property
-has drifted`, and the only exit is to take the resource out of the state and
-bring it back:
+The recognition **reverses** the escaping instead of reproducing it, and that is
+not a detail. The two write paths were measured escaping different subsets of the
+same eight characters: the vApp-property endpoint escapes all eight, while the
+deployment endpoint used at creation was observed escaping `/` on one
+environment and `<` alone on another, storing the rest verbatim. There is
+therefore no single forward form to compare a live value against — reversing is
+indifferent to which subset was applied.
+
+The table holds the measured forms, and only those:
+
+| sent | stored |
+|---|---|
+| `/` | `&#x2F;` |
+| `&` | `&amp;` |
+| `<` | `&lt;` |
+| `>` | `&gt;` |
+| `"` | `&quot;` |
+| `'` | `&#x27;` |
+| `` ` `` | `&#96;` |
+| `\` | `&#x5C;` |
+
+An entity form that has **not** been observed — `&#38;`, the decimal form of
+`&`, for instance — is deliberately left alone: recognising it would mean
+treating somebody else's edit as this provider's own value. Such a key still
+reports `a changed vApp property has drifted`, and the only exit is to take the
+resource out of the state and bring it back:
 
 ```shell
 terraform state rm cloudtemple_compute_virtual_machine.example

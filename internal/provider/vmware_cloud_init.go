@@ -660,6 +660,7 @@ func planCloudInitEdits(vm *client.VAppSnapshot, old, desired, deploy map[string
 		// Drift is only meaningful against a recorded intent. An unmanaged key
 		// has none — there is nothing it could have drifted from — so the check
 		// below is confined to keys this resource already tracks.
+		//
 		// A value the platform DEFORMED on the way in is not drift. It is this
 		// provider's own recorded intent, in the form the platform chose to
 		// store it.
@@ -673,10 +674,12 @@ func planCloudInitEdits(vm *client.VAppSnapshot, old, desired, deploy map[string
 		// value either, since the platform escapes it again on the way in. The
 		// only way out was `terraform state rm` followed by `terraform import`.
 		//
-		// The recognition is confined to the deformation that was MEASURED (see
-		// cloudInitPlatformEscape). Anything else still reports drift and fails
-		// closed, which is why the guide keeps the state surgery as the exit for
-		// those.
+		// The recognition works by REVERSING the escaping (see
+		// cloudInitPlatformUnescape), not by reproducing it: the two write paths
+		// were measured escaping different subsets of the same eight characters,
+		// so there is no single forward form to compare against. A transform
+		// outside the measured table is left alone and still reports drift,
+		// which is why the guide keeps the state surgery as the exit for those.
 		if managed && live != nil && live["value"] != was && (!present || live["value"] != want) &&
 			!cloudInitIsPlatformEscapeOf(live["value"], was) {
 			return nil, fmt.Errorf("a changed vApp property has drifted; reconcile it before applying")
@@ -796,33 +799,57 @@ func transparentVAppString(s string) bool {
 	return s != "" && strings.TrimSpace(s) == s && !strings.ContainsAny(s, "&<>\"'/`\\")
 }
 
-// cloudInitPlatformEscape reproduces the one deformation of the deployment API
-// that was actually MEASURED on a live machine: it trims surrounding whitespace,
-// and it replaces '/' with the six literal characters &#x2F;.
+// cloudInitPlatformEntities maps each entity form the platform was MEASURED to
+// produce back to the character it replaced.
 //
-// It serves a single purpose — recognising this provider's own recorded intent
-// inside a value the platform deformed on the way in — and it is deliberately
-// narrower than the set transparentVAppString refuses. That set is a REFUSAL, so
-// including a character there on an assumption costs an operator a diagnostic
-// they can act on. This is a RECOGNITION: a wrong entity form here would
-// silently classify somebody else's edit as "our value, escaped", and suppress
-// drift that should have been reported. So nothing is reconstructed beyond what
-// was measured; everything else keeps reporting drift and fails closed.
+// Measured on a live machine by sending ONE string carrying all eight characters
+// through each write path and reading back what was stored:
 //
-// On a value transparentVAppString accepts this is the identity — no surrounding
-// whitespace to trim, no '/' to replace — so no caller needs to guard on it.
-func cloudInitPlatformEscape(s string) string {
-	return strings.ReplaceAll(strings.TrimSpace(s), "/", "&#x2F;")
+//	A/B&C<D>E"F\'G`H\\I
+//
+//	deployment (creation)    -> A/B&C&lt;D>E"F\'G`H\\I          only '<'
+//	vApp properties (update) -> A&#x2F;B&amp;C&lt;D&gt;E&quot;F&#x27;G&#96;H&#x5C;I   all eight
+//
+// The two write paths do not agree, and an earlier measurement on another
+// environment found the deployment path escaping '/' as well. That is precisely
+// why the recognition below REVERSES the escaping instead of reproducing it:
+// reproducing it would require knowing which subset a given path applied to a
+// given value, and that is not a property of this provider. Reversing is
+// indifferent to the subset.
+var cloudInitPlatformEntities = []struct{ entity, char string }{
+	{"&#x2F;", "/"},
+	{"&lt;", "<"},
+	{"&gt;", ">"},
+	{"&quot;", "\""},
+	{"&#x27;", "'"},
+	{"&#96;", "`"},
+	{"&#x5C;", "\\"},
+	// &amp; LAST, and the order is load-bearing. A declared value containing a
+	// literal "&lt;" is stored as "&amp;lt;"; un-escaping the ampersand first
+	// would turn that into "&lt;" and then into "<", inventing a character the
+	// operator never wrote and silently accepting a value as "our own".
+	{"&amp;", "&"},
+}
+
+// cloudInitPlatformUnescape reverses the escaping above. It is the recognition
+// half of the drift rule, not a refusal: a form that is NOT in the measured
+// table is left alone, so the value still reports as drifted and fails closed.
+func cloudInitPlatformUnescape(s string) string {
+	for _, e := range cloudInitPlatformEntities {
+		s = strings.ReplaceAll(s, e.entity, e.char)
+	}
+	return s
 }
 
 // cloudInitIsPlatformEscapeOf reports whether a live vApp value is what the
-// deployment API produces from a recorded one. Both sides come from untyped maps
-// — JSON for the live value, state for the recorded one — so a non-string on
+// platform produces from a recorded one: the recorded value trimmed, with any
+// subset of the measured characters escaped. Both sides come from untyped maps —
+// JSON for the live value, state for the recorded one — so a non-string on
 // either side is simply not a match.
 func cloudInitIsPlatformEscapeOf(live, recorded interface{}) bool {
 	l, lok := live.(string)
 	r, rok := recorded.(string)
-	return lok && rok && l == cloudInitPlatformEscape(r)
+	return lok && rok && cloudInitPlatformUnescape(l) == strings.TrimSpace(r)
 }
 
 // cloudInitDeployOptionsOverlap returns the keys declared in BOTH maps, sorted:
@@ -1050,8 +1077,8 @@ func refreshVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *clie
 		// handed to the guest, and in an SSH key cloud-init installed from such
 		// a value. That is why creation refuses these values outright, and why
 		// the way out for a machine that already carries one is the planner
-		// recognising the escaped form (see cloudInitPlatformEscape) rather than
-		// anything this refresh could record.
+		// recognising the escaped form (see cloudInitPlatformUnescape) rather
+		// than anything this refresh could record.
 		if s, ok := was.(string); !ok || !transparentVAppString(s) {
 			continue
 		}
