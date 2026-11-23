@@ -158,15 +158,10 @@ func resourceBucket() *schema.Resource {
 func objectStorageBucketCreate(ctx context.Context, d *schema.ResourceData, meta any) diag.Diagnostics {
 	c := getClient(meta)
 
-	whitelist := []string{}
-	for _, v := range d.Get("whitelist").([]interface{}) {
-		whitelist = append(whitelist, v.(string))
-	}
-
 	activityId, err := c.ObjectStorage().Bucket().Create(ctx, &client.CreateBucketRequest{
-		Name:       d.Get("name").(string),
-		AccessType: d.Get("access_type").(string),
-		Whitelist:  whitelist,
+		Name:        d.Get("name").(string),
+		AccessType:  d.Get("access_type").(string),
+		IPWhitelist: buildBucketIPWhitelist(d),
 	})
 	if err != nil {
 		return diag.Errorf("failed to create bucket: %s", err)
@@ -287,14 +282,9 @@ func objectStorageBucketUpdate(ctx context.Context, d *schema.ResourceData, meta
 
 	// Update access_type or whitelist
 	if d.HasChange("access_type") || d.HasChange("whitelist") {
-		whitelist := []string{}
-		for _, v := range d.Get("whitelist").([]interface{}) {
-			whitelist = append(whitelist, v.(string))
-		}
-
 		activityId, err := c.ObjectStorage().Bucket().UpdateWhitelist(ctx, d.Get("name").(string), &client.UpdateWhitelistRequest{
-			AccessType: d.Get("access_type").(string),
-			Whitelist:  whitelist,
+			AccessType:  d.Get("access_type").(string),
+			IPWhitelist: buildBucketIPWhitelist(d),
 		})
 		if err != nil {
 			return diag.Errorf("failed to update bucket whitelist: %s", err)
@@ -372,4 +362,14 @@ func objectStorageBucketDelete(ctx context.Context, d *schema.ResourceData, meta
 	}
 
 	return nil
+}
+
+// buildBucketIPWhitelist maps the `whitelist` attribute to `ipWhiteList`
+// entries. An empty attribute gives no entry, so no list is sent.
+func buildBucketIPWhitelist(d *schema.ResourceData) []client.IPWhitelistEntry {
+	var entries []client.IPWhitelistEntry
+	for _, v := range d.Get("whitelist").([]interface{}) {
+		entries = append(entries, client.IPWhitelistEntry{CIDR: v.(string)})
+	}
+	return entries
 }
