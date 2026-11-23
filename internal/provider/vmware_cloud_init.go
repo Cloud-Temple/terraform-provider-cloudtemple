@@ -646,7 +646,25 @@ func planCloudInitEdits(vm *client.VAppSnapshot, old, desired, deploy map[string
 		// Drift is only meaningful against a recorded intent. An unmanaged key
 		// has none — there is nothing it could have drifted from — so the check
 		// below is confined to keys this resource already tracks.
-		if managed && live != nil && live["value"] != was && (!present || live["value"] != want) {
+		// A value the platform DEFORMED on the way in is not drift. It is this
+		// provider's own recorded intent, in the form the platform chose to
+		// store it.
+		//
+		// Reporting it as drift made the upgrade to 1.13.0 a dead end for every
+		// machine created before it whose cloud_init carried a '/' — most RSA
+		// public keys, every seedfrom URL. State holds the declared form, the
+		// vApp holds the escaped one, and both remedies the upgrade note offers
+		// land here: removing the key is a change, and so is replacing it with a
+		// transmittable value. The vApp cannot be "reconciled" to the recorded
+		// value either, since the platform escapes it again on the way in. The
+		// only way out was `terraform state rm` followed by `terraform import`.
+		//
+		// The recognition is confined to the deformation that was MEASURED (see
+		// cloudInitPlatformEscape). Anything else still reports drift and fails
+		// closed, which is why the guide keeps the state surgery as the exit for
+		// those.
+		if managed && live != nil && live["value"] != was && (!present || live["value"] != want) &&
+			!cloudInitIsPlatformEscapeOf(live["value"], was) {
 			return nil, fmt.Errorf("a changed vApp property has drifted; reconcile it before applying")
 		}
 		if present && live != nil && live["value"] == want {
@@ -762,6 +780,106 @@ func cloudInitValueFault(s string) string {
 
 func transparentVAppString(s string) bool {
 	return s != "" && strings.TrimSpace(s) == s && !strings.ContainsAny(s, "&<>\"'/`\\")
+}
+
+// cloudInitPlatformEscape reproduces the one deformation of the deployment API
+// that was actually MEASURED on a live machine: it trims surrounding whitespace,
+// and it replaces '/' with the six literal characters &#x2F;.
+//
+// It serves a single purpose — recognising this provider's own recorded intent
+// inside a value the platform deformed on the way in — and it is deliberately
+// narrower than the set transparentVAppString refuses. That set is a REFUSAL, so
+// including a character there on an assumption costs an operator a diagnostic
+// they can act on. This is a RECOGNITION: a wrong entity form here would
+// silently classify somebody else's edit as "our value, escaped", and suppress
+// drift that should have been reported. So nothing is reconstructed beyond what
+// was measured; everything else keeps reporting drift and fails closed.
+//
+// On a value transparentVAppString accepts this is the identity — no surrounding
+// whitespace to trim, no '/' to replace — so no caller needs to guard on it.
+func cloudInitPlatformEscape(s string) string {
+	return strings.ReplaceAll(strings.TrimSpace(s), "/", "&#x2F;")
+}
+
+// cloudInitIsPlatformEscapeOf reports whether a live vApp value is what the
+// deployment API produces from a recorded one. Both sides come from untyped maps
+// — JSON for the live value, state for the recorded one — so a non-string on
+// either side is simply not a match.
+func cloudInitIsPlatformEscapeOf(live, recorded interface{}) bool {
+	l, lok := live.(string)
+	r, rok := recorded.(string)
+	return lok && rok && l == cloudInitPlatformEscape(r)
+}
+
+// cloudInitDeployOptionsOverlap returns the keys declared in BOTH maps, sorted:
+// map iteration order is random and must never reach a diagnostic.
+func cloudInitDeployOptionsOverlap(cloudInit, deploy map[string]interface{}) []string {
+	if len(cloudInit) == 0 || len(deploy) == 0 {
+		return nil
+	}
+	var shared []string
+	for key := range cloudInit {
+		if _, both := deploy[key]; both {
+			shared = append(shared, key)
+		}
+	}
+	sort.Strings(shared)
+	return shared
+}
+
+// cloudInitCollisionError is the single wording of the collision refusal, shared
+// by the plan-time guard and the creation backstop so the two cannot drift apart.
+func cloudInitCollisionError(shared []string) error {
+	return fmt.Errorf(
+		"%s declared in both cloud_init and deploy_options: creation sends the deploy_options value and the cloud_init one is never applied, so declare each key in exactly one of the two maps",
+		strings.Join(shared, ", "))
+}
+
+// cloudInitCreateBackstop re-applies, on the RESOLVED configuration and before
+// any platform call, the cloud_init rules the plan enforces — because every one
+// of them fails open on a value the plan does not know, and creation has no
+// apply-time copy of them.
+//
+// How the hole opens. terraform-plugin-sdk validates a configuration once, with
+// the values the plan holds, and it does not validate an unknown one: a
+// cloud_init whose value comes from another resource reaches validateCloudInitMap
+// as unknown and is not checked at all. The collision CustomizeDiff has the same
+// shape through d.Get, where an unresolved map reads as EMPTY and the overlap
+// check is skipped. Neither runs again at apply.
+//
+// On UPDATE that costs nothing: planCloudInitEdits re-applies both rules at apply
+// time, on resolved values, and refuses before any write. Creation had no such
+// copy. computeVirtualMachineCreate merges cloud_init into the deploy options,
+// gives deploy_options precedence on a shared key, and sends whatever it was
+// given — so
+//
+//	cloud_init = { public-keys = tls_private_key.k.public_key_openssh }
+//
+// validated clean, deployed, and stored &#x2F; wherever the key held a '/',
+// while state recorded the declared form and the refresh deliberately leaves
+// such a key alone. Nothing ever reported it. That is exactly the silent false
+// success #549 exists to remove, reaching the machine through the one door a
+// plan cannot close.
+//
+// The key and value rules are not restated here: validateCloudInitMap IS the
+// rule, called again on the resolved map, so the two copies cannot diverge.
+func cloudInitCreateBackstop(d *schema.ResourceData) diag.Diagnostics {
+	cloudInit, _ := d.Get("cloud_init").(map[string]interface{})
+	if len(cloudInit) == 0 {
+		return nil
+	}
+	path := cty.Path{cty.GetAttrStep{Name: "cloud_init"}}
+	diags := validateCloudInitMap()(cloudInit, path)
+	deploy, _ := d.Get("deploy_options").(map[string]interface{})
+	if shared := cloudInitDeployOptionsOverlap(cloudInit, deploy); len(shared) > 0 {
+		diags = append(diags, diag.Diagnostic{
+			Severity:      diag.Error,
+			Summary:       "cloud_init key declared in deploy_options as well",
+			Detail:        cloudInitCollisionError(shared).Error(),
+			AttributePath: path,
+		})
+	}
+	return diags
 }
 
 // Normalize only documented empty metadata and 0/1 booleans. Unknown metadata

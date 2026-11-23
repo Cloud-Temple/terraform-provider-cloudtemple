@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 	"time"
 
@@ -985,29 +984,20 @@ Test mode creates temporary virtual machines for development or testing, snapsho
 			// to the seven cloud-init keys, so an overlap is by construction a
 			// cloud-init key claimed by deploy_options.
 			//
-			// Unknowns need no special handling: an unresolved map reads as empty
-			// here, which skips the check, and the apply-time refusal still
-			// covers a changed shared key.
+			// This check FAILS OPEN on an unresolved map, which reads as empty
+			// through d.Get. On update that is covered: planCloudInitEdits
+			// refuses a shared key again at apply time, on resolved values and
+			// before any write. Creation has no such copy in this resource, so
+			// cloudInitCreateBackstop re-applies this rule — and the key and
+			// value rules, which the SDK also skips on an unknown — at the top
+			// of computeVirtualMachineCreate.
 			func(ctx context.Context, d *schema.ResourceDiff, meta interface{}) error {
 				cloudInit, _ := d.Get("cloud_init").(map[string]interface{})
 				deploy, _ := d.Get("deploy_options").(map[string]interface{})
-				if len(cloudInit) == 0 || len(deploy) == 0 {
-					return nil
+				if shared := cloudInitDeployOptionsOverlap(cloudInit, deploy); len(shared) > 0 {
+					return cloudInitCollisionError(shared)
 				}
-				var shared []string
-				for key := range cloudInit {
-					if _, both := deploy[key]; both {
-						shared = append(shared, key)
-					}
-				}
-				if len(shared) == 0 {
-					return nil
-				}
-				// Map iteration order must not change the diagnostic.
-				sort.Strings(shared)
-				return fmt.Errorf(
-					"%s declared in both cloud_init and deploy_options: creation sends the deploy_options value and the cloud_init one is never applied, so declare each key in exactly one of the two maps",
-					strings.Join(shared, ", "))
+				return nil
 			},
 			// #549: refuse at plan time a cloud_init change that would require
 			// powering a running virtual machine off, unless allow_vm_restart is
@@ -1148,6 +1138,21 @@ func computeVirtualMachineCreate(ctx context.Context, d *schema.ResourceData, me
 	// Same structural guarantee as the update: a create that fails after the virtual
 	// machine exists must not leave an unapplied address recorded either.
 	defer rollbackInlineAdapterIPsOnAnyError(d, &diags)
+
+	// #549 runtime backstop, in the spirit of the #395 one further down: the
+	// plan-time cloud_init rules all fail open on an unresolved value, and
+	// creation — unlike the update — has no apply-time copy of them. Refuse here,
+	// on the resolved configuration, before anything is deployed or cloned.
+	//
+	// refuseBeforeAnyMutation is inert at this point, because the SDK discards
+	// the state of a resource whose id was never set; it is kept so that every
+	// refusal that precedes a mutation reads and greps the same way, and so that
+	// moving this block below a platform call could not silently lose the
+	// guarantee.
+	if diags := cloudInitCreateBackstop(d); diags.HasError() {
+		return refuseBeforeAnyMutation(d, diags)
+	}
+
 	name := d.Get("name").(string)
 
 	// A configured ip_address is a VPC static IP, and it is only honoured on a

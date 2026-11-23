@@ -210,8 +210,44 @@ work, since only the platform can; it stops Terraform from reporting success for
 something that did not happen.
 
 A `seedfrom` URL is affected by construction, and so is the Base64 body of most
-SSH public keys. Retaining an existing map is unaffected: the rule looks at what
-a configuration declares, not at what a machine already holds.
+SSH public keys.
+
+### Upgrading a machine that already carries such a value
+
+The rule looks at what a configuration **declares**, not at what a machine
+already holds — and it applies whether or not that declaration changed. So a
+machine created before 1.13.0 with, say, `public-keys = "ssh-ed25519 AAAA/BBB"`
+fails `terraform validate` as soon as the provider is upgraded. Keeping the
+declaration is not one of the options. Two moves resolve it, both **in place**:
+
+- **remove the key** from `cloud_init`. The vApp property is deleted; whatever
+  cloud-init already did with the escaped value on the machine's first boot
+  stays done;
+- **declare a transmittable form** — a key without `/`, or a value the image can
+  consume in another encoding.
+
+Either way, the machine's vApp holds the *escaped* value while the state holds
+the declared one. That difference is **not** drift: it is this provider's own
+recorded intent in the form the platform chose to store it. It is recognised as
+such for the deformation that was measured — surrounding whitespace, and `/`
+stored as `&#x2F;` — and the change then applies like any other, on a stopped
+machine.
+
+A value deformed through some **other** character is not reconstructed, because
+no such transformation has been measured, and guessing one would mean treating
+somebody else's edit as our own. Those keys still report `a changed vApp property
+has drifted`, and the only exit is to take the resource out of the state and
+bring it back:
+
+```shell
+terraform state rm cloudtemple_compute_virtual_machine.example
+terraform import cloudtemple_compute_virtual_machine.example <virtual machine id>
+```
+
+An import records no `cloud_init`, so every declared key is then adopted on the
+next apply and the declared value overwrites what the machine holds. Read the
+machine's vApp properties first — the plan under-reports it, as *Importing a
+machine that already carries cloud-init* above explains.
 
 ## Failure and recovery
 
@@ -386,10 +422,14 @@ releases before 1.13.0 did, and the configuration stays convergent. Drift on
 them is not detected — there would be no point, since the update path refuses to
 write the declared value back.
 
-Whether the platform deforms the value **on the machine** or only the copy it
-reports back is not established. That answer decides whether creation should
-refuse these values outright instead of accepting them; until it is known, this
-provider contains the damage rather than guessing.
+The platform deforms the value **on the machine**, not merely the copy it reports
+back: vCenter holds the escaped form, so does the OVF environment handed to the
+guest, and an SSH key cloud-init installed from such a value had both of its `/`
+replaced. That is why creation now refuses these values outright, and why the
+refresh has nothing to gain from recording what the machine reports for a key
+already in this shape — the declaration that produced it can no longer be
+written. What such a machine needs is *Upgrading a machine that already carries
+such a value* above, not drift detection.
 
 An imported machine records no `cloud_init`, so a refresh has nothing to
 resynchronise and, deliberately, adopts nothing: adoption is a decision for an

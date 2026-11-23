@@ -14,6 +14,7 @@ import (
 
 	"github.com/hashicorp/go-cty/cty"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/terraform"
 )
 
@@ -416,6 +417,85 @@ func TestVMwareCloudInitPlanOwnershipAndValidation(t *testing.T) {
 			t.Fatalf("a drifted tracked key must still be refused; got: %v", err)
 		}
 	})
+	// M1, review of 23/11. A value the platform DEFORMED on the way in must not
+	// be reported as drift, or the upgrade to 1.13.0 is a dead end for every
+	// machine created before it whose cloud_init carried a '/': state holds the
+	// declared form, the vApp holds the escaped one, keeping the declaration
+	// fails validate, and both ways out of that — removing the key, or giving it
+	// a transmittable value — are CHANGES, which the drift guard refused. The
+	// only exit was `terraform state rm` + `terraform import`.
+	deformed := func(live string) *client.VAppSnapshot {
+		p := map[string]interface{}{}
+		for k, v := range original {
+			p[k] = v
+		}
+		p["value"] = live
+		return &client.VAppSnapshot{ID: "vm", PowerState: "stopped", Enabled: true, Properties: []map[string]interface{}{p}}
+	}
+	escapedIntent := map[string]interface{}{"hostname": "a/b"}
+	t.Run("a value the platform escaped can be removed", func(t *testing.T) {
+		edits, err := planCloudInitEdits(deformed("a&#x2F;b"), escapedIntent, map[string]interface{}{}, nil)
+		if err != nil {
+			t.Fatalf("removing a key the platform deformed must be allowed: %v", err)
+		}
+		if len(edits) != 1 || edits[0].replacement != nil {
+			t.Fatalf("want exactly one deletion; got %#v", edits)
+		}
+	})
+	t.Run("a value the platform escaped can be replaced by a transmittable one", func(t *testing.T) {
+		edits, err := planCloudInitEdits(deformed("a&#x2F;b"), escapedIntent,
+			map[string]interface{}{"hostname": "safe"}, nil)
+		if err != nil {
+			t.Fatalf("repairing a key the platform deformed must be allowed: %v", err)
+		}
+		if len(edits) != 1 || edits[0].replacement == nil {
+			t.Fatalf("want exactly one replacement; got %#v", edits)
+		}
+		if edits[0].replacement["value"] != "safe" {
+			t.Fatalf("replacement value = %v, want \"safe\"", edits[0].replacement["value"])
+		}
+		// Still a replacement of the LIVE descriptor: the image's metadata must
+		// survive the repair, as it does for any other adoption.
+		if edits[0].replacement["label"] != "Hostname" {
+			t.Fatalf("the repair dropped the live metadata: %#v", edits[0].replacement)
+		}
+	})
+	t.Run("a value the platform trimmed is not drift", func(t *testing.T) {
+		_, err := planCloudInitEdits(deformed("web01"), map[string]interface{}{"hostname": " web01 "},
+			map[string]interface{}{}, nil)
+		if err != nil {
+			t.Fatalf("a trimmed value is the platform's own storage of our intent: %v", err)
+		}
+	})
+	// The three cases that keep the exemption NARROW. It recognises this
+	// provider's recorded intent in the form the platform was MEASURED to store
+	// it, and nothing else: a wrong entity form here would silently classify
+	// somebody else's edit as "our value, escaped" and suppress real drift.
+	t.Run("a live value that is not the escape of the recorded one is still drift", func(t *testing.T) {
+		_, err := planCloudInitEdits(deformed("a&#x2F;c"), escapedIntent, map[string]interface{}{}, nil)
+		if err == nil || !strings.Contains(err.Error(), "drifted") {
+			t.Fatalf("a different value must still be refused; got: %v", err)
+		}
+	})
+	t.Run("an unmeasured escape is still drift", func(t *testing.T) {
+		// '&' is in the REFUSAL set on the strength of a common escape table,
+		// but only '/' and trimming were measured. Guessing "&amp;" here would
+		// widen the exemption on an assumption.
+		_, err := planCloudInitEdits(deformed("a&amp;b"), map[string]interface{}{"hostname": "a&b"},
+			map[string]interface{}{}, nil)
+		if err == nil || !strings.Contains(err.Error(), "drifted") {
+			t.Fatalf("an unmeasured transform must still be refused; got: %v", err)
+		}
+	})
+	t.Run("the escaped form is recognised only against the key it belongs to", func(t *testing.T) {
+		// The live value is a valid escape — of a value this key never held.
+		_, err := planCloudInitEdits(deformed("a&#x2F;b"), map[string]interface{}{"hostname": "c/d"},
+			map[string]interface{}{}, nil)
+		if err == nil || !strings.Contains(err.Error(), "drifted") {
+			t.Fatalf("an escape of another value must still be refused; got: %v", err)
+		}
+	})
+
 	// Resolving a collision must have a way out. Removing the key from
 	// deploy_options is not one: that attribute is ForceNew, so editing it
 	// replaces the machine. The only in-place remedy is to drop the key from
@@ -2016,4 +2096,204 @@ func TestVMwareCloudInitValueValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// TestVMwareCloudInitCreateBackstop pins B1 of the 23/11 review: CREATION had no
+// refusal of its own, and every plan-time cloud_init rule fails open on a value
+// the plan does not know.
+//
+// The SDK validates a configuration once, with the values the plan holds, and
+// skips an unknown one; the collision CustomizeDiff reads through d.Get, where
+// an unresolved map reads as EMPTY. Neither runs again at apply. On update that
+// costs nothing, because planCloudInitEdits re-applies both rules on resolved
+// values before any write — creation had no such copy, merged the two maps,
+// gave deploy_options precedence and sent whatever it was handed.
+//
+// So `cloud_init = { public-keys = tls_private_key.k.public_key_openssh }`
+// validated clean and deployed a value the platform stores as &#x2F;, with state
+// recording the declared form and the refresh deliberately leaving the key
+// alone. Nothing reported it, ever.
+//
+// Non-complacency: the table carries four configurations that MUST pass (a clean
+// map, unrelated deploy_options, a cloud-init key owned only by deploy_options,
+// and no cloud_init at all), so a backstop that over-refuses goes red; and the
+// wiring subtests drive the real computeVirtualMachineCreate against a server
+// that fails the test on ANY request, so "refused before any platform call" is
+// asserted rather than assumed.
+func TestVMwareCloudInitCreateBackstop(t *testing.T) {
+	data := func(t *testing.T, cloudInit, deploy map[string]interface{}) *schema.ResourceData {
+		t.Helper()
+		raw := map[string]interface{}{
+			"name": "investigation", "datacenter_id": "dc", "host_cluster_id": "hc",
+			"guest_operating_system_moref": "ubuntu64Guest", "memory": 2147483648, "cpu": 2,
+		}
+		if cloudInit != nil {
+			raw["cloud_init"] = cloudInit
+		}
+		if deploy != nil {
+			raw["deploy_options"] = deploy
+		}
+		return schema.TestResourceDataRaw(t, resourceVirtualMachine().Schema, raw)
+	}
+
+	for _, tc := range []struct {
+		name      string
+		cloudInit map[string]interface{}
+		deploy    map[string]interface{}
+		want      []string // every fragment must appear in the diagnostics
+		wantCount int      // 0 means "exactly len(want) > 0 is not asserted"
+	}{
+		{
+			// The review's own scenario, with the value resolved as it is at apply.
+			name:      "a value the platform would escape is refused",
+			cloudInit: map[string]interface{}{"public-keys": "ssh-ed25519 AAAA/BBB"},
+			want:      []string{"public-keys", "contains '/' at offset 16", "stored faithfully"},
+			wantCount: 1,
+		},
+		{
+			name:      "a value the platform would trim is refused",
+			cloudInit: map[string]interface{}{"hostname": " web01 "},
+			want:      []string{"hostname", "leading or trailing whitespace"},
+			wantCount: 1,
+		},
+		{
+			name:      "an empty value is refused",
+			cloudInit: map[string]interface{}{"hostname": ""},
+			want:      []string{"hostname", "is empty"},
+			wantCount: 1,
+		},
+		{
+			// The key rule fails open on an unknown map too, so the backstop
+			// re-applies validateCloudInitMap whole rather than its value half.
+			name:      "a key the platform does not know is refused",
+			cloudInit: map[string]interface{}{"not-a-cloud-init-key": "x"},
+			want:      []string{"not allowed for cloud-init"},
+			wantCount: 1,
+		},
+		{
+			name:      "a key declared in deploy_options as well is refused",
+			cloudInit: map[string]interface{}{"user-data": "bmV3"},
+			deploy:    map[string]interface{}{"user-data": "owned-by-deploy"},
+			want:      []string{"user-data declared in both cloud_init and deploy_options"},
+			wantCount: 1,
+		},
+		{
+			// Map iteration order is random; the diagnostic must not be.
+			name:      "every shared key is named, in a stable order",
+			cloudInit: map[string]interface{}{"user-data": "bmV3", "hostname": "web01"},
+			deploy:    map[string]interface{}{"user-data": "a", "hostname": "b", "disk_provisioning_type": "thin"},
+			want:      []string{"hostname, user-data declared in both"},
+			wantCount: 1,
+		},
+		{
+			// Both halves report, so neither hides the other.
+			name:      "a value fault and a collision are both reported",
+			cloudInit: map[string]interface{}{"public-keys": "ssh-ed25519 AAAA/BBB"},
+			deploy:    map[string]interface{}{"public-keys": "owned-by-deploy"},
+			want:      []string{"contains '/' at offset 16", "declared in both cloud_init and deploy_options"},
+			wantCount: 2,
+		},
+		{
+			name:      "a transmittable map passes",
+			cloudInit: map[string]interface{}{"user-data": "bmV3", "hostname": "web01"},
+		},
+		{
+			name:      "unrelated deploy_options alongside cloud_init pass",
+			cloudInit: map[string]interface{}{"user-data": "bmV3"},
+			deploy:    map[string]interface{}{"disk_provisioning_type": "thin"},
+		},
+		{
+			name:      "a cloud-init key owned only by deploy_options passes",
+			cloudInit: map[string]interface{}{"user-data": "bmV3"},
+			deploy:    map[string]interface{}{"hostname": "web01"},
+		},
+		{
+			name:   "no cloud_init at all passes",
+			deploy: map[string]interface{}{"hostname": "web01"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			diags := cloudInitCreateBackstop(data(t, tc.cloudInit, tc.deploy))
+			if len(tc.want) == 0 {
+				if diags.HasError() {
+					t.Fatalf("a valid configuration must not be refused at creation: %v", diags)
+				}
+				return
+			}
+			if !diags.HasError() {
+				t.Fatalf("creation accepted a configuration the plan refuses: %#v", tc.cloudInit)
+			}
+			if tc.wantCount > 0 && len(diags) != tc.wantCount {
+				t.Fatalf("got %d diagnostics, want %d: %v", len(diags), tc.wantCount, diags)
+			}
+			var got strings.Builder
+			for _, d := range diags {
+				fmt.Fprintf(&got, "%s|%s\n", d.Summary, d.Detail)
+			}
+			for _, want := range tc.want {
+				if !strings.Contains(got.String(), want) {
+					t.Fatalf("diagnostics must contain %q; got:\n%s", want, got.String())
+				}
+			}
+		})
+	}
+
+	// The wiring. The behavioural table above would stay green if the backstop
+	// were never called, which is precisely the defect: the refusal has to sit
+	// in computeVirtualMachineCreate, ahead of every platform call.
+	for _, tc := range []struct {
+		name      string
+		cloudInit map[string]interface{}
+		deploy    map[string]interface{}
+		want      string
+	}{
+		{
+			name:      "a value the platform would escape never reaches the platform",
+			cloudInit: map[string]interface{}{"public-keys": "ssh-ed25519 AAAA/BBB"},
+			want:      "stored faithfully",
+		},
+		{
+			name:      "a shared key never reaches the platform",
+			cloudInit: map[string]interface{}{"user-data": "bmV3"},
+			deploy:    map[string]interface{}{"user-data": "owned-by-deploy"},
+			want:      "declared in both cloud_init and deploy_options",
+		},
+	} {
+		t.Run("create: "+tc.name, func(t *testing.T) {
+			c := newAssignTestClient(t, func(w http.ResponseWriter, q *http.Request) {
+				t.Errorf("a refused cloud_init must reach NO platform call; got %s %s", q.Method, q.URL.Path)
+				w.WriteHeader(500)
+			})
+			diags := computeVirtualMachineCreate(context.Background(), data(t, tc.cloudInit, tc.deploy), c)
+			if !diags.HasError() {
+				t.Fatal("creation was not refused")
+			}
+			var got strings.Builder
+			for _, d := range diags {
+				fmt.Fprintf(&got, "%s|%s\n", d.Summary, d.Detail)
+			}
+			if !strings.Contains(got.String(), tc.want) {
+				t.Fatalf("creation must fail with the cloud_init refusal; got:\n%s", got.String())
+			}
+		})
+	}
+
+	// And the other direction: a transmittable map must NOT be refused here, so
+	// the create goes on and reaches the platform. Without this, a backstop that
+	// refuses everything would pass every assertion above.
+	t.Run("create: a transmittable map is attempted", func(t *testing.T) {
+		reached := 0
+		c := newAssignTestClient(t, func(w http.ResponseWriter, q *http.Request) {
+			reached++
+			w.WriteHeader(500)
+		})
+		d := data(t, map[string]interface{}{"user-data": "bmV3"}, map[string]interface{}{"hostname": "web01"})
+		diags := computeVirtualMachineCreate(context.Background(), d, c)
+		if reached == 0 {
+			t.Fatal("a transmittable cloud_init was refused before any platform call")
+		}
+		if !diags.HasError() {
+			t.Fatal("the stub server fails every call, so the create must still report an error")
+		}
+	})
 }
