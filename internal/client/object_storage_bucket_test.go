@@ -113,21 +113,35 @@ func TestBucketWhitelistBody(t *testing.T) {
 }
 
 // TestBucketListWhitelist pins the read used by the acceptance tests: the
-// CIDRs of GET /buckets/{bucket}/whitelist.
+// CIDRs of GET /buckets/{bucket}/whitelist, and an error on a partial answer.
 func TestBucketListWhitelist(t *testing.T) {
-	var method, path string
-	c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-		method, path = r.Method, r.URL.Path
-		_, _ = w.Write([]byte(`["10.0.0.0/8","192.168.1.0/24"]`))
+	ctx := context.Background()
+
+	t.Run("decodes the CIDRs", func(t *testing.T) {
+		var method, path string
+		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			method, path = r.Method, r.URL.Path
+			_, _ = w.Write([]byte(`["10.0.0.0/8","192.168.1.0/24"]`))
+		})
+		got, err := c.ObjectStorage().Bucket().ListWhitelist(ctx, "bucket-1")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if method != http.MethodGet || path != "/storage/object/v1/buckets/bucket-1/whitelist" {
+			t.Fatalf("unexpected request: %s %s", method, path)
+		}
+		if want := []string{"10.0.0.0/8", "192.168.1.0/24"}; !reflect.DeepEqual(got, want) {
+			t.Fatalf("unexpected CIDRs: got %v, want %v", got, want)
+		}
 	})
-	got, err := c.ObjectStorage().Bucket().ListWhitelist(context.Background(), "bucket-1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if method != http.MethodGet || path != "/storage/object/v1/buckets/bucket-1/whitelist" {
-		t.Fatalf("unexpected request: %s %s", method, path)
-	}
-	if want := []string{"10.0.0.0/8", "192.168.1.0/24"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("unexpected CIDRs: got %v, want %v", got, want)
-	}
+
+	t.Run("a partial answer is an error", func(t *testing.T) {
+		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusPartialContent)
+			_, _ = w.Write([]byte(`["10.0.0.0/8"]`))
+		})
+		if got, err := c.ObjectStorage().Bucket().ListWhitelist(ctx, "bucket-1"); err == nil {
+			t.Fatalf("expected an error on HTTP 206, got %v", got)
+		}
+	})
 }

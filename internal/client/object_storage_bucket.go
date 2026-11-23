@@ -125,7 +125,8 @@ type UpdateWhitelistRequest struct {
 	IPWhitelist []IPWhitelistEntry `json:"ipWhiteList,omitempty"`
 }
 
-// ListWhitelist returns the CIDRs the platform applies to a bucket.
+// ListWhitelist returns the CIDRs the platform applies to a bucket. Only a
+// complete HTTP 200 is accepted: a partial answer cannot stand as evidence (#281).
 func (c *BucketClient) ListWhitelist(ctx context.Context, name string) ([]string, error) {
 	r := c.c.newRequest("GET", "/storage/object/v1/buckets/%s/whitelist", name)
 	resp, err := c.c.doRequest(ctx, r)
@@ -133,7 +134,7 @@ func (c *BucketClient) ListWhitelist(ctx context.Context, name string) ([]string
 		return nil, err
 	}
 	defer closeResponseBody(resp)
-	if err := requireOK(resp); err != nil {
+	if err := requireHttpCodes(resp, 200); err != nil {
 		return nil, err
 	}
 

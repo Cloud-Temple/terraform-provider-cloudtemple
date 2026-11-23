@@ -62,7 +62,14 @@ func TestAccResourceObjectStorageBucket_CustomWithWhitelist(t *testing.T) {
 // platform applies to the bucket to be exactly `want`, in any order.
 func testAccCheckObjectStorageBucketPlatformWhitelist(t *testing.T, resourceName string, want []string) resource.TestCheckFunc {
 	return func(s *terraform.State) error {
-		name := s.RootModule().Resources[resourceName].Primary.Attributes["name"]
+		rs, ok := s.RootModule().Resources[resourceName]
+		if !ok || rs == nil || rs.Primary == nil {
+			return fmt.Errorf("resource %s not found in state", resourceName)
+		}
+		name := rs.Primary.Attributes["name"]
+		if name == "" {
+			return fmt.Errorf("resource %s has no name in state", resourceName)
+		}
 		got, err := bucketTestClient(t).ObjectStorage().Bucket().ListWhitelist(context.Background(), name)
 		if err != nil {
 			return fmt.Errorf("read the whitelist of bucket %s: %w", name, err)
@@ -85,6 +92,8 @@ func bucketTestClient(t *testing.T) *client.Client {
 	cfg := client.DefaultConfig()
 	cfg.ClientID = os.Getenv(testClientIDEnvName)
 	cfg.SecretID = os.Getenv(testSecretIDEnvName)
+	// Must match providerFactories, which forces the provider's api_suffix to false.
+	cfg.ApiSuffix = false
 	c, err := client.NewClient(cfg)
 	if err != nil {
 		t.Fatalf("NewClient: %v", err)
