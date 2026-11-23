@@ -180,6 +180,13 @@ func updateVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *clien
 func cloudInitPrepare(ctx context.Context, d *schema.ResourceData, c *client.Client, id string, run *cloudInitRun, allowRestart bool, before **client.VAppSnapshot, planned []cloudInitEdit) diag.Diagnostics {
 	switch (*before).PowerState {
 	case "stopped":
+		// This state came from a LIVE read, so it is an observation, and the
+		// update can still fail after this point with nothing of its own to
+		// record — a failed write leaves the machine exactly as stopped as it
+		// found it. Without recording it here the SDK persists the PLANNED power
+		// state on such a failure, so a machine nobody ever powered off is
+		// written down as running: the one state it is known not to be in.
+		cloudInitRecordPower(run, "stopped")
 		return nil
 	case "running":
 		if run.targetOn && !allowRestart {
@@ -366,6 +373,13 @@ func cloudInitSafeToStart(ctx context.Context, c *client.Client, id string, run 
 	if err != nil {
 		return fmt.Errorf("its vApp could not be read")
 	}
+	// This read is a live observation, and on every path that reaches here the
+	// caller is about to record a power state on an error. Hand it this one
+	// rather than let an older one stand: the machine may have been started by
+	// another actor while it was down, in which case the provider's own earlier
+	// "off" is stale and would be recorded over a machine that is running. An
+	// unrecognised or transitional state still records nothing.
+	cloudInitRecordPower(run, live.PowerState)
 	if live.PowerState != "stopped" {
 		return fmt.Errorf("it is not observably stopped")
 	}
@@ -991,9 +1005,9 @@ func verifyVAppAddition(before, after *client.VAppSnapshot, payload map[string]i
 //     that attribute; recording it here would leave a diff the planner refuses
 //     for collision, for ever;
 //   - it never touches a key whose RECORDED value this provider could not write
-//     back. Creation accepts strings the update path refuses, and the platform
-//     normalises them, so such a key would gain a diff that can never be
-//     applied;
+//     back. Creation refuses such a value since 1.13.0, but state written by an
+//     earlier release can still hold one, and the platform stored a deformed
+//     version of it, so such a key would gain a diff that can never be applied;
 //   - it never FAILS. Every anomaly degrades to a warning and leaves the
 //     recorded value in place.
 //
@@ -1021,19 +1035,23 @@ func refreshVMwareCloudInit(ctx context.Context, d *schema.ResourceData, c *clie
 			continue
 		}
 		// A value this provider could never write back is not worth a diff.
-		// Creation accepts strings the update path refuses, and the platform was
-		// observed to normalise them: it trims surrounding whitespace and
-		// HTML-escapes '/'. Resynchronising such a key would record the
-		// normalised form, raise a diff against the declared one, and then
-		// refuse to apply it — permanently, and on a running machine the plan
-		// itself would fail. Leaving it alone is what 1.12 did, and it
+		// Creation refuses such a value since 1.13.0 — at plan time, and again
+		// on the resolved configuration for a value the plan could not see — but
+		// state written by an EARLIER release can still hold one, and the
+		// platform deformed it on the way in: it trims surrounding whitespace
+		// and HTML-escapes '/' as &#x2F;. Resynchronising such a key would
+		// record the deformed form, raise a diff against the declared one, and
+		// then refuse to apply it — permanently, and on a running machine the
+		// plan itself would fail. Leaving it alone is what 1.12 did, and it
 		// converged.
 		//
-		// This contains the damage; it does not repair the cause. Creation
-		// still accepts a value the platform will deform. Whether that deforms
-		// the value ON THE MACHINE, or only the one the API reports back, is
-		// unestablished — and the answer decides whether creation should refuse
-		// these values outright.
+		// The deformation is ON THE MACHINE, not only in the copy the API
+		// reports back: it was measured in vCenter, in the OVF environment
+		// handed to the guest, and in an SSH key cloud-init installed from such
+		// a value. That is why creation refuses these values outright, and why
+		// the way out for a machine that already carries one is the planner
+		// recognising the escaped form (see cloudInitPlatformEscape) rather than
+		// anything this refresh could record.
 		if s, ok := was.(string); !ok || !transparentVAppString(s) {
 			continue
 		}

@@ -706,6 +706,7 @@ type cloudInitPowerFake struct {
 	modSettle bool   // another writer edits a descriptor before settlement
 	dupAfter  bool   // another writer adds a duplicate id after the shutdown
 	oddRestor bool   // the machine turns transitional before compensation
+	extStart  bool   // another actor starts the machine while it is down
 	failGetNo int    // 403 the Nth GET on the virtual machine endpoint (1-based)
 	// The two response shapes the general read tolerates and the vApp
 	// snapshot does not, each applied to the Nth GET (1-based).
@@ -754,6 +755,11 @@ func (f *cloudInitPowerFake) handler(w http.ResponseWriter, q *http.Request) {
 			}
 			if f.oddRestor && f.postOff > 1 {
 				power = "suspending"
+			}
+			if f.extStart && f.postOff > 1 {
+				// Somebody else powered it back on behind the provider's back.
+				power = "running"
+				f.power = "running"
 			}
 		}
 		if n := len(f.actions); n > 0 && f.actions[n-1] == "DELETE" {
@@ -896,6 +902,7 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 		modSettle  bool
 		dupAfter   bool
 		oddRestor  bool
+		extStart   bool
 		planFails  bool
 		applyFails bool
 		actions    string
@@ -1025,6 +1032,25 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 		{name: "restore-not-confirmed-is-reported", wantState: "off", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			drift: true, onNoOp: true, applyFails: true, actions: "[power:off power:on]", wantLive: "stopped",
 			wantIntent: "b2xk", diagnostic: "could not be confirmed running again"},
+
+		// --- M2: an observation nobody made must never be recorded ------------
+		// The machine was ALREADY stopped, so no shutdown was needed and the
+		// provider never touched its power — yet the write failed, and the SDK
+		// persists the planned "on". The live read that found it stopped is an
+		// observation and has to be recorded, or the state claims the one thing
+		// that is certainly false: that a machine nobody started is running.
+		{name: "already-stopped-write-fails-records-off", wantState: "off", statePower: "off", cfgPower: "on", livePower: "stopped",
+			failCall: "POST", applyFails: true, actions: "[POST]", wantLive: "stopped",
+			wantIntent: "b2xk", recovery: true},
+		// The mirror image, on the compensation path: the provider powered the
+		// machine off and recorded "off", then ANOTHER actor started it while it
+		// was down. The safety check sees "running" and refuses to act, so the
+		// provider's own "off" is now stale — recording it would describe a
+		// machine that is running as stopped, and the next plan would propose to
+		// start a machine that is already up.
+		{name: "external-start-is-observed-not-overwritten", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+			drift: true, extStart: true, applyFails: true, actions: "[power:off]", wantLive: "running",
+			wantIntent: "b2xk", diagnostic: "not observably stopped"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := resourceVirtualMachine()
@@ -1054,6 +1080,7 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 				failRead: tc.failRead, staysOn: tc.staysOn, onNoOp: tc.onNoOp, drift: tc.drift,
 				oddLater: tc.oddLater, secretLoc: tc.secretLoc,
 				dupSettle: tc.dupSettle, modSettle: tc.modSettle, dupAfter: tc.dupAfter, oddRestor: tc.oddRestor,
+				extStart: tc.extStart,
 				props: []map[string]interface{}{{"key": float64(7000), "id": "user-data", "value": liveValue,
 					"label": "User data", "type": "string", "userConfigurable": float64(1)}}}
 

@@ -212,6 +212,15 @@ something that did not happen.
 A `seedfrom` URL is affected by construction, and so is the Base64 body of most
 SSH public keys.
 
+> **`deploy_options` is not covered by this rule, and moving a value there is not
+> a way around it.** Both attributes feed the same deployment request, but
+> `deploy_options` is a generic map of deployment parameters — nothing lets the
+> provider tell a cloud-init key in it from any other parameter — so no value
+> rule is applied to it. A value refused in `cloud_init` is accepted in
+> `deploy_options` and deformed in exactly the same way, with nothing reporting
+> it. The refusal validates what this provider claims to manage, not what the
+> deployment API will accept.
+
 ### Upgrading a machine that already carries such a value
 
 The rule looks at what a configuration **declares**, not at what a machine
