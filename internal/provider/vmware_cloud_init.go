@@ -635,6 +635,24 @@ func planCloudInitEdits(vm *client.VAppSnapshot, old, desired, deploy map[string
 		was, managed := old[id]
 		want, present := desired[id]
 		if managed && live == nil {
+			// A property this resource recorded is no longer on the machine:
+			// deleted in the console, or by another tool.
+			//
+			// Dropping the key from the configuration asks for an end state the
+			// machine is ALREADY in, and asks for no write — there is nothing
+			// left to delete. Refusing it was a dead end with no exit but
+			// `terraform state rm` followed by `terraform import`, since the
+			// value could not be changed either (just below) and so NO
+			// configuration converged. Converging here also leaves the state
+			// and the machine agreeing, which is strictly better than the
+			// divergence a still-declared key leaves behind.
+			if !present {
+				continue
+			}
+			// Writing a new value is a different matter: the replacement below
+			// clones the LIVE descriptor, and there is none. A fresh property
+			// would carry invented metadata and would silently resurrect
+			// something a third party deliberately deleted.
 			return nil, fmt.Errorf("a previously managed property is missing; reconcile it before applying (metadata cannot be reconstructed)")
 		}
 		// A key the configuration declares is a key the configuration owns, even

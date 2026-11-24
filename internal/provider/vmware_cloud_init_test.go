@@ -367,6 +367,58 @@ func TestVMwareCloudInitPlanOwnershipAndValidation(t *testing.T) {
 			t.Fatalf("bad removal plan: %v", err)
 		}
 	})
+	// D3, live run of 24/11. A property deleted OUTSIDE Terraform — in the
+	// console, say — leaves the state recording a key the machine no longer
+	// carries. Removing that key from the configuration asks for an end state
+	// the machine is already in, so it must converge with nothing written.
+	//
+	// It used to be refused with the message written for a value CHANGE, which
+	// left an operator aligning their configuration on reality with no move at
+	// all: the key could not be changed (no descriptor to clone) and could not
+	// be dropped either. The only exit was `terraform state rm` and `import`.
+	t.Run("remove a key whose property vanished out of band", func(t *testing.T) {
+		vm := snapshot()
+		vm.Properties = nil
+		edits, err := planCloudInitEdits(vm, old, map[string]interface{}{}, nil)
+		if err != nil {
+			t.Fatalf("dropping a key the machine no longer carries must converge: %v", err)
+		}
+		if len(edits) != 0 {
+			t.Fatalf("there is nothing to delete, so nothing may be written; got %d edit(s)", len(edits))
+		}
+	})
+	// The other half of that branch, and the reason it is narrowed rather than
+	// removed: writing a new value clones the LIVE descriptor, and there is
+	// none. A fresh property would carry invented metadata and would silently
+	// resurrect something a third party deliberately deleted.
+	t.Run("change a key whose property vanished out of band is still refused", func(t *testing.T) {
+		vm := snapshot()
+		vm.Properties = nil
+		_, err := planCloudInitEdits(vm, old, map[string]interface{}{"hostname": "after"}, nil)
+		if err == nil || !strings.Contains(err.Error(), "previously managed property is missing") {
+			t.Fatalf("a value change with no descriptor to clone must still be refused; got: %v", err)
+		}
+	})
+	// The skip is confined to the vanished key: converging on it must not
+	// swallow the edits the rest of the configuration still asks for.
+	t.Run("a vanished key does not cancel the other edits", func(t *testing.T) {
+		survivor := map[string]interface{}{}
+		for k, v := range original {
+			survivor[k] = v
+		}
+		survivor["key"], survivor["id"], survivor["label"] = float64(2), "user-data", "User data"
+		vm := snapshot()
+		vm.Properties = []map[string]interface{}{survivor}
+		edits, err := planCloudInitEdits(vm,
+			map[string]interface{}{"hostname": "before", "user-data": "before"},
+			map[string]interface{}{"user-data": "after"}, nil)
+		if err != nil {
+			t.Fatalf("unexpected refusal: %v", err)
+		}
+		if len(edits) != 1 || edits[0].replacement == nil || edits[0].replacement["id"] != "user-data" {
+			t.Fatalf("the surviving key must still be written; got %#v", edits)
+		}
+	})
 	t.Run("add only absent key", func(t *testing.T) {
 		edits, err := planCloudInitEdits(snapshot(), old, map[string]interface{}{"hostname": "before", "new": "value"}, nil)
 		if err != nil || len(edits) != 1 || edits[0].original != nil || edits[0].replacement["id"] != "new" {
@@ -613,7 +665,7 @@ func TestVMwareCloudInitPlanOwnershipAndValidation(t *testing.T) {
 }
 
 func TestVMwareCloudInitApplyAddRemoveAndPartialBatch(t *testing.T) {
-	for _, mode := range []string{"add", "remove", "partial-batch", "unchanged"} {
+	for _, mode := range []string{"add", "remove", "partial-batch", "unchanged", "vanished"} {
 		t.Run(mode, func(t *testing.T) {
 			r := resourceVirtualMachine()
 			state, _ := cloudInitStateConfig()
@@ -631,6 +683,12 @@ func TestVMwareCloudInitApplyAddRemoveAndPartialBatch(t *testing.T) {
 			cfg := terraform.NewResourceConfigRaw(map[string]interface{}{"name": "investigation", "datacenter_id": "dc", "host_cluster_id": "hc", "guest_operating_system_moref": "ubuntu64Guest", "memory": 2147483648, "cpu": 2, "num_cores_per_socket": 1, "power_state": "off", "cloud_init": desired})
 			sentinel := map[string]interface{}{"key": float64(9000), "id": "unmanaged", "value": true, "type": "boolean", "custom": map[string]interface{}{"keep": true}}
 			props := []map[string]interface{}{{"key": float64(7000), "id": "hostname", "value": "before", "label": "User data", "type": "string", "userConfigurable": float64(1)}, sentinel}
+			if mode == "vanished" {
+				// D3: the property was deleted outside Terraform, and the
+				// configuration now drops the key. Nothing is left to delete,
+				// and the machine is already in the end state asked for.
+				props = []map[string]interface{}{sentinel}
+			}
 			writes := []string{}
 			c := newAssignTestClient(t, func(w http.ResponseWriter, q *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
@@ -696,7 +754,7 @@ func TestVMwareCloudInitApplyAddRemoveAndPartialBatch(t *testing.T) {
 				if diags.HasError() {
 					t.Fatal(diags)
 				}
-				expected := map[string]string{"add": "[POST]", "remove": "[DELETE]", "unchanged": "[]"}[mode]
+				expected := map[string]string{"add": "[POST]", "remove": "[DELETE]", "unchanged": "[]", "vanished": "[]"}[mode]
 				if fmt.Sprint(writes) != expected {
 					t.Fatalf("unexpected writes: %v", writes)
 				}
@@ -705,7 +763,7 @@ func TestVMwareCloudInitApplyAddRemoveAndPartialBatch(t *testing.T) {
 						t.Fatal("desired state not persisted")
 					}
 				}
-				if mode == "remove" && next.Attributes["cloud_init.hostname"] != "" {
+				if (mode == "remove" || mode == "vanished") && next.Attributes["cloud_init.hostname"] != "" {
 					t.Fatal("removed property retained in state")
 				}
 			}
@@ -947,6 +1005,8 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 		dupAfter   bool
 		oddRestor  bool
 		extStart   bool
+		vanished   bool // the managed property is gone from the machine
+		dropKey    bool // the configuration stops declaring the key
 		planFails  bool
 		applyFails bool
 		actions    string
@@ -1095,6 +1155,26 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 		{name: "external-start-is-observed-not-overwritten", wantState: "on", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
 			drift: true, extStart: true, applyFails: true, actions: "[power:off]", wantLive: "running",
 			wantIntent: "b2xk", diagnostic: "not observably stopped"},
+
+		// --- D3: a property deleted OUTSIDE Terraform -------------------------
+		// Dropping the key asks for an end state the machine is ALREADY in and
+		// asks for no write, so it must cost no interruption and must converge:
+		// the second plan at the end of this test is empty. It used to be
+		// refused with the message written for a value CHANGE, which left an
+		// operator aligning their configuration on reality with no move at all.
+		//
+		// The opt-in is set because the PLAN guard still asks for it: it has no
+		// live evidence and cannot know the property is already gone, exactly as
+		// for noop-never-interrupts above. Granting it costs nothing here —
+		// nothing is interrupted, which is what "[]" asserts.
+		{name: "vanished-property-dropped-key-never-interrupts", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+			vanished: true, dropKey: true, actions: "[]", wantLive: "running", wantState: "on", wantIntent: ""},
+		// The boundary the fix deliberately keeps: writing a NEW value clones the
+		// LIVE descriptor, and there is none. It stays refused — and the refusal
+		// lands BEFORE any shutdown, so it costs the running machine nothing.
+		{name: "vanished-property-value-change-refused-before-downtime", statePower: "on", cfgPower: "on", allow: true, livePower: "running",
+			vanished: true, applyFails: true, actions: "[]", wantLive: "running", wantState: "on",
+			wantIntent: "b2xk", diagnostic: "previously managed property is missing"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := resourceVirtualMachine()
@@ -1113,6 +1193,9 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 			if tc.unsafe {
 				cfg.Raw["cloud_init"] = map[string]interface{}{"user-data": "unsafe/value"}
 			}
+			if tc.dropKey {
+				cfg.Raw["cloud_init"] = map[string]interface{}{}
+			}
 			cfg.Config = cfg.Raw
 
 			liveValue := tc.liveValue
@@ -1127,6 +1210,14 @@ func TestVMwareCloudInitPowerCycle(t *testing.T) {
 				extStart: tc.extStart,
 				props: []map[string]interface{}{{"key": float64(7000), "id": "user-data", "value": liveValue,
 					"label": "User data", "type": "string", "userConfigurable": float64(1)}}}
+			if tc.vanished {
+				// The property list is still READABLE — an empty or absent list
+				// is a different failure, refused earlier as an incomplete
+				// snapshot. Only the managed key is gone, and the unrelated
+				// property left behind must survive the apply untouched.
+				f.props = []map[string]interface{}{{"key": float64(7900), "id": "sentinel",
+					"value": "untouched", "label": "Sentinel", "type": "string", "userConfigurable": float64(0)}}
+			}
 
 			var logs bytes.Buffer
 			ctx := tflogtest.RootLogger(context.Background(), &logs)

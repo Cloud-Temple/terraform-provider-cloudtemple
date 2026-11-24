@@ -182,8 +182,13 @@ keys can change; the Terraform resource ID does not.
 The entire edit set is validated before writing. Updates require vApp to be enabled,
 unique IDs for changed properties, and a complete property snapshot. A key present in
 `deploy_options` is never written or deleted by this path, because creation gives
-that attribute precedence; declaring it in both maps is refused at plan time. A previously managed property that is missing, an unmanaged existing
-property, or an unexpected live value requires reconciliation before updating.
+that attribute precedence; declaring it in both maps is refused at plan time. An
+unexpected live value on a tracked key requires reconciliation before updating. A
+previously managed property that is **missing** from the machine can no longer
+have its value changed — the replacement clones the live descriptor, and there is
+none — but **removing the key** from the configuration converges and writes
+nothing, because the machine is already in the end state asked for. See *A
+property deleted outside Terraform* below.
 Unchanged legacy keys acquire no new ownership, and no validation beyond one
 thing: before the provider starts a machine, any key present in the declared or
 the previously declared map is checked for duplicate vApp entries, whoever
@@ -433,6 +438,34 @@ changed:
   apply — permanently, and on a running machine the plan itself would fail.
 - a machine that declares no `cloud_init` at all is not affected, and its vApp
   is not even read.
+
+### A property deleted outside Terraform
+
+A property removed in the console, or by another tool, leaves the state
+recording a key the machine no longer carries. The refresh keeps that key, for
+the reason given above — absence is not evidence of deletion — so the divergence
+is silent and no plan reports it.
+
+Two moves are available from there, and the configuration decides which:
+
+- **drop the key from `cloud_init`.** The machine is already in the end state
+  this asks for, so the apply converges and writes nothing. The property is not
+  "deleted" a second time, no other property is touched, and the machine is not
+  interrupted. On a running machine the *plan* still asks for
+  `allow_vm_restart`: it has no live reading and cannot know the property is
+  already gone, so it assumes a write is coming. Granting the opt-in costs
+  nothing here — the apply then finds nothing to write and powers nothing off.
+- **restore the property and keep managing it.** Recreate it on the machine with
+  the value the state records, as a user-configurable string property of the
+  same textual ID. The next plan is then empty, and subsequent value changes
+  apply normally.
+
+Changing the **value** of such a key without restoring the property first is
+refused. A replacement clones the live descriptor and swaps only its value;
+with the property gone there is nothing to clone, and a fresh one would carry
+invented metadata and silently resurrect something that was deliberately
+deleted. The refusal lands before any shutdown, so it costs a running machine
+nothing.
 
 ### What drift detection does not repair
 
