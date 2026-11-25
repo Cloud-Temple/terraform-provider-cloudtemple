@@ -27,7 +27,15 @@ func (f fakeRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) { r
 // must NOT appear in the captured log. Mutation-proven RED:
 //   - removing the mask call leaks every marker;
 //   - reverting the value matcher to `[^"]*` leaks the escaped-quote case's
-//     marker (the suffix after the `\"`).
+//     marker (the suffix after the `\"`);
+//   - removing the vapp_properties clause from RoundTrip leaks all three
+//     descriptor cases, which no key-based redaction can reach.
+//
+// What this does NOT cover, and what no case here should be read as covering:
+// the deployment body sent at creation, and the virtual machine GET whose
+// response echoes vAppProperties. Both carry the same shape and both still log
+// their values; they predate the cloud_init update path and need a fix of their
+// own.
 func TestLoggingHttpTransportRedactsSecretBodyValues(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -52,6 +60,41 @@ func TestLoggingHttpTransportRedactsSecretBodyValues(t *testing.T) {
 			name:        "global access key in the response body (case-insensitive)",
 			path:        "/api/storage/object/v1/namespaces/access_key/renew",
 			respBody:    `{"AccessSecretKey":"S3cret-9f3a-do-not-log"}`,
+			mustNotLeak: "S3cret-9f3a-do-not-log",
+		},
+		{
+			// A vApp descriptor carries its secret as a VALUE, under the generic
+			// key "value", while "password" appears as the value of "id". The
+			// key-based regex cannot see it; the body is masked by path instead.
+			name:        "cloud-init password in a vApp property descriptor",
+			path:        "/compute/v1/vcenters/virtual_machines/vm-1/vapp_properties",
+			reqBody:     `[{"id":"password","label":"Password","type":"string","value":"S3cret-9f3a-do-not-log"}]`,
+			mustNotLeak: "S3cret-9f3a-do-not-log",
+		},
+		{
+			// JSON keys have no guaranteed order, which is on its own a reason
+			// not to attempt this with a regex.
+			name:        "the same descriptor with value before id",
+			path:        "/compute/v1/vcenters/virtual_machines/vm-1/vapp_properties",
+			reqBody:     `[{"value":"S3cret-9f3a-do-not-log","id":"password"}]`,
+			mustNotLeak: "S3cret-9f3a-do-not-log",
+		},
+		{
+			// Not only the key called "password": cloud-init user-data routinely
+			// embeds credentials of its own, so the whole body goes.
+			name:        "cloud-init user-data in a vApp property descriptor",
+			path:        "/compute/v1/vcenters/virtual_machines/vm-1/vapp_properties",
+			reqBody:     `[{"id":"user-data","value":"S3cret-9f3a-do-not-log"}]`,
+			mustNotLeak: "S3cret-9f3a-do-not-log",
+		},
+		{
+			// The response shape is not something this provider controls, and the
+			// project's own fake server echoes the submitted descriptor straight
+			// back. Masking only the request would rely on the real API never
+			// doing the same, which nothing here establishes.
+			name:        "a response echoing the descriptor back",
+			path:        "/compute/v1/vcenters/virtual_machines/vm-1/vapp_properties",
+			respBody:    `[{"key":7000,"id":"password","value":"S3cret-9f3a-do-not-log"}]`,
 			mustNotLeak: "S3cret-9f3a-do-not-log",
 		},
 		{

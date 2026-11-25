@@ -269,6 +269,21 @@ var sensitiveBodyValueRegex = regexp.MustCompile(`(?i)"(secretAccessKey|accessSe
 
 func (t *loggingHttpTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
+	// vApp property bodies carry their secret as a VALUE, not under a secret-
+	// bearing KEY: a descriptor reads {"id":"password","value":"..."}, and
+	// cloud-init user-data routinely embeds credentials of its own. No key-based
+	// redaction can recognise either, and the keys may arrive in any order, so
+	// the whole body is masked for this path instead — as it already is for the
+	// token endpoint.
+	//
+	// This covers the endpoint the cloud_init update path writes to. It does NOT
+	// cover the deployment body sent at creation, nor the virtual machine GET
+	// whose response echoes vAppProperties; both predate it and both still log
+	// their values at TF_LOG=DEBUG.
+	if strings.Contains(req.URL.Path, "vapp_properties") {
+		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "tf_http_req_body")
+		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "tf_http_res_body")
+	}
 	if strings.Contains(req.URL.Path, "personal_access_token") {
 		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "tf_http_req_body")
 		ctx = tflog.MaskFieldValuesWithFieldKeys(ctx, "tf_http_res_body")
