@@ -28,9 +28,17 @@ type OpenIaaSReplicationPolicy struct {
 		ID   string
 		Name string
 	}
+	// Start and End are Unix timestamps in MILLISECONDS (e.g. 1759830000000),
+	// documented as int64 by the Compute API. They MUST NOT be `int`: the 386
+	// and arm artifacts published by goreleaser build `int` as 32 bits, where
+	// encoding/json refuses the value outright ("cannot unmarshal number
+	// 1759830000000 into Go struct field ... of type int") and fails every read
+	// that decodes this struct — including the Read of an Open IaaS virtual
+	// machine, which resolves its replication policy through
+	// /replication/virtual_machines/{id}/configurations (#543).
 	LastRun struct {
-		Start  int
-		End    int
+		Start  int64
+		End    int64
 		Status string
 	}
 	Interval struct {
