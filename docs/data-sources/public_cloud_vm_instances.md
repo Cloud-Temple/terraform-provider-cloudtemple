@@ -37,7 +37,7 @@ output "running_vms" {
 - `availability_zone_id` (String) Filter by availability zone ID.
 - `instance_family_id` (String) Filter by instance family ID.
 - `name` (String) Filter by exact VM name.
-- `order_by` (String) Field to order by (`name`, `createdAt`, `updatedAt`, `status`, `vcpu`, `ramGb`).
+- `order_by` (String) Field to order by (`name`, `createdAt`, `updatedAt`, `status`, `vcpu`, `ramGib`). `ramGb` is the deprecated spelling of `ramGib` and is still accepted; it is the only one older API versions understand, but it stops working when the API removes it. `ramGib` requires a VM Instances API version that knows the renamed field.
 - `order_dir` (String) Order direction (`asc` or `desc`).
 - `status` (String) Filter by status (e.g. `running`, `stopped`).
 
@@ -54,13 +54,13 @@ Read-Only:
 - `availability_zone` (List of Object) (see [below for nested schema](#nestedobjatt--instances--availability_zone))
 - `backup_policy` (List of Object) (see [below for nested schema](#nestedobjatt--instances--backup_policy))
 - `created_at` (String)
-- `disks_size_gb` (Number)
+- `disks_size_gib` (Number)
 - `guest_tools_installed` (Boolean)
 - `id` (String)
 - `image` (List of Object) (see [below for nested schema](#nestedobjatt--instances--image))
 - `instance_family` (List of Object) (see [below for nested schema](#nestedobjatt--instances--instance_family))
 - `name` (String)
-- `ram_gb` (Number)
+- `ram_gib` (Number)
 - `status` (String)
 - `updated_at` (String)
 - `vcpu` (Number)

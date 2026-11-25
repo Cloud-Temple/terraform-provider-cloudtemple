@@ -61,8 +61,8 @@ func TestPublicCloudVMInstanceListDecode(t *testing.T) {
 	if first.Image.ID != "img-1" || first.InstanceFamily.ID != "fam-1" {
 		t.Fatalf("image/family refs not decoded: %+v", first)
 	}
-	if first.VCPU != 2 || first.RAMGb != 4 || first.DisksSizeGb != 40 {
-		t.Fatalf("int fields not decoded: vcpu=%d ramGb=%d disksSizeGb=%d", first.VCPU, first.RAMGb, first.DisksSizeGb)
+	if first.VCPU != 2 || first.RAMGib != 4 || first.DisksSizeGib != 40 {
+		t.Fatalf("int fields not decoded: vcpu=%d ramGb=%d disksSizeGb=%d", first.VCPU, first.RAMGib, first.DisksSizeGib)
 	}
 	if !first.GuestToolsInstalled {
 		t.Fatalf("guestToolsInstalled should decode to true")
@@ -93,7 +93,7 @@ func TestPublicCloudVMInstanceListPaginates(t *testing.T) {
 
 		page := []map[string]any{}
 		for n := offset; n < offset+limit && n < total; n++ {
-			page = append(page, map[string]any{"id": fmt.Sprintf("vm-%d", n), "name": fmt.Sprintf("vm%d", n)})
+			page = append(page, map[string]any{"id": fmt.Sprintf("vm-%d", n), "name": fmt.Sprintf("vm%d", n), "ramGib": 4, "disksSizeGib": 40})
 		}
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(map[string]any{"vms": page, "total": len(page)})
@@ -133,7 +133,7 @@ func TestPublicCloudVMInstanceListRefusesRunawayPagination(t *testing.T) {
 		// Ignore offset entirely: always return the SAME full page of distinct ids.
 		page := make([]map[string]any, publicCloudVMInstanceListPageSize)
 		for n := 0; n < publicCloudVMInstanceListPageSize; n++ {
-			page[n] = map[string]any{"id": fmt.Sprintf("vm-%d", n)}
+			page[n] = map[string]any{"id": fmt.Sprintf("vm-%d", n), "ramGib": 4, "disksSizeGib": 40}
 		}
 		w.WriteHeader(http.StatusOK)
 		_ = json.NewEncoder(w).Encode(map[string]any{"vms": page, "total": len(page)})
@@ -159,14 +159,14 @@ func TestPublicCloudVMInstanceListStrictLaterPagePartial(t *testing.T) {
 		if offset == 0 {
 			page := make([]map[string]any, publicCloudVMInstanceListPageSize)
 			for n := 0; n < publicCloudVMInstanceListPageSize; n++ {
-				page[n] = map[string]any{"id": fmt.Sprintf("vm-%d", n)}
+				page[n] = map[string]any{"id": fmt.Sprintf("vm-%d", n), "ramGib": 4, "disksSizeGib": 40}
 			}
 			w.WriteHeader(http.StatusOK)
 			_ = json.NewEncoder(w).Encode(map[string]any{"vms": page, "total": len(page)})
 			return
 		}
 		w.WriteHeader(http.StatusPartialContent)
-		_, _ = w.Write([]byte(`[{"id":"vm-200"}]`))
+		_, _ = w.Write([]byte(`[{"id":"vm-200","ramGib":4,"disksSizeGib":40}]`))
 	})
 	if _, err := c.PublicCloudVM().Instance().ListStrict(ctx, nil); err == nil {
 		t.Fatal("a 206 on a later page must fail closed (strict 200-only across all pages)")
@@ -221,7 +221,7 @@ func TestPublicCloudVMInstanceListStrict(t *testing.T) {
 	t.Run("200 returns the listing", func(t *testing.T) {
 		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"vms":[{"id":"vm-1","name":"web"}],"total":1}`))
+			_, _ = w.Write([]byte(`{"vms":[{"id":"vm-1","name":"web","ramGib":4,"disksSizeGib":40}],"total":1}`))
 		})
 		vms, err := c.PublicCloudVM().Instance().ListStrict(ctx, nil)
 		if err != nil {
@@ -235,7 +235,7 @@ func TestPublicCloudVMInstanceListStrict(t *testing.T) {
 	t.Run("206 partial fails closed", func(t *testing.T) {
 		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusPartialContent)
-			_, _ = w.Write([]byte(`{"vms":[{"id":"vm-1","name":"web"}],"total":1}`))
+			_, _ = w.Write([]byte(`{"vms":[{"id":"vm-1","name":"web","ramGib":4,"disksSizeGib":40}],"total":1}`))
 		})
 		if _, err := c.PublicCloudVM().Instance().ListStrict(ctx, nil); err == nil {
 			t.Fatal("a 206 partial listing must fail closed (it cannot prove an absence)")
@@ -264,7 +264,7 @@ func TestPublicCloudVMInstanceRead(t *testing.T) {
 				t.Errorf("unexpected path: %s", r.URL.Path)
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"vm-1","name":"web","status":"running","vcpu":2,"ramGb":4}`))
+			_, _ = w.Write([]byte(`{"id":"vm-1","name":"web","status":"running","vcpu":2,"ramGb":4,"disksSizeGib":40}`))
 		})
 		vm, err := c.PublicCloudVM().Instance().Read(ctx, "vm-1")
 		if err != nil {

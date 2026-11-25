@@ -1,6 +1,9 @@
 package client
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 type PublicCloudVMInstanceFamilyClient struct {
 	c *Client
@@ -20,14 +23,45 @@ type PublicCloudVMInstanceFamily struct {
 	Description string
 	VcpuMin     int
 	VcpuMax     int
-	RamMinGb    int
-	RamMaxGb    int
+	RamMinGib   int
+	RamMaxGib   int
 	// Skus is the priced billing catalogue (vCPU and RAM) of the family. The
 	// API returns it on both the list and the single-item endpoints (#506).
 	// PublicCloudVMSku is the shared SKU type (defined with the storage-type
 	// sibling in public_cloud_vm_storage_type.go, #507): the same priced-SKU
 	// shape the VM Instances API returns across catalogue resources.
 	Skus []PublicCloudVMSku `json:"skus"`
+}
+
+// UnmarshalJSON accepts both the current `ramMinGib`/`ramMaxGib` spellings and
+// the deprecated `ramMinGb`/`ramMaxGb` ones (see public_cloud_vm_capacity.go,
+// issue #524). The explicit `skus` tag on the embedded alias is preserved.
+func (f *PublicCloudVMInstanceFamily) UnmarshalJSON(data []byte) error {
+	type plain PublicCloudVMInstanceFamily
+	var v struct {
+		plain
+		RamMinGib *int
+		RamMinGb  *int
+		RamMaxGib *int
+		RamMaxGb  *int
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*f = PublicCloudVMInstanceFamily(v.plain)
+
+	subject := "instance family " + quotedOrUnidentified(v.plain.ID)
+	ramMin, err := resolveRenamedCapacity(v.RamMinGib, v.RamMinGb, "ramMinGib", "ramMinGb", subject)
+	if err != nil {
+		return err
+	}
+	ramMax, err := resolveRenamedCapacity(v.RamMaxGib, v.RamMaxGb, "ramMaxGib", "ramMaxGb", subject)
+	if err != nil {
+		return err
+	}
+	f.RamMinGib = ramMin
+	f.RamMaxGib = ramMax
+	return nil
 }
 
 // List returns the instance families of the tenant (bare JSON array, no filter).

@@ -11,7 +11,7 @@ func FlattenPublicCloudVMDisk(d *client.PublicCloudVMDisk) map[string]interface{
 		"id":           d.ID,
 		"position":     d.Position,
 		"name":         d.Label,
-		"size_gb":      d.SizeGb,
+		"size_gib":     d.SizeGib,
 		"storage_type": d.StorageType,
 		"is_primary":   d.IsPrimary,
 	}

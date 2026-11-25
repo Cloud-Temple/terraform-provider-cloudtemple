@@ -27,7 +27,7 @@ func TestPublicCloudVMDiskList(t *testing.T) {
 	if len(disks) != 2 {
 		t.Fatalf("want 2 disks, got %d", len(disks))
 	}
-	if disks[0].Position != 0 || !disks[0].IsPrimary || disks[0].SizeGb != 38 {
+	if disks[0].Position != 0 || !disks[0].IsPrimary || disks[0].SizeGib != 38 {
 		t.Fatalf("system disk not decoded: %+v", disks[0])
 	}
 	if disks[1].ID != "d1" || disks[1].Position != 1 || disks[1].IsPrimary || disks[1].StorageType != "st-1" {
@@ -44,7 +44,7 @@ func TestPublicCloudVMDiskListStrict(t *testing.T) {
 	t.Run("complete 200 returns the disks", func(t *testing.T) {
 		c := newPATTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"vmId":"vm-1","total":1,"disks":[{"id":"d1","position":1}]}`))
+			_, _ = w.Write([]byte(`{"vmId":"vm-1","total":1,"disks":[{"id":"d1","position":1,"sizeGib":10}]}`))
 		})
 		disks, err := c.PublicCloudVM().Disk().ListStrict(ctx, "vm-1")
 		if err != nil || len(disks) != 1 {
@@ -118,7 +118,7 @@ func TestPublicCloudVMDiskRead(t *testing.T) {
 			_, _ = w.Write([]byte(`{"id":"d1","position":1,"label":"data","sizeGb":12,"storageType":"st-1","isPrimary":false}`))
 		})
 		disk, err := c.PublicCloudVM().Disk().Read(ctx, "vm-1", "d1")
-		if err != nil || disk == nil || disk.SizeGb != 12 || disk.IsPrimary {
+		if err != nil || disk == nil || disk.SizeGib != 12 || disk.IsPrimary {
 			t.Fatalf("bad disk: %+v err=%v", disk, err)
 		}
 	})

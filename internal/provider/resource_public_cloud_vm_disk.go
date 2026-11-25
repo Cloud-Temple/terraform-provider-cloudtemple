@@ -17,7 +17,7 @@ import (
 // never shrunk. oldSize == 0 is the create case (no prior size) and is allowed.
 func vmDiskGrowOnlyCheck(oldSize, newSize int) error {
 	if oldSize != 0 && newSize < oldSize {
-		return fmt.Errorf("size can only be increased (grow-only): %d GB -> %d GB is a shrink, which is not supported", oldSize, newSize)
+		return fmt.Errorf("size can only be increased (grow-only): %d GiB -> %d GiB is a shrink, which is not supported", oldSize, newSize)
 	}
 	return nil
 }
@@ -64,7 +64,7 @@ func resourcePublicCloudVMDisk() *schema.Resource {
 				Type:         schema.TypeInt,
 				Required:     true,
 				ValidateFunc: validation.IntBetween(1, vmDiskMaxSizeGb),
-				Description:  "The size of the disk in GB (1-2048). Grow-only; changing it extends the disk, which requires the VM to be stopped.",
+				Description:  "The size of the disk in GiB (1-2048). Grow-only; changing it extends the disk, which requires the VM to be stopped.",
 			},
 			"storage_type": {
 				Type:         schema.TypeString,
@@ -227,9 +227,9 @@ func createVMDiskWith(ctx context.Context, d *schema.ResourceData, funcs vmDiskC
 		d.SetId("")
 		return diag.Errorf("disk %s on VM %s read back as the primary (system) disk; a wrong id was adopted. The resource was NOT recorded in the state. If a data disk was created it is ORPHANED — audit the VM's disks and import (terraform import <vmID>/<diskID>) or delete it.", candidate, vmID)
 	}
-	if disk.SizeGb != req.Size {
+	if disk.SizeGib != req.Size {
 		d.SetId("")
-		return diag.Errorf("data disk %s on VM %s read back size %d GB, expected %d GB; a different disk was adopted. The resource was NOT recorded in the state. If a disk was created it is ORPHANED — audit the VM's disks and import (terraform import <vmID>/<diskID>) or delete it.", candidate, vmID, disk.SizeGb, req.Size)
+		return diag.Errorf("data disk %s on VM %s read back size %d GiB, expected %d GiB; a different disk was adopted. The resource was NOT recorded in the state. If a disk was created it is ORPHANED — audit the VM's disks and import (terraform import <vmID>/<diskID>) or delete it.", candidate, vmID, disk.SizeGib, req.Size)
 	}
 	return readVMDiskInto(ctx, d, funcs, vmDiskReadAfterWrite)
 }
@@ -258,7 +258,7 @@ func readVMDiskInto(ctx context.Context, d *schema.ResourceData, funcs vmDiskCRU
 
 	sw := newStateWriter(d)
 	sw.set("virtual_machine_id", vmID)
-	sw.set("size", disk.SizeGb)
+	sw.set("size", disk.SizeGib)
 	sw.set("storage_type", disk.StorageType)
 	sw.set("name", disk.Label)
 	sw.set("position", disk.Position)

@@ -12,6 +12,6 @@ func FlattenPublicCloudVMFlavor(flavor *client.PublicCloudVMFlavor) map[string]i
 		"instance_family_id": flavor.InstanceFamilyID,
 		"name":               flavor.Name,
 		"vcpu":               flavor.Vcpu,
-		"ram_gb":             flavor.RamGb,
+		"ram_gib":            flavor.RamGib,
 	}
 }

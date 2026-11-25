@@ -44,11 +44,19 @@ func dataSourcePublicCloudVMInstances() *schema.Resource {
 				ValidateFunc: validation.IsUUID,
 				Description:  "Filter by instance family ID.",
 			},
+			// `ramGib` is the current spelling of the RAM sort field and `ramGb` the
+			// deprecated one (issue #524). BOTH are accepted, deliberately: `ramGb` is
+			// the only one an API version predating the rename understands, and it is
+			// still mapped by newer ones — while `ramGib` is the only one that survives
+			// the 2026-12-09 removal. The provider cannot tell which API version it is
+			// talking to, and the endpoint does not report an unusable sort field, so
+			// the choice is documented rather than validated (same class of silent
+			// server-side behaviour as the v1.11.0 storage-type filters).
 			"order_by": {
 				Type:         schema.TypeString,
 				Optional:     true,
-				ValidateFunc: validation.StringInSlice([]string{"name", "createdAt", "updatedAt", "status", "vcpu", "ramGb"}, false),
-				Description:  "Field to order by (`name`, `createdAt`, `updatedAt`, `status`, `vcpu`, `ramGb`).",
+				ValidateFunc: validation.StringInSlice([]string{"name", "createdAt", "updatedAt", "status", "vcpu", "ramGib", "ramGb"}, false),
+				Description:  "Field to order by (`name`, `createdAt`, `updatedAt`, `status`, `vcpu`, `ramGib`). `ramGb` is the deprecated spelling of `ramGib` and is still accepted; it is the only one older API versions understand, but it stops working when the API removes it. `ramGib` requires a VM Instances API version that knows the renamed field.",
 			},
 			"order_dir": {
 				Type:         schema.TypeString,

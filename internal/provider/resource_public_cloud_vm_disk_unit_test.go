@@ -24,7 +24,7 @@ func newDiskRD(t *testing.T, size int) *schema.ResourceData {
 }
 
 func dataDisk(id string, size int) *client.PublicCloudVMDisk {
-	return &client.PublicCloudVMDisk{ID: id, Position: 1, Label: "data", SizeGb: size, StorageType: "st-1", IsPrimary: false}
+	return &client.PublicCloudVMDisk{ID: id, Position: 1, Label: "data", SizeGib: size, StorageType: "st-1", IsPrimary: false}
 }
 
 func diskActivity(result string) *client.Activity {

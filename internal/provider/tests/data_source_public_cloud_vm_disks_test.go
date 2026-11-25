@@ -19,7 +19,7 @@ func TestAccDataSourcePublicCloudVMInstanceDisks(t *testing.T) {
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_disks.all", "disks.#"),
 					// Every VM has at least a system disk.
 					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_disks.all", "disks.0.id"),
-					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_disks.all", "disks.0.size_gb"),
+					resource.TestCheckResourceAttrSet("data.cloudtemple_public_cloud_vm_disks.all", "disks.0.size_gib"),
 				),
 			},
 		},

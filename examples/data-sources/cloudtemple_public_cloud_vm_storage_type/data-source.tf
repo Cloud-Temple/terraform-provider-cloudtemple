@@ -6,9 +6,9 @@ data "cloudtemple_public_cloud_vm_storage_type" "fast" {
 # The storage type id is consumed by the data-disk resource.
 output "storage_type" {
   value = {
-    id          = data.cloudtemple_public_cloud_vm_storage_type.fast.id
-    iops_hint   = data.cloudtemple_public_cloud_vm_storage_type.fast.iops_hint
-    max_size_gb = data.cloudtemple_public_cloud_vm_storage_type.fast.max_size_gb
+    id           = data.cloudtemple_public_cloud_vm_storage_type.fast.id
+    iops_hint    = data.cloudtemple_public_cloud_vm_storage_type.fast.iops_hint
+    max_size_gib = data.cloudtemple_public_cloud_vm_storage_type.fast.max_size_gib
   }
 }
 

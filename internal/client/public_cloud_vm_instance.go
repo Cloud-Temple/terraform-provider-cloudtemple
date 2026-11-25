@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strconv"
 )
@@ -47,12 +48,43 @@ type PublicCloudVMInstance struct {
 	Image               PublicCloudVMInstanceRef
 	InstanceFamily      PublicCloudVMInstanceRef
 	VCPU                int
-	RAMGb               int
-	DisksSizeGb         int
+	RAMGib              int
+	DisksSizeGib        int
 	BackupPolicy        *PublicCloudVMInstanceRef
 	GuestToolsInstalled bool
 	CreatedAt           string
 	UpdatedAt           string
+}
+
+// UnmarshalJSON accepts both the current `ramGib`/`disksSizeGib` spellings and
+// the deprecated `ramGb`/`disksSizeGb` ones (see public_cloud_vm_capacity.go,
+// issue #524).
+func (i *PublicCloudVMInstance) UnmarshalJSON(data []byte) error {
+	type plain PublicCloudVMInstance
+	var v struct {
+		plain
+		RAMGib       *int
+		RAMGb        *int
+		DisksSizeGib *int
+		DisksSizeGb  *int
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*i = PublicCloudVMInstance(v.plain)
+
+	subject := "VM instance " + quotedOrUnidentified(v.plain.ID)
+	ram, err := resolveRenamedCapacity(v.RAMGib, v.RAMGb, "ramGib", "ramGb", subject)
+	if err != nil {
+		return err
+	}
+	disksSize, err := resolveRenamedCapacity(v.DisksSizeGib, v.DisksSizeGb, "disksSizeGib", "disksSizeGb", subject)
+	if err != nil {
+		return err
+	}
+	i.RAMGib = ram
+	i.DisksSizeGib = disksSize
+	return nil
 }
 
 // PublicCloudVMInstanceFilter carries the server-side query filters of the list

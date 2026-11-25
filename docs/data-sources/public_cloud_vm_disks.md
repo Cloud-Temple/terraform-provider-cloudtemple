@@ -26,8 +26,8 @@ data "cloudtemple_public_cloud_vm_disks" "vm" {
   virtual_machine_id = var.virtual_machine_id
 }
 
-output "system_disk_size_gb" {
-  value = one([for d in data.cloudtemple_public_cloud_vm_disks.vm.disks : d.size_gb if d.is_primary])
+output "system_disk_size_gib" {
+  value = one([for d in data.cloudtemple_public_cloud_vm_disks.vm.disks : d.size_gib if d.is_primary])
 }
 
 output "data_disks" {
@@ -56,7 +56,7 @@ Read-Only:
 - `is_primary` (Boolean)
 - `name` (String)
 - `position` (Number)
-- `size_gb` (Number)
+- `size_gib` (Number)
 - `storage_type` (String)
 
 

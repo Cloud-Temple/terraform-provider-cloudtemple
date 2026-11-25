@@ -1,6 +1,9 @@
 package client
 
-import "context"
+import (
+	"context"
+	"encoding/json"
+)
 
 type PublicCloudVMImageClient struct {
 	c *Client
@@ -24,7 +27,7 @@ type PublicCloudVMImage struct {
 	OsFamily           string
 	OsName             string
 	OsVersion          string
-	DiskSizesGb        []int
+	DiskSizesGib       []int
 	CompatibleFamilies []string
 	Categories         []string
 	Family             string
@@ -33,6 +36,31 @@ type PublicCloudVMImage struct {
 	DescriptionEn      string
 	ImageType          string
 	Icon               string
+}
+
+// UnmarshalJSON accepts both the current `diskSizesGib` spelling and the
+// deprecated `diskSizesGb` one (see public_cloud_vm_capacity.go, issue #524).
+func (i *PublicCloudVMImage) UnmarshalJSON(data []byte) error {
+	type plain PublicCloudVMImage
+	var v struct {
+		plain
+		DiskSizesGib *[]int
+		DiskSizesGb  *[]int
+	}
+	if err := json.Unmarshal(data, &v); err != nil {
+		return err
+	}
+	*i = PublicCloudVMImage(v.plain)
+
+	sizes, err := resolveRenamedCapacityList(
+		v.DiskSizesGib, v.DiskSizesGb, "diskSizesGib", "diskSizesGb",
+		"image "+quotedOrUnidentified(v.plain.ID),
+	)
+	if err != nil {
+		return err
+	}
+	i.DiskSizesGib = sizes
+	return nil
 }
 
 // PublicCloudVMImageFilter carries the optional list filters.

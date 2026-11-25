@@ -24,8 +24,8 @@ func FlattenPublicCloudVMStorageType(st *client.PublicCloudVMStorageType) map[st
 		"name":         st.Name,
 		"description":  st.Description,
 		"iops_hint":    st.IopsHint,
-		"min_size_gb":  st.MinSizeGb,
-		"max_size_gb":  st.MaxSizeGb,
+		"min_size_gib": st.MinSizeGib,
+		"max_size_gib": st.MaxSizeGib,
 		"is_available": st.IsAvailable,
 		"sku":          sku,
 	}

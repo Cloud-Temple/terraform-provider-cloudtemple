@@ -44,7 +44,7 @@ func TestAccResourcePublicCloudVMInstance(t *testing.T) {
 					resource.TestCheckResourceAttr("cloudtemple_public_cloud_vm_instance.test", "status", "running"),
 					resource.TestCheckResourceAttr("cloudtemple_public_cloud_vm_instance.test", "cpu", "1"),
 					resource.TestCheckResourceAttr("cloudtemple_public_cloud_vm_instance.test", "memory", "2"),
-					resource.TestCheckResourceAttrSet("cloudtemple_public_cloud_vm_instance.test", "disks_size_gb"),
+					resource.TestCheckResourceAttrSet("cloudtemple_public_cloud_vm_instance.test", "disks_size_gib"),
 					resource.TestCheckResourceAttrSet("cloudtemple_public_cloud_vm_instance.test", "availability_zone_name"),
 					resource.TestCheckResourceAttrSet("cloudtemple_public_cloud_vm_instance.test", "image_name"),
 				),

@@ -36,8 +36,8 @@ func TestPublicCloudVMImageList(t *testing.T) {
 	if img.ID != "img-1" || img.OsFamily != "linux" || img.OsName != "Rocky Linux 9" || img.OsVersion != "9" {
 		t.Fatalf("os fields not decoded: %+v", img)
 	}
-	if len(img.DiskSizesGb) != 2 || img.DiskSizesGb[0] != 38 || img.DiskSizesGb[1] != 50 {
-		t.Fatalf("disk_sizes_gb not decoded: %+v", img.DiskSizesGb)
+	if len(img.DiskSizesGib) != 2 || img.DiskSizesGib[0] != 38 || img.DiskSizesGib[1] != 50 {
+		t.Fatalf("disk_sizes_gb not decoded: %+v", img.DiskSizesGib)
 	}
 	if len(img.CompatibleFamilies) != 2 || img.CompatibleFamilies[0] != "fam-1" {
 		t.Fatalf("compatible_families not decoded: %+v", img.CompatibleFamilies)
@@ -61,7 +61,7 @@ func TestPublicCloudVMImageRead(t *testing.T) {
 				t.Errorf("unexpected path: %s", r.URL.Path)
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{"id":"img-1","name":"Rocky Linux 9","osFamily":"linux"}`))
+			_, _ = w.Write([]byte(`{"id":"img-1","name":"Rocky Linux 9","osFamily":"linux","diskSizesGib":[38]}`))
 		})
 		img, err := c.PublicCloudVM().Image().Read(ctx, "img-1")
 		if err != nil || img == nil || img.ID != "img-1" {

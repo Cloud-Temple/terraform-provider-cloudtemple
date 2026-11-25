@@ -72,7 +72,7 @@ func TestPublicCloudVMImageLiveProbe(t *testing.T) {
 	}
 	first := imgs[0]
 	t.Logf("PHASE1 /images returned %d images; first: id=%s name=%q osFamily=%q imageType=%q diskSizesGb=%v",
-		len(imgs), first.ID, first.Name, first.OsFamily, first.ImageType, first.DiskSizesGb)
+		len(imgs), first.ID, first.Name, first.OsFamily, first.ImageType, first.DiskSizesGib)
 
 	byID, err := c.PublicCloudVM().Image().Read(ctx, first.ID)
 	if err != nil || byID == nil || byID.ID != first.ID {

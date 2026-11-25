@@ -80,7 +80,7 @@ resource "cloudtemple_public_cloud_vm_instance" "web" {
 # - resize: change cpu/memory together with power_state = "off";
 # - grow the system disk (grow-only, VM stopped) by declaring:
 #   os_disk {
-#     size_gb = 45
+#     size_gib = 45
 #   }
 
 # A VPC-attached VM. `ip_address` registers a static IP on the VPC private
@@ -111,8 +111,8 @@ output "web_status" {
   value = cloudtemple_public_cloud_vm_instance.web.status
 }
 
-output "web_os_disk_size_gb" {
-  value = one(cloudtemple_public_cloud_vm_instance.web.os_disk[*].size_gb)
+output "web_os_disk_size_gib" {
+  value = one(cloudtemple_public_cloud_vm_instance.web.os_disk[*].size_gib)
 }
 ```
 
@@ -126,14 +126,14 @@ output "web_os_disk_size_gb" {
 - `cpu` (Number) The number of vCPUs. Mutable via resize, which requires `power_state = "off"`.
 - `image_id` (String) The ID of the OS image the VM is created from. Immutable.
 - `instance_family_id` (String) The ID of the instance family. Immutable.
-- `memory` (Number) The amount of RAM in GB. Mutable via resize, which requires `power_state = "off"`.
+- `memory` (Number) The amount of RAM in GiB. Mutable via resize, which requires `power_state = "off"`.
 - `name` (String) The name of the virtual machine. Mutable (issues a metadata update).
 - `os_network_adapter` (Block List, Min: 1, Max: 8) The network interfaces attached at creation. Both Private Backbone and VPC networks are supported, so a VPC-only VM can be declared here. Immutable (`ForceNew`): changing an interface's `network_id` or `ip_address` REPLACES the VM — relocate an existing adapter with a `cloudtemple_public_cloud_vm_network_adapter` resource instead. Additional adapters beyond creation are also managed by that resource. (see [below for nested schema](#nestedblock--os_network_adapter))
 
 ### Optional
 
 - `cloud_init` (Map of String) The cloud-init configuration applied at creation (keys `cloud_config` and/or `network_config`), as plain YAML — the provider base64-encodes it for the API. Immutable and not readable back, so it is not reconciled on refresh.
-- `os_disk` (Block List, Max: 1) The system (primary) disk of the VM, provided by the image. Declare the block with `size_gb` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the image's size is used. Data disks are managed by the separate disk resource. (see [below for nested schema](#nestedblock--os_disk))
+- `os_disk` (Block List, Max: 1) The system (primary) disk of the VM, provided by the image. Declare the block with `size_gib` to grow it (grow-only; requires the VM to be stopped). Not settable at creation — the image's size is used. Data disks are managed by the separate disk resource. (see [below for nested schema](#nestedblock--os_disk))
 - `power_state` (String) The desired power state (`on` or `off`, default `off`). Honoured from the first apply (passed to the create call, so an `on` VM boots at creation). Changing it later issues a start (`off`->`on`) or stop (`on`->`off`).
 - `timeouts` (Block, Optional) (see [below for nested schema](#nestedblock--timeouts))
 
@@ -142,7 +142,7 @@ output "web_os_disk_size_gb" {
 - `availability_zone_name` (String) The name of the availability zone.
 - `backup_policy_name` (String) The name of the applied backup policy.
 - `created_at` (String) The creation date of the VM (RFC3339).
-- `disks_size_gb` (Number) The total size of the VM's disks (system + data) in GB.
+- `disks_size_gib` (Number) The total size of the VM's disks (system + data) in GiB.
 - `guest_tools_installed` (Boolean) Whether the guest tools are installed.
 - `id` (String) The ID of this resource.
 - `image_name` (String) The name of the OS image.
@@ -168,7 +168,8 @@ Optional:
 
 Optional:
 
-- `size_gb` (Number) The size of the system disk in GB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the current size is kept.
+- `size_gb` (Number, Deprecated) Deprecated: use `size_gib`, which carries the same value. The size of the system disk in GiB.
+- `size_gib` (Number) The size of the system disk in GiB. Grow-only; increasing it extends the system disk, which requires the VM to be stopped. When omitted, the current size is kept.
 
 Read-Only:
 

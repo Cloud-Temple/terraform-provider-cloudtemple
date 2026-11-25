@@ -43,7 +43,7 @@ func dataSourcePublicCloudVMImages() *schema.Resource {
 						"os_family":           {Type: schema.TypeString, Computed: true, Description: "The OS family of the image (e.g. `linux`)."},
 						"os_name":             {Type: schema.TypeString, Computed: true, Description: "The OS name of the image."},
 						"os_version":          {Type: schema.TypeString, Computed: true, Description: "The OS version of the image."},
-						"disk_sizes_gb":       {Type: schema.TypeList, Computed: true, Description: "The disk sizes (GB) provided by the image.", Elem: &schema.Schema{Type: schema.TypeInt}},
+						"disk_sizes_gib":      {Type: schema.TypeList, Computed: true, Description: "The disk sizes (GiB) provided by the image.", Elem: &schema.Schema{Type: schema.TypeInt}},
 						"compatible_families": {Type: schema.TypeList, Computed: true, Description: "The IDs of the instance families this image is compatible with.", Elem: &schema.Schema{Type: schema.TypeString}},
 						"categories":          {Type: schema.TypeList, Computed: true, Description: "The categories of the image.", Elem: &schema.Schema{Type: schema.TypeString}},
 						"family":              {Type: schema.TypeString, Computed: true, Description: "The image family."},

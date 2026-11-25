@@ -10,6 +10,6 @@ data "cloudtemple_public_cloud_vm_flavors" "dev" {
 output "dev_sizings" {
   value = [
     for f in data.cloudtemple_public_cloud_vm_flavors.dev.flavors :
-    "${f.name}: ${f.vcpu} vCPU / ${f.ram_gb} GB"
+    "${f.name}: ${f.vcpu} vCPU / ${f.ram_gib} GB"
   ]
 }

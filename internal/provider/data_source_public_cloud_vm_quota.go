@@ -21,30 +21,30 @@ func dataSourcePublicCloudVMQuota() *schema.Resource {
 				Computed:    true,
 				Description: "The maximum number of vCPUs allowed for the tenant.",
 			},
-			"ram_limit_mb": {
+			"ram_limit_mib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The maximum amount of RAM allowed for the tenant, in MB.",
+				Description: "The maximum amount of RAM allowed for the tenant, in MiB.",
 			},
-			"storage_limit_gb": {
+			"storage_limit_gib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The maximum amount of storage allowed for the tenant, in GB.",
+				Description: "The maximum amount of storage allowed for the tenant, in GiB.",
 			},
 			"vcpu_used": {
 				Type:        schema.TypeInt,
 				Computed:    true,
 				Description: "The number of vCPUs currently consumed by the tenant.",
 			},
-			"ram_used_mb": {
+			"ram_used_mib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The amount of RAM currently consumed by the tenant, in MB.",
+				Description: "The amount of RAM currently consumed by the tenant, in MiB.",
 			},
-			"storage_used_gb": {
+			"storage_used_gib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The amount of storage currently consumed by the tenant, in GB.",
+				Description: "The amount of storage currently consumed by the tenant, in GiB.",
 			},
 		},
 	}

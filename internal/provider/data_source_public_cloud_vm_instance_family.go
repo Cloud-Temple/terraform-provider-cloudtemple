@@ -52,15 +52,15 @@ func dataSourcePublicCloudVMInstanceFamily() *schema.Resource {
 				Computed:    true,
 				Description: "The maximum number of vCPUs allowed in this family.",
 			},
-			"ram_min_gb": {
+			"ram_min_gib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The minimum amount of RAM (GB) allowed in this family.",
+				Description: "The minimum amount of RAM (GiB) allowed in this family.",
 			},
-			"ram_max_gb": {
+			"ram_max_gib": {
 				Type:        schema.TypeInt,
 				Computed:    true,
-				Description: "The maximum amount of RAM (GB) allowed in this family.",
+				Description: "The maximum amount of RAM (GiB) allowed in this family.",
 			},
 			"skus": publicCloudVMSkusSchema(),
 		},
